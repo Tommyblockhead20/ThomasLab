@@ -1,0 +1,1881 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tides Campaign · Core V5</title>
+  <style>
+    :root {
+      --bg: #071018;
+      --panel: rgba(8, 18, 27, 0.94);
+      --panel-2: rgba(12, 26, 38, 0.94);
+      --line: rgba(199, 153, 82, 0.28);
+      --line-strong: rgba(218, 174, 99, 0.58);
+      --gold: #d7a65b;
+      --text: #ede6d8;
+      --muted: #9aa8b1;
+      --blue: #3c98c9;
+      --green: #739c58;
+      --red: #b35343;
+      --shadow: 0 18px 55px rgba(0,0,0,.38);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% -20%, rgba(43, 83, 107, .27), transparent 42%),
+        linear-gradient(180deg, #08131d, #050b11 72%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    .app-shell { min-height: 100vh; }
+
+    .topbar {
+      height: 66px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: stretch;
+      padding: 0 22px;
+      background: rgba(4, 11, 17, .94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(18px);
+    }
+
+    .nav-tabs { grid-column: 2; display: flex; align-items: stretch; gap: 14px; }
+    .nav-tab {
+      min-width: 105px;
+      padding: 0 14px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: #bda786;
+      cursor: pointer;
+      transition: .18s ease;
+      letter-spacing: .01em;
+    }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active {
+      color: #f0d39d;
+      border-bottom-color: var(--gold);
+      background: linear-gradient(180deg, transparent, rgba(215,166,91,.07));
+    }
+
+    .player-switcher {
+      grid-column: 3;
+      justify-self: end;
+      align-self: center;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+    }
+    .player-switcher select, select, input, textarea {
+      color: var(--text);
+      background: #0c1721;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      outline: none;
+    }
+    .player-switcher select { min-width: 150px; }
+    textarea { width: 100%; resize: vertical; min-height: 110px; }
+
+    .utility-btn {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(14, 27, 38, .9);
+      cursor: pointer;
+    }
+    .utility-btn:hover { border-color: var(--line-strong); }
+
+    main { padding: 14px; }
+    .screen { display: none; }
+    .screen.active { display: block; animation: fade .18s ease; }
+    @keyframes fade { from { opacity: .4; transform: translateY(3px); } }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(11, 24, 35, .95), rgba(7, 16, 24, .95));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .panel-title {
+      margin: 0 0 14px;
+      color: #e1bd7e;
+      font-family: Georgia, serif;
+      font-size: .9rem;
+      font-weight: 500;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .eyebrow { color: var(--gold); text-transform: uppercase; font-size: .75rem; letter-spacing: .12em; }
+    .muted { color: var(--muted); }
+
+    /* OVERVIEW */
+    .overview-grid {
+      display: grid;
+      grid-template-columns: minmax(245px, 290px) minmax(520px, 1fr) minmax(255px, 320px);
+      gap: 14px;
+      min-height: calc(100vh - 94px);
+    }
+    .overview-left, .overview-right { padding: 18px; }
+    .overview-center { display: grid; grid-template-rows: auto 1fr auto; gap: 14px; }
+    .progress-track {
+      height: 9px;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 1fr;
+      gap: 4px;
+      margin-top: 12px;
+    }
+    .progress-segment { background: rgba(255,255,255,.08); border-radius: 3px; }
+    .progress-segment.done { background: var(--blue); }
+
+    .ship-summary { padding: 17px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .ship-summary:first-of-type { margin-top: 20px; }
+    .ship-name { margin-bottom: 3px; font-family: Georgia, serif; font-size: 1.2rem; }
+    .ship-name.blue { color: #7fc1e4; }
+    .ship-name.red { color: #dd7565; }
+    .captain-line { color: var(--muted); font-size: .8rem; margin-bottom: 10px; }
+
+    .stat-row {
+      display: grid;
+      grid-template-columns: 90px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 5px 0;
+      color: #d3d8dc;
+      font-size: .9rem;
+    }
+    .meter { display: flex; gap: 4px; }
+    .meter.compact { gap: 2px; }
+    .meter.compact .pip { width: 10px; }
+    .pip { width: 18px; height: 8px; border-radius: 2px; background: rgba(255,255,255,.08); }
+    .pip.on.blue { background: var(--blue); }
+    .pip.on.red { background: var(--red); }
+    .pip.on.gold { background: var(--gold); }
+
+    .session-banner {
+      min-height: 205px;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background:
+        linear-gradient(90deg, rgba(6,14,21,.96), rgba(6,14,21,.46)),
+        radial-gradient(circle at 78% 40%, rgba(56,93,115,.38), transparent 35%),
+        linear-gradient(145deg, #14283a, #0b1721 56%, #182a34);
+      position: relative;
+      overflow: hidden;
+    }
+    .session-banner::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(167deg, transparent 52%, rgba(0,0,0,.32) 53%),
+        repeating-linear-gradient(90deg, transparent 0 110px, rgba(255,255,255,.015) 111px 112px);
+      pointer-events: none;
+    }
+    .session-banner > * { position: relative; z-index: 1; }
+    .session-title { margin: 7px 0 4px; font: 2rem Georgia, serif; }
+    .session-subtitle { color: #cfbeaa; }
+    .session-narrative { max-width: 820px; color: #d4d0c8; line-height: 1.55; margin: 13px 0 0; }
+    .vote-type-badge {
+      align-self: flex-start;
+      margin-top: 13px;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #e6c58c;
+      background: rgba(5,12,18,.55);
+      font-size: .78rem;
+    }
+    .outcome-box {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-left: 3px solid var(--gold);
+      background: rgba(4, 12, 18, .62);
+      line-height: 1.5;
+    }
+    .outcome-box strong { color: #f0d39d; }
+    .resolution-panel { display: grid; gap: 16px; }
+    .outcome-result {
+      padding: 20px;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(38,55,64,.48), rgba(7,16,24,.7));
+    }
+    .outcome-result h3 { margin: 4px 0 8px; color: #f0d39d; font: 1.45rem Georgia, serif; }
+    .outcome-result p { margin: 0; color: #d0ccc3; line-height: 1.55; }
+    .ship-outcome-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+    .ship-outcome-card { padding: 17px; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; background: rgba(255,255,255,.025); }
+    .ship-outcome-card.blue { border-top: 3px solid var(--blue); }
+    .ship-outcome-card.red { border-top: 3px solid var(--red); }
+    .ship-outcome-card h3 { margin: 0 0 5px; font: 1.2rem Georgia, serif; }
+    .ship-outcome-card h4 { margin: 8px 0; color: #e7c58c; font: 1.05rem Georgia, serif; }
+    .ship-outcome-card p { margin: 0; color: #cbc7bf; line-height: 1.5; }
+    .consequence-box { border: 1px solid rgba(255,255,255,.09); border-radius: 11px; overflow: hidden; }
+    .consequence-heading { padding: 11px 14px; background: rgba(215,166,91,.08); color: #e5c187; font-size: .78rem; letter-spacing: .09em; text-transform: uppercase; }
+    .consequence-row { display: grid; grid-template-columns: 92px 1fr; gap: 12px; padding: 11px 14px; border-top: 1px solid rgba(255,255,255,.06); }
+    .consequence-kind { color: var(--muted); font-size: .8rem; }
+    .consequence-change { color: #d7d4cd; }
+    .outcome-actions { display: flex; justify-content: center; margin-top: 2px; }
+
+    .decision-panel { padding: 26px; }
+    .decision-question { text-align: center; margin: 0; font: 1.65rem Georgia, serif; }
+    .decision-intro { text-align: center; color: #baaf9f; margin: 8px 0 22px; }
+    .choice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .choice-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: rgba(5,12,18,.7);
+      cursor: pointer;
+      transition: .16s ease;
+      text-align: left;
+      padding: 0;
+    }
+    .choice-card:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--line-strong); }
+    .choice-card.selected { border-color: #69b3df; box-shadow: 0 0 0 2px rgba(60,152,201,.22); }
+    .choice-card.winner { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(215,166,91,.2); }
+    .choice-card:disabled { cursor: default; opacity: .83; }
+    .choice-art {
+      height: 145px;
+      background:
+        linear-gradient(180deg, transparent 45%, rgba(3,8,12,.9)),
+        radial-gradient(circle at 50% 45%, rgba(190,135,64,.25), transparent 30%),
+        linear-gradient(135deg, #1b3141, #09131c);
+      position: relative;
+    }
+    .choice-art::before {
+      content: "";
+      position: absolute;
+      left: 14%; right: 14%; bottom: 19%; height: 42%;
+      border-radius: 50% 50% 18% 18%;
+      background: rgba(0,0,0,.48);
+      box-shadow: 40px 10px 0 -10px rgba(0,0,0,.44), -42px 14px 0 -14px rgba(0,0,0,.4);
+    }
+    .choice-body { padding: 16px; min-height: 122px; }
+    .choice-title { margin: 0 0 8px; color: #f0cf96; font: 1.14rem Georgia, serif; }
+    .choice-flavor { margin: 0; color: #c8c3ba; line-height: 1.45; }
+    .vote-row { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+    .influence-input { width: 72px; }
+
+    .primary-btn, .secondary-btn { border-radius: 8px; padding: 10px 18px; cursor: pointer; }
+    .primary-btn { background: #15364a; border: 1px solid #357ba2; }
+    .secondary-btn { background: #0c1720; border: 1px solid var(--line); }
+    .primary-btn:hover, .secondary-btn:hover { filter: brightness(1.13); }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+
+    .vote-status { padding: 18px 22px; }
+    .vote-status-grid { display: flex; flex-wrap: wrap; gap: 9px; }
+    .vote-chip {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 999px;
+      background: rgba(255,255,255,.025);
+      color: #c9c7c0;
+      font-size: .85rem;
+    }
+    .vote-chip.done { color: #9bbf8c; border-color: rgba(115,156,88,.35); }
+    .vote-chip.waiting { color: #e5ba70; border-color: rgba(215,166,91,.32); }
+
+    .roster-group + .roster-group { margin-top: 23px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.08); }
+    .roster-heading { font: 1.08rem Georgia, serif; margin: 0 0 12px; }
+    .roster-heading.blue { color: #7fc1e4; }
+    .roster-heading.red { color: #dd7565; }
+    .player-row {
+      display: grid;
+      grid-template-columns: 42px 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-top: 1px solid rgba(255,255,255,.045);
+    }
+    .portrait {
+      width: 42px; height: 42px; border-radius: 50%;
+      display: grid; place-items: center;
+      background: linear-gradient(145deg, #253746, #111b23);
+      border: 1px solid var(--line-strong);
+      color: #e0c08a;
+      font-family: Georgia, serif;
+      font-size: 1.1rem;
+    }
+    .player-name { font-family: Georgia, serif; }
+    .player-role { color: #88b7d2; font-size: .8rem; margin-top: 2px; }
+    .roster-group.red .player-role { color: #d9897d; }
+    .resource { color: #c1cbd1; font-size: .86rem; white-space: nowrap; }
+    .resource.gold { color: #e5b969; }
+
+    /* MAP */
+    .map-layout { display: grid; grid-template-columns: 1fr 300px; gap: 14px; min-height: calc(100vh - 94px); }
+    .map-panel { position: relative; overflow: hidden; min-height: 820px; }
+    #hexMap { width: 100%; height: 100%; min-height: 820px; display: block; cursor: grab; touch-action: none; }
+    #hexMap.dragging { cursor: grabbing; }
+    .map-side { padding: 20px; }
+    .map-toolbar { position: absolute; left: 16px; top: 16px; z-index: 3; display: flex; gap: 8px; }
+    .map-tag {
+      position: absolute; right: 16px; top: 16px; z-index: 3;
+      padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px;
+      background: rgba(6,14,21,.85); color: var(--muted); font-size: .85rem;
+    }
+    .ship-map-label { font: 700 11px Inter, sans-serif; paint-order:stroke; stroke:#061019; stroke-width:3px; stroke-linejoin:round; }
+
+    /* DETAILS */
+    .details-shell { min-height: calc(100vh - 94px); }
+    .subtabs { display: flex; gap: 8px; padding: 12px; margin-bottom: 14px; }
+    .subtab {
+      border: 1px solid var(--line); background: transparent; color: #bda786;
+      border-radius: 8px; padding: 10px 16px; cursor: pointer;
+    }
+    .subtab.active { color: var(--text); background: rgba(215,166,91,.1); border-color: var(--line-strong); }
+    .details-grid { display: grid; grid-template-columns: 290px 1fr 340px; gap: 14px; }
+    .details-panel { padding: 18px; min-height: 620px; }
+    .hold-grid {
+      --hold-cell: 42px;
+      --hold-gap: 3px;
+      display: grid;
+      gap: var(--hold-gap);
+      align-content: start;
+      width: max-content;
+      max-width: 100%;
+      overflow: auto;
+      padding: 10px;
+      background: rgba(2,8,12,.55);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      position: relative;
+    }
+    .hold-grid.editable { outline: 1px solid rgba(60,152,201,.22); }
+    .hold-cell { width: var(--hold-cell); height: var(--hold-cell); border: 1px solid rgba(191,153,92,.22); background: rgba(255,255,255,.025); position: relative; }
+    .hold-cell.drop-hover { background: rgba(60,152,201,.16); border-color: rgba(96,181,229,.7); }
+    .damage-cell {
+      z-index: 4;
+      min-height: var(--hold-cell);
+      border: 1px solid rgba(225,91,72,.82);
+      border-radius: 4px;
+      background:
+        repeating-linear-gradient(135deg, rgba(159,41,31,.75) 0 6px, rgba(87,20,18,.86) 6px 12px);
+      display: grid;
+      place-items: center;
+      color: #ffd2c9;
+      font-weight: 800;
+      font-size: 1.1rem;
+      pointer-events: none;
+    }
+    .hold-fill { display:grid; grid-template-columns:repeat(5,1fr); gap:5px; margin:8px 0 14px; }
+    .hold-fill-segment { height:8px; border-radius:3px; overflow:hidden; background:rgba(255,255,255,.07); }
+    .hold-fill-segment > span { display:block; height:100%; background:var(--gold); }
+    .cargo-item {
+      border: 1px solid rgba(207,166,92,.7);
+      background: linear-gradient(145deg, rgba(117,84,42,.95), rgba(69,45,24,.95));
+      display: grid; place-items: center;
+      color: #f0d39d;
+      font-size: .72rem;
+      overflow: hidden;
+      border-radius: 5px;
+      z-index: 2;
+      min-height: var(--hold-cell, 42px);
+      text-align: center;
+      padding: 3px;
+    }
+    .cargo-item[draggable="true"] { cursor: grab; user-select:none; }
+    .cargo-item.dragging { opacity:.55; cursor:grabbing; }
+    .cargo-item.rum { background: linear-gradient(145deg, rgba(105,69,35,.95), rgba(54,31,17,.95)); }
+    .player-select-card {
+      display: grid; grid-template-columns: 42px 1fr; gap: 10px; align-items: center;
+      padding: 10px; border: 1px solid transparent; border-radius: 9px; cursor: pointer;
+    }
+    .player-select-card:hover, .player-select-card.active { border-color: var(--line); background: rgba(255,255,255,.035); }
+    .inventory-list { display: grid; gap: 8px; }
+    .inventory-item { padding: 10px 12px; border: 1px solid rgba(255,255,255,.07); border-radius: 8px; display: flex; justify-content: space-between; gap: 12px; }
+
+    /* V5 INTERACTION / VISUALS */
+    .influence-stepper {
+      display:inline-grid; grid-template-columns:38px 58px 38px; align-items:center;
+      border:1px solid var(--line); border-radius:999px; overflow:hidden;
+      background:rgba(4,12,18,.72); box-shadow:inset 0 0 0 1px rgba(255,255,255,.015);
+    }
+    .influence-stepper button { height:38px; border:0; background:transparent; color:#e6c58c; cursor:pointer; font-size:1.15rem; }
+    .influence-stepper button:hover:not(:disabled) { background:rgba(215,166,91,.1); }
+    .influence-stepper button:disabled { opacity:.28; cursor:default; }
+    .influence-value { text-align:center; font-weight:800; color:#f0d39d; font-variant-numeric:tabular-nums; }
+    .vote-summary { min-width:230px; color:#bfc8ce; font-size:.87rem; }
+    .vote-summary strong { color:#f0d39d; }
+
+    .ship-hold-cutaway {
+      position:relative; width:max-content; max-width:100%; padding:22px 34px 24px;
+      margin-top:8px; border:1px solid rgba(183,132,66,.42); border-radius:48% 48% 18px 18px / 18px 18px 32px 32px;
+      background:
+        linear-gradient(90deg,rgba(63,39,20,.52),rgba(104,69,35,.32) 12%,rgba(24,18,13,.7) 50%,rgba(104,69,35,.32) 88%,rgba(63,39,20,.52)),
+        repeating-linear-gradient(0deg,rgba(231,190,120,.035) 0 2px,transparent 2px 18px),
+        #120e0b;
+      box-shadow: inset 0 -18px 40px rgba(0,0,0,.45), 0 14px 34px rgba(0,0,0,.26);
+      overflow:auto;
+    }
+    .ship-hold-cutaway::before, .ship-hold-cutaway::after {
+      content:""; position:absolute; top:18px; bottom:18px; width:18px;
+      border:1px solid rgba(205,157,83,.38); background:linear-gradient(90deg,rgba(113,73,33,.72),rgba(47,31,18,.7));
+    }
+    .ship-hold-cutaway::before { left:8px; border-radius:100% 0 0 100%; }
+    .ship-hold-cutaway::after { right:8px; transform:scaleX(-1); border-radius:100% 0 0 100%; }
+    .hold-deck-label { text-align:center; margin:-9px 0 10px; color:#8f826f; font-size:.68rem; letter-spacing:.13em; text-transform:uppercase; }
+    .hold-grid { background:
+        linear-gradient(rgba(0,0,0,.15),rgba(0,0,0,.15)),
+        repeating-linear-gradient(90deg,rgba(169,119,60,.055) 0 1px,transparent 1px 45px),
+        rgba(4,10,13,.76); }
+    .hold-cell { background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.035),rgba(255,255,255,.012)); }
+    .hold-cell.drop-valid { background:rgba(60,152,201,.27); border-color:rgba(115,200,244,.95); box-shadow:inset 0 0 12px rgba(60,152,201,.2); }
+    .hold-cell.drop-invalid { background:rgba(179,83,67,.26); border-color:rgba(226,112,91,.9); box-shadow:inset 0 0 12px rgba(179,83,67,.18); }
+    .cargo-item {
+      background:linear-gradient(145deg,rgba(125,89,45,.96),rgba(58,39,22,.98));
+      box-shadow:inset 0 0 0 1px rgba(255,225,170,.06), 0 2px 5px rgba(0,0,0,.28);
+      border-radius:4px; margin:1px; min-height:0; padding:0; position:relative;
+    }
+    .cargo-item.material { background:linear-gradient(145deg,rgba(86,94,88,.96),rgba(43,51,49,.98)); }
+    .cargo-item.supply { background:linear-gradient(145deg,rgba(72,96,78,.96),rgba(34,53,40,.98)); }
+    .cargo-item.valuable { background:linear-gradient(145deg,rgba(116,78,111,.96),rgba(58,38,62,.98)); }
+    .cargo-item.crafted { background:linear-gradient(145deg,rgba(73,92,116,.96),rgba(32,47,63,.98)); }
+    .cargo-cell-icon { font-size:1rem; opacity:.96; line-height:1; }
+    .cargo-cell-label { position:absolute; left:3px; right:3px; bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.56rem; color:#f1dcc0; text-shadow:0 1px 2px #000; }
+    .damage-cell { background:
+      linear-gradient(25deg,transparent 46%,rgba(255,178,137,.22) 47% 51%,transparent 52%),
+      repeating-linear-gradient(135deg,rgba(130,37,29,.8) 0 6px,rgba(55,20,18,.92) 6px 12px); }
+
+    .upgrade-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    .upgrade-card { min-height:88px; border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:11px; background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015)); }
+    .upgrade-slot { color:#8aa4b3; font-size:.68rem; letter-spacing:.09em; text-transform:uppercase; }
+    .upgrade-name { margin-top:4px; color:#e8c98f; font-family:Georgia,serif; }
+    .upgrade-icon { float:right; font-size:1.5rem; color:#d7a65b; margin-left:8px; }
+    .reputation-row { display:grid; grid-template-columns:1fr auto; gap:10px; padding:5px 0; color:#bcc5ca; }
+
+    .job-chip-row { display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 2px; }
+    .job-chip { padding:5px 8px; border:1px solid rgba(60,152,201,.3); border-radius:999px; color:#9dc7df; background:rgba(60,152,201,.06); font-size:.72rem; }
+    .config-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:10px; }
+    .config-card { border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:11px; background:rgba(255,255,255,.025); }
+    .config-card.active { border-color:var(--line-strong); background:rgba(215,166,91,.06); }
+    .config-assignment { color:#aeb9bf; font-size:.76rem; line-height:1.5; margin-top:7px; }
+
+    .recipe-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+    .recipe-card { border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:11px; background:rgba(255,255,255,.022); }
+    .recipe-card h4 { margin:0 0 5px; color:#e6c58c; font:1rem Georgia,serif; }
+    .recipe-cost { color:#9da9af; font-size:.78rem; min-height:34px; }
+    .recipe-output { color:#b8cbd6; font-size:.76rem; margin:6px 0 9px; }
+
+    .map-region-label { font:italic 24px Georgia,serif; fill:rgba(194,217,224,.18); letter-spacing:.08em; pointer-events:none; }
+    .map-coast-mark { pointer-events:none; opacity:.9; }
+    .map-event-marker { filter:drop-shadow(0 3px 3px rgba(0,0,0,.6)); pointer-events:none; }
+
+    /* ROLE */
+    .role-grid { display:grid; grid-template-columns:210px minmax(690px,1fr) 300px; gap:12px; min-height:calc(100vh - 94px); align-items:start; }
+    .role-card, .role-main, .role-side { padding:14px; }
+    .role-main .job-card, .role-main .ability-card { padding:10px; margin-bottom:7px; }
+    .role-action-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; align-items:start; }
+    .role-main .recipe-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .role-main .recipe-card { padding:9px; }
+    .role-main .panel-title { margin-bottom:9px; }
+    .role-side textarea { min-height:76px; }
+    .role-card { position: sticky; top: 80px; }
+    .role-badge {
+      width: 78px; height: 78px; border-radius: 50%; margin-bottom: 13px;
+      display: grid; place-items: center;
+      border: 1px solid var(--line-strong);
+      background: radial-gradient(circle, rgba(215,166,91,.16), rgba(0,0,0,.1));
+      font: 2rem Georgia, serif;
+    }
+    .role-resource-row { display: flex; gap: 14px; margin-top: 16px; color: #c7cdd0; }
+    .ability-card, .secret-card, .job-card, .note-card {
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 13px;
+      margin-bottom: 9px;
+      background: rgba(255,255,255,.025);
+    }
+    .secret-card { border-color: rgba(179,83,67,.38); background: rgba(85,24,21,.14); }
+    .job-card { border-color: rgba(60,152,201,.28); }
+    .role-action-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+    .role-action-row select { min-width: 145px; }
+    .move-pad { display: grid; grid-template-columns: repeat(3, 36px); gap: 5px; }
+    .move-pad button { width: 36px; height: 32px; padding: 0; }
+    .note-card .note-meta { color: var(--muted); font-size: .78rem; margin-bottom: 6px; }
+    .role-side textarea { min-height: 82px; }
+    .notes-list { max-height: 210px; overflow: auto; padding-right: 3px; }
+
+    /* JOURNAL */
+    .journal-layout { display: grid; grid-template-columns: 260px 1fr; gap: 14px; min-height: calc(100vh - 94px); }
+    .journal-nav, .journal-main { padding: 20px; }
+    .journal-filter {
+      width: 100%; text-align: left; color: #c7b79c; background: transparent;
+      border: 0; border-radius: 8px; padding: 10px; cursor: pointer;
+    }
+    .journal-filter.active, .journal-filter:hover { background: rgba(255,255,255,.045); color: var(--text); }
+    .journal-entry { padding: 18px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    .journal-entry:first-of-type { border-top: 0; }
+    .journal-entry h3 { margin: 0 0 6px; font: 1.25rem Georgia, serif; color: #e6c58c; }
+    .journal-meta { color: #7f8c95; font-size: .82rem; margin-bottom: 10px; }
+    .journal-entry p { color: #c9c7c0; line-height: 1.6; max-width: 850px; }
+
+    .empty-note { color: var(--muted); font-style: italic; }
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; z-index: 80;
+      padding: 12px 16px; border: 1px solid var(--line-strong); border-radius: 9px;
+      background: #0d1b26; box-shadow: var(--shadow); opacity: 0; transform: translateY(10px);
+      pointer-events: none; transition: .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1180px) {
+      .overview-grid { grid-template-columns: 245px 1fr; }
+      .overview-right { grid-column: 1 / -1; }
+      .overview-right .rosters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+      .roster-group + .roster-group { margin: 0; padding: 0; border: 0; }
+      .details-grid { grid-template-columns: 250px 1fr; }
+      .details-grid > :last-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 820px) {
+      .topbar { grid-template-columns: 1fr; height: auto; padding: 0; }
+      .nav-tabs { grid-column: 1; overflow-x: auto; gap: 0; }
+      .nav-tab { min-width: 90px; padding: 14px 10px; }
+      .player-switcher { display: none; }
+      main { padding: 8px; }
+      .overview-grid, .map-layout, .details-grid, .role-grid, .journal-layout { grid-template-columns: 1fr; }
+      .ship-outcome-grid { grid-template-columns: 1fr; }
+      .role-card { position: static; }
+      .overview-left { order: 2; }
+      .overview-center { order: 1; }
+      .overview-right { order: 3; }
+      .choice-grid { grid-template-columns: 1fr; }
+      .map-side { display: none; }
+      .subtabs, .role-subtabs { overflow-x: auto; }
+      .hold-cell { width: 34px; height: 34px; }
+      .upgrade-grid, .recipe-grid, .config-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <nav class="nav-tabs" aria-label="Primary">
+        <button class="nav-tab active" data-screen="overview">◉ Overview</button>
+        <button class="nav-tab" data-screen="map">⬡ Map</button>
+        <button class="nav-tab" data-screen="details">⚓ Details</button>
+        <button class="nav-tab" data-screen="role">⌘ Role</button>
+        <button class="nav-tab" data-screen="journal">▤ Journal</button>
+      </nav>
+      <div class="player-switcher">
+        <select id="currentPlayerSelect" aria-label="Current player"></select>
+        <button class="utility-btn" id="exportSaveBtn" title="Export save">⇩</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="screen-overview" class="screen active"></section>
+      <section id="screen-map" class="screen"></section>
+      <section id="screen-details" class="screen"></section>
+      <section id="screen-role" class="screen"></section>
+      <section id="screen-journal" class="screen"></section>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <!--
+    Three-file setup:
+      1. tides_coreV5.html     (structure and rules UI)
+      2. story.js              sets window.STORY_DATA
+      3. campaign-save.js      sets window.CAMPAIGN_STATE
+
+    Browser progress is also stored in localStorage. Replacing tides_coreV5.html or
+    story.js does not erase the active save. Export creates a portable JSON backup.
+  -->
+  <script src="story.js"></script>
+  <script src="campaign-save.js"></script>
+  <script>
+    const FALLBACK_STORY = {
+      campaignTitle: "Tides Campaign",
+      chaptersTotal: 12,
+      eventOrder: ["smugglers-bargain-1", "split-salvage-demo"],
+      currentEventId: "smugglers-bargain-1",
+      events: {
+        "smugglers-bargain-1": {
+          chapter: 5,
+          title: "The Smuggler’s Bargain",
+          part: "Part 1 of 3",
+          setup: "After two days following a coded chart, the fleet reaches a hidden harbor beneath the cliffs. A smuggler offers the location of a navy supply convoy, but wants both ships to shelter his crew if the navy discovers the deal.",
+          voteType: "fleet",
+          question: "How do you respond to the smuggler’s proposal?",
+          intro: "Choose an approach, then decide how much Influence the decision is worth.",
+          choices: [
+            { id: "accept", title: "Accept their offer.", flavor: "Hear them out, take the convoy’s location, and owe the smugglers protection." },
+            { id: "threaten", title: "Threaten them instead.", flavor: "Try to take the information without promising shelter or payment." },
+            { id: "leave", title: "Walk away.", flavor: "Avoid the obligation and continue searching for the convoy yourselves." }
+          ],
+          outcomes: {
+            accept: "The fleet accepts the bargain. The smugglers reveal the convoy’s route and both crews celebrate the chance at a rich prize, though the promise of shelter may return to haunt them.",
+            threaten: "The threat turns violent. The smugglers surrender a crude route before escaping through the cliffs, leaving the Blackwake damaged and the fleet with a new enemy.",
+            leave: "The fleet refuses the bargain. The smugglers keep their information, and the ships continue the hunt without taking on a new obligation."
+          },
+          consequences: {
+            accept: [
+              { kind: "useRum", targetId: "blackwake" },
+              { kind: "useRum", targetId: "red-horizon" }
+            ],
+            threaten: [
+              { kind: "damage", targetId: "blackwake", shape: "T", x: 2, y: 1 },
+              { kind: "stat", targetId: "red-horizon", stat: "Morale", delta: -1 },
+              { kind: "item", targetId: "blackwake", item: { name: "Crude Convoy Chart", w: 2, h: 1 } }
+            ],
+            leave: []
+          }
+        },
+        "split-salvage-demo": {
+          chapter: 5,
+          title: "The Divided Wreck",
+          part: "Side decision",
+          setup: "On the way out of the cove, the tide exposes a wreck wedged between two reefs. There is time for each ship to recover only one part of the cargo before the wreck slips beneath the water.",
+          voteType: "ship",
+          question: "What should your ship recover?",
+          intro: "Each ship resolves its own vote and receives the result it chose.",
+          choices: [
+            { id: "cannon", title: "Recover the cannon.", flavor: "Heavy and difficult to move, but potentially valuable in a future battle." },
+            { id: "medicine", title: "Recover the medicine.", flavor: "Sealed crates may help treat injuries and illness." },
+            { id: "charts", title: "Recover the charts.", flavor: "The watertight case may contain routes no living navigator knows." }
+          ],
+          outcomes: {
+            cannon: "The crew frees a bronze cannon and hauls it aboard moments before the wreck drops from the reef.",
+            medicine: "The crew recovers sealed medical crates before the rising water reaches them.",
+            charts: "The crew retrieves a watertight chart case containing several unfamiliar routes."
+          },
+          consequences: {
+            cannon: [{ kind: "item", targetId: "currentShip", item: { name: "Salvaged Cannon", w: 3, h: 2 } }],
+            medicine: [{ kind: "item", targetId: "currentShip", item: { name: "Medicine", w: 2, h: 2 } }],
+            charts: [
+              { kind: "item", targetId: "currentShip", item: { name: "Sealed Charts", w: 2, h: 1 } },
+              { kind: "mapReveal", key: "3,-1", name: "Forgotten Passage" }
+            ]
+          }
+        }
+      }
+    };
+
+    const FALLBACK_STATE = {
+      saveVersion: 5,
+      saveId: "demo-campaign-v5",
+      campaignName: "Tides Campaign",
+      currentPlayerId: "kaelen",
+      currentEventId: "smugglers-bargain-1",
+      chapterProgress: 5,
+      ships: [
+        {
+          id: "blackwake", name: "The Blackwake", color: "blue", captainId: "thorne",
+          stats: { Hull: 4, Firepower: 3, Speed: 4, Morale: 6 },
+          crewConfiguration: "four-balanced",
+          upgrades: [
+            { id:"blackwake-sails", slot:"Sails", name:"Cutlass Sails", icon:"◢", text:"Light canvas rigging built for quick changes of heading." },
+            { id:"blackwake-utility", slot:"Utility", name:"Smuggler Compartments", icon:"▦", text:"Hidden storage built into the lower deck." }
+          ],
+          reputation: { Smugglers: 2, Navy: -2, Merchants: 1 },
+          hold: { columns: 8, rows: 5, damagePieces: [
+            { id: "damage-blackwake-1", shape: "L", rotation: 0, x: 5, y: 1 }
+          ], items: [
+            { id: "rum-1", name: "Rum", kind: "rum", x: 0, y: 0, w: 1, h: 1 },
+            { id: "rum-2", name: "Rum", kind: "rum", x: 1, y: 0, w: 1, h: 1 },
+            { id: "rum-3", name: "Rum", kind: "rum", x: 2, y: 0, w: 1, h: 1 },
+            { id: "cloth", name: "Cloth", kind:"material", icon:"▧", x: 3, y: 0, w: 2, h: 1 },
+            { id: "medicine", name: "Medicine", kind:"supply", icon:"✚", x: 0, y: 2, w: 2, h: 2 },
+            { id: "timber", name: "Timber", kind:"material", icon:"═", x: 2, y: 4, w: 4, h: 1 }
+          ]}
+        },
+        {
+          id: "red-horizon", name: "The Red Horizon", color: "red", captainId: "seraphine",
+          stats: { Hull: 5, Firepower: 4, Speed: 3, Morale: 5 },
+          crewConfiguration: "three-specialists",
+          upgrades: [
+            { id:"red-guns", slot:"Weapons", name:"Long Nine", icon:"✦", text:"A long-range cannon mounted along the forward deck." },
+            { id:"red-hull", slot:"Hull", name:"Copper Sheathing", icon:"⬢", text:"Protective plating below the waterline." }
+          ],
+          reputation: { Smugglers: 0, Navy: -1, Merchants: 2 },
+          hold: { columns: 8, rows: 5, damagePieces: [
+            { id: "damage-red-1", shape: "T", rotation: 0, x: 4, y: 2 }
+          ], items: [
+            { id: "rum-4", name: "Rum", kind: "rum", x: 0, y: 0, w: 1, h: 1 },
+            { id: "rum-5", name: "Rum", kind: "rum", x: 1, y: 0, w: 1, h: 1 },
+            { id: "powder", name: "Powder", kind:"material", icon:"✹", x: 0, y: 1, w: 2, h: 2 },
+            { id: "spices", name: "Spices", kind:"valuable", icon:"✣", x: 2, y: 0, w: 2, h: 2 },
+            { id: "tools", name: "Tools", kind:"material", icon:"⚒", x: 5, y: 0, w: 3, h: 1 },
+            { id: "silk", name: "Silk", kind:"valuable", icon:"≈", x: 0, y: 3, w: 3, h: 2 }
+          ]}
+        }
+      ],
+      players: [
+        { id: "kaelen", name: "Kaelen", shipId: "blackwake", role: "Navigator", influence: 3, gold: 27,
+          stats: { Might: 2, Cunning: 3, Command: 2, Seamanship: 4 }, inventory: ["Fine spyglass", "Charting tools"],
+          abilities: [{ name: "Read the Current", text: "Once per session, inspect one adjacent map hex before the fleet moves." }],
+          secrets: ["A navy chart in your possession shows a route nobody else knows exists."] },
+        { id: "thorne", name: "Thorne", shipId: "blackwake", role: "Captain", influence: 2, gold: 32,
+          stats: { Might: 3, Cunning: 2, Command: 5, Seamanship: 3 }, inventory: ["Officer’s blade", "Signet ring"],
+          abilities: [{ name: "Call the Vote", text: "Once per session, reopen one ship-only vote after discussion." }], secrets: [] },
+        { id: "rowan", name: "Rowan", shipId: "blackwake", role: "Quartermaster", influence: 2, gold: 26,
+          stats: { Might: 2, Cunning: 4, Command: 3, Seamanship: 2 }, inventory: ["Cargo ledger", "Lock picks"],
+          abilities: [{ name: "Make It Fit", text: "Once per session, rotate or repack one cargo item after placement." }], secrets: [] },
+        { id: "vik", name: "Vik", shipId: "blackwake", role: "Gunner", influence: 1, gold: 19,
+          stats: { Might: 5, Cunning: 2, Command: 1, Seamanship: 3 }, inventory: ["Pistol", "Powder horn"],
+          abilities: [{ name: "First Volley", text: "Gain an advantage on the first ship-combat roll of a session." }], secrets: [] },
+        { id: "makoa", name: "Makoa", shipId: "red-horizon", role: "Navigator", influence: 2, gold: 18,
+          stats: { Might: 3, Cunning: 3, Command: 2, Seamanship: 4 }, inventory: ["Compass", "Storm cloak"],
+          abilities: [{ name: "Weather Eye", text: "Reveal whether the next movement crosses dangerous weather." }], secrets: [] },
+        { id: "jessa", name: "Jessa", shipId: "red-horizon", role: "Boatswain", influence: 1, gold: 14,
+          stats: { Might: 4, Cunning: 2, Command: 3, Seamanship: 3 }, inventory: ["Repair mallet", "Coil of rope"],
+          abilities: [{ name: "Patch Job", text: "Ignore one temporary Hull penalty until the end of the session." }], secrets: [] },
+        { id: "seraphine", name: "Seraphine", shipId: "red-horizon", role: "Captain", influence: 3, gold: 21,
+          stats: { Might: 2, Cunning: 3, Command: 5, Seamanship: 3 }, inventory: ["Ceremonial saber", "Captain’s coat"],
+          abilities: [{ name: "Hold the Crew", text: "Once per session, prevent one point of Morale loss." }],
+          secrets: ["A private letter offers you safe passage if you abandon the alliance."] }
+      ],
+      votes: {
+        "smugglers-bargain-1": {
+          thorne: { choiceId: "accept", influence: 1 },
+          rowan: { choiceId: "threaten", influence: 1 },
+          vik: { choiceId: "leave", influence: 0 },
+          makoa: { choiceId: "leave", influence: 1 },
+          jessa: { choiceId: "accept", influence: 0 },
+          seraphine: { choiceId: "threaten", influence: 0 }
+        },
+        "split-salvage-demo": {
+          thorne: { choiceId: "cannon", influence: 1 },
+          rowan: { choiceId: "medicine", influence: 0 },
+          vik: { choiceId: "charts", influence: 0 },
+          makoa: { choiceId: "charts", influence: 1 },
+          jessa: { choiceId: "medicine", influence: 1 },
+          seraphine: { choiceId: "medicine", influence: 1 }
+        }
+      },
+      resolvedEvents: {},
+      continueReady: {},
+      notes: [],
+      abilityUses: {},
+      knownRecipes: ["repair-kit", "field-still", "reinforced-bracing", "smoke-pots", "medical-satchel", "grappling-rig"],
+      downtime: {},
+      map: {
+        selected: "0,0",
+        shipPositions: { "blackwake": "0,0", "red-horizon": "0,0" },
+        revealed: [
+          "-5,1","-5,2","-4,-1","-4,0","-4,1","-4,2","-4,3","-3,-2","-3,-1","-3,0","-3,1","-3,2","-3,3","-3,4",
+          "-2,-3","-2,-2","-2,-1","-2,0","-2,1","-2,2","-2,3","-2,4","-1,-3","-1,-2","-1,-1","-1,0","-1,1","-1,2","-1,3","-1,4",
+          "0,-4","0,-3","0,-2","0,-1","0,0","0,1","0,2","0,3","1,-4","1,-3","1,-2","1,-1","1,0","1,1","1,2","1,3",
+          "2,-4","2,-3","2,-2","2,-1","2,0","2,1","2,2","3,-3","3,-2","3,-1","3,0","3,1","4,-3","4,-2","4,-1","4,0","5,-2","5,-1"
+        ],
+        locations: {
+          "0,0": { name: "Hidden Cove", type: "Port", note: "A concealed anchorage used by smugglers." },
+          "2,-1": { name: "Broken Teeth", type: "Hazard", note: "Jagged rocks narrow the safe passage." },
+          "-1,2": { name: "Saint Orra", type: "Island", note: "A wind-beaten island with a ruined chapel." },
+          "1,1": { name: "Shatterbank", type: "Shoal", note: "A shallow bank littered with old wreckage." },
+          "3,-1": { name: "Forgotten Passage", type: "Route", note: "A narrow passage omitted from modern charts." },
+          "-4,2": { name: "Gullwatch", type: "Port", note: "A small neutral harbor built around a leaning lighthouse." },
+          "-2,-2": { name: "Morrow Isles", type: "Island", note: "Three steep islands shelter a maze of calm channels." },
+          "4,-2": { name: "Tempest Reach", type: "Hazard", note: "Storms gather here with unsettling regularity." },
+          "2,2": { name: "Wreckwater", type: "Shoal", note: "Broken masts mark a field of submerged wrecks." },
+          "-3,0": { name: "Merchant Run", type: "Route", note: "A frequently traveled route between the western ports." }
+        }
+      },
+      journal: [
+        { type: "story", session: 1, title: "An Uneasy Alliance", text: "Two rival ships agreed to travel together while neither trusted the other enough to sail alone." },
+        { type: "discovery", session: 3, title: "The Hidden Cove", text: "A coded chart led the fleet toward a cove absent from official maps." },
+        { type: "character", session: 4, title: "The Salvager", text: "Thorne recovered useful material from a wreck and earned a reputation for wasting nothing." }
+      ]
+    };
+
+    const STORY = window.STORY_DATA || FALLBACK_STORY;
+    const providedState = window.CAMPAIGN_STATE || FALLBACK_STATE;
+    const SAVE_KEY = `tides-save:${providedState.saveId || "default"}`;
+
+    let state;
+    try {
+      state = JSON.parse(localStorage.getItem(SAVE_KEY)) || structuredClone(providedState);
+    } catch {
+      state = JSON.parse(JSON.stringify(providedState));
+    }
+
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+    const JOBS = ["Captaincy","Quartermaster","Crafting","Navigation","Gunnery","Repairs","Medicine","Diplomacy","Scouting","Morale","Intelligence","Trade"];
+    const JOB_INFO = {
+      Captaincy:"Crew assignments, command decisions, and ship leadership.",
+      Quartermaster:"Cargo placement, shared equipment, and hold management.",
+      Crafting:"Turn materials into equipment, consumables, and ship upgrades.",
+      Navigation:"Routes, movement, weather, and difficult sailing.",
+      Gunnery:"Cannons, ammunition, and ship-combat readiness.",
+      Repairs:"Repair ship damage and maintain critical systems.",
+      Medicine:"Treat injuries, illness, and recovery problems.",
+      Diplomacy:"Negotiation, formal agreements, and outside relations.",
+      Scouting:"Reveal locations, threats, and opportunities before committing.",
+      Morale:"Manage crew confidence, unrest, and Rum use.",
+      Intelligence:"Handle secrets, coded information, and enemy intentions.",
+      Trade:"Buy, sell, appraise, and negotiate over goods."
+    };
+    const CREW_CONFIGS = {
+      2: [
+        { id:"two-command", name:"Command Pair", slots:[
+          { title:"Sea Captain", jobs:["Captaincy","Diplomacy","Navigation","Morale","Intelligence","Trade"] },
+          { title:"Master of the Deck", jobs:["Quartermaster","Crafting","Gunnery","Repairs","Medicine","Scouting"] }
+        ]},
+        { id:"two-raiders", name:"Raider Pair", slots:[
+          { title:"Corsair Captain", jobs:["Captaincy","Gunnery","Diplomacy","Morale","Scouting","Intelligence"] },
+          { title:"Sailing Master", jobs:["Quartermaster","Crafting","Navigation","Repairs","Medicine","Trade"] }
+        ]}
+      ],
+      3: [
+        { id:"three-specialists", name:"Specialist Watch", slots:[
+          { title:"Captain", jobs:["Captaincy","Diplomacy","Morale","Trade"] },
+          { title:"Wayfinder", jobs:["Navigation","Scouting","Intelligence","Medicine"] },
+          { title:"Shipwright", jobs:["Quartermaster","Crafting","Gunnery","Repairs"] }
+        ]},
+        { id:"three-raiders", name:"Raiding Watch", slots:[
+          { title:"War Captain", jobs:["Captaincy","Gunnery","Morale","Intelligence"] },
+          { title:"Freebooter", jobs:["Navigation","Scouting","Diplomacy","Trade"] },
+          { title:"Deckmaster", jobs:["Quartermaster","Crafting","Repairs","Medicine"] }
+        ]}
+      ],
+      4: [
+        { id:"four-balanced", name:"Balanced Watch", slots:[
+          { title:"Captain", jobs:["Captaincy","Diplomacy","Morale"] },
+          { title:"Pathfinder", jobs:["Navigation","Scouting","Intelligence"] },
+          { title:"Quartermaster", jobs:["Quartermaster","Trade","Medicine"] },
+          { title:"Master Gunner", jobs:["Gunnery","Repairs","Crafting"] }
+        ]},
+        { id:"four-expedition", name:"Expedition Watch", slots:[
+          { title:"Expedition Captain", jobs:["Captaincy","Navigation","Diplomacy"] },
+          { title:"Bosun", jobs:["Repairs","Morale","Medicine"] },
+          { title:"Factor", jobs:["Quartermaster","Crafting","Trade"] },
+          { title:"Sea Hunter", jobs:["Gunnery","Scouting","Intelligence"] }
+        ]}
+      ]
+    };
+    function hasJob(player, job) { return (player.jobs || []).includes(job); }
+    function shipCrew(ship) {
+      const crew = state.players.filter(p=>p.shipId===ship.id);
+      const captain = crew.find(p=>p.id===ship.captainId);
+      return [captain, ...crew.filter(p=>p.id!==ship.captainId)].filter(Boolean);
+    }
+    function configForShip(ship, configId = ship.crewConfiguration) {
+      const list = CREW_CONFIGS[shipCrew(ship).length] || [];
+      return list.find(c=>c.id===configId) || list[0] || null;
+    }
+    function applyCrewConfiguration(ship, configId, persist = false) {
+      const config = configForShip(ship, configId);
+      if (!config) return false;
+      ship.crewConfiguration = config.id;
+      shipCrew(ship).forEach((player,index)=>{
+        const slot=config.slots[index];
+        if (!slot) return;
+        player.role=slot.title;
+        player.jobs=[...slot.jobs];
+      });
+      if (persist) { saveState(); renderAll(); }
+      return true;
+    }
+
+    const CRAFT_RECIPES = [
+      { id:"repair-kit", name:"Repair Kit", needs:["Cloth"], output:{ type:"item", name:"Repair Kit", kind:"crafted", icon:"⚒", w:1,h:1 }, text:"A compact kit for emergency repairs." },
+      { id:"medical-satchel", name:"Medical Satchel", needs:["Medicine","Cloth"], output:{ type:"personal", name:"Medical Satchel" }, text:"Portable medical supplies carried by one player." },
+      { id:"reinforced-bracing", name:"Reinforced Bracing", needs:["Timber","Cloth"], output:{ type:"upgrade", slot:"Hull", name:"Reinforced Bracing", icon:"╬", text:"Internal braces built to resist structural damage." }, text:"A permanent ship upgrade." },
+      { id:"smoke-pots", name:"Smoke Pots", needs:["Powder","Tools"], output:{ type:"item", name:"Smoke Pots", kind:"crafted", icon:"◌", w:2,h:1 }, text:"Consumables for escape, confusion, or boarding actions." },
+      { id:"field-still", name:"Field Still", needs:["Tools","Spices"], output:{ type:"upgrade", slot:"Utility", name:"Field Still", icon:"♨", text:"A compact still for producing useful spirits and extracts." }, text:"A utility upgrade for the ship." },
+      { id:"grappling-rig", name:"Grappling Rig", needs:["Tools"], output:{ type:"item", name:"Grappling Rig", kind:"crafted", icon:"⌁", shape:"L", rotation:0 }, text:"A four-space shaped boarding tool." }
+    ];
+
+    function normalizeState() {
+      state.votes ||= {};
+      const legacyVotes = Object.values(state.votes).some(v => v && typeof v === "object" && "eventId" in v);
+      if (legacyVotes) {
+        const migrated = {};
+        for (const [playerId, vote] of Object.entries(state.votes)) {
+          if (!vote?.eventId) continue;
+          migrated[vote.eventId] ||= {};
+          migrated[vote.eventId][playerId] = { choiceId: vote.choiceId, influence: Number(vote.influence || 0) };
+        }
+        state.votes = migrated;
+      }
+      if ((state.saveVersion || 0) < 3) {
+        for (const [eventId, votes] of Object.entries(FALLBACK_STATE.votes || {})) {
+          state.votes[eventId] ||= structuredClone(votes);
+        }
+      }
+      state.currentEventId ||= STORY.currentEventId || STORY.eventOrder?.[0] || Object.keys(STORY.events)[0];
+      state.resolvedEvents ||= {};
+      state.continueReady ||= {};
+      state.notes ||= [];
+      state.abilityUses ||= {};
+      state.map ||= { selected: "0,0", revealed: [], locations: {}, shipPositions: {} };
+      state.map.revealed ||= [];
+      state.map.locations ||= {};
+      state.map.shipPositions ||= { "blackwake": "0,0", "red-horizon": "0,0" };
+      const fleetHex = state.map.shipPositions[state.ships?.[0]?.id] || "0,0";
+      state.ships.forEach(ship => state.map.shipPositions[ship.id] = fleetHex);
+      state.knownRecipes ||= FALLBACK_STATE.knownRecipes || CRAFT_RECIPES.map(r=>r.id);
+      state.downtime ||= {};
+      state.ships.forEach((ship, shipIndex) => {
+        ship.hold ||= { columns: 8, rows: 5, damagePieces: [], items: [] };
+        ship.hold.items ||= [];
+        ship.hold.damagePieces ||= [];
+        if (ship.hold.damaged?.length && !ship.hold.damagePieces.length) {
+          ship.hold.damagePieces.push({ id: `migrated-damage-${ship.id}`, shape: shipIndex ? "T" : "L", rotation: 0, x: shipIndex ? 4 : 5, y: shipIndex ? 2 : 1 });
+        }
+        ship.hold.columns = 8;
+        ship.hold.rows = 5;
+        delete ship.hold.damaged;
+        ship.stats ||= {};
+        ship.stats.Morale = Math.max(0, Math.min(10, Number(ship.stats.Morale ?? 5)));
+        ship.upgrades ||= [];
+        ship.reputation ||= {};
+        const crewCount = state.players.filter(p=>p.shipId===ship.id).length;
+        ship.crewConfiguration ||= (CREW_CONFIGS[crewCount]?.[0]?.id || null);
+      });
+      state.players.forEach(player => {
+        player.stats ||= {};
+        player.inventory ||= [];
+        player.abilities ||= [];
+        player.secrets ||= [];
+        player.influence = Math.max(0, Math.min(15, Number(player.influence ?? 0)));
+        player.conditions ||= [];
+        player.goal ||= "Build a name worth remembering.";
+      });
+      state.ships.forEach(ship => applyCrewConfiguration(ship, ship.crewConfiguration));
+      state.saveVersion = 5;
+    }
+    normalizeState();
+
+    function saveState() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch {} }
+    function toast(message) {
+      const el = $("#toast");
+      el.textContent = message;
+      el.classList.add("show");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => el.classList.remove("show"), 2200);
+    }
+    function getShip(id) { return state.ships.find(s => s.id === id); }
+    function getPlayer(id) { return state.players.find(p => p.id === id); }
+    function currentPlayer() { return getPlayer(state.currentPlayerId) || state.players[0]; }
+    function currentEventId() { return state.currentEventId || STORY.currentEventId || STORY.eventOrder?.[0]; }
+    function currentEvent() { return STORY.events[currentEventId()] || Object.values(STORY.events)[0]; }
+    function eventOrder() { return STORY.eventOrder?.length ? STORY.eventOrder : Object.keys(STORY.events); }
+    function nextEventId() {
+      const order = eventOrder();
+      const index = order.indexOf(currentEventId());
+      return index >= 0 ? order[index + 1] || null : null;
+    }
+    function initials(name) { return name.split(/\s+/).map(n => n[0]).join("").slice(0,2).toUpperCase(); }
+    function pips(value, max = 5, color = "blue") {
+      return `<div class="meter ${max > 5 ? "compact" : ""}">${Array.from({length:max}, (_, i) => `<span class="pip ${i < value ? `on ${color}` : ""}"></span>`).join("")}</div>`;
+    }
+    const TETROMINO_SHAPES = {
+      I: [[0,0],[1,0],[2,0],[3,0]],
+      O: [[0,0],[1,0],[0,1],[1,1]],
+      T: [[0,0],[1,0],[2,0],[1,1]],
+      L: [[0,0],[0,1],[0,2],[1,2]],
+      J: [[1,0],[1,1],[1,2],[0,2]],
+      S: [[1,0],[2,0],[0,1],[1,1]],
+      Z: [[0,0],[1,0],[1,1],[2,1]]
+    };
+    function rotatedShape(shape = "T", rotation = 0) {
+      let cells = (TETROMINO_SHAPES[shape] || TETROMINO_SHAPES.T).map(([x,y]) => [x,y]);
+      for (let i=0; i<((rotation%4)+4)%4; i++) cells = cells.map(([x,y]) => [-y,x]);
+      const minX = Math.min(...cells.map(c=>c[0])), minY = Math.min(...cells.map(c=>c[1]));
+      return cells.map(([x,y]) => [x-minX,y-minY]);
+    }
+    function damageCells(piece) {
+      return rotatedShape(piece.shape, piece.rotation).map(([dx,dy]) => ({ x:piece.x+dx, y:piece.y+dy }));
+    }
+    function holdDamageSet(hold) {
+      return new Set((hold.damagePieces || []).flatMap(piece => damageCells(piece).map(c => `${c.x},${c.y}`)));
+    }
+    function itemRelativeCells(item, rotation = item.rotation || 0) {
+      if (item.shape) return rotatedShape(item.shape, rotation).map(([x,y])=>({x,y}));
+      const cells=[];
+      for (let dx=0; dx<(item.w||1); dx++) for (let dy=0; dy<(item.h||1); dy++) cells.push({x:dx,y:dy});
+      return cells;
+    }
+    function itemCells(item, rotation = item.rotation || 0, originX = item.x, originY = item.y) {
+      return itemRelativeCells(item, rotation).map(cell=>({x:originX+cell.x,y:originY+cell.y}));
+    }
+    function itemFootprintSize(item, rotation = item.rotation || 0) {
+      const cells=itemRelativeCells(item,rotation);
+      return { w:Math.max(...cells.map(c=>c.x))+1, h:Math.max(...cells.map(c=>c.y))+1 };
+    }
+    function itemIcon(item) {
+      if (item.icon) return item.icon;
+      if (item.kind === "rum") return "◉";
+      if (item.kind === "valuable") return "✦";
+      if (item.kind === "material") return "◇";
+      if (item.kind === "supply") return "+";
+      if (item.kind === "crafted") return "⚒";
+      return "◆";
+    }
+    function holdUsage(ship) {
+      const hold = ship.hold;
+      const damaged = holdDamageSet(hold);
+      const occupied = new Set();
+      for (const item of hold.items || []) {
+        for (const {x,y} of itemCells(item)) {
+          if (x >= 0 && x < hold.columns && y >= 0 && y < hold.rows && !damaged.has(`${x},${y}`)) occupied.add(`${x},${y}`);
+        }
+      }
+      return { occupied: occupied.size, usable: hold.columns * hold.rows - damaged.size, damaged: damaged.size };
+    }
+    function holdFillMarkup(ship) {
+      const usage = holdUsage(ship);
+      const segmentCount = Math.ceil((ship.hold.columns * ship.hold.rows) / 8);
+      return `<div class="hold-fill" style="grid-template-columns:repeat(${segmentCount},1fr)">${Array.from({length:segmentCount},(_,i)=>{
+        const fill = Math.max(0, Math.min(8, usage.occupied - i*8)) / 8 * 100;
+        return `<span class="hold-fill-segment"><span style="width:${fill}%"></span></span>`;
+      }).join("")}</div>`;
+    }
+    function eventVotes(eventId = currentEventId()) {
+      state.votes[eventId] ||= {};
+      return state.votes[eventId];
+    }
+    function playersLeftToVote(eventId = currentEventId()) {
+      const votes = eventVotes(eventId);
+      return state.players.filter(p => !votes[p.id]);
+    }
+    function playersLeftToContinue(eventId = currentEventId()) {
+      state.continueReady[eventId] ||= {};
+      return state.players.filter(p => !state.continueReady[eventId][p.id]);
+    }
+    function voteTypeLabel(event) {
+      return event.voteType === "ship" ? "Ship Vote · each ship resolves separately" : "Fleet Vote · all Influence is combined";
+    }
+    function tallyChoices(players, event, eventId = currentEventId()) {
+      const totals = Object.fromEntries(event.choices.map(c => [c.id, 0]));
+      const votes = eventVotes(eventId);
+      for (const player of players) {
+        const vote = votes[player.id];
+        if (vote && totals[vote.choiceId] !== undefined) totals[vote.choiceId] += 1 + Number(vote.influence || 0);
+      }
+      const highest = Math.max(...Object.values(totals));
+      const winners = Object.entries(totals).filter(([,score]) => score === highest).map(([id]) => id);
+      return { totals, winners, winner: winners.length === 1 ? winners[0] : null };
+    }
+    function slotLabelXY(x, y) { return `${String.fromCharCode(65 + y)}${x + 1}`; }
+    function itemOccupies(item, index, columns) {
+      const x = index % columns, y = Math.floor(index / columns);
+      return itemCells(item).some(cell => cell.x === x && cell.y === y);
+    }
+    function validDamagePlacement(ship, piece) {
+      const cells = damageCells(piece);
+      const existing = holdDamageSet(ship.hold);
+      return cells.every(({x,y}) => x>=0 && y>=0 && x<ship.hold.columns && y<ship.hold.rows && !existing.has(`${x},${y}`));
+    }
+    function placeDamagePiece(ship, change = {}) {
+      const piece = {
+        id: `damage-${ship.id}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+        shape: change.shape || "T",
+        rotation: Number(change.rotation || 0),
+        x: Number.isInteger(change.x) ? change.x : 0,
+        y: Number.isInteger(change.y) ? change.y : 0
+      };
+      if (!validDamagePlacement(ship, piece)) {
+        let found = null;
+        for (let y=0; y<ship.hold.rows && !found; y++) for (let x=0; x<ship.hold.columns && !found; x++) {
+          const candidate = {...piece,x,y};
+          if (validDamagePlacement(ship,candidate)) found = candidate;
+        }
+        if (!found) return null;
+        Object.assign(piece, found);
+      }
+      const damagedKeys = new Set(damageCells(piece).map(c=>`${c.x},${c.y}`));
+      const lost = ship.hold.items.filter(item => itemCells(item).some(c => damagedKeys.has(`${c.x},${c.y}`)));
+      ship.hold.items = ship.hold.items.filter(item => !lost.includes(item));
+      ship.hold.damagePieces.push(piece);
+      return { piece, lost };
+    }
+    function findOpenCargoSlot(ship, w, h, shape = null, rotation = 0) {
+      const placeholder = { id:"__new__", w:w||1, h:h||1, shape, rotation, x:0, y:0 };
+      for (let y = 0; y < ship.hold.rows; y++) for (let x = 0; x < ship.hold.columns; x++) {
+        if (validCargoPlacement(ship, placeholder, x, y)) return { x, y };
+      }
+      return null;
+    }
+    function consumeRum(ship) {
+      const index = ship.hold.items.findIndex(item => item.kind === "rum");
+      const before = Number(ship.stats.Morale || 0);
+      if (before >= 10) return { used:false, reason:"Morale is already 10." };
+      if (index < 0) return { used:false, reason:"No Rum is in the hold." };
+      const [item] = ship.hold.items.splice(index,1);
+      ship.stats.Morale = Math.min(10, before + 1);
+      return { used:true, item, before, after:ship.stats.Morale };
+    }
+    function applyConsequences(event, choiceId, contextShipId = null) {
+      const rows = [];
+      for (const change of event.consequences?.[choiceId] || []) {
+        const targetId = change.targetId === "currentShip" ? contextShipId : change.targetId;
+        if (change.kind === "stat") {
+          const ship = getShip(targetId);
+          if (!ship) continue;
+          const before = Number(ship.stats[change.stat] || 0);
+          const max = change.stat === "Morale" ? 10 : 5;
+          const after = Math.max(0, Math.min(max, before + Number(change.delta || 0)));
+          ship.stats[change.stat] = after;
+          rows.push({ kind: "Stat", text: `${ship.name}: ${change.stat} ${before} → ${after} (${after-before >= 0 ? "+" : ""}${after-before})` });
+        } else if (change.kind === "useRum") {
+          const ship = getShip(targetId);
+          if (!ship) continue;
+          const result = consumeRum(ship);
+          rows.push(result.used
+            ? { kind:"Item used", text:`${ship.name}: 1 Rum used; Morale ${result.before} → ${result.after}` }
+            : { kind:"No change", text:`${ship.name}: ${result.reason}` });
+        } else if (change.kind === "item") {
+          const ship = getShip(targetId);
+          if (!ship) continue;
+          const item = { ...change.item, id: `${(change.item?.name || "item").toLowerCase().replace(/[^a-z0-9]+/g,"-")}-${Date.now()}-${Math.random().toString(36).slice(2,6)}` };
+          const spot = findOpenCargoSlot(ship, item.w || 1, item.h || 1);
+          if (spot) {
+            Object.assign(item, spot, { w: item.w || 1, h: item.h || 1 });
+            ship.hold.items.push(item);
+            rows.push({ kind: "Item gained", text: `${ship.name}: ${item.name} added to the hold (${item.w}×${item.h})` });
+          } else rows.push({ kind: "Item blocked", text: `${ship.name}: ${item.name} could not fit in the hold` });
+        } else if (change.kind === "damage") {
+          const ship = getShip(targetId);
+          if (!ship) continue;
+          const result = placeDamagePiece(ship, change);
+          if (!result) {
+            rows.push({kind:"Hold damage",text:`${ship.name}: no tetromino damage could fit`});
+            continue;
+          }
+          const labels = damageCells(result.piece).map(c=>slotLabelXY(c.x,c.y)).join(", ");
+          rows.push({ kind: "Hold damage", text: `${ship.name}: ${result.piece.shape}-tetromino damage placed across ${labels}` });
+          if (result.lost.length) rows.push({ kind: "Item lost", text: `${ship.name}: ${result.lost.map(i=>i.name).join(", ")} destroyed by the damage` });
+        } else if (change.kind === "mapReveal") {
+          if (!state.map.revealed.includes(change.key)) state.map.revealed.push(change.key);
+          if (change.name && !state.map.locations[change.key]) state.map.locations[change.key] = { name: change.name, type: "Route", note: "Revealed by recovered charts." };
+          rows.push({ kind: "Map", text: `${change.name || change.key} revealed` });
+        }
+      }
+      return rows;
+    }
+    function recordResolution(event, result) {
+      const eventId = currentEventId();
+      if (state.journal.some(entry => entry.eventId === eventId)) return;
+      let text;
+      if (result.type === "ship") {
+        text = state.ships.map(ship => `${ship.name}: ${result.ships[ship.id].outcome}`).join(" ");
+      } else text = result.outcome;
+      state.journal.push({ eventId, type: "story", session: event.chapter || state.chapterProgress, title: event.title, text });
+    }
+    function resolveCurrentEvent() {
+      const eventId = currentEventId();
+      const event = currentEvent();
+      if (playersLeftToVote(eventId).length) return null;
+      if (state.resolvedEvents[eventId]) return state.resolvedEvents[eventId];
+      let result;
+      if (event.voteType === "ship") {
+        const ships = {};
+        for (const ship of state.ships) {
+          const tally = tallyChoices(state.players.filter(p => p.shipId === ship.id), event, eventId);
+          ships[ship.id] = {
+            ...tally,
+            outcome: tally.winner ? event.outcomes?.[tally.winner] : "The vote is tied and needs a tie-break.",
+            consequences: tally.winner ? applyConsequences(event, tally.winner, ship.id) : []
+          };
+        }
+        result = { type: "ship", eventId, ships };
+      } else {
+        const tally = tallyChoices(state.players, event, eventId);
+        result = {
+          type: "fleet", eventId, ...tally,
+          outcome: tally.winner ? event.outcomes?.[tally.winner] : "The fleet vote is tied and needs a tie-break.",
+          consequences: tally.winner ? applyConsequences(event, tally.winner) : []
+        };
+      }
+      state.resolvedEvents[eventId] = result;
+      recordResolution(event, result);
+      saveState();
+      return result;
+    }
+    function currentResolution() { return state.resolvedEvents[currentEventId()] || resolveCurrentEvent(); }
+    function choiceById(event, id) { return event.choices.find(choice => choice.id === id); }
+    function consequenceMarkup(rows = []) {
+      return `<div class="consequence-box"><div class="consequence-heading">Changes</div>${rows.length
+        ? rows.map(row => `<div class="consequence-row"><div class="consequence-kind">${row.kind}</div><div class="consequence-change">${row.text}</div></div>`).join("")
+        : `<div class="consequence-row"><div class="consequence-kind">None</div><div class="consequence-change">No tracked stats, items, or damage changed.</div></div>`}</div>`;
+    }
+    function resolutionMarkup(event, resolution) {
+      if (!resolution) return "";
+      if (resolution.type === "ship") {
+        return `<div class="resolution-panel"><div class="ship-outcome-grid">${state.ships.map(ship => {
+          const r = resolution.ships[ship.id];
+          const choice = choiceById(event, r.winner);
+          return `<article class="ship-outcome-card ${ship.color}"><h3>${ship.name}</h3><h4>${choice?.title || "Tie"}</h4><p>${r.outcome}</p></article>`;
+        }).join("")}</div>${state.ships.map(ship => `<div><div class="eyebrow" style="margin:4px 0 7px">${ship.name}</div>${consequenceMarkup(resolution.ships[ship.id].consequences)}</div>`).join("")}</div>`;
+      }
+      const choice = choiceById(event, resolution.winner);
+      return `<div class="resolution-panel"><div class="outcome-result"><div class="eyebrow">Winning decision</div><h3>${choice?.title || "Tie"}</h3><p>${resolution.outcome}</p></div>${consequenceMarkup(resolution.consequences)}</div>`;
+    }
+
+    function renderPlayerSwitcher() {
+      const select = $("#currentPlayerSelect");
+      select.innerHTML = state.players.map(p => `<option value="${p.id}" ${p.id === state.currentPlayerId ? "selected" : ""}>${p.name}</option>`).join("");
+      select.onchange = () => {
+        state.currentPlayerId = select.value;
+        saveState();
+        renderAll();
+      };
+    }
+
+    function shipSummary(ship) {
+      const captain = getPlayer(ship.captainId);
+      const hold = holdUsage(ship);
+      return `
+        <div class="ship-summary">
+          <div class="ship-name ${ship.color}">${ship.name}</div>
+          <div class="captain-line">Captain: ${captain?.name || "Unassigned"}</div>
+          ${Object.entries(ship.stats).map(([key, val]) => `
+            <div class="stat-row"><span>${key}</span>${pips(val, key === "Morale" ? 10 : 5, ship.color)}<strong>${val}</strong></div>
+          `).join("")}
+          <div class="stat-row"><span>Hold</span><span></span><strong>${hold.occupied}/${hold.usable}</strong></div>
+          ${holdFillMarkup(ship)}
+        </div>`;
+    }
+
+    function rosterGroup(ship) {
+      const players = state.players.filter(p => p.shipId === ship.id);
+      return `
+        <div class="roster-group ${ship.color}">
+          <h3 class="roster-heading ${ship.color}">${ship.name}</h3>
+          ${players.map(p => `
+            <div class="player-row">
+              <div class="portrait">${initials(p.name)}</div>
+              <div><div class="player-name">${p.name}</div><div class="player-role">${p.role}</div></div>
+              <div class="resource">♟ ${p.influence}</div>
+              <div class="resource gold">◉ ${p.gold}</div>
+            </div>`).join("")}
+        </div>`;
+    }
+
+    function renderOverview() {
+      const eventId = currentEventId();
+      const event = currentEvent();
+      const cp = currentPlayer();
+      const resolution = currentResolution();
+      const remaining = resolution ? playersLeftToContinue(eventId) : playersLeftToVote(eventId);
+      const existingVote = eventVotes(eventId)[cp.id] || null;
+      const availableInfluence = cp.influence + Number(existingVote?.influence || 0);
+      const nextId = nextEventId();
+      const hasContinued = Boolean(state.continueReady[eventId]?.[cp.id]);
+      const screen = $("#screen-overview");
+      screen.innerHTML = `
+        <div class="overview-grid">
+          <aside class="panel overview-left">
+            <h2 class="panel-title">Campaign Progress</h2>
+            <div>Chapter ${event.chapter}: ${event.title}</div>
+            <div style="display:flex; justify-content:flex-end; color:var(--muted); margin-top:8px"><span>${state.chapterProgress}/${STORY.chaptersTotal}</span></div>
+            <div class="progress-track">${Array.from({length:STORY.chaptersTotal}, (_,i)=>`<span class="progress-segment ${i < state.chapterProgress ? "done" : ""}"></span>`).join("")}</div>
+            ${state.ships.map(shipSummary).join("")}
+          </aside>
+
+          <div class="overview-center">
+            <section class="panel session-banner">
+              <span class="eyebrow">Current Session</span>
+              <h1 class="session-title">${event.title}</h1>
+              <div class="session-subtitle">${event.part || ""}</div>
+              <p class="session-narrative">${event.setup || ""}</p>
+              <div class="vote-type-badge">${voteTypeLabel(event)}</div>
+            </section>
+
+            <section class="panel decision-panel">
+              ${resolution ? `
+                <h2 class="decision-question">Outcome</h2>
+                <p class="decision-intro">${event.question}</p>
+                ${resolutionMarkup(event, resolution)}
+                <div class="outcome-actions">
+                  ${nextId
+                    ? `<button class="primary-btn" id="continueDecisionBtn" ${hasContinued ? "disabled" : ""}>${hasContinued ? "Waiting for everyone" : "Continue"}</button>`
+                    : `<button class="primary-btn" id="continueDecisionBtn" ${hasContinued ? "disabled" : ""}>${hasContinued ? "Marked complete" : "Finish decision"}</button>`}
+                </div>
+              ` : `
+                <h2 class="decision-question">${event.question}</h2>
+                <p class="decision-intro">${event.intro || ""}</p>
+                <div class="choice-grid">
+                  ${event.choices.map((c, idx) => `
+                    <button class="choice-card ${existingVote?.choiceId === c.id ? "selected" : ""}" data-choice="${c.id}">
+                      <div class="choice-art"></div>
+                      <div class="choice-body">
+                        <h3 class="choice-title">${String.fromCharCode(65+idx)}. ${c.title}</h3>
+                        <p class="choice-flavor">${c.flavor || ""}</p>
+                      </div>
+                    </button>`).join("")}
+                </div>
+                <div class="vote-row">
+                  <div class="vote-summary" id="voteSummary">${existingVote ? `Your vote: <strong>${choiceById(event,existingVote.choiceId)?.title || "Selected"}</strong>` : `Choose an option`} · ${availableInfluence} available</div>
+                  <div class="influence-stepper" aria-label="Influence to spend"><button id="influenceMinus" type="button">−</button><div class="influence-value" id="influenceValue">${existingVote?.influence || 0}</div><button id="influencePlus" type="button">+</button></div>
+                  <button class="primary-btn" id="castVoteBtn">${existingVote ? "Update Vote" : "Cast Vote"}</button>
+                </div>
+              `}
+            </section>
+
+            <section class="panel vote-status">
+              <h2 class="panel-title">${resolution ? "Continue Status" : "Vote Status"}</h2>
+              <div style="margin-bottom:12px;color:#c9c7c0">${remaining.length ? `${remaining.length} left to ${resolution ? "continue" : "vote"}` : (resolution ? "Everyone is ready" : "Everyone has voted")}</div>
+              <div class="vote-status-grid">
+                ${state.players.map(p => {
+                  const done = !remaining.some(r => r.id === p.id);
+                  return `<div class="vote-chip ${done ? "done" : "waiting"}"><span>${done ? "✓" : "○"}</span><span>${p.name}</span></div>`;
+                }).join("")}
+              </div>
+            </section>
+          </div>
+
+          <aside class="panel overview-right">
+            <h2 class="panel-title">Players</h2>
+            <div class="rosters">${state.ships.map(rosterGroup).join("")}</div>
+          </aside>
+        </div>`;
+
+      if (resolution) {
+        if ($("#continueDecisionBtn", screen)) $("#continueDecisionBtn", screen).onclick = () => {
+          state.continueReady[eventId] ||= {};
+          state.continueReady[eventId][cp.id] = true;
+          const left = playersLeftToContinue(eventId);
+          if (!left.length && nextId) {
+            state.currentEventId = nextId;
+            saveState();
+            renderAll();
+            toast("Everyone continued. Next decision loaded.");
+            return;
+          }
+          saveState();
+          renderAll();
+          toast(left.length ? `Ready. ${left.length} still need to continue.` : "Decision complete.");
+        };
+        return;
+      }
+      let pendingChoice = existingVote?.choiceId || null;
+      let pendingInfluence = Math.max(0, Math.min(availableInfluence, Number(existingVote?.influence || 0)));
+      const updateVoteControls = () => {
+        $("#influenceValue",screen).textContent=pendingInfluence;
+        $("#influenceMinus",screen).disabled=pendingInfluence<=0;
+        $("#influencePlus",screen).disabled=pendingInfluence>=availableInfluence;
+        const choice=pendingChoice?choiceById(event,pendingChoice):null;
+        $("#voteSummary",screen).innerHTML=`${choice?`Your vote: <strong>${choice.title}</strong>`:"Choose an option"} · <strong>${pendingInfluence}</strong> Influence · ${availableInfluence} available`;
+      };
+      $$(".choice-card", screen).forEach(card => card.onclick = () => {
+        pendingChoice = card.dataset.choice;
+        $$(".choice-card", screen).forEach(c => c.classList.toggle("selected", c === card));
+        updateVoteControls();
+      });
+      $("#influenceMinus",screen).onclick=()=>{ pendingInfluence=Math.max(0,pendingInfluence-1); updateVoteControls(); };
+      $("#influencePlus",screen).onclick=()=>{ pendingInfluence=Math.min(availableInfluence,pendingInfluence+1); updateVoteControls(); };
+      updateVoteControls();
+      $("#castVoteBtn", screen).onclick = () => {
+        if (!pendingChoice) return toast("Choose an option first.");
+        const influence = pendingInfluence;
+        cp.influence = availableInfluence - influence;
+        eventVotes(eventId)[cp.id] = { choiceId: pendingChoice, influence };
+        const resolved = resolveCurrentEvent();
+        saveState();
+        toast(resolved ? "Vote saved. The decision is resolved." : "Vote saved.");
+        renderAll();
+      };
+    }
+
+    function isoHexPoints(cx, cy, size = 52, yScale = .58) {
+      return Array.from({length:6}, (_, i) => {
+        const angle = (Math.PI / 180) * (60 * i - 30);
+        return `${cx + size * Math.cos(angle)},${cy + size * Math.sin(angle) * yScale}`;
+      }).join(" ");
+    }
+
+    function renderMap() {
+      const screen = $("#screen-map");
+      screen.innerHTML = `
+        <div class="map-layout">
+          <section class="panel map-panel">
+            <div class="map-toolbar"><button class="utility-btn" id="zoomIn">＋</button><button class="utility-btn" id="zoomOut">−</button><button class="utility-btn" id="resetMap">⌂</button></div>
+            <div class="map-tag">Click a hex · Drag to move · Scroll to zoom</div>
+            <svg id="hexMap" viewBox="0 0 1800 1000" aria-label="Campaign map">
+              <defs>
+                <radialGradient id="seaGlow" cx="50%" cy="38%"><stop offset="0" stop-color="#173c50"/><stop offset=".65" stop-color="#0a2638"/><stop offset="1" stop-color="#06131d"/></radialGradient>
+                <linearGradient id="tileSea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#23556d"/><stop offset="1" stop-color="#123348"/></linearGradient>
+                <linearGradient id="tileSeaDeep" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b475e"/><stop offset="1" stop-color="#0c293d"/></linearGradient>
+                <linearGradient id="tileLand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8d8b5d"/><stop offset=".28" stop-color="#657052"/><stop offset="1" stop-color="#334536"/></linearGradient>
+                <linearGradient id="tileShoal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d7c84"/><stop offset="1" stop-color="#1d5663"/></linearGradient>
+                <filter id="tileShadow"><feDropShadow dx="0" dy="5" stdDeviation="3" flood-opacity=".34"/></filter>
+                <filter id="softGlow"><feGaussianBlur stdDeviation="6"/></filter>
+              </defs>
+              <rect width="1800" height="1000" fill="url(#seaGlow)"/>
+              <g opacity=".07">${Array.from({length:18},(_,i)=>`<path d="M0 ${105+i*48} Q280 ${82+i*48} 560 ${105+i*48} T1120 ${105+i*48} T1900 ${105+i*48}" fill="none" stroke="#9ad0df" stroke-width="2"/>`).join("")}</g>
+              <text class="map-region-label" x="365" y="245">WESTERN REACHES</text>
+              <text class="map-region-label" x="1195" y="710">TEMPEST SEA</text>
+              <g id="mapWorld"></g>
+            </svg>
+          </section>
+          <aside class="panel map-side" id="mapInfo"></aside>
+        </div>`;
+
+      const world=$("#mapWorld",screen);
+      const centerX=900, centerY=500, size=52, yScale=.60;
+      const cells=[];
+      for (let q=-8;q<=8;q++) for (let r=-7;r<=7;r++) {
+        if (Math.abs(q+r)>10) continue;
+        const x=centerX+Math.sqrt(3)*size*(q+r/2);
+        const y=centerY+1.5*size*r*yScale;
+        cells.push({q,r,x,y,key:`${q},${r}`});
+      }
+      cells.sort((a,b)=>a.y-b.y||a.x-b.x);
+      const cellByKey=Object.fromEntries(cells.map(c=>[c.key,c]));
+      const validKeys=new Set(cells.map(c=>c.key));
+      if (!validKeys.has(state.map.selected)) state.map.selected="0,0";
+      const landKeys=new Set(["-4,2","-4,3","-3,2","-3,3","-2,-2","-2,-1","-1,-2","-1,-1","-1,2","-1,3","0,0","0,1","1,0","1,1","3,-2","3,-1","4,-2"]);
+      const shoalKeys=new Set(["-5,2","-4,1","-3,-2","-2,-3","0,2","1,2","2,1","2,2","3,1","4,-1","5,-2"]);
+      let html="";
+      for (const cell of cells) {
+        const {x,y,key,q,r}=cell;
+        const revealed=state.map.revealed.includes(key);
+        const loc=state.map.locations[key];
+        const selected=key===state.map.selected;
+        const terrain=landKeys.has(key)?"land":shoalKeys.has(key)?"shoal":"sea";
+        let fill="rgba(3,9,14,.88)";
+        if (revealed) fill=terrain==="land"?"url(#tileLand)":terrain==="shoal"?"url(#tileShoal)":((Math.abs(q*7+r*11)%3)===0?"url(#tileSeaDeep)":"url(#tileSea)");
+        const wave=revealed&&terrain==="sea"?`<path d="M${x-15} ${y+2} q8 -5 16 0 q8 5 16 0" fill="none" stroke="rgba(186,221,231,.22)" stroke-width="1.2" pointer-events="none"/>`:"";
+        const island=revealed&&terrain==="land"?`<path class="map-coast-mark" d="M${x-20} ${y+5} q12 -19 27 -11 q12 6 9 19 q-14 12 -36 2Z" fill="rgba(184,164,104,.34)" stroke="rgba(229,206,145,.26)"/>`:"";
+        html+=`<g class="hex" data-key="${key}" style="cursor:pointer" filter="url(#tileShadow)"><polygon points="${isoHexPoints(x,y+7,size,yScale)}" fill="rgba(0,0,0,.32)" pointer-events="none"/><polygon class="hex-face" points="${isoHexPoints(x,y,size,yScale)}" fill="${fill}" stroke="${selected?'#f0c777':revealed?'rgba(208,180,123,.24)':'rgba(107,132,143,.16)'}" stroke-width="${selected?3:1}"/>${wave}${island}${loc&&revealed?`<text x="${x}" y="${y-5}" text-anchor="middle" fill="#f0d39d" font-size="17" pointer-events="none">${loc.type==="Port"?"⚓":loc.type==="Hazard"?"⚠":loc.type==="Shoal"?"≋":loc.type==="Route"?"➜":"◆"}</text><text x="${x}" y="${y+15}" text-anchor="middle" fill="#ece2d2" font-size="9.5" font-weight="700" paint-order="stroke" stroke="#071018" stroke-width="3" pointer-events="none">${loc.name}</text>`:""}</g>`;
+      }
+      const routeKeys=["-4,2","-3,0","0,0","2,-1","3,-1"];
+      const routePoints=routeKeys.map(k=>cellByKey[k]).filter(Boolean);
+      if (routePoints.length>1) html+=`<polyline points="${routePoints.map(c=>`${c.x},${c.y}`).join(' ')}" fill="none" stroke="rgba(231,194,125,.38)" stroke-width="4" stroke-dasharray="8 11" stroke-linecap="round" pointer-events="none"/>`;
+      const fleetHex=state.map.shipPositions?.[state.ships[0]?.id]||"0,0";
+      state.ships.forEach(ship=>state.map.shipPositions[ship.id]=fleetHex);
+      const fleetCell=cellByKey[fleetHex]||cellByKey["0,0"];
+      state.ships.forEach((ship,index)=>{
+        const offset=(index-(state.ships.length-1)/2)*72;
+        const stroke=ship.color==="red"?"#dd7565":"#7fc1e4";
+        html+=`<g class="ship-marker" transform="translate(${fleetCell.x+offset},${fleetCell.y-34})" pointer-events="none"><ellipse cx="0" cy="12" rx="18" ry="6" fill="rgba(0,0,0,.35)"/><path d="M-15 4 L15 4 L9 13 L-10 13 Z M0 -19 L0 4 M0 -17 L12 -7 L0 -7 Z" fill="${stroke}" stroke="#061019" stroke-width="2"/><text class="ship-map-label" x="0" y="28" text-anchor="middle" fill="${stroke}">${ship.name.replace(/^The /,'')}</text></g>`;
+      });
+      html+=`<g class="map-event-marker" transform="translate(${cellByKey['4,-2']?.x||0},${(cellByKey['4,-2']?.y||0)-27})"><circle r="10" fill="rgba(179,83,67,.88)"/><text y="4" text-anchor="middle" fill="#fff" font-size="12">!</text></g>`;
+      world.innerHTML=html;
+
+      function renderMapInfo(){
+        const loc=state.map.locations[state.map.selected];
+        const revealed=state.map.revealed.includes(state.map.selected);
+        const fleetHere=state.map.selected===fleetHex;
+        $("#mapInfo",screen).innerHTML=`<h2 class="panel-title">Map</h2><h3 style="font:1.5rem Georgia,serif;margin:0 0 8px">${revealed?(loc?.name||"Open Water"):"Uncharted"}</h3><div style="color:var(--gold);margin-bottom:14px">${revealed?(loc?.type||"Sea"):"Unknown"}</div><p style="color:#c9c7c0;line-height:1.55">${revealed?(loc?.note||"No notable location has been recorded here."):"This hex has not been explored."}</p>${fleetHere?`<div style="margin-top:20px"><div class="eyebrow" style="margin-bottom:8px">Fleet location</div>${state.ships.map(ship=>`<div style="padding:6px 0;color:${ship.color==='red'?'#dd7565':'#7fc1e4'}">${ship.name}</div>`).join('')}</div>`:''}<div style="margin-top:24px;color:var(--muted)">Hex ${state.map.selected}</div>`;
+      }
+      function selectHex(key){state.map.selected=key;saveState();$$(".hex",screen).forEach(group=>{const face=$(".hex-face",group);const selected=group.dataset.key===key;face.setAttribute("stroke",selected?"#f0c777":state.map.revealed.includes(group.dataset.key)?"rgba(208,180,123,.24)":"rgba(107,132,143,.16)");face.setAttribute("stroke-width",selected?"3":"1")});renderMapInfo();}
+      renderMapInfo();
+      const svg=$("#hexMap",screen);let view={x:0,y:0,w:1800,h:1000};let pointer=null;const apply=()=>svg.setAttribute("viewBox",`${view.x} ${view.y} ${view.w} ${view.h}`);
+      svg.addEventListener("wheel",e=>{e.preventDefault();const factor=e.deltaY>0?1.1:.9;const nw=Math.max(700,Math.min(2800,view.w*factor));const nh=nw*1000/1800;view.x+=(view.w-nw)/2;view.y+=(view.h-nh)/2;view.w=nw;view.h=nh;apply();},{passive:false});
+      svg.addEventListener("pointerdown",e=>{pointer={id:e.pointerId,x:e.clientX,y:e.clientY,vx:view.x,vy:view.y,moved:false,key:e.target.closest?.(".hex")?.dataset.key||null};svg.setPointerCapture(e.pointerId)});
+      svg.addEventListener("pointermove",e=>{if(!pointer||pointer.id!==e.pointerId)return;const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;if(Math.hypot(dx,dy)>5)pointer.moved=true;if(pointer.moved){svg.classList.add("dragging");view.x=pointer.vx-dx*view.w/svg.clientWidth;view.y=pointer.vy-dy*view.h/svg.clientHeight;apply()}});
+      svg.addEventListener("pointerup",e=>{if(!pointer||pointer.id!==e.pointerId)return;if(!pointer.moved&&pointer.key)selectHex(pointer.key);pointer=null;svg.classList.remove("dragging")});
+      svg.addEventListener("pointercancel",()=>{pointer=null;svg.classList.remove("dragging")});
+      $("#zoomIn",screen).onclick=()=>{view.w=Math.max(700,view.w*.9);view.h=view.w*1000/1800;apply()};
+      $("#zoomOut",screen).onclick=()=>{view.w=Math.min(2800,view.w*1.1);view.h=view.w*1000/1800;apply()};
+      $("#resetMap",screen).onclick=()=>{view={x:0,y:0,w:1800,h:1000};apply()};
+    }
+
+    let activeDetailsShipId = null;
+    let activeDetailsPlayerId = null;
+
+    function renderHold(ship, options = {}) {
+      const hold = ship.hold;
+      const editable = Boolean(options.editable);
+      const cellSize = options.compact ? 34 : 42;
+      const cells = Array.from({length: hold.columns*hold.rows}, (_,i) => {
+        const x=i%hold.columns, y=Math.floor(i/hold.columns);
+        return `<div class="hold-cell" data-hold-x="${x}" data-hold-y="${y}" style="grid-column:${x+1};grid-row:${y+1}"></div>`;
+      }).join("");
+      const items = (hold.items||[]).flatMap(item => {
+        const rel=itemRelativeCells(item);
+        return rel.map((cell,index)=>{
+          const x=item.x+cell.x, y=item.y+cell.y;
+          return `<div class="cargo-item ${item.kind || ""}" ${editable ? `draggable="true" data-cargo-id="${item.id}"` : ""} data-item-name="${item.name}" title="${item.name}${editable ? " · drag to move · right-click to rotate" : ""}" style="grid-column:${x+1};grid-row:${y+1}">${index===0 ? `<span class="cargo-cell-icon">${itemIcon(item)}</span><span class="cargo-cell-label">${item.name}</span>` : `<span class="cargo-cell-icon" style="opacity:.3">${itemIcon(item)}</span>`}</div>`;
+        });
+      }).join("");
+      const damage = (hold.damagePieces||[]).flatMap(piece => damageCells(piece).map((cell,index) => `<div class="damage-cell" title="${piece.shape}-tetromino damage" style="grid-column:${cell.x+1};grid-row:${cell.y+1}">${index===0 ? "✕" : ""}</div>`)).join("");
+      const usage = holdUsage(ship);
+      return `<div style="display:flex; justify-content:space-between; margin-bottom:2px"><span>Hold</span><span style="color:var(--muted)">${usage.occupied}/${usage.usable}</span></div>${holdFillMarkup(ship)}<div class="ship-hold-cutaway"><div class="hold-deck-label">Lower cargo deck</div><div class="hold-grid ${editable ? "editable" : ""}" data-editable-hold="${editable ? "true" : "false"}" style="--hold-cell:${cellSize}px;grid-template-columns:repeat(${hold.columns},${cellSize}px);grid-template-rows:repeat(${hold.rows},${cellSize}px)">${cells}${items}${damage}</div></div>`;
+    }
+
+    function renderDetails() {
+      activeDetailsShipId ||= currentPlayer().shipId;
+      const ship = getShip(activeDetailsShipId) || state.ships[0];
+      const players = state.players.filter(p=>p.shipId===ship.id);
+      activeDetailsPlayerId = players.some(p=>p.id===activeDetailsPlayerId) ? activeDetailsPlayerId : players[0]?.id;
+      const selected = getPlayer(activeDetailsPlayerId);
+      const captain = getPlayer(ship.captainId);
+      const usage = holdUsage(ship);
+      const config=configForShip(ship);
+      const screen = $("#screen-details");
+      screen.innerHTML = `
+        <div class="details-shell">
+          <div class="panel subtabs">${state.ships.map(s=>`<button class="subtab ${s.id===ship.id?"active":""}" data-ship="${s.id}">${s.name}</button>`).join("")}</div>
+          <div class="details-grid">
+            <aside class="panel details-panel">
+              <h2 class="panel-title">${ship.name}</h2>
+              <div class="captain-line">Captain: ${captain?.name || "Unassigned"}</div>
+              <div class="captain-line">Crew: ${config?.name || "Unconfigured"}</div>
+              ${Object.entries(ship.stats).map(([key,val])=>`<div class="stat-row"><span>${key}</span>${pips(val,key === "Morale" ? 10 : 5,ship.color)}<strong>${val}</strong></div>`).join("")}
+              <div class="stat-row"><span>Hold</span><span></span><strong>${usage.occupied}/${usage.usable}</strong></div>
+              <h2 class="panel-title" style="margin-top:24px">Reputation</h2>
+              ${Object.entries(ship.reputation||{}).map(([name,val])=>`<div class="reputation-row"><span>${name}</span><strong style="color:${val>0?'#9fbd8d':val<0?'#d78376':'#b8bec2'}">${val>0?'+':''}${val}</strong></div>`).join("")}
+              <h2 class="panel-title" style="margin-top:24px">Crew</h2>
+              ${players.map(p=>`<div class="player-select-card ${p.id===selected?.id?"active":""}" data-player="${p.id}"><div class="portrait">${initials(p.name)}</div><div><div>${p.name}</div><div class="player-role">${p.role}</div></div></div>`).join("")}
+            </aside>
+            <section class="panel details-panel">
+              <h2 class="panel-title">Cargo Hold</h2>
+              ${renderHold(ship)}
+              <h2 class="panel-title" style="margin-top:28px">Ship Upgrades</h2>
+              <div class="upgrade-grid">${(ship.upgrades||[]).map(up=>`<div class="upgrade-card"><span class="upgrade-icon">${up.icon||'◆'}</span><div class="upgrade-slot">${up.slot||'Special'}</div><div class="upgrade-name">${up.name}</div><div class="muted" style="font-size:.76rem;line-height:1.4;margin-top:5px">${up.text||''}</div></div>`).join("") || `<div class="empty-note">No ship upgrades yet.</div>`}</div>
+            </section>
+            <aside class="panel details-panel">
+              ${selected ? `
+                <div style="display:flex; gap:14px; align-items:center; margin-bottom:14px"><div class="portrait" style="width:58px;height:58px">${initials(selected.name)}</div><div><h2 style="margin:0;font:1.5rem Georgia,serif">${selected.name}</h2><div class="player-role">${selected.role}</div></div></div>
+                <div class="job-chip-row">${(selected.jobs||[]).map(job=>`<span class="job-chip">${job}</span>`).join("")}</div>
+                <div class="stat-row"><span>Influence</span><span></span><strong>${selected.influence}</strong></div>
+                <div class="stat-row"><span>Gold</span><span></span><strong>${selected.gold}</strong></div>
+                <h2 class="panel-title" style="margin-top:22px">Stats</h2>
+                ${Object.entries(selected.stats||{}).map(([key,val])=>`<div class="stat-row"><span>${key}</span>${pips(val,5,"gold")}<strong>${val}</strong></div>`).join("")}
+                <h2 class="panel-title" style="margin-top:22px">Inventory</h2>
+                <div class="inventory-list">${(selected.inventory||[]).map(i=>`<div class="inventory-item"><span>${i}</span></div>`).join("") || `<div class="empty-note">No personal items.</div>`}</div>
+                ${(selected.conditions||[]).length?`<h2 class="panel-title" style="margin-top:22px">Conditions</h2>${selected.conditions.map(c=>`<div class="secret-card">${c}</div>`).join("")}`:''}
+              ` : `<div class="empty-note">No player selected.</div>`}
+            </aside>
+          </div>
+        </div>`;
+      $$(".subtab", screen).forEach(btn=>btn.onclick=()=>{activeDetailsShipId=btn.dataset.ship;activeDetailsPlayerId=null;renderDetails();});
+      $$(".player-select-card", screen).forEach(btn=>btn.onclick=()=>{activeDetailsPlayerId=btn.dataset.player;renderDetails();});
+    }
+
+    const ROLE_INFO = {
+      Captain: { summary: "Leads the ship and controls crew assignments.", responsibilities: ["Reassign ship roles", "Handle ship tie-breaks", "Approve major crew changes"] },
+      Quartermaster: { summary: "Controls the hold and distributes shared cargo.", responsibilities: ["Move and rotate hold items", "Give suitable cargo to shipmates", "Track hold capacity"] },
+      Navigator: { summary: "Handles routes, exploration, and navigation risks.", responsibilities: ["Inspect map hexes", "Recommend routes", "Use navigation abilities"] },
+      Gunner: { summary: "Handles cannons, ammunition, and ship combat readiness.", responsibilities: ["Prepare weapons", "Choose firing priorities", "Manage combat equipment"] },
+      Boatswain: { summary: "Handles repairs, deck work, and the condition of the ship.", responsibilities: ["Repair hold damage pieces", "Coordinate emergency repairs", "Maintain ship equipment"] },
+      Crafter: { summary: "Turns materials into equipment using known recipes.", responsibilities: ["Use crafting recipes", "Create or improve items", "Track required materials"] }
+    };
+    const ROLE_OPTIONS = ["Captain", "Quartermaster", "Navigator", "Gunner", "Boatswain", "Crafter"];
+
+    function validCargoPlacement(ship, item, nx, ny, options = {}) {
+      const hold = ship.hold;
+      const rotation = options.rotation ?? item.rotation ?? 0;
+      const proposed = itemCells(item, rotation, nx, ny);
+      if (proposed.some(cell=>cell.x<0||cell.y<0||cell.x>=hold.columns||cell.y>=hold.rows)) return false;
+      const damaged = holdDamageSet(hold);
+      const occupied = new Set();
+      for (const other of hold.items) {
+        if (other.id === item.id) continue;
+        for (const cell of itemCells(other)) occupied.add(`${cell.x},${cell.y}`);
+      }
+      return proposed.every(cell=>!damaged.has(`${cell.x},${cell.y}`)&&!occupied.has(`${cell.x},${cell.y}`));
+    }
+
+    function recipeStatus(ship, recipe) {
+      const remaining = [...recipe.needs];
+      for (const item of ship.hold.items) {
+        const index=remaining.indexOf(item.name);
+        if (index>=0) remaining.splice(index,1);
+      }
+      return { canCraft: remaining.length===0, missing: remaining };
+    }
+    function craftRecipe(player, ship, recipeId) {
+      const recipe=CRAFT_RECIPES.find(r=>r.id===recipeId);
+      if (!recipe) return {ok:false,message:"Unknown recipe."};
+      const status=recipeStatus(ship,recipe);
+      if (!status.canCraft) return {ok:false,message:`Missing ${status.missing.join(", ")}.`};
+      let placement=null;
+      if (recipe.output.type === "item") {
+        placement=findOpenCargoSlot(ship,recipe.output.w||1,recipe.output.h||1,recipe.output.shape||null,recipe.output.rotation||0);
+        if (!placement) return {ok:false,message:"The crafted item will not fit in the hold."};
+      }
+      for (const name of recipe.needs) {
+        const idx=ship.hold.items.findIndex(item=>item.name===name);
+        if (idx>=0) ship.hold.items.splice(idx,1);
+      }
+      if (recipe.output.type === "item") {
+        ship.hold.items.push({ id:`crafted-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, ...recipe.output, x:placement.x, y:placement.y });
+      } else if (recipe.output.type === "personal") {
+        player.inventory.push(recipe.output.name);
+      } else if (recipe.output.type === "upgrade") {
+        ship.upgrades.push({ id:`upgrade-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, ...recipe.output });
+      }
+      state.journal.push({type:"character",session:state.chapterProgress,title:`Crafted ${recipe.name}`,text:`${player.name} crafted ${recipe.name} aboard ${ship.name}.`});
+      return {ok:true,message:`Crafted ${recipe.name}.`};
+    }
+
+    function roleJobContent(p, ship) {
+      const jobs=p.jobs||[];
+      const actions=[];
+      if (hasJob(p,"Captaincy")) {
+        const configs=CREW_CONFIGS[shipCrew(ship).length]||[];
+        actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Crew Configuration</h3><div class="muted">Choose one of the two role distributions for a ${shipCrew(ship).length}-person crew.</div><div class="config-grid">${configs.map(config=>`<div class="config-card ${config.id===ship.crewConfiguration?"active":""}"><strong>${config.name}</strong><div class="config-assignment">${config.slots.map((slot,i)=>`${shipCrew(ship)[i]?.name||`Crew ${i+1}`}: ${slot.title}`).join("<br>")}</div><button class="secondary-btn" style="margin-top:9px" data-config="${config.id}" ${config.id===ship.crewConfiguration?"disabled":""}>${config.id===ship.crewConfiguration?"Active":"Use configuration"}</button></div>`).join("")}</div></div>`);
+      }
+      if (hasJob(p,"Quartermaster")) {
+        actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Manage Hold</h3><p class="muted" style="margin:0 0 12px">Drag an item to move it. Right-click any part of an item to rotate it.</p>${renderHold(ship,{editable:true,compact:true})}<div class="role-action-row"><select id="cargoGiveSelect">${ship.hold.items.map(i=>`<option value="${i.id}">${i.name}</option>`).join("")}</select><select id="cargoRecipientSelect">${state.players.filter(x=>x.shipId===ship.id&&x.id!==p.id).map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}</select><button class="secondary-btn" id="giveCargoBtn">Give Item</button></div></div>`);
+      }
+      if (hasJob(p,"Crafting")) {
+        const recipes=CRAFT_RECIPES.filter(r=>state.knownRecipes.includes(r.id));
+        actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Crafting</h3><div class="recipe-grid">${recipes.map(recipe=>{const st=recipeStatus(ship,recipe);return `<div class="recipe-card"><h4>${recipe.name}</h4><div class="recipe-cost">${recipe.needs.join(" + ")}</div><div class="recipe-output">${recipe.text}</div><button class="secondary-btn" data-craft="${recipe.id}" ${st.canCraft?"":"disabled"}>${st.canCraft?"Craft":`Missing ${st.missing.join(", ")}`}</button></div>`}).join("")}</div></div>`);
+      }
+      if (hasJob(p,"Morale")) {
+        const rumCount=ship.hold.items.filter(item=>item.kind==="rum").length;
+        actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Crew Morale</h3><div class="role-action-row"><span>${rumCount} Rum · Morale ${ship.stats.Morale}/10</span><button class="secondary-btn" id="useRumBtn" ${!rumCount||ship.stats.Morale>=10?"disabled":""}>Use 1 Rum → +1 Morale</button></div></div>`);
+      }
+      if (hasJob(p,"Navigation") || hasJob(p,"Scouting")) {
+        const selected=state.map.selected, already=state.map.revealed.includes(selected);
+        actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Chart & Scout</h3><div class="role-action-row"><span class="muted">Selected hex ${selected}</span><button class="secondary-btn" id="inspectHexBtn" ${already?"disabled":""}>${already?"Already charted":"Reveal Hex"}</button></div></div>`);
+      }
+      if (hasJob(p,"Repairs")) {
+        actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Repairs</h3>${ship.hold.damagePieces.length?`<div class="role-action-row"><select id="repairDamageSelect">${ship.hold.damagePieces.map(piece=>`<option value="${piece.id}">${piece.shape}-damage near ${slotLabelXY(piece.x,piece.y)}</option>`).join("")}</select><button class="secondary-btn" id="repairDamageBtn">Repair Damage</button></div>`:`<div class="empty-note">No hold damage.</div>`}</div>`);
+      }
+      if (hasJob(p,"Gunnery")) actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Gunnery</h3><button class="secondary-btn" id="prepareGunsBtn">Prepare Guns</button></div>`);
+      if (hasJob(p,"Medicine")) actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Medicine</h3><div class="muted">Treat injuries and persistent conditions when a story event allows it.</div></div>`);
+      if (hasJob(p,"Trade")) actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Trade</h3><div class="muted">Buying, selling, and appraisal controls appear here while the fleet is in port.</div></div>`);
+      if (hasJob(p,"Intelligence")) actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Intelligence</h3><div class="muted">Coded reports and enemy information appear in Private Information.</div></div>`);
+      if (hasJob(p,"Diplomacy")) actions.push(`<div class="job-card"><h3 style="margin:0 0 6px;font:1.15rem Georgia,serif;color:#e6c58c">Diplomacy</h3><div class="muted">Special negotiation options appear during applicable decisions.</div></div>`);
+
+      return `<h2 class="panel-title">Jobs</h2><div class="job-card"><h3 style="margin:0 0 5px;font:1.22rem Georgia,serif;color:#e6c58c">${p.role}</h3><div class="job-chip-row">${jobs.map(job=>`<span class="job-chip" title="${JOB_INFO[job]||""}">${job}</span>`).join("")}</div></div><div class="role-action-grid">${actions.join("")}</div>`;
+    }
+
+    function roleSecretsContent(p) {
+      return `<h2 class="panel-title">Private Information</h2>${(p.secrets||[]).map(s=>`<div class="secret-card">${s}</div>`).join("") || `<div class="empty-note">No private information right now.</div>`}`;
+    }
+
+    function roleNotesContent(p) {
+      const received = state.notes.filter(n=>n.toId===p.id).slice().reverse();
+      const sent = state.notes.filter(n=>n.fromId===p.id).slice().reverse();
+      return `
+        <h2 class="panel-title">Pass a Secret Note</h2>
+        <div class="job-card">
+          <div class="role-action-row"><select id="noteRecipient">${state.players.filter(x=>x.id!==p.id).map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}</select></div>
+          <textarea id="noteText" maxlength="500" placeholder="Write a private note..."></textarea>
+          <button class="primary-btn" id="sendNoteBtn">Send Note</button>
+        </div>
+        <h2 class="panel-title" style="margin-top:26px">Received</h2>
+        ${received.map(n=>`<div class="note-card"><div class="note-meta">From ${getPlayer(n.fromId)?.name || "Unknown"}</div><div>${n.text}</div></div>`).join("") || `<div class="empty-note">No received notes.</div>`}
+        <h2 class="panel-title" style="margin-top:26px">Sent</h2>
+        ${sent.map(n=>`<div class="note-card"><div class="note-meta">To ${getPlayer(n.toId)?.name || "Unknown"}</div><div>${n.text}</div></div>`).join("") || `<div class="empty-note">No sent notes.</div>`}`;
+    }
+
+    function attachEditableHold(ship, screen) {
+      const grid = $('[data-editable-hold="true"]', screen);
+      if (!grid) return;
+      let draggedId = null;
+      const clearPreview=()=>$$('.hold-cell',grid).forEach(cell=>cell.classList.remove('drop-valid','drop-invalid','drop-hover'));
+      const preview=(item,x,y)=>{
+        clearPreview();
+        const proposed=itemCells(item,item.rotation||0,x,y);
+        const valid=validCargoPlacement(ship,item,x,y);
+        for (const pos of proposed) {
+          const cell=$(`.hold-cell[data-hold-x="${pos.x}"][data-hold-y="${pos.y}"]`,grid);
+          if (cell) cell.classList.add(valid?'drop-valid':'drop-invalid');
+        }
+        return valid;
+      };
+      $$('[data-cargo-id]', grid).forEach(itemEl => {
+        itemEl.addEventListener("dragstart", event => {
+          draggedId = itemEl.dataset.cargoId;
+          $$(`[data-cargo-id="${draggedId}"]`,grid).forEach(el=>el.classList.add("dragging"));
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", draggedId);
+        });
+        itemEl.addEventListener("dragend", () => {
+          if (draggedId) $$(`[data-cargo-id="${draggedId}"]`,grid).forEach(el=>el.classList.remove("dragging"));
+          draggedId = null;
+          clearPreview();
+        });
+        itemEl.addEventListener("contextmenu", event=>{
+          event.preventDefault();
+          const item=ship.hold.items.find(entry=>entry.id===itemEl.dataset.cargoId);
+          if (!item) return;
+          if (item.shape) {
+            const rotation=((item.rotation||0)+1)%4;
+            if (!validCargoPlacement(ship,item,item.x,item.y,{rotation})) return toast("That rotation does not fit.");
+            item.rotation=rotation;
+          } else {
+            const oldW=item.w||1, oldH=item.h||1;
+            const candidate={...item,w:oldH,h:oldW};
+            if (!validCargoPlacement(ship,candidate,item.x,item.y)) return toast("That rotation does not fit.");
+            item.w=oldH; item.h=oldW;
+          }
+          saveState(); renderAll(); toast("Cargo rotated.");
+        });
+      });
+      grid.addEventListener("dragover", event => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        const itemId=draggedId||event.dataTransfer.getData("text/plain");
+        const item=ship.hold.items.find(entry=>entry.id===itemId);
+        const cell=event.target.closest?.('.hold-cell');
+        if (!item||!cell) return clearPreview();
+        preview(item,Number(cell.dataset.holdX),Number(cell.dataset.holdY));
+      });
+      grid.addEventListener("dragleave", event => { if (!grid.contains(event.relatedTarget)) clearPreview(); });
+      grid.addEventListener("drop", event => {
+        event.preventDefault();
+        const itemId = draggedId || event.dataTransfer.getData("text/plain");
+        const item = ship.hold.items.find(entry=>entry.id===itemId);
+        const cell=event.target.closest?.('.hold-cell');
+        if (!item||!cell) return clearPreview();
+        const x=Number(cell.dataset.holdX), y=Number(cell.dataset.holdY);
+        if (!validCargoPlacement(ship,item,x,y)) { clearPreview(); return toast("That placement does not fit."); }
+        item.x=x; item.y=y;
+        clearPreview(); saveState(); renderAll(); toast("Hold updated.");
+      });
+    }
+
+    function attachRoleActions(p, ship, screen) {
+      $$('[data-ability]', screen).forEach(btn=>btn.onclick=()=>{
+        const key = `${p.id}:${btn.dataset.ability}`;
+        state.abilityUses[key] = true;
+        saveState(); toast(`${btn.dataset.ability} marked as used.`); renderRole();
+      });
+      attachEditableHold(ship, screen);
+      $$('[data-config]',screen).forEach(btn=>btn.onclick=()=>{
+        applyCrewConfiguration(ship,btn.dataset.config);
+        saveState(); toast(`Crew configuration changed to ${configForShip(ship)?.name}.`); renderAll();
+      });
+      $$('[data-craft]',screen).forEach(btn=>btn.onclick=()=>{
+        const result=craftRecipe(p,ship,btn.dataset.craft);
+        if (!result.ok) return toast(result.message);
+        saveState(); toast(result.message); renderAll();
+      });
+      if ($("#useRumBtn",screen)) $("#useRumBtn",screen).onclick=()=>{
+        const result=consumeRum(ship);
+        if (!result.used) return toast(result.reason);
+        saveState(); renderAll(); toast(`Rum used. Morale is now ${result.after}.`);
+      };
+      if ($("#giveCargoBtn",screen)) $("#giveCargoBtn",screen).onclick=()=>{
+        const itemId=$("#cargoGiveSelect",screen).value;
+        const target=getPlayer($("#cargoRecipientSelect",screen).value);
+        const index=ship.hold.items.findIndex(i=>i.id===itemId);
+        if (index<0||!target) return;
+        const [item]=ship.hold.items.splice(index,1);
+        target.inventory.push(item.name);
+        saveState(); toast(`${item.name} given to ${target.name}.`); renderAll();
+      };
+      if ($("#inspectHexBtn",screen)) $("#inspectHexBtn",screen).onclick=()=>{
+        if (!state.map.revealed.includes(state.map.selected)) state.map.revealed.push(state.map.selected);
+        saveState(); toast(`Hex ${state.map.selected} revealed.`); renderAll();
+      };
+      if ($("#repairDamageBtn",screen)) $("#repairDamageBtn",screen).onclick=()=>{
+        const damageId=$("#repairDamageSelect",screen).value;
+        ship.hold.damagePieces=ship.hold.damagePieces.filter(piece=>piece.id!==damageId);
+        saveState(); toast("Hold damage repaired."); renderAll();
+      };
+      if ($("#prepareGunsBtn",screen)) $("#prepareGunsBtn",screen).onclick=()=>toast(`${ship.name} is marked ready for combat.`);
+      if ($("#sendNoteBtn",screen)) $("#sendNoteBtn",screen).onclick=()=>{
+        const text=$("#noteText",screen).value.trim();
+        if (!text) return toast("Write a note first.");
+        state.notes.push({ id: crypto.randomUUID?.() || String(Date.now()), fromId:p.id, toId:$("#noteRecipient",screen).value, text, createdAt:new Date().toISOString() });
+        saveState(); toast("Secret note sent."); renderRole();
+      };
+      if ($("#downtimeBtn",screen)) $("#downtimeBtn",screen).onclick=()=>{
+        state.downtime[p.id]=$("#downtimeAction",screen).value;
+        saveState(); toast("Downtime action saved."); renderRole();
+      };
+    }
+
+    function renderRole() {
+      const p = currentPlayer();
+      const ship = getShip(p.shipId);
+      const received = state.notes.filter(n=>n.toId===p.id).slice().reverse();
+      const sent = state.notes.filter(n=>n.fromId===p.id).slice().reverse();
+      const screen = $("#screen-role");
+      screen.innerHTML = `
+        <div class="role-grid">
+          <aside class="panel role-card">
+            <div class="role-badge">${initials(p.role)}</div>
+            <h1 style="font:1.75rem Georgia,serif;margin:0 0 3px">${p.name}</h1>
+            <div style="color:#e6c58c">${p.role}</div>
+            <div style="color:var(--muted);margin-top:3px">${ship.name}</div>
+            <div class="role-resource-row"><span>♟ ${p.influence}</span><span style="color:#e5b969">◉ ${p.gold}</span></div>
+            ${(p.conditions||[]).length?`<div style="margin-top:15px">${p.conditions.map(c=>`<span class="vote-chip waiting">${c}</span>`).join(" ")}</div>`:""}
+            <div style="margin-top:17px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)"><div class="eyebrow">Personal Goal</div><div style="color:#c9c7c0;line-height:1.45;margin-top:6px">${p.goal}</div></div>
+            <div style="margin-top:17px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)"><div class="eyebrow">Special Ability</div>${(p.abilities||[]).map(a=>`<div style="margin-top:7px"><div style="color:#e6c58c;font-family:Georgia,serif">${a.name}</div><div style="color:#9fa9ae;font-size:.74rem;line-height:1.4;margin-top:3px">${a.text}</div><button class="secondary-btn" style="margin-top:7px;padding:6px 9px" data-ability="${a.name}">${state.abilityUses[`${p.id}:${a.name}`]?"Used":"Use"}</button></div>`).join("")||`<div class="muted" style="margin-top:6px">None</div>`}</div>
+          </aside>
+          <section class="panel role-main">${roleJobContent(p,ship)}</section>
+          <aside class="panel role-side">
+            ${roleSecretsContent(p)}
+            <h2 class="panel-title" style="margin-top:22px">Downtime</h2>
+            <div class="job-card"><select id="downtimeAction" style="width:100%">${["Recover","Train","Investigate","Trade","Work on ship","Improve a relationship"].map(a=>`<option ${state.downtime[p.id]===a?"selected":""}>${a}</option>`).join("")}</select><button class="secondary-btn" id="downtimeBtn" style="margin-top:9px">Save Action</button></div>
+            <h2 class="panel-title" style="margin-top:22px">Pass a Secret Note</h2>
+            <div class="job-card">
+              <div class="role-action-row"><select id="noteRecipient">${state.players.filter(x=>x.id!==p.id).map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}</select></div>
+              <textarea id="noteText" maxlength="500" placeholder="Write a private note..."></textarea>
+              <button class="primary-btn" id="sendNoteBtn">Send Note</button>
+            </div>
+            <h2 class="panel-title" style="margin-top:20px">Recent Notes</h2>
+            <div class="notes-list">
+              ${received.map(n=>`<div class="note-card"><div class="note-meta">From ${getPlayer(n.fromId)?.name || "Unknown"}</div><div>${n.text}</div></div>`).join("")}
+              ${sent.map(n=>`<div class="note-card"><div class="note-meta">To ${getPlayer(n.toId)?.name || "Unknown"}</div><div>${n.text}</div></div>`).join("")}
+              ${!received.length && !sent.length ? `<div class="empty-note">No notes yet.</div>` : ""}
+            </div>
+          </aside>
+        </div>`;
+      attachRoleActions(p,ship,screen);
+    }
+
+    function renderJournal() {
+      const screen = $("#screen-journal");
+      screen.innerHTML = `
+        <div class="journal-layout">
+          <aside class="panel journal-nav">
+            <h2 class="panel-title">Journal</h2>
+            ${["all","story","discovery","character"].map((f,i)=>`<button class="journal-filter ${i===0?"active":""}" data-filter="${f}">${f[0].toUpperCase()+f.slice(1)}</button>`).join("")}
+            <div style="border-top:1px solid rgba(255,255,255,.07);margin:18px 0"></div>
+            <button class="secondary-btn" id="exportJournalBtn" style="width:100%">Export Save</button>
+          </aside>
+          <section class="panel journal-main"><div id="journalEntries"></div></section>
+        </div>`;
+      function show(filter="all") {
+        const entries = state.journal.filter(e=>filter==="all"||e.type===filter).slice().reverse();
+        $("#journalEntries", screen).innerHTML = entries.map(e=>`<article class="journal-entry"><h3>${e.title}</h3><div class="journal-meta">Session ${e.session} · ${e.type}</div><p>${e.text}</p></article>`).join("") || `<div class="empty-note">No entries.</div>`;
+      }
+      show();
+      $$(".journal-filter", screen).forEach(btn=>btn.onclick=()=>{ $$(".journal-filter",screen).forEach(b=>b.classList.remove("active"));btn.classList.add("active");show(btn.dataset.filter); });
+      $("#exportJournalBtn", screen).onclick = exportSave;
+    }
+
+    function exportSave() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${state.saveId || "campaign"}-save.json`; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function renderAll() {
+      renderPlayerSwitcher();
+      renderOverview();
+      renderMap();
+      renderDetails();
+      renderRole();
+      renderJournal();
+    }
+
+    $$(".nav-tab").forEach(tab => tab.onclick = () => {
+      $$(".nav-tab").forEach(t => t.classList.toggle("active", t === tab));
+      $$(".screen").forEach(s => s.classList.toggle("active", s.id === `screen-${tab.dataset.screen}`));
+    });
+    $("#exportSaveBtn").onclick = exportSave;
+    renderAll();
+  </script>
+</body>
+</html>
