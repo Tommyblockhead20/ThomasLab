@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>House Ratings Standalone v43</title>
+  <title>House Ratings Standalone v44</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -420,6 +420,28 @@ function foundObj(m,raw,value){return {raw:raw??m[0],value:value??m[1]??m[0],ind
 function labelAny(t,labels,p){for(let l of labels){let f=label(t,l,p);if(f)return f}return null}
 function sectionAny(t,heads){for(let h of heads){let f=section(t,h);if(f)return f}return null}
 function matchAny(t,patterns){for(let p of patterns){let m=t.match(p);if(m)return foundObj(m,m[0],m[1]??m[0])}return null}
+
+function parseZillowSchoolAverage(t){
+  let section=t;
+  let start=t.search(/Nearby schools/i);
+  if(start>=0){
+    section=t.slice(start);
+    let end=section.search(/More about schools/i);
+    if(end>0)section=section.slice(0,end);
+  }
+  let ratings=[];
+  let re=/(?:^|\n|\r)\s*(10|[0-9])\s*\/\s*10\s*(?:\n|\r|\s)+GreatSchools(?:®|&reg;)?\s+Rating/gi;
+  let m;
+  while((m=re.exec(section))) ratings.push(Number(m[1]));
+  if(!ratings.length){
+    let compact=section.replace(/\s+/g,' ');
+    re=/(10|[0-9])\s*\/\s*10\s+GreatSchools(?:®|&reg;)?\s+Rating/gi;
+    while((m=re.exec(compact))) ratings.push(Number(m[1]));
+  }
+  if(!ratings.length)return null;
+  let avg=ratings.reduce((a,b)=>a+b,0)/ratings.length;
+  return {rating:clamp(Math.round(avg),0,10),average:avg,ratings};
+}
 function normalizeGarage(raw){let s=String(raw||"").toLowerCase();if(/\b(no garage|without a garage|no covered parking)\b/.test(s))return "None";if(/carport/.test(s))return "Carport only";let attached=/attached/.test(s),detached=/detached/.test(s);let n=(s.match(/\b(\d+)\s*(?:-|\s)?car\b/)||s.match(/\b(one|two|three|four)\s*(?:-|\s)?car\b/)||[])[1];let num={one:1,two:2,three:3,four:4}[n]||Number(n)||null;if(attached&&detached)return "Both attached and detached";if(num>=3)return "3+ car garage";if(num===2&&attached)return "Two-car attached garage";if(num===2&&detached)return "Two-car detached garage";if(num===1&&attached)return "One-car attached garage";if(num===1&&detached)return "One-car detached garage";if(attached)return "Attached garage";if(detached)return "Detached garage";if(/garage/.test(s))return num>=2?"Garage":"Garage";if(/driveway|off[-\s]?street/.test(s))return "Driveway only";if(/street parking/.test(s))return "Street parking only";return "Other parking"}
 function normalizeBasement(raw){let s=String(raw||"").toLowerCase();if(/no basement|slab/.test(s))return "None";if(/crawl/.test(s))return "Crawl space";if(/walk[-\s]?out/.test(s))return "Walkout basement";if(/partially finished|part finished|partial finished/.test(s))return "Partially finished";if(/finished|lower level|rec room/.test(s))return "Finished";if(/full basement|basement|unfinished/.test(s))return "Unfinished";return title(raw)}
 function normalizeLaundry(raw){let s=String(raw||"").toLowerCase();if(/no laundry|laundromat/.test(s))return "None";if(/second[-\s]?floor|upper[-\s]?level|near bedrooms|bedroom level/.test(s))return "Near bedrooms";if(/main[-\s]?floor|first[-\s]?floor/.test(s))return "Main-floor laundry";if(/basement/.test(s))return "Basement laundry";if(/hookups|hook-ups|connections/.test(s))return "Hookups only";if(/washer|dryer|laundry/.test(s))return "In-unit laundry";return title(raw)}
@@ -456,6 +478,15 @@ function parseListingInto(h){let t=h.listingText||"",x,w=[],summary=[],foundIssu
   if(x=matchAny(t,[/Walk Score(?:®)?\s*(?:\n|\s)*(\d{1,3})\s*\/\s*100/i]))setLoc("walkScore",clamp(Number(x.value),0,100),x,"Walk Score");
   if(x=matchAny(t,[/Transit Score(?:®)?\s*(?:\n|\s)*(\d{1,3})\s*\/\s*100/i]))setLoc("transitScore",clamp(Number(x.value),0,100),x,"Transit Score");
   if(x=matchAny(t,[/Bike Score(?:®)?\s*(?:\n|\s)*(\d{1,3})\s*\/\s*100/i]))setLoc("bikeScore",clamp(Number(x.value),0,100),x,"Bike Score");
+  let schools=parseZillowSchoolAverage(t);
+  if(schools){
+    h.city.schoolQualityRating=schools.rating;
+    if(h.autoSources)delete h.autoSources[pathKey("city","schoolQualityRating")];
+    let si=t.search(/Nearby schools/i);
+    let snippet=si>=0?snip(t,si,Math.min(650,t.length-si)):`GreatSchools ratings: ${schools.ratings.join(", ")}`;
+    addSnippet(h,"schoolQualityRating",snippet);
+    summary.push({field:"School quality",value:schools.rating,snippet:`Zillow GreatSchools ratings ${schools.ratings.join(", ")} average ${schools.average.toFixed(1)} → ${schools.rating}/10`});
+  }
   if(x=matchAny(t,[/\b(screened porch|sunroom|three season room|3-season room|covered porch|front porch|porch|patio|deck|balcony)\b/i]))set("outdoorSpace",normalizeOutdoor(x.value),x,"Outdoor space");
   if(x=matchAny(t,[/\b(home office|office|flex room|bonus room|den)\b/i]))set("officeFlexRoom",true,x,"Office/flex room");
   if(x=matchAny(t,[/\bpantry\b/i]))set("pantry",true,x,"Pantry");
@@ -784,7 +815,35 @@ Transit Score®
 
 Bike Score®
 
-95 / 100`;parseListingInto(h);assert(h.community==="Old North Columbus","neighborhood "+h.community);assert(h.cityName==="Columbus","city "+h.cityName);assert(h.state==="OH","state "+h.state);assert(h.location.walkScore===92,"walk");assert(h.location.transitScore===47,"transit");assert(h.location.bikeScore===95,"bike")});test("Infer fills Ohio state and Toledo metro from Perrysburg",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";inferFromText(h);assert(h.state==="OH","state");assert(h.metroArea==="Toledo","metro")});test("Hardcoded data fills Perrysburg community defaults",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(h.metroArea==="Toledo","metro");assert(h.location.bfiScore!==null,"bfi");assert(h.city.jobMarketRating!==null,"job");assert(h.city.bfiCityScore!==null,"bfi city");assert(Array.isArray(h.location.airports)&&h.location.airports.length,"airport")});test("Columbus OH metro crime uses Ohio CBSA",()=>{let h=blankHouse();h.community="Columbus";h.cityName="Columbus";h.state="OH";h.metroArea="Columbus";applyHardcodedData(h);assert(Math.abs(h.city.cityViolentCrimePer1000-3.3)<.05,"metro violent "+h.city.cityViolentCrimePer1000);assert(Math.abs(h.city.cityPropertyCrimePer1000-21.935)<.05,"metro property "+h.city.cityPropertyCrimePer1000)});test("BFI city table fills city score",()=>{let h=blankHouse();h.community="Old North Columbus";h.cityName="Columbus";h.state="OH";applyHardcodedData(h);assert(h.city.bfiCityScore===41,"bfi city "+h.city.bfiCityScore)});test("Crime atlas fills Perrysburg and Toledo metro crime",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(Math.abs(h.location.violentCrimePer1000-0.3)<0.02,"community violent "+h.location.violentCrimePer1000);assert(h.location.propertyCrimePer1000<6,"community property "+h.location.propertyCrimePer1000);assert(h.city.cityViolentCrimePer1000!==null,"metro violent");assert(h.city.cityPropertyCrimePer1000!==null,"metro property")});test("Tree cover buckets normalize",()=>{assert(normalizeTreeCover("none")==="None");assert(treeCoverRating("Very high")===10);assert(normalizeTreeCover("low")==="Light");assert(normalizeTreeCover(0)==="None")});document.getElementById("tests").innerHTML=`<p><strong>${out.filter(x=>x.pass).length}/${out.length} passing</strong></p>`+out.map(x=>`<div class="${x.pass?"pass":"fail"}">${x.pass?"PASS":"FAIL"}: ${html(x.name)}${x.error?" - "+html(x.error):""}</div>`).join("");return out}
+95 / 100`;parseListingInto(h);assert(h.community==="Old North Columbus","neighborhood "+h.community);assert(h.cityName==="Columbus","city "+h.cityName);assert(h.state==="OH","state "+h.state);assert(h.location.walkScore===92,"walk");assert(h.location.transitScore===47,"transit");assert(h.location.bikeScore===95,"bike")});test("Parser averages Zillow GreatSchools ratings",()=>{let h=blankHouse();h.listingText=`Nearby schools
+Source: GreatSchools®
+Woodland Elementary School
+Grades K-4 • 0.3 miles
+7/10
+GreatSchools® Rating
+Test Score Rating
+8/10
+Student Progress Rating
+4/10
+Perrysburg Junior High School
+Grades 7-8 • 1.2 miles
+9/10
+GreatSchools® Rating
+Test Score Rating
+10/10
+Student Progress Rating
+8/10
+Perrysburg High School
+Grades 9-12 • 3.9 miles
+9/10
+GreatSchools® Rating
+Test Score Rating
+9/10
+College Readiness Rating
+9/10
+Student Progress Rating
+9/10
+More about schools`;parseListingInto(h);assert(h.city.schoolQualityRating===8,"school "+h.city.schoolQualityRating)});test("Infer fills Ohio state and Toledo metro from Perrysburg",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";inferFromText(h);assert(h.state==="OH","state");assert(h.metroArea==="Toledo","metro")});test("Hardcoded data fills Perrysburg community defaults",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(h.metroArea==="Toledo","metro");assert(h.location.bfiScore!==null,"bfi");assert(h.city.jobMarketRating!==null,"job");assert(h.city.bfiCityScore!==null,"bfi city");assert(Array.isArray(h.location.airports)&&h.location.airports.length,"airport")});test("Columbus OH metro crime uses Ohio CBSA",()=>{let h=blankHouse();h.community="Columbus";h.cityName="Columbus";h.state="OH";h.metroArea="Columbus";applyHardcodedData(h);assert(Math.abs(h.city.cityViolentCrimePer1000-3.3)<.05,"metro violent "+h.city.cityViolentCrimePer1000);assert(Math.abs(h.city.cityPropertyCrimePer1000-21.935)<.05,"metro property "+h.city.cityPropertyCrimePer1000)});test("BFI city table fills city score",()=>{let h=blankHouse();h.community="Old North Columbus";h.cityName="Columbus";h.state="OH";applyHardcodedData(h);assert(h.city.bfiCityScore===41,"bfi city "+h.city.bfiCityScore)});test("Crime atlas fills Perrysburg and Toledo metro crime",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(Math.abs(h.location.violentCrimePer1000-0.3)<0.02,"community violent "+h.location.violentCrimePer1000);assert(h.location.propertyCrimePer1000<6,"community property "+h.location.propertyCrimePer1000);assert(h.city.cityViolentCrimePer1000!==null,"metro violent");assert(h.city.cityPropertyCrimePer1000!==null,"metro property")});test("Tree cover buckets normalize",()=>{assert(normalizeTreeCover("none")==="None");assert(treeCoverRating("Very high")===10);assert(normalizeTreeCover("low")==="Light");assert(normalizeTreeCover(0)==="None")});document.getElementById("tests").innerHTML=`<p><strong>${out.filter(x=>x.pass).length}/${out.length} passing</strong></p>`+out.map(x=>`<div class="${x.pass?"pass":"fail"}">${x.pass?"PASS":"FAIL"}: ${html(x.name)}${x.error?" - "+html(x.error):""}</div>`).join("");return out}
 
 
 const SHEET_COLUMNS={
@@ -827,7 +886,11 @@ out body;
 out skel qt;`}
 function osmPoiQuery(lat,lon,miles,onlyMissingCats=null){
   let a=osmAround(lat,lon,miles),wanted=new Set(onlyMissingCats||[]);let include=(c)=>!onlyMissingCats||wanted.has(c);let blocks=[];
-  if(include("grocery"))blocks.push(`nwr["shop"~"^(supermarket|grocery|department_store|mall|greengrocer|food|general)$"]${a};`);
+  if(include("grocery"))blocks.push(
+    `nwr["shop"~"^(supermarket|grocery|department_store|mall|greengrocer|food|general|wholesale)$"]${a};`,
+    `nwr["shop"]["name"~"(market|foods|food imports|grocery|supermarket|mercado|bodega|tienda|carniceria|international|mediterranean|asian|indian|halal|latin)",i]${a};`,
+    `nwr["brand"~"(Kroger|Giant Eagle|Meijer|Aldi|ALDI|Lidl|Trader Joe|Lucky|Walmart|Target|Whole Foods|Sprouts|Publix|Wegmans|Costco|Sam's|BJ's|Food Lion|Save A Lot|Grocery Outlet|Fresh Market|Fresh Thyme)",i]${a};`
+  );
   if(include("park"))blocks.push(
     `nwr["leisure"~"^(park|playground|recreation_ground|nature_reserve|garden|sports_centre)$"]${a};`,
     `nwr["landuse"~"^(recreation_ground|forest)$"]${a};`,
@@ -841,6 +904,8 @@ function osmPoiQuery(lat,lon,miles,onlyMissingCats=null){
   if(!onlyMissingCats){
     blocks.push(
       `nwr["shop"~"^(hardware|doityourself|home_improvement|garden_centre|paint|laundry|chemist|department_store|mall|clothes|electronics|shoes|computer)$"]${a};`,
+      `nwr["name"~"(Lowe|LOWE|Home Depot|HOME DEPOT|Ace Hardware|ACE Hardware|Menards|MENARDS|True Value|TRUE VALUE|Harbor Freight|HARBOR FREIGHT)"]${a};`,
+      `nwr["brand"~"(Lowe|LOWE|Home Depot|HOME DEPOT|Ace Hardware|ACE Hardware|Menards|MENARDS|True Value|TRUE VALUE|Harbor Freight|HARBOR FREIGHT)"]${a};`,
       `nwr["amenity"~"^(pharmacy|library|restaurant|cafe|fast_food|ice_cream|cinema|theatre|bar|pub|nightclub|post_office|bank)$"]${a};`,
       `nwr["leisure"~"^(fitness_centre|sports_centre)$"]${a};`,
       `nwr["aeroway"="aerodrome"]${a};`,
@@ -979,30 +1044,17 @@ async function testOverpassEndpoints(){
 }
 async function fetchOsmEstimateData(lat,lon,miles,onlyMissingCats=null){
   let warnings=[],parts=[];
-  let gotAnyPoi=false;
-  async function addPart(q,label,timeoutMs,optional=false,allowZero=false){
-    try{
-      let json=await fetchOverpassQuery(q,label,timeoutMs,allowZero);
-      parts.push(json);
-      if((json.elements||[]).length>0)gotAnyPoi=true;
-    }catch(e){
-      let msg=e&&e.message?e.message:String(e);
-      console.warn(e);
-      if(optional)warnings.push(`${label} failed; continuing without that optional OSM layer. ${msg}`);
-      else throw e;
-    }
-  }
-  // Keep the first/main POI request close to the older working query, but without way-node recursion.
-  // Brand/name grocery and hardware catch-alls are now separate optional requests so one heavy regex cannot kill the whole OSM estimator.
-  await addPart(osmPoiQuery(lat,lon,miles,onlyMissingCats),`${miles}-mile OSM core destinations`,45000,false,false);
-  if(!onlyMissingCats||onlyMissingCats.includes("grocery"))await addPart(osmGroceryNameQuery(lat,lon,miles),`${miles}-mile OSM grocery name fallback`,30000,true,true);
-  if(!onlyMissingCats)await addPart(osmHardwareBrandQuery(lat,lon,miles),`${miles}-mile OSM hardware brand fallback`,25000,true,true);
+  // v44: normal OSM runs use one destination/POI query plus one roads+rail query.
+  // Regex/name catch-alls for small groceries and hardware are folded into the destination query so optional fallback failures do not stop the run.
+  try{
+    parts.push(await fetchOverpassQuery(osmPoiQuery(lat,lon,miles,onlyMissingCats),`${miles}-mile OSM destinations`,55000,false));
+  }catch(e){throw e}
   let shouldFetchRoads=miles<=5&&!onlyMissingCats;
   if(shouldFetchRoads){
-    try{parts.push(await fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile OSM routing roads`,35000,false))}
-    catch(e){console.warn(e);warnings.push(`Road routing fetch failed, so route times were estimated from straight-line distance. ${e.message||String(e)}`)}
+    try{parts.push(await fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile OSM roads and rail`,40000,false))}
+    catch(e){console.warn(e);warnings.push(`Road/rail fetch failed, so route times were estimated from straight-line distance. ${e.message||String(e)}`)}
   }else if(onlyMissingCats&&onlyMissingCats.includes("freeway")){
-    try{parts.push(await fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile freeway corridors`,25000,false))}
+    try{parts.push(await fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile freeway/road fallback`,30000,false))}
     catch(e){console.warn(e);warnings.push(`Freeway corridor fetch failed in the ${miles}-mile fallback. ${e.message||String(e)}`)}
   }
   return mergeOsmElements(parts,warnings);
@@ -1279,18 +1331,18 @@ function renderOsmMap(est){
   let legend=`<div class="osmLegend">${legendItems.map(([c,t])=>`<span style="background:${c}"></span>${t}`).join(" ")}</div>`;
   let maxR=est.radiusMiles>=10?10:5,sz=720,c=sz/2,scale=(sz*.45)/maxR;
   let xy=p=>{let dx=(p.lon-center.lon)*Math.cos(center.lat*Math.PI/180)*69.172,dy=(p.lat-center.lat)*69,x=c+dx*scale,y=c-dy*scale;return{x,y}};
-  let roadPriority=w=>w.kind==="freeway"?5:w.kind==="highway"?4:w.kind==="mainroad"?3:w.kind==="rail"?2:w.kind==="major"?1:0;
+  let roadPriority=w=>w.kind==="freeway"?5:w.kind==="highway"?4:w.kind==="mainroad"?3:w.kind==="rail"?3:w.kind==="major"?1:0;
   let selectRoads=roads=>{
     let arr=(roads||[]).filter(w=>w&&w.coords&&w.coords.length>1);
+    // Always keep rail/main/highway/freeway across the full 5-mile area. Only draw local/other roads near the house so major lines are not crowded out.
     let important=arr.filter(w=>roadPriority(w)>0);
-    let local=arr.filter(w=>roadPriority(w)===0);
-    let localNear=local.filter(w=>(w.coords||[]).some(p=>osmDistMi(center,p)<=1.35));
-    let nearSet=new Set(localNear);
-    let localFar=local.filter(w=>!nearSet.has(w));
-    // Keep all/most local roads near the house, then sample across the full remainder.
-    let maxNear=2600, maxFar=3400, step=Math.max(1,Math.ceil(localFar.length/maxFar)), sampled=[];
-    for(let i=0;i<localFar.length;i+=step)sampled.push(localFar[i]);
-    return [...localNear.slice(0,maxNear),...sampled,...important].slice(0,6500).sort((a,b)=>roadPriority(a)-roadPriority(b));
+    let localNear=arr.filter(w=>roadPriority(w)===0&&(w.coords||[]).some(p=>osmDistMi(center,p)<=1.0));
+    let maxLocal=3600;
+    let localStep=Math.max(1,Math.ceil(localNear.length/maxLocal));
+    let sampledLocal=[];
+    for(let i=0;i<localNear.length;i+=localStep)sampledLocal.push(localNear[i]);
+    // Put minor roads first and high-priority layers last so important roads/rail are visible on top.
+    return [...sampledLocal,...important].sort((a,b)=>roadPriority(a)-roadPriority(b));
   };
   let roadLine=w=>{let pts=(w.coords||[]).map(xy).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>-40&&p.x<sz+40&&p.y>-40&&p.y<sz+40);if(pts.length<2)return"";let col=w.kind==="rail"?"#7c3aed":w.kind==="freeway"?"#111827":w.kind==="highway"?"#f97316":w.kind==="mainroad"?"#facc15":w.kind==="major"?"#64748b":"#94a3b8";let width=w.kind==="rail"?2.3:w.kind==="freeway"?4.1:w.kind==="highway"?3.1:w.kind==="mainroad"?2.6:w.kind==="major"?2.0:1.25;let dash=w.kind==="rail"?' stroke-dasharray="6 4"':"";return`<polyline points="${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"${dash}/>`};
   let pin=p=>{let q=xy(p);if(!Number.isFinite(q.x)||!Number.isFinite(q.y)||q.x<0||q.x>sz||q.y<0||q.y>sz)return"";let col=colors[p.category]||"#111827";return`<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="6.8" fill="${col}" stroke="white" stroke-width="1.6"><title>${html(p.name)} (${p.category})</title></circle>`};
