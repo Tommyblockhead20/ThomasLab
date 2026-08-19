@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive projects, games, maps, rankings, and other things Thomas made.">
+  <meta name="theme-color" content="#fff8ed">
+  <title>Thomas Made This</title>
+  <style>
+    :root {
+      --bg: #fff8ed;
+      --ink: #171717;
+      --muted: #68645f;
+      --paper: #fffdf8;
+      --line: #171717;
+      --shadow: 5px 5px 0 var(--line);
+      --radius: 24px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 7% 2%, #ffe08a 0 0, transparent 22rem),
+        radial-gradient(circle at 96% 30%, #b8e0ff 0 0, transparent 24rem),
+        var(--bg);
+      font-family: Inter, ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+      opacity: .035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.72'/%3E%3C/svg%3E");
+    }
+
+    button, a { -webkit-tap-highlight-color: transparent; }
+
+    .shell {
+      width: min(1180px, calc(100% - 34px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      min-height: 520px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 44px;
+      align-items: center;
+      padding: 74px 0 56px;
+    }
+
+    .hero-copy { max-width: 850px; }
+
+    .eyebrow {
+      margin: 0 0 13px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(58px, 9.4vw, 116px);
+      line-height: .87;
+      letter-spacing: -.065em;
+      font-weight: 900;
+      text-wrap: balance;
+    }
+
+    .underline {
+      position: relative;
+      display: inline-block;
+      z-index: 0;
+    }
+
+    .underline::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      left: 2%;
+      right: -1%;
+      bottom: -.02em;
+      height: .14em;
+      border-radius: 999px;
+      background: #7ed9a1;
+      transform: rotate(-1.3deg);
+    }
+
+    .intro {
+      max-width: 700px;
+      margin: 28px 0 0;
+      color: #4a4742;
+      font-size: clamp(18px, 2vw, 22px);
+      line-height: 1.5;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .button {
+      min-height: 49px;
+      padding: 0 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 2px solid var(--line);
+      border-radius: 999px;
+      background: white;
+      color: var(--ink);
+      box-shadow: 4px 4px 0 var(--line);
+      text-decoration: none;
+      font: inherit;
+      font-weight: 850;
+      cursor: pointer;
+      transition: transform .14s ease, box-shadow .14s ease;
+    }
+
+    .button.primary { background: var(--ink); color: white; box-shadow: 4px 4px 0 #ff9f91; }
+    .button:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--line); }
+    .button.primary:hover { box-shadow: 6px 6px 0 #ff9f91; }
+    .button:active { transform: translate(1px, 1px); }
+
+    .hero-doodle {
+      width: 160px;
+      height: 160px;
+      position: relative;
+      border: 3px solid var(--line);
+      border-radius: 34px;
+      background: #ff887c;
+      box-shadow: 8px 8px 0 var(--line);
+      transform: rotate(6deg);
+      cursor: pointer;
+      transition: transform .2s ease;
+    }
+
+    .hero-doodle:hover { transform: rotate(-3deg) scale(1.04); }
+    .hero-doodle.bounce { animation: bounce .62s cubic-bezier(.2,.85,.2,1); }
+
+    .hero-doodle .eye {
+      position: absolute;
+      width: 18px;
+      height: 24px;
+      top: 52px;
+      border: 3px solid var(--line);
+      border-radius: 50%;
+      background: white;
+    }
+    .hero-doodle .eye::after {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 8px;
+      top: 7px;
+      left: 5px;
+      border-radius: 50%;
+      background: var(--ink);
+    }
+    .hero-doodle .eye.one { left: 45px; }
+    .hero-doodle .eye.two { right: 45px; }
+    .hero-doodle .mouth {
+      position: absolute;
+      width: 55px;
+      height: 25px;
+      left: 50%;
+      bottom: 37px;
+      border: 3px solid var(--line);
+      border-top: 0;
+      border-radius: 0 0 50px 50px;
+      transform: translateX(-50%);
+    }
+
+    @keyframes bounce {
+      0% { transform: rotate(6deg) translateY(0); }
+      35% { transform: rotate(-10deg) translateY(-28px) scale(1.08); }
+      72% { transform: rotate(11deg) translateY(3px) scale(.97); }
+      100% { transform: rotate(6deg) translateY(0); }
+    }
+
+    .projects { padding: 18px 0 76px; }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 25px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 55px);
+      line-height: 1;
+      letter-spacing: -.045em;
+    }
+
+    .count {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      --c: #d9eaff;
+      --r: 0deg;
+      grid-column: span 4;
+      min-height: 285px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      padding: 24px;
+      border: 3px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--c);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+      text-decoration: none;
+      transform: rotate(var(--r));
+      transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease;
+      isolation: isolate;
+    }
+
+    .card:nth-child(4n + 1) { --r: -.25deg; }
+    .card:nth-child(4n + 3) { --r: .25deg; }
+    .card.wide { grid-column: span 8; }
+    .card.half { grid-column: span 6; }
+
+    .card:hover {
+      z-index: 4;
+      transform: translate(-4px, -5px) rotate(0deg);
+      box-shadow: 9px 10px 0 var(--line);
+    }
+
+    .card::before,
+    .card::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      border: 3px solid rgba(23,23,23,.82);
+      opacity: .14;
+      pointer-events: none;
+    }
+
+    .card::before {
+      width: 160px;
+      height: 160px;
+      right: -65px;
+      top: -68px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.55);
+    }
+
+    .card::after {
+      width: 75px;
+      height: 75px;
+      right: 45px;
+      bottom: -43px;
+      transform: rotate(24deg);
+      background: rgba(255,255,255,.5);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .icon {
+      width: 67px;
+      height: 67px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255,255,255,.76);
+      box-shadow: 3px 3px 0 rgba(23,23,23,.18);
+      font-size: 32px;
+      transform: rotate(-3deg);
+      transition: transform .2s ease;
+    }
+
+    .card:hover .icon { transform: rotate(5deg) scale(1.05); }
+
+    .tag {
+      display: inline-flex;
+      min-height: 30px;
+      align-items: center;
+      padding: 0 11px;
+      border: 2px solid rgba(23,23,23,.9);
+      border-radius: 999px;
+      background: rgba(255,255,255,.64);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .copy { margin-top: 34px; }
+
+    .copy h3 {
+      margin: 0;
+      max-width: 92%;
+      font-size: clamp(27px, 3.1vw, 39px);
+      line-height: .98;
+      letter-spacing: -.04em;
+    }
+
+    .copy p {
+      max-width: 95%;
+      margin: 12px 0 0;
+      color: rgba(23,23,23,.72);
+      font-size: 15px;
+      line-height: 1.42;
+      font-weight: 600;
+    }
+
+    .arrow {
+      position: absolute;
+      right: 22px;
+      bottom: 18px;
+      font-size: 30px;
+      font-weight: 900;
+      transition: transform .18s ease;
+    }
+
+    .card:hover .arrow { transform: translateX(5px); }
+
+    .external .arrow { transform: rotate(-45deg); }
+    .external:hover .arrow { transform: translate(4px,-4px) rotate(-45deg); }
+
+    .coming .tag::after { content: " soon"; }
+    .coming { cursor: pointer; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      padding: 28px 0 44px;
+      border-top: 2px solid rgba(23,23,23,.16);
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .tiny-button {
+      border: 0;
+      padding: 4px 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      font-weight: 800;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      cursor: pointer;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 26px;
+      z-index: 100;
+      padding: 12px 16px;
+      border: 2px solid var(--line);
+      border-radius: 999px;
+      background: white;
+      box-shadow: 4px 4px 0 var(--line);
+      font-weight: 800;
+      opacity: 0;
+      transform: translate(-50%, 18px);
+      pointer-events: none;
+      transition: .2s ease;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    .confetti-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .confetti {
+      --duration: 2s;
+      --drift: 0px;
+      --spin: 720deg;
+      position: absolute;
+      top: -20px;
+      width: 9px;
+      height: 15px;
+      border: 1px solid rgba(23,23,23,.3);
+      animation: fall var(--duration) cubic-bezier(.2,.7,.35,1) forwards;
+    }
+
+    @keyframes fall {
+      to { transform: translate(var(--drift), calc(100vh + 60px)) rotate(var(--spin)); }
+    }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; min-height: auto; padding: 62px 0 56px; }
+      .hero-doodle { display: none; }
+      .card, .card.wide { grid-column: span 6; }
+    }
+
+    @media (max-width: 620px) {
+      .shell { width: min(100% - 22px, 1180px); }
+      .hero { padding-top: 46px; }
+      h1 { font-size: clamp(55px, 18vw, 82px); }
+      .intro { margin-top: 24px; }
+      .section-head { align-items: start; flex-direction: column; gap: 9px; }
+      .grid { gap: 15px; }
+      .card, .card.wide, .card.half { grid-column: 1 / -1; min-height: 260px; padding: 21px; }
+      .copy { margin-top: 31px; }
+      .copy h3 { font-size: 33px; }
+      footer { flex-direction: column; align-items: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; transition-duration: .001ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Thomas's corner of the internet</p>
+        <h1>I make <span class="underline">stuff.</span></h1>
+        <p class="intro">Maps, games, rankings, simulators, and small ideas that somehow turned into entire websites.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#projects">Pick a rabbit hole ↓</a>
+          <button class="button" id="surprise">Surprise me</button>
+        </div>
+      </div>
+
+      <button class="hero-doodle" id="doodle" aria-label="Poke the little square face">
+        <span class="eye one"></span><span class="eye two"></span><span class="mouth"></span>
+      </button>
+    </header>
+
+    <section class="projects" id="projects" aria-labelledby="projects-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Projects</p>
+          <h2 id="projects-title">Choose your distraction.</h2>
+        </div>
+        <p class="count"><span id="count">0</span> projects & counting</p>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <footer>
+      <span>Made by Thomas. Normal hobbies were apparently insufficient.</span>
+      <button class="tiny-button" id="confetti">deploy confetti</button>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+
+  <script>
+    /*
+      EDIT PROJECT LINKS HERE.
+      Use a relative GitHub Pages path like "./tier-list/" for projects in the same repo,
+      or a full URL like "https://example.com" for redirects.
+      Leave href as "#" while a project is not live yet.
+    */
+    const projects = [
+      {
+        title: "MetroMatch",
+        description: "Weight what matters to you and find the U.S. places that fit best.",
+        icon: "🗺️", tag: "recommender", color: "#addcff", href: "#", size: "wide"
+      },
+      {
+        title: "State Shaper",
+        description: "Redraw the United States county by county and make entirely new states.",
+        icon: "✂️", tag: "map tool", color: "#ffd77e", href: "#"
+      },
+      {
+        title: "Game Night Picker",
+        description: "Tell it who's playing and let it settle the eternal question: what should we play?",
+        icon: "🎲", tag: "recommender", color: "#bde8bf", href: "#"
+      },
+      {
+        title: "Tier Forge",
+        description: "Build, rank, rearrange, and export tier lists without fighting the interface.",
+        icon: "🏆", tag: "ranking tool", color: "#ffc4d5", href: "#"
+      },
+      {
+        title: "House Score",
+        description: "Rate a house on the stuff that actually matters and turn gut feelings into a score.",
+        icon: "🏠", tag: "decision tool", color: "#cfc4ff", href: "#"
+      },
+      {
+        title: "Intersection Lab",
+        description: "Mess with traffic flows, signals, lanes, and watch an intersection deal with your decisions.",
+        icon: "🚦", tag: "simulator", color: "#ffb38f", href: "#", size: "half"
+      },
+      {
+        title: "Railway Clicker",
+        description: "A train-themed cookie clicker. Build absurd amounts of railway because number go up.",
+        icon: "🚂", tag: "game", color: "#aee3d9", href: "#", size: "half"
+      },
+      {
+        title: "Pirate Legacy",
+        description: "A pirate game about building a story, making choices, and probably acquiring questionable treasure.",
+        icon: "🏴‍☠️", tag: "game", color: "#9fc5ee", href: "#"
+      },
+      {
+        title: "Everywhere I've Been",
+        description: "Track visited countries, states, and U.S. counties on one increasingly satisfying map.",
+        icon: "📍", tag: "personal map", color: "#ffd6a3", href: "#"
+      },
+      {
+        title: "The Good Routes",
+        description: "My favorite hikes, bike rides, train rides, drives, and boating routes — ranked.",
+        icon: "🥾", tag: "lists + maps", color: "#b8df96", href: "#", size: "wide"
+      },
+      {
+        title: "Recipe Box",
+        description: "Recipes worth making again, without digging through seventeen paragraphs about someone's childhood.",
+        icon: "🍳", tag: "collection", color: "#ffc3a8", href: "#"
+      },
+      {
+        title: "Challenges",
+        description: "Goals, checklists, collections, and other completely reasonable ways to gamify existing.",
+        icon: "✅", tag: "tracker", color: "#e5ca93", href: "#"
+      },
+      {
+        title: "Bike Friendliness Index",
+        description: "My bike-friendliness ranking project. This one sends you to its own home on the web.",
+        icon: "🚲", tag: "external", color: "#9ed9b5", href: "#", external: true
+      }
+    ];
+
+    const grid = document.getElementById("grid");
+    const count = document.getElementById("count");
+    const toast = document.getElementById("toast");
+    const doodle = document.getElementById("doodle");
+    const surprise = document.getElementById("surprise");
+    const confettiButton = document.getElementById("confetti");
+    const confettiLayer = document.getElementById("confettiLayer");
+
+    const escapeHTML = value => String(value).replace(/[&<>'"]/g, ch => ({
+      "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;"
+    })[ch]);
+
+    function render() {
+      grid.innerHTML = projects.map((p, i) => {
+        const inactive = !p.href || p.href === "#";
+        const classes = ["card", p.size || "", p.external ? "external" : "", inactive ? "coming" : ""]
+          .filter(Boolean).join(" ");
+        return `
+          <a class="${classes}" style="--c:${escapeHTML(p.color)}" href="${escapeHTML(p.href || '#')}"
+             data-index="${i}" ${p.external && !inactive ? 'target="_blank" rel="noopener"' : ''}>
+            <div class="card-top">
+              <div class="icon" aria-hidden="true">${escapeHTML(p.icon)}</div>
+              <span class="tag">${escapeHTML(inactive ? p.tag : p.tag)}</span>
+            </div>
+            <div class="copy">
+              <h3>${escapeHTML(p.title)}</h3>
+              <p>${escapeHTML(p.description)}</p>
+            </div>
+            <span class="arrow" aria-hidden="true">→</span>
+          </a>`;
+      }).join("");
+
+      count.textContent = projects.length;
+
+      document.querySelectorAll(".card.coming").forEach(card => {
+        card.addEventListener("click", event => {
+          event.preventDefault();
+          showToast(`${projects[Number(card.dataset.index)].title} isn't live yet 👨‍🍳`);
+        });
+      });
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("show"), 1600);
+    }
+
+    surprise.addEventListener("click", () => {
+      const live = projects.map((p, i) => ({...p, i})).filter(p => p.href && p.href !== "#");
+      if (live.length) {
+        const pick = live[Math.floor(Math.random() * live.length)];
+        if (pick.external) window.open(pick.href, "_blank", "noopener");
+        else window.location.href = pick.href;
+        return;
+      }
+
+      const cards = [...document.querySelectorAll(".card")];
+      const pick = cards[Math.floor(Math.random() * cards.length)];
+      pick.scrollIntoView({ behavior: "smooth", block: "center" });
+      pick.animate([
+        { transform: "scale(1) rotate(0deg)" },
+        { transform: "scale(1.045) rotate(-1deg)" },
+        { transform: "scale(1) rotate(0deg)" }
+      ], { duration: 560, easing: "cubic-bezier(.2,.8,.2,1)" });
+      showToast("surprise! now you have to finish that one");
+    });
+
+    doodle.addEventListener("click", () => {
+      doodle.classList.remove("bounce");
+      void doodle.offsetWidth;
+      doodle.classList.add("bounce");
+    });
+
+    const colors = ["#ff887c", "#ffd76a", "#7ed9a1", "#addcff", "#cfc4ff", "#ffc4d5"];
+
+    confettiButton.addEventListener("click", () => {
+      for (let i = 0; i < 54; i++) {
+        const bit = document.createElement("i");
+        bit.className = "confetti";
+        bit.style.left = Math.random() * 100 + "%";
+        bit.style.background = colors[Math.floor(Math.random() * colors.length)];
+        bit.style.setProperty("--duration", (1.7 + Math.random() * 1.6) + "s");
+        bit.style.setProperty("--drift", (-170 + Math.random() * 340) + "px");
+        bit.style.setProperty("--spin", (-720 + Math.random() * 1440) + "deg");
+        bit.style.animationDelay = Math.random() * .3 + "s";
+        confettiLayer.appendChild(bit);
+        bit.addEventListener("animationend", () => bit.remove());
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
