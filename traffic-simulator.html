@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traffic Flow Simulator</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #191919;
+    --panel: #242424;
+    --panel-border: #3a3a3a;
+    --text: #f3f3f3;
+    --muted: #bdbdbd;
+    --button: #c8c8c8;
+    --button-text: #111;
+    --accent: #ef4444;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  body { padding: 18px; }
+
+  .app {
+    width: min(100%, 1860px);
+    margin: 0 auto;
+  }
+
+  h1 {
+    margin: 0 0 14px;
+    font-size: clamp(24px, 3vw, 34px);
+    font-weight: 700;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px 28px;
+    padding: 14px;
+    margin-bottom: 16px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+  }
+
+  .traffic-controls {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(92px, auto));
+    gap: 8px;
+  }
+
+  button {
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--button);
+    color: var(--button-text);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: translateY(1px); }
+
+  .slider-wrap {
+    width: min(420px, 100%);
+    flex: 1 1 320px;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .slider-row input { width: 100%; }
+
+  .label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .subtle {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .sim-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .sim-card {
+    overflow: hidden;
+    min-width: 0;
+    background: #228b22;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    background: #228b22;
+  }
+
+  @media (max-width: 1100px) {
+    .sim-grid { grid-template-columns: 1fr; }
+    .sim-card { width: min(700px, 100%); margin: 0 auto; }
+  }
+
+  @media (max-width: 560px) {
+    body { padding: 10px; }
+    .traffic-controls { grid-template-columns: repeat(2, minmax(105px, 1fr)); width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Traffic Flow Simulator</h1>
+
+  <div class="controls">
+    <div>
+      <span class="label">Directional traffic level</span>
+      <div class="traffic-controls">
+        <button id="btn-N" type="button">N: Medium</button>
+        <button id="btn-S" type="button">S: Medium</button>
+        <button id="btn-E" type="button">E: Medium</button>
+        <button id="btn-W" type="button">W: Medium</button>
+      </div>
+    </div>
+
+    <div class="slider-wrap">
+      <label class="label" for="spawnSpeed">Car Spawn Speed: <span id="spawnValue">14</span></label>
+      <div class="slider-row">
+        <span>5</span>
+        <input id="spawnSpeed" type="range" min="5" max="20" value="14" step="0.1">
+        <span>20</span>
+      </div>
+      <div class="subtle">Higher = more frequent cars, matching the original inverse-delay slider.</div>
+    </div>
+  </div>
+
+  <div class="sim-grid">
+    <div class="sim-card"><canvas id="trafficLightCanvas" width="600" height="600"></canvas></div>
+    <div class="sim-card"><canvas id="stopSignCanvas" width="600" height="600"></canvas></div>
+    <div class="sim-card"><canvas id="roundaboutCanvas" width="600" height="600"></canvas></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // --- Constants ported from the Pygame version ---
+  const INTERSECTION_WIDTH = 600;
+  const INTERSECTION_HEIGHT = 600;
+  const ROAD_WIDTH = 60;
+  const LANE_WIDTH = ROAD_WIDTH / 2;
+
+  const CAR_WIDTH = 20;
+  const CAR_HEIGHT = 10;
+  const CAR_SPEED = 2;
+  const SAFE_DISTANCE = 40;
+
+  const MANDATORY_STOP_TIME = 8;
+  const ADDITIONAL_STOP_TIME = 10;
+  const LIGHT_GREEN_DURATION = 300;
+  const LIGHT_YELLOW_DURATION = 60;
+
+  const ROAD_COLOR = 'rgb(100,100,100)';
+  const LINE_COLOR = 'rgb(255,255,255)';
+  const GRASS_COLOR = 'rgb(34,139,34)';
+  const RED = 'rgb(255,0,0)';
+  const YELLOW = 'rgb(255,255,0)';
+  const GREEN = 'rgb(0,255,0)';
+
+  const trafficLevels = { N: 'Medium', S: 'Medium', E: 'Medium', W: 'Medium' };
+  const trafficCycle = ['Low', 'Medium', 'High'];
+  const levelMapValues = { Low: 0, Medium: 1, High: 2 };
+  const oppositeDir = { N: 'S', S: 'N', E: 'W', W: 'E' };
+  const perpendiculars = {
+    N: ['E', 'W'],
+    S: ['E', 'W'],
+    E: ['N', 'S'],
+    W: ['N', 'S']
+  };
+
+  const spawnSlider = document.getElementById('spawnSpeed');
+  const spawnValue = document.getElementById('spawnValue');
+
+  function sliderOutputValue() {
+    const displayValue = Number(spawnSlider.value);
+    return 150 - (displayValue - 5) * (140 / 15);
+  }
+
+  spawnSlider.addEventListener('input', () => {
+    spawnValue.textContent = String(Math.trunc(Number(spawnSlider.value)));
+  });
+
+  for (const d of ['N', 'S', 'E', 'W']) {
+    document.getElementById(`btn-${d}`).addEventListener('click', () => {
+      const current = trafficCycle.indexOf(trafficLevels[d]);
+      trafficLevels[d] = trafficCycle[(current + 1) % trafficCycle.length];
+      document.getElementById(`btn-${d}`).textContent = `${d}: ${trafficLevels[d]}`;
+    });
+  }
+
+  function computeTurnProbs(levelMap, origin, baseStraight = 0.60, k = 0.25, minStraight = 0.20, maxStraight = 0.85) {
+    const tD = levelMap[origin];
+    const tO = levelMap[oppositeDir[origin]];
+    const [p1, p2] = perpendiculars[origin];
+    const tPsum = levelMap[p1] + levelMap[p2];
+
+    const diff = (tD + tO) - tPsum;
+    const norm = diff / 4.0;
+    let straight = baseStraight + k * norm;
+    straight = Math.max(minStraight, Math.min(maxStraight, straight));
+
+    const remaining = 1 - straight;
+    return { S: straight, L: remaining / 2, R: remaining / 2 };
+  }
+
+  function getTurnChoice(origin) {
+    const numeric = {};
+    for (const d of ['N', 'S', 'E', 'W']) numeric[d] = levelMapValues[trafficLevels[d]];
+    const probs = computeTurnProbs(numeric, origin);
+    const roll = Math.random();
+    if (roll < probs.S) return 'S';
+    if (roll < probs.S + probs.L) return 'L';
+    return 'R';
+  }
+
+  function hypot(x, y) { return Math.hypot(x, y); }
+
+  function randomCarColor() {
+    const r = Math.floor(50 + Math.random() * 151);
+    const g = Math.floor(50 + Math.random() * 151);
+    const b = Math.floor(50 + Math.random() * 151);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  function offsetPath(centerline, laneWidth) {
+    laneWidth = -laneWidth; // right-hand driving
+    const result = [];
+
+    for (let i = 0; i < centerline.length - 1; i++) {
+      const dx = centerline[i + 1][0] - centerline[i][0];
+      const dy = centerline[i + 1][1] - centerline[i][1];
+      const length = Math.hypot(dx, dy) || 1;
+      const offsetX = centerline[i][0] + (dy / length) * laneWidth / 2;
+      const offsetY = centerline[i][1] - (dx / length) * laneWidth / 2;
+      result.push([offsetX, offsetY]);
+    }
+
+    const last = centerline.length - 1;
+    const dx = centerline[last][0] - centerline[last - 1][0];
+    const dy = centerline[last][1] - centerline[last - 1][1];
+    const length = Math.hypot(dx, dy) || 1;
+    result.push([
+      centerline[last][0] + (dy / length) * laneWidth / 2,
+      centerline[last][1] - (dx / length) * laneWidth / 2
+    ]);
+    return result;
+  }
+
+  class Car {
+    constructor(path, spawnTime) {
+      this.path = path;
+      this.waypointIndex = 0;
+      [this.x, this.y] = path[0];
+      this.angle = 0;
+      this.speed = CAR_SPEED;
+      this.color = randomCarColor();
+      this.stopped = false;
+      this.waitingAtStop = false;
+      this.spawnTime = spawnTime;
+      this.stopTimer = null;
+    }
+
+    draw(ctx) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      // Pygame's angle convention is opposite Canvas rotation, so negate it.
+      ctx.rotate(-this.angle * Math.PI / 180);
+      ctx.fillStyle = this.color;
+      ctx.fillRect(-CAR_WIDTH / 2, -CAR_HEIGHT / 2, CAR_WIDTH, CAR_HEIGHT);
+      ctx.restore();
+    }
+
+    update(leadCar, intersection) {
+      this.stopped = Boolean(leadCar && Math.hypot(this.x - leadCar.x, this.y - leadCar.y) < SAFE_DISTANCE);
+      if (intersection) intersection.applyRules(this);
+      if (!this.stopped) this.move();
+    }
+
+    move() {
+      if (this.waypointIndex >= this.path.length) return;
+      const [tx, ty] = this.path[this.waypointIndex];
+      const dx = tx - this.x;
+      const dy = ty - this.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < this.speed) {
+        this.waypointIndex += 1;
+      } else {
+        this.angle = Math.atan2(-dy, dx) * 180 / Math.PI;
+        this.x += this.speed * Math.cos(this.angle * Math.PI / 180);
+        this.y -= this.speed * Math.sin(this.angle * Math.PI / 180);
+      }
+    }
+  }
+
+  class Intersection {
+    constructor(canvas) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      this.centerX = INTERSECTION_WIDTH / 2;
+      this.centerY = INTERSECTION_HEIGHT / 2;
+      this.cars = [];
+      this.spawnTimer = 0;
+      this.paths = {};
+      this.carLifetimes = [];
+      this.totalCarsMeasured = 0;
+      this.avgLifetimeToDisplay = null;
+    }
+
+    definePaths() { return {}; }
+
+    spawnCar(simTimeMs) {
+      if (!Object.keys(this.paths).length) return;
+      if (this.spawnTimer > 0) {
+        this.spawnTimer -= 1;
+        return;
+      }
+
+      const origins = [...new Set(Object.keys(this.paths).map(k => k[0]))].sort();
+      const origin = origins[Math.floor(Math.random() * origins.length)];
+      const turn = getTurnChoice(origin);
+      const turnMap = {
+        N: { S: 'S', L: 'W', R: 'E' },
+        S: { S: 'N', L: 'E', R: 'W' },
+        E: { S: 'W', L: 'N', R: 'S' },
+        W: { S: 'E', L: 'S', R: 'N' }
+      };
+      const dest = turnMap[origin][turn];
+      const path = this.paths[`${origin}_${dest}`];
+      if (!path) return;
+
+      this.cars.push(new Car(path, simTimeMs));
+      this.spawnTimer = Math.trunc(sliderOutputValue());
+    }
+
+    update(simTimeMs) {
+      this.spawnCar(simTimeMs);
+
+      for (let i = this.cars.length - 1; i >= 0; i--) {
+        const car = this.cars[i];
+        let leadCar = null;
+
+        for (let j = i - 1; j >= 0; j--) {
+          const potential = this.cars[j];
+          if (potential.path === car.path) {
+            leadCar = potential;
+            break;
+          }
+        }
+
+        car.update(leadCar, this);
+
+        if (car.waypointIndex >= car.path.length) {
+          const lifetime = simTimeMs - car.spawnTime;
+          this.carLifetimes.push(lifetime);
+          this.totalCarsMeasured += 1;
+
+          if (this.carLifetimes.length >= 10) {
+            const sum = this.carLifetimes.reduce((a, b) => a + b, 0);
+            this.avgLifetimeToDisplay = (sum / this.carLifetimes.length) / 1000;
+            this.carLifetimes.length = 0;
+          }
+          this.cars.splice(i, 1);
+        }
+      }
+    }
+
+    draw() {
+      const ctx = this.ctx;
+      ctx.fillStyle = GRASS_COLOR;
+      ctx.fillRect(0, 0, INTERSECTION_WIDTH, INTERSECTION_HEIGHT);
+      this.drawRoads();
+      for (const car of this.cars) car.draw(ctx);
+
+      if (this.avgLifetimeToDisplay !== null) {
+        this.drawText(`Avg wait time (last 10): ${this.avgLifetimeToDisplay.toFixed(1)}s`, 10, 40);
+      }
+    }
+
+    drawText(text, x, y, color = '#fff', size = 30) {
+      const ctx = this.ctx;
+      ctx.fillStyle = color;
+      ctx.font = `${size}px Arial, Helvetica, sans-serif`;
+      ctx.textBaseline = 'top';
+      ctx.fillText(String(text), x, y);
+    }
+
+    drawRoads() {}
+    applyRules(_car) {}
+  }
+
+  class TrafficLightIntersection extends Intersection {
+    constructor(canvas) {
+      super(canvas);
+      this.lightState = 'NS_GREEN';
+      this.lightTimer = LIGHT_GREEN_DURATION;
+      this.paths = this.definePaths();
+    }
+
+    definePaths() {
+      const cx = this.centerX;
+      const cy = this.centerY;
+      const raw = {
+        S_N: [[cx, INTERSECTION_HEIGHT], [cx, 0]],
+        N_S: [[cx, 0], [cx, INTERSECTION_HEIGHT]],
+        W_E: [[0, cy], [INTERSECTION_WIDTH, cy]],
+        E_W: [[INTERSECTION_WIDTH, cy], [0, cy]],
+
+        S_E: [[cx, INTERSECTION_HEIGHT], [cx + LANE_WIDTH, cy + LANE_WIDTH], [INTERSECTION_WIDTH, cy]],
+        N_W: [[cx, 0], [cx + LANE_WIDTH, cy + LANE_WIDTH], [0, cy]],
+        W_S: [[0, cy], [cx + LANE_WIDTH, cy - LANE_WIDTH], [cx, INTERSECTION_HEIGHT]],
+        E_N: [[INTERSECTION_WIDTH, cy], [cx - LANE_WIDTH, cy + LANE_WIDTH], [cx, 0]],
+
+        S_W: [[cx, INTERSECTION_HEIGHT], [cx + LANE_WIDTH, cy - LANE_WIDTH], [0, cy]],
+        N_E: [[cx, 0], [cx + LANE_WIDTH, cy - LANE_WIDTH], [INTERSECTION_WIDTH, cy]],
+        W_N: [[0, cy], [cx + LANE_WIDTH, cy + LANE_WIDTH], [cx, 0]],
+        E_S: [[INTERSECTION_WIDTH, cy], [cx - LANE_WIDTH, cy - LANE_WIDTH], [cx, INTERSECTION_HEIGHT]]
+      };
+
+      return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, offsetPath(v, LANE_WIDTH)]));
+    }
+
+    update(simTimeMs) {
+      super.update(simTimeMs);
+      this.lightTimer -= 1;
+      if (this.lightTimer <= 0) {
+        if (this.lightState === 'NS_GREEN') this.lightState = 'NS_YELLOW';
+        else if (this.lightState === 'NS_YELLOW') this.lightState = 'EW_GREEN';
+        else if (this.lightState === 'EW_GREEN') this.lightState = 'EW_YELLOW';
+        else this.lightState = 'NS_GREEN';
+        this.lightTimer = this.lightState.includes('GREEN') ? LIGHT_GREEN_DURATION : LIGHT_YELLOW_DURATION;
+      }
+    }
+
+    draw() {
+      super.draw();
+      this.drawText('Traffic Light', 10, 10);
+      this.drawLights();
+    }
+
+    drawRoads() {
+      const ctx = this.ctx;
+      ctx.fillStyle = ROAD_COLOR;
+      ctx.fillRect(this.centerX - ROAD_WIDTH / 2, 0, ROAD_WIDTH, INTERSECTION_HEIGHT);
+      ctx.fillRect(0, this.centerY - ROAD_WIDTH / 2, INTERSECTION_WIDTH, ROAD_WIDTH);
+    }
+
+    drawLights() {
+      const ctx = this.ctx;
+      const nsColor = this.lightState === 'NS_GREEN' ? GREEN : this.lightState === 'NS_YELLOW' ? YELLOW : RED;
+      const ewColor = this.lightState === 'EW_GREEN' ? GREEN : this.lightState === 'EW_YELLOW' ? YELLOW : RED;
+      const circle = (x, y, color) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      };
+
+      circle(this.centerX - LANE_WIDTH, this.centerY + ROAD_WIDTH / 2 + 5, nsColor);
+      circle(this.centerX + LANE_WIDTH, this.centerY - ROAD_WIDTH / 2 - 5, nsColor);
+      circle(this.centerX + ROAD_WIDTH / 2 + 5, this.centerY + LANE_WIDTH, ewColor);
+      circle(this.centerX - ROAD_WIDTH / 2 - 5, this.centerY - LANE_WIDTH, ewColor);
+    }
+
+    applyRules(car) {
+      const passLineNorth = this.centerY + ROAD_WIDTH / 2 + 80;
+      const stopLineNorth = this.centerY + ROAD_WIDTH / 2 + 20;
+      const passLineSouth = this.centerY - ROAD_WIDTH / 2 - 80;
+      const stopLineSouth = this.centerY - ROAD_WIDTH / 2 - 20;
+      const passLineEast = this.centerX - ROAD_WIDTH / 2 - 40;
+      const stopLineEast = this.centerX - ROAD_WIDTH / 2 - 20;
+      const passLineWest = this.centerX + ROAD_WIDTH / 2 + 40;
+      const stopLineWest = this.centerX + ROAD_WIDTH / 2 + 20;
+
+      if (['EW_GREEN', 'EW_YELLOW', 'NS_YELLOW'].includes(this.lightState)) {
+        if (car.path[0][1] === INTERSECTION_HEIGHT) {
+          if (car.y <= passLineNorth && car.y > this.centerY + 40 && car.y <= stopLineNorth) car.stopped = true;
+        } else if (car.path[0][1] === 0) {
+          if (car.y >= passLineSouth && car.y < this.centerY - 40 && car.y >= stopLineSouth) car.stopped = true;
+        }
+      }
+
+      if (['NS_GREEN', 'NS_YELLOW', 'EW_YELLOW'].includes(this.lightState)) {
+        if (car.path[0][0] === 0) {
+          if (car.x >= passLineEast && car.x < this.centerX - 40 && car.x >= stopLineEast) car.stopped = true;
+        } else if (car.path[0][0] === INTERSECTION_WIDTH) {
+          if (car.x <= passLineWest && car.x > this.centerX + 40 && car.x <= stopLineWest) car.stopped = true;
+        }
+      }
+    }
+  }
+
+  class StopSignIntersection extends Intersection {
+    constructor(canvas) {
+      super(canvas);
+      this.paths = this.definePaths();
+      this.queues = Object.fromEntries(Object.keys(this.paths).map(k => [k, []]));
+      this.releasedCar = null;
+      this.releaseCooldown = 0;
+      this.dirOrder = Object.keys(this.paths);
+      this.nextDirIdx = 0;
+    }
+
+    definePaths() {
+      const cx = this.centerX;
+      const cy = this.centerY;
+      const raw = {
+        S_N: [[cx, INTERSECTION_HEIGHT], [cx, 0]],
+        N_S: [[cx, 0], [cx, INTERSECTION_HEIGHT]],
+        W_E: [[0, cy], [INTERSECTION_WIDTH, cy]],
+        E_W: [[INTERSECTION_WIDTH, cy], [0, cy]],
+
+        S_E: [[cx, INTERSECTION_HEIGHT], [cx, cy], [INTERSECTION_WIDTH, cy]],
+        N_W: [[cx, 0], [cx, cy], [0, cy]],
+        W_S: [[0, cy], [cx, cy], [cx, INTERSECTION_HEIGHT]],
+        E_N: [[INTERSECTION_WIDTH, cy], [cx, cy], [cx, 0]],
+
+        S_W: [[cx, INTERSECTION_HEIGHT], [cx, cy], [0, cy]],
+        N_E: [[cx, 0], [cx, cy], [INTERSECTION_WIDTH, cy]],
+        W_N: [[0, cy], [cx, cy], [cx, 0]],
+        E_S: [[INTERSECTION_WIDTH, cy], [cx, cy], [cx, INTERSECTION_HEIGHT]]
+      };
+      return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, offsetPath(v, LANE_WIDTH)]));
+    }
+
+    applyRules(car) {
+      let dirKey = null;
+      for (const [k, path] of Object.entries(this.paths)) {
+        if (car.path === path) {
+          dirKey = k;
+          break;
+        }
+      }
+      if (dirKey === null) return;
+
+      const stopLineMin = ROAD_WIDTH / 2 - 10;
+      const stopLineMax = ROAD_WIDTH / 2 + 30;
+      const distToCenter = Math.hypot(car.x - this.centerX, car.y - this.centerY);
+      const atStop = stopLineMin < distToCenter && distToCenter < stopLineMax;
+
+      if (atStop && !car.waitingAtStop) {
+        car.waitingAtStop = true;
+        car.stopTimer = MANDATORY_STOP_TIME;
+        this.queues[dirKey].push(car);
+      }
+
+      if (car.stopTimer !== null && car.stopTimer > 0) {
+        car.stopped = true;
+        car.stopTimer -= 1;
+        return;
+      }
+
+      if (car === this.releasedCar) {
+        car.stopped = false;
+        if (car.waypointIndex >= car.path.length || distToCenter > ROAD_WIDTH * 1.2) {
+          this.releasedCar = null;
+          this.releaseCooldown = ADDITIONAL_STOP_TIME;
+        }
+        return;
+      }
+
+      for (const q of Object.values(this.queues)) {
+        if (q.includes(car)) {
+          car.stopped = true;
+          return;
+        }
+      }
+
+      if (this.releasedCar === null && this.releaseCooldown <= 0) {
+        for (let tries = 0; tries < Object.keys(this.paths).length; tries++) {
+          const key = this.dirOrder[this.nextDirIdx];
+          this.nextDirIdx = (this.nextDirIdx + 1) % this.dirOrder.length;
+          if (this.queues[key].length) {
+            this.releasedCar = this.queues[key].shift();
+            break;
+          }
+        }
+      }
+
+      if (this.releaseCooldown > 0) this.releaseCooldown -= 1;
+    }
+
+    draw() {
+      super.draw();
+      this.drawText('Stop Sign', 10, 10);
+    }
+
+    drawRoads() {
+      const ctx = this.ctx;
+      ctx.fillStyle = ROAD_COLOR;
+      ctx.fillRect(this.centerX - ROAD_WIDTH / 2, 0, ROAD_WIDTH, INTERSECTION_HEIGHT);
+      ctx.fillRect(0, this.centerY - ROAD_WIDTH / 2, INTERSECTION_WIDTH, ROAD_WIDTH);
+
+      const stopOffset = ROAD_WIDTH / 2 + 2;
+      const lineLen = LANE_WIDTH;
+      ctx.strokeStyle = LINE_COLOR;
+      ctx.lineWidth = 4;
+      const line = (x1, y1, x2, y2) => {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      };
+      line(this.centerX + 2, this.centerY - stopOffset, this.centerX - lineLen, this.centerY - stopOffset);
+      line(this.centerX + lineLen, this.centerY + stopOffset, this.centerX - 2, this.centerY + stopOffset);
+      line(this.centerX - stopOffset, this.centerY + lineLen, this.centerX - stopOffset, this.centerY - 2);
+      line(this.centerX + stopOffset, this.centerY + 2, this.centerX + stopOffset, this.centerY - lineLen);
+    }
+  }
+
+  class RoundaboutIntersection extends Intersection {
+    constructor(canvas) {
+      super(canvas);
+      this.radius = ROAD_WIDTH * 1.2;
+      this.centerCircleRadius = this.radius - ROAD_WIDTH;
+      this.paths = this.definePaths();
+    }
+
+    definePaths() {
+      const r = this.radius - ROAD_WIDTH / 2.5;
+      const specs = [
+        ['S', 'N', 300, 60], ['N', 'S', 120, 240], ['W', 'E', 210, 330], ['E', 'W', 30, 150],
+        ['S', 'W', 300, 210], ['N', 'E', 120, 30], ['W', 'N', 210, 120], ['E', 'S', 30, 300],
+        ['S', 'E', 300, 330], ['N', 'W', 120, 150], ['W', 'S', 210, 240], ['E', 'N', 30, 60]
+      ];
+
+      const result = {};
+      for (const [from, to, start, end] of specs) {
+        result[`${from}_${to}`] = [
+          ...this.getEntryPath(from),
+          ...this.getArcPath(start, end, r),
+          ...this.getExitPath(to)
+        ];
+      }
+      return result;
+    }
+
+    getEntryPath(direction) {
+      if (direction === 'N') return [[this.centerX - LANE_WIDTH / 2, 0], [this.centerX - LANE_WIDTH / 2, this.centerY - this.radius]];
+      if (direction === 'S') return [[this.centerX + LANE_WIDTH / 2, INTERSECTION_HEIGHT], [this.centerX + LANE_WIDTH / 2, this.centerY + this.radius]];
+      if (direction === 'E') return [[INTERSECTION_WIDTH, this.centerY - LANE_WIDTH / 2], [this.centerX + this.radius, this.centerY - LANE_WIDTH / 2]];
+      if (direction === 'W') return [[0, this.centerY + LANE_WIDTH / 2], [this.centerX - this.radius, this.centerY + LANE_WIDTH / 2]];
+      return [];
+    }
+
+    getExitPath(direction) {
+      if (direction === 'N') return [[this.centerX + LANE_WIDTH / 2, this.centerY - this.radius], [this.centerX + LANE_WIDTH / 2, 0]];
+      if (direction === 'S') return [[this.centerX - LANE_WIDTH / 2, this.centerY + this.radius], [this.centerX - LANE_WIDTH / 2, INTERSECTION_HEIGHT]];
+      if (direction === 'E') return [[this.centerX + this.radius, this.centerY + LANE_WIDTH / 2], [INTERSECTION_WIDTH, this.centerY + LANE_WIDTH / 2]];
+      if (direction === 'W') return [[this.centerX - this.radius, this.centerY - LANE_WIDTH / 2], [0, this.centerY - LANE_WIDTH / 2]];
+      return [];
+    }
+
+    getArcPath(startAngle, endAngle, radius, steps = 40) {
+      const path = [];
+      if (endAngle <= startAngle) endAngle += 360;
+      const range = endAngle - startAngle;
+      for (let i = 0; i <= steps; i++) {
+        const angleDeg = startAngle + range * i / steps;
+        const angleRad = angleDeg * Math.PI / 180;
+        path.push([
+          this.centerX + radius * Math.cos(angleRad),
+          this.centerY - radius * Math.sin(angleRad)
+        ]);
+      }
+      return path;
+    }
+
+    draw() {
+      super.draw();
+      this.drawText('Roundabout', 10, 10);
+    }
+
+    drawRoads() {
+      const ctx = this.ctx;
+      ctx.fillStyle = ROAD_COLOR;
+      ctx.beginPath();
+      ctx.arc(this.centerX, this.centerY, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(0, this.centerY - ROAD_WIDTH / 2, INTERSECTION_WIDTH, ROAD_WIDTH);
+      ctx.fillRect(this.centerX - ROAD_WIDTH / 2, 0, ROAD_WIDTH, INTERSECTION_HEIGHT);
+
+      // Pygame draw.circle radius = center_circle_radius * 2.4 in the source.
+      ctx.fillStyle = GRASS_COLOR;
+      ctx.beginPath();
+      ctx.arc(this.centerX, this.centerY, this.centerCircleRadius * 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    applyRules(car) {
+      const distToCenter = Math.hypot(car.x - this.centerX, car.y - this.centerY);
+      const isAtYieldPoint = this.radius - 5 < distToCenter && distToCenter < this.radius + 25 && car.waypointIndex < 5;
+
+      if (isAtYieldPoint) {
+        for (const other of this.cars) {
+          if (other === car) continue;
+          const otherDist = Math.hypot(other.x - this.centerX, other.y - this.centerY);
+          if (otherDist < this.radius + CAR_WIDTH / 2) {
+            const collisionDist = Math.hypot(car.x - other.x, car.y - other.y);
+            if (collisionDist < SAFE_DISTANCE * 1.5) {
+              car.stopped = true;
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const simulations = [
+    new TrafficLightIntersection(document.getElementById('trafficLightCanvas')),
+    new StopSignIntersection(document.getElementById('stopSignCanvas')),
+    new RoundaboutIntersection(document.getElementById('roundaboutCanvas'))
+  ];
+
+  // Fixed 60 Hz simulation so game speed does not depend on monitor refresh rate.
+  const STEP_MS = 1000 / 60;
+  let lastTime = performance.now();
+  let accumulator = 0;
+  let simulationTime = 0;
+
+  function frame(now) {
+    let dt = now - lastTime;
+    lastTime = now;
+    // Avoid huge catch-up bursts after switching tabs.
+    dt = Math.min(dt, 250);
+    accumulator += dt;
+
+    while (accumulator >= STEP_MS) {
+      simulationTime += STEP_MS;
+      for (const sim of simulations) sim.update(simulationTime);
+      accumulator -= STEP_MS;
+    }
+
+    for (const sim of simulations) sim.draw();
+    requestAnimationFrame(frame);
+  }
+
+  for (const sim of simulations) sim.draw();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
