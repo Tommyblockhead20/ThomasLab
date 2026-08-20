@@ -113,6 +113,15 @@
       font-weight: 800;
     }
 
+    .project-count {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+
     .button {
       min-height: 49px;
       padding: 0 20px;
@@ -204,7 +213,7 @@
 
     .projects {
       position: relative;
-      padding: 0 0 54px;
+      padding: 0;
     }
 
     .projects::before {
@@ -223,16 +232,17 @@
     }
 
     .about-head {
-      display: flex;
-      align-items: center;
-      margin: 0 0 15px;
+      margin: 20px 0 11px;
     }
 
     .about-head h2 {
       margin: 0;
-      font-size: clamp(20px, 2.2vw, 29px);
+      font-size: 15px;
       line-height: 1;
-      letter-spacing: -.03em;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
 
     .row-label {
@@ -280,11 +290,13 @@
       grid-column: span 6;
       height: 312px;
       min-height: 312px;
+      --r: 0deg;
     }
 
 
     .card:nth-child(4n + 1) { --r: -.25deg; }
     .card:nth-child(4n + 3) { --r: .25deg; }
+    .card.feature { --r: 0deg; }
     .card:hover {
       z-index: 4;
       transform: translate(-4px, -5px) rotate(0deg);
@@ -343,18 +355,21 @@
 
     .card:hover .icon { transform: rotate(5deg) scale(1.05); }
 
-    .copy { margin-top: 34px; }
+    .copy {
+      margin-top: 34px;
+      padding-right: 42px;
+    }
 
     .copy h3 {
       margin: 0;
-      max-width: 92%;
+      max-width: 100%;
       font-size: clamp(27px, 2.35vw, 34px);
       line-height: .98;
       letter-spacing: -.04em;
     }
 
     .copy p {
-      max-width: 95%;
+      max-width: 100%;
       margin: 12px 0 0;
       color: rgba(23,23,23,.72);
       font-size: 15px;
@@ -378,30 +393,6 @@
 
     .coming { cursor: pointer; }
 
-    footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 18px;
-      padding: 28px 0 44px;
-      border-top: 2px solid rgba(23,23,23,.16);
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 650;
-    }
-
-    .tiny-button {
-      border: 0;
-      padding: 4px 0;
-      background: none;
-      color: inherit;
-      font: inherit;
-      font-weight: 800;
-      text-decoration: underline;
-      text-underline-offset: 4px;
-      cursor: pointer;
-    }
-
     .toast {
       position: fixed;
       left: 50%;
@@ -421,30 +412,6 @@
 
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-    .confetti-layer {
-      position: fixed;
-      inset: 0;
-      z-index: 90;
-      overflow: hidden;
-      pointer-events: none;
-    }
-
-    .confetti {
-      --duration: 2s;
-      --drift: 0px;
-      --spin: 720deg;
-      position: absolute;
-      top: -20px;
-      width: 9px;
-      height: 15px;
-      border: 1px solid rgba(23,23,23,.3);
-      animation: fall var(--duration) cubic-bezier(.2,.7,.35,1) forwards;
-    }
-
-    @keyframes fall {
-      to { transform: translate(var(--drift), calc(100vh + 60px)) rotate(var(--spin)); }
-    }
-
     @media (max-width: 900px) {
       .hero { grid-template-columns: 1fr; min-height: auto; padding: 52px 0 30px; }
       .hero-doodle { display: none; }
@@ -459,10 +426,8 @@
       .grid { gap: 15px; }
       .grid + .grid { margin-top: 15px; }
       .card, .card.feature { grid-column: 1 / -1; height: 260px; min-height: 260px; padding: 21px; }
-      .about-head { margin-bottom: 12px; }
       .copy { margin-top: 31px; }
       .copy h3 { font-size: 33px; }
-      footer { flex-direction: column; align-items: flex-start; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -477,6 +442,7 @@
         <p class="eyebrow">Thomas's corner of the internet</p>
         <h1>I make <span class="underline">stuff.</span></h1>
         <p class="intro">Try it out!</p>
+        <p class="project-count" id="projectCount">14 incomplete projects &amp; counting</p>
       </div>
 
       <div class="hero-side">
@@ -502,19 +468,14 @@
       <div class="grid" id="aboutGrid"></div>
     </section>
 
-    <footer>
-      <span>Made by Thomas. Normal hobbies were apparently insufficient.</span>
-      <button class="tiny-button" id="confetti">deploy confetti</button>
-    </footer>
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
 
   <script>
     /*
       EDIT PROJECT LINKS HERE.
-      Use a relative GitHub Pages path like "./tier-list/" for projects in the same repo,
+      Use a relative GitHub Pages path like "./tierlist/" for projects in the same repo,
       or a full URL like "https://example.com" for redirects.
       Leave href as "#" while a project is not live yet.
     */
@@ -556,7 +517,7 @@
       },
       {
         title: "Train Clicker",
-        description: "A train-themed clicker game. Build an increasingly absurd railway empire because number go up.",
+        description: "A train themed clicker game. Build an increasingly absurd railway empire because number go up.",
         icon: "🚂", color: "#aee3d9", href: "./Train%20Clicker/", group: "games"
       },
       {
@@ -566,7 +527,7 @@
       },
       {
         title: "Favorite Routes",
-        description: "My favorite hikes, bike rides, train rides, drives, and boating routes — ranked.",
+        description: "My favorite hikes, bike rides, train rides, drives, and boating routes, ranked.",
         icon: "🥾", color: "#b8df96", href: "#", group: "third"
       },
       {
@@ -596,11 +557,10 @@
     const thirdGrid = document.getElementById("thirdGrid");
     const gamesGrid = document.getElementById("gamesGrid");
     const aboutGrid = document.getElementById("aboutGrid");
+    const projectCount = document.getElementById("projectCount");
     const toast = document.getElementById("toast");
     const doodle = document.getElementById("doodle");
     const surprise = document.getElementById("surprise");
-    const confettiButton = document.getElementById("confetti");
-    const confettiLayer = document.getElementById("confettiLayer");
 
     const escapeHTML = value => String(value).replace(/[&<>'"]/g, ch => ({
       "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;"
@@ -696,22 +656,9 @@
       doodle.style.setProperty("--eye-y", "0px");
     });
 
-    const colors = ["#ff887c", "#ffd76a", "#7ed9a1", "#addcff", "#cfc4ff", "#ffc4d5"];
 
-    confettiButton.addEventListener("click", () => {
-      for (let i = 0; i < 54; i++) {
-        const bit = document.createElement("i");
-        bit.className = "confetti";
-        bit.style.left = Math.random() * 100 + "%";
-        bit.style.background = colors[Math.floor(Math.random() * colors.length)];
-        bit.style.setProperty("--duration", (1.7 + Math.random() * 1.6) + "s");
-        bit.style.setProperty("--drift", (-170 + Math.random() * 340) + "px");
-        bit.style.setProperty("--spin", (-720 + Math.random() * 1440) + "deg");
-        bit.style.animationDelay = Math.random() * .3 + "s";
-        confettiLayer.appendChild(bit);
-        bit.addEventListener("animationend", () => bit.remove());
-      }
-    });
+
+    projectCount.textContent = `${projects.length} incomplete projects & counting`;
 
     render();
   </script>
