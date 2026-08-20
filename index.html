@@ -50,12 +50,19 @@
     }
 
     .hero {
-      min-height: 520px;
+      min-height: 410px;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 44px;
+      grid-template-columns: minmax(0, 1fr) 180px;
+      gap: 36px;
       align-items: center;
-      padding: 74px 0 56px;
+      padding: 54px 0 38px;
+    }
+
+    .hero-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
     }
 
     .hero-copy { max-width: 850px; }
@@ -99,17 +106,11 @@
 
     .intro {
       max-width: 700px;
-      margin: 28px 0 0;
+      margin: 24px 0 0;
       color: #4a4742;
-      font-size: clamp(18px, 2vw, 22px);
-      line-height: 1.5;
-    }
-
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 28px;
+      font-size: clamp(20px, 2vw, 24px);
+      line-height: 1.35;
+      font-weight: 800;
     }
 
     .button {
@@ -132,6 +133,13 @@
     }
 
     .button.primary { background: var(--ink); color: white; box-shadow: 4px 4px 0 #ff9f91; }
+
+    .hero-side .button {
+      width: 150px;
+      min-height: 46px;
+      padding-inline: 14px;
+      font-size: 14px;
+    }
     .button:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--line); }
     .button.primary:hover { box-shadow: 6px 6px 0 #ff9f91; }
     .button:active { transform: translate(1px, 1px); }
@@ -226,7 +234,8 @@
       --c: #d9eaff;
       --r: 0deg;
       grid-column: span 4;
-      min-height: 285px;
+      height: 300px;
+      min-height: 300px;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -246,9 +255,6 @@
 
     .card:nth-child(4n + 1) { --r: -.25deg; }
     .card:nth-child(4n + 3) { --r: .25deg; }
-    .card.wide { grid-column: span 8; }
-    .card.half { grid-column: span 6; }
-
     .card:hover {
       z-index: 4;
       transform: translate(-4px, -5px) rotate(0deg);
@@ -326,7 +332,7 @@
     .copy h3 {
       margin: 0;
       max-width: 92%;
-      font-size: clamp(27px, 3.1vw, 39px);
+      font-size: clamp(27px, 2.35vw, 34px);
       line-height: .98;
       letter-spacing: -.04em;
     }
@@ -427,7 +433,7 @@
     @media (max-width: 900px) {
       .hero { grid-template-columns: 1fr; min-height: auto; padding: 62px 0 56px; }
       .hero-doodle { display: none; }
-      .card, .card.wide { grid-column: span 6; }
+      .card { grid-column: span 6; height: 290px; min-height: 290px; }
     }
 
     @media (max-width: 620px) {
@@ -437,7 +443,7 @@
       .intro { margin-top: 24px; }
       .section-head { align-items: start; flex-direction: column; gap: 9px; }
       .grid { gap: 15px; }
-      .card, .card.wide, .card.half { grid-column: 1 / -1; min-height: 260px; padding: 21px; }
+      .card { grid-column: 1 / -1; height: 270px; min-height: 270px; padding: 21px; }
       .copy { margin-top: 31px; }
       .copy h3 { font-size: 33px; }
       footer { flex-direction: column; align-items: flex-start; }
@@ -454,16 +460,15 @@
       <div class="hero-copy">
         <p class="eyebrow">Thomas's corner of the internet</p>
         <h1>I make <span class="underline">stuff.</span></h1>
-        <p class="intro">Maps, games, rankings, simulators, and small ideas that somehow turned into entire websites.</p>
-        <div class="hero-actions">
-          <a class="button primary" href="#projects">Pick a rabbit hole ↓</a>
-          <button class="button" id="surprise">Surprise me</button>
-        </div>
+        <p class="intro">Try it!</p>
       </div>
 
-      <button class="hero-doodle" id="doodle" aria-label="Poke the little square face">
-        <span class="eye one"></span><span class="eye two"></span><span class="mouth"></span>
-      </button>
+      <div class="hero-side">
+        <button class="button" id="surprise">Surprise me ✨</button>
+        <button class="hero-doodle" id="doodle" aria-label="Poke the little square face">
+          <span class="eye one"></span><span class="eye two"></span><span class="mouth"></span>
+        </button>
+      </div>
     </header>
 
     <section class="projects" id="projects" aria-labelledby="projects-title">
@@ -495,59 +500,64 @@
     */
     const projects = [
       {
-        title: "MetroMatch",
-        description: "Weight what matters to you and find the U.S. places that fit best.",
-        icon: "🗺️", tag: "recommender", color: "#addcff", href: "#", size: "wide"
+        title: "Find Your Place",
+        description: "Weight what matters to you and find the U.S. places that fit you best.",
+        icon: "🗺️", tag: "recommender", color: "#addcff", href: "./Find%20Your%20Place/"
       },
       {
-        title: "State Shaper",
-        description: "Redraw the United States county by county and make entirely new states.",
-        icon: "✂️", tag: "map tool", color: "#ffd77e", href: "#"
+        title: "Custom State Generator",
+        description: "Redraw the United States county by county and generate entirely new states.",
+        icon: "✂️", tag: "map tool", color: "#ffd77e", href: "./Custom%20State%20Generator/"
       },
       {
-        title: "Game Night Picker",
-        description: "Tell it who's playing and let it settle the eternal question: what should we play?",
-        icon: "🎲", tag: "recommender", color: "#bde8bf", href: "#"
-      },
-      {
-        title: "Tier Forge",
-        description: "Build, rank, rearrange, and export tier lists without fighting the interface.",
-        icon: "🏆", tag: "ranking tool", color: "#ffc4d5", href: "#"
-      },
-      {
-        title: "House Score",
-        description: "Rate a house on the stuff that actually matters and turn gut feelings into a score.",
-        icon: "🏠", tag: "decision tool", color: "#cfc4ff", href: "#"
-      },
-      {
-        title: "Intersection Lab",
-        description: "Mess with traffic flows, signals, lanes, and watch an intersection deal with your decisions.",
-        icon: "🚦", tag: "simulator", color: "#ffb38f", href: "#", size: "half"
-      },
-      {
-        title: "Railway Clicker",
-        description: "A train-themed cookie clicker. Build absurd amounts of railway because number go up.",
-        icon: "🚂", tag: "game", color: "#aee3d9", href: "#", size: "half"
+        title: "Traffic Sim",
+        description: "Mess with traffic flow, signals, lanes, and watch an intersection deal with your choices.",
+        icon: "🚦", tag: "simulator", color: "#ffb38f", href: "./Traffic%20Sim/"
       },
       {
         title: "Pirate Legacy",
-        description: "A pirate game about building a story, making choices, and probably acquiring questionable treasure.",
-        icon: "🏴‍☠️", tag: "game", color: "#9fc5ee", href: "#"
+        description: "Build a pirate legacy through choices, upgrades, treasure, and questionable decisions.",
+        icon: "🏴‍☠️", tag: "game", color: "#9fc5ee", href: "./Pirate%20Legacy/"
       },
       {
-        title: "Everywhere I've Been",
-        description: "Track visited countries, states, and U.S. counties on one increasingly satisfying map.",
-        icon: "📍", tag: "personal map", color: "#ffd6a3", href: "#"
+        title: "Game Picker",
+        description: "Tell it who's playing and let it answer the eternal question: what should we play?",
+        icon: "🎲", tag: "recommender", color: "#bde8bf", href: "./Game%20Picker/"
       },
       {
-        title: "The Good Routes",
+        title: "Train Clicker",
+        description: "A train-themed clicker game. Build an increasingly absurd railway empire because number go up.",
+        icon: "🚂", tag: "game", color: "#aee3d9", href: "./Train%20Clicker/"
+      },
+      {
+        title: "Rank Things",
+        description: "Build, rearrange, and export tier lists without fighting the interface.",
+        icon: "🏆", tag: "ranking tool", color: "#ffc4d5", href: "./Rank%20Things/"
+      },
+      {
+        title: "Bike Friendliness Index",
+        description: "Compare how friendly places are for getting around by bike.",
+        icon: "🚲", tag: "external", color: "#9ed9b5", href: "https://bikefriendlinessindex.org/", external: true
+      },
+      {
+        title: "Places I Have Been",
+        description: "Countries, states, and U.S. counties I've visited, all mapped in one place.",
+        icon: "📍", tag: "personal map", color: "#ffd6a3", href: "./Places%20I%20Have%20Been/"
+      },
+      {
+        title: "Journey of My Ancestors",
+        description: "Follow my family history across places, generations, and migrations.",
+        icon: "🧭", tag: "story map", color: "#d7c4ff", href: "./Journey%20of%20my%20Ancestors/"
+      },
+      {
+        title: "House Rater",
+        description: "Rate a house on the stuff that actually matters and turn gut feelings into a score.",
+        icon: "🏠", tag: "decision tool", color: "#cfc4ff", href: "./House%20Rater/"
+      },
+      {
+        title: "Favorite Routes",
         description: "My favorite hikes, bike rides, train rides, drives, and boating routes — ranked.",
-        icon: "🥾", tag: "lists + maps", color: "#b8df96", href: "#", size: "wide"
-      },
-      {
-        title: "Recipe Box",
-        description: "Recipes worth making again, without digging through seventeen paragraphs about someone's childhood.",
-        icon: "🍳", tag: "collection", color: "#ffc3a8", href: "#"
+        icon: "🥾", tag: "lists + maps", color: "#b8df96", href: "#"
       },
       {
         title: "Challenges",
@@ -555,9 +565,9 @@
         icon: "✅", tag: "tracker", color: "#e5ca93", href: "#"
       },
       {
-        title: "Bike Friendliness Index",
-        description: "My bike-friendliness ranking project. This one sends you to its own home on the web.",
-        icon: "🚲", tag: "external", color: "#9ed9b5", href: "#", external: true
+        title: "Recipe Book",
+        description: "Recipes worth making again, without digging through seventeen paragraphs first.",
+        icon: "🍳", tag: "collection", color: "#ffc3a8", href: "#"
       }
     ];
 
@@ -576,7 +586,7 @@
     function render() {
       grid.innerHTML = projects.map((p, i) => {
         const inactive = !p.href || p.href === "#";
-        const classes = ["card", p.size || "", p.external ? "external" : "", inactive ? "coming" : ""]
+        const classes = ["card", p.external ? "external" : "", inactive ? "coming" : ""]
           .filter(Boolean).join(" ");
         return `
           <a class="${classes}" style="--c:${escapeHTML(p.color)}" href="${escapeHTML(p.href || '#')}"
