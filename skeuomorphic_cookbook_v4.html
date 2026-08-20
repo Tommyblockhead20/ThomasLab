@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thomas's Cookbook</title>
+<style>
+:root{
+  --wood1:#4f2f1e;
+  --wood2:#805033;
+  --wood3:#a16b46;
+  --paper:#f4e8ca;
+  --ink:#473729;
+  --muted:#7b6854;
+  --red:#994d43;
+  --green:#5f7258;
+  --gold:#b98a49;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{
+  padding:40px 18px 60px;
+  color:var(--ink);
+  font-family:Georgia,"Times New Roman",serif;
+  background:
+    repeating-linear-gradient(92deg,rgba(255,255,255,.025) 0 2px,rgba(0,0,0,.025) 3px 5px,transparent 6px 20px),
+    linear-gradient(115deg,var(--wood1),var(--wood2) 48%,var(--wood3) 51%,var(--wood1));
+  background-attachment:fixed;
+}
+button{font:inherit}
+.stage{
+  width:min(1120px,100%);
+  margin:auto;
+  position:relative;
+  perspective:2400px;
+}
+.book{
+  position:relative;
+  z-index:20;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  min-height:720px;
+  filter:drop-shadow(0 20px 28px rgba(35,21,12,.42));
+  isolation:isolate;
+}
+.page{
+  position:relative;
+  z-index:10;
+  min-height:720px;
+  overflow:hidden;
+  padding:44px 46px 58px;
+  background:
+    radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),
+    radial-gradient(circle at 78% 74%,rgba(98,69,31,.03) 0 1px,transparent 1.6px),
+    repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),
+    var(--paper);
+  box-shadow:inset 0 0 44px rgba(93,65,31,.08);
+}
+.left-page{
+  border-radius:20px 0 0 20px;
+  box-shadow:inset -28px 0 36px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08);
+}
+.right-page{
+  border-radius:0 20px 20px 0;
+  box-shadow:inset 28px 0 36px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08);
+}
+.page:after{
+  content:"";
+  position:absolute;
+  inset:16px;
+  border:1px solid rgba(138,102,55,.14);
+  pointer-events:none;
+}
+.spine{
+  position:absolute;
+  z-index:45;
+  top:0;bottom:0;left:50%;
+  width:30px;
+  transform:translateX(-50%);
+  pointer-events:none;
+  background:linear-gradient(90deg,rgba(54,34,20,.16),rgba(50,30,17,.28) 35%,rgba(255,255,255,.26) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08));
+  box-shadow:0 0 16px rgba(63,39,22,.16);
+}
+
+/* Persistent bookmark / index tab */
+.bookmark-tab{
+  position:absolute;
+  z-index:140;
+  top:-31px;
+  left:58px;
+  width:92px;
+  height:37px;
+  border:1px solid #59271f;
+  border-bottom:0;
+  border-radius:8px 8px 0 0;
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 6px),
+    linear-gradient(#a94e45,#7c302d);
+  color:#fff0d8;
+  font-weight:bold;
+  font-size:.75rem;
+  letter-spacing:.12em;
+  cursor:pointer;
+  box-shadow:0 -2px 7px rgba(32,17,12,.22),inset 0 1px rgba(255,255,255,.18);
+}
+.bookmark-tab:before,
+.bookmark-tab:after{
+  content:"•";
+  position:absolute;
+  top:9px;
+  color:#ddb07b;
+  font-size:.62rem;
+}
+.bookmark-tab:before{left:8px}
+.bookmark-tab:after{right:8px}
+.bookmark-tab:disabled{cursor:default}
+
+.bookmark-tail{
+  position:absolute;
+  top:0;
+  left:73px;
+  width:62px;
+  height:132px;
+  z-index:1;
+  pointer-events:none;
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.028) 0 1px,transparent 1px 6px),
+    linear-gradient(90deg,#742b29,#a74b42 50%,#742b29);
+  box-shadow:0 3px 7px rgba(49,24,18,.22);
+}
+.bookmark-tail:after{
+  content:"";
+  position:absolute;
+  bottom:-28px;
+  border-left:31px solid #772e2b;
+  border-right:31px solid #772e2b;
+  border-bottom:28px solid transparent;
+}
+.stage.at-index .bookmark-tail{z-index:80}
+.stage:not(.at-index) .bookmark-tail{z-index:1}
+
+/* Turning overlay */
+.turner{
+  display:none;
+  position:absolute;
+  top:0;
+  width:50%;
+  height:100%;
+  z-index:100;
+  transform-style:preserve-3d;
+  pointer-events:none;
+  will-change:transform;
+}
+.turner.forward{
+  display:block;
+  right:0;
+  transform-origin:left center;
+}
+.turner.backward{
+  display:block;
+  left:0;
+  transform-origin:right center;
+}
+.turn-face{
+  position:absolute;
+  inset:0;
+  padding:44px 46px 58px;
+  backface-visibility:hidden;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),
+    repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),
+    var(--paper);
+}
+.turner.forward .front{
+  border-radius:0 20px 20px 0;
+  box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
+}
+.turner.forward .back{
+  transform:rotateY(180deg);
+  border-radius:20px 0 0 20px;
+  box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
+}
+.turner.backward .front{
+  border-radius:20px 0 0 20px;
+  box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
+}
+.turner.backward .back{
+  transform:rotateY(180deg);
+  border-radius:0 20px 20px 0;
+  box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
+}
+.turner.mid-flip .turn-face{
+  box-shadow:0 10px 24px rgba(38,22,13,.28),inset 0 0 30px rgba(93,65,31,.08);
+}
+
+.eyebrow{
+  color:var(--red);
+  text-transform:uppercase;
+  letter-spacing:.16em;
+  font-size:.77rem;
+  font-weight:bold;
+}
+h1{
+  margin:8px 0 0;
+  font-size:clamp(2.7rem,5vw,4.5rem);
+  line-height:.96;
+  letter-spacing:-.04em;
+  font-weight:normal;
+}
+h2{font-weight:normal;margin:0}
+.title-rule{
+  height:3px;
+  max-width:220px;
+  margin:12px auto 26px;
+  background:linear-gradient(90deg,transparent,var(--red) 15%,var(--red) 85%,transparent);
+}
+.subtitle{
+  max-width:420px;
+  margin:18px 0 28px;
+  color:var(--muted);
+  font-size:1.06rem;
+  line-height:1.58;
+  font-style:italic;
+}
+.note{
+  margin-top:28px;
+  padding:20px 22px 18px;
+  background:#f7edcf;
+  border:1px solid #d8bd7f;
+  border-radius:4px;
+  box-shadow:0 4px 10px rgba(82,58,29,.14),inset 0 0 16px rgba(122,90,43,.08);
+  transform:rotate(-.45deg);
+  position:relative;
+}
+.note:before{
+  content:"";
+  position:absolute;
+  width:62px;height:19px;top:-10px;left:50%;
+  transform:translateX(-50%) rotate(1deg);
+  background:rgba(213,187,125,.56);
+}
+.note strong{color:var(--red)}
+.footer-stamp{
+  margin-top:34px;
+  text-align:center;
+  color:#8a6d4a;
+  font-size:.71rem;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+}
+.heading-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:20px;
+}
+.heading-row h2{font-size:2.08rem}
+.flourish{flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
+.legend{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:-7px 0 19px;
+  color:var(--green);
+  font-size:.83rem;
+  font-style:italic;
+}
+.lf{
+  width:23px;height:23px;
+  display:inline-grid;place-items:center;
+  border-radius:50%;
+  border:1px solid rgba(81,103,74,.72);
+  background:rgba(226,234,213,.55);
+  color:var(--green);
+  font-size:.7rem;
+  font-weight:bold;
+  flex:0 0 auto;
+}
+.index-list{display:grid;gap:12px}
+.index-card{
+  width:100%;
+  appearance:none;
+  border:1px solid #cbb57f;
+  border-radius:5px;
+  background:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.07)),#efdfb8;
+  color:var(--ink);
+  padding:14px 16px 13px 19px;
+  text-align:left;
+  cursor:pointer;
+  box-shadow:0 3px 7px rgba(85,61,29,.13),inset 0 1px rgba(255,255,255,.72);
+  transition:transform .12s ease,box-shadow .12s ease;
+  position:relative;
+}
+.index-card:before{
+  content:"";
+  position:absolute;left:8px;top:7px;bottom:7px;width:2px;
+  border-left:1px solid rgba(160,75,63,.5);
+  border-right:1px solid rgba(160,75,63,.18);
+}
+.index-card:hover{transform:translateY(-2px);box-shadow:0 6px 10px rgba(85,61,29,.18)}
+.index-top{display:flex;align-items:center;gap:8px;padding-right:34px}
+.index-name{font-weight:bold;font-size:1.08rem}
+.index-meta{display:block;margin-top:3px;color:var(--muted);font-size:.81rem;font-style:italic;padding-left:31px}
+.index-meta.no-lf{padding-left:0}
+.index-num{
+  position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  color:#9a7c57;font-size:.83rem;font-style:italic;
+}
+.recipe-title{
+  display:flex;
+  align-items:flex-start;
+  gap:11px;
+  margin:7px 0 8px;
+}
+.recipe-title h2{
+  font-size:2.45rem;
+  line-height:1.06;
+}
+.category{
+  color:var(--muted);
+  font-size:.88rem;
+  font-style:italic;
+  margin:0 0 22px 34px;
+}
+.category.no-lf{margin-left:0}
+.section-label{
+  margin:0 0 10px;
+  color:var(--red);
+  font-size:.76rem;
+  font-weight:bold;
+  text-transform:uppercase;
+  letter-spacing:.14em;
+}
+.ingredients{
+  border-top:1px solid rgba(156,74,62,.34);
+  padding-top:17px;
+}
+.ingredient-card{
+  min-height:390px;
+  padding:17px 18px;
+  border:1px solid #d5bf88;
+  background:rgba(249,239,211,.66);
+  box-shadow:inset 0 0 18px rgba(119,87,42,.06);
+}
+.blank-list{margin:0;padding:0;list-style:none}
+.blank-list li{height:32px;border-bottom:1px solid rgba(101,118,136,.18)}
+.instructions-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:16px;
+}
+.instructions-head h2{font-size:2rem}
+.instruction-lines{
+  min-height:520px;
+  background:repeating-linear-gradient(to bottom,transparent 0 31px,rgba(99,117,138,.19) 31px 32px);
+  border-top:1px solid rgba(156,74,62,.35);
+}
+.coming{
+  color:#8e7a63;
+  font-style:italic;
+  line-height:1.55;
+  margin:0 0 8px;
+}
+.page-num{
+  position:absolute;
+  bottom:22px;
+  color:#8c765b;
+  font-size:.78rem;
+  font-style:italic;
+}
+.left-page .page-num{left:28px}
+.right-page .page-num{right:28px}
+.turn-face .page-num{display:none}
+.nav{
+  position:absolute;
+  z-index:130;
+  top:50%;
+  transform:translateY(-50%);
+  width:51px;height:51px;
+  border-radius:50%;
+  border:1px solid rgba(64,38,22,.45);
+  background:linear-gradient(#b47a52,#7e4c32);
+  color:#fff4dc;
+  cursor:pointer;
+  font-size:1.65rem;
+  box-shadow:0 5px 12px rgba(38,23,14,.3),inset 0 1px rgba(255,255,255,.22);
+}
+.nav.prev{left:-68px}
+.nav.next{right:-68px}
+.nav:disabled{opacity:.28;cursor:default}
+.progress{
+  position:absolute;
+  z-index:130;
+  bottom:-34px;
+  right:6px;
+  color:#f3e4c7;
+  font-size:.82rem;
+  text-shadow:0 1px 2px rgba(42,27,17,.45);
+}
+@media(max-width:1280px){
+  .nav{top:auto;bottom:12px;transform:none;width:44px;height:44px}
+  .nav.prev{left:10px}.nav.next{right:10px}
+  .progress{bottom:26px;right:65px;color:#7c654c;text-shadow:none}
+}
+@media(max-width:830px){
+  body{padding:42px 10px 56px}
+  .book{display:block;min-height:0}
+  .page{min-height:650px;padding:40px 26px 56px}
+  .left-page{border-radius:16px 16px 0 0;box-shadow:inset 0 -25px 34px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08)}
+  .right-page{border-radius:0 0 16px 16px;box-shadow:inset 0 25px 34px rgba(72,46,27,.08),inset 0 0 44px rgba(93,65,31,.08)}
+  .spine{top:50%;left:0;right:0;width:auto;height:28px;transform:translateY(-50%);background:linear-gradient(0deg,rgba(54,34,20,.16),rgba(50,30,17,.25) 35%,rgba(255,255,255,.25) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08))}
+  .turner{display:none!important}
+  .bookmark-tab{left:28px}
+  .bookmark-tail{left:43px}
+}
+@media(max-width:520px){
+  h1{font-size:2.8rem}
+  .recipe-title h2{font-size:2.08rem}
+  .heading-row h2,.instructions-head h2{font-size:1.85rem}
+}
+</style>
+</head>
+<body>
+<main class="stage at-index" id="stage">
+  <div class="bookmark-tail" aria-hidden="true"></div>
+  <button class="bookmark-tab" id="bookmarkIndex" type="button" title="Return to recipe index">INDEX</button>
+
+  <button class="nav prev" id="prevBtn" type="button" aria-label="Previous recipe">‹</button>
+  <button class="nav next" id="nextBtn" type="button" aria-label="Next recipe">›</button>
+
+  <section class="book" aria-live="polite">
+    <article class="page left-page" id="leftPage"></article>
+    <article class="page right-page" id="rightPage"></article>
+    <div class="spine" aria-hidden="true"></div>
+
+    <div class="turner" id="turner" aria-hidden="true">
+      <div class="turn-face front" id="turnFront"></div>
+      <div class="turn-face back" id="turnBack"></div>
+    </div>
+  </section>
+
+  <div class="progress" id="progress">Title + Index</div>
+</main>
+
+<script>
+(() => {
+  const recipes = [
+    {name:"20 Layer Nacho Dip", category:"Dips & party food", lf:true},
+    {name:"Basil Pesto", category:"Sauces & spreads", lf:true},
+    {name:"French Onion Soup", category:"Soups", lf:true},
+    {name:"Tzatziki Sauce", category:"Sauces & dips", lf:true},
+    {name:"Navy Bean and Bacon Soup", category:"Soups", lf:true},
+    {name:"Dumpling Soup", category:"Soups", lf:true},
+    {name:"Goat Cheese Pizza", category:"Pizza & mains", lf:false}
+  ];
+
+  const stage = document.getElementById("stage");
+  const leftPage = document.getElementById("leftPage");
+  const rightPage = document.getElementById("rightPage");
+  const turner = document.getElementById("turner");
+  const turnFront = document.getElementById("turnFront");
+  const turnBack = document.getElementById("turnBack");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const bookmarkIndex = document.getElementById("bookmarkIndex");
+  const progress = document.getElementById("progress");
+
+  let current = 0;
+  let busy = false;
+
+  /* Six deliberate animation frames. Total page turn is only ~150 ms. */
+  const FRAME_MS = 24;
+  const FORWARD_ANGLES = [-30,-60,-90,-120,-150,-180];
+  const BACKWARD_ANGLES = [30,60,90,120,150,180];
+
+  const lfIcon = () => '<span class="lf" title="Lactose free">LF</span>';
+
+  function titlePage(){
+    return `
+      <div class="eyebrow">From the kitchen of</div>
+      <h1>Thomas's<br>Cookbook</h1>
+      <div class="title-rule"></div>
+      <p class="subtitle">A growing collection of soups, sauces, dips, pizzas, and other things worth making again.</p>
+      <div class="note"><strong>Kitchen note:</strong><br>Recipes are still being written. For now, this book is the shelf they will live on.</div>
+      <div class="footer-stamp">Est. 2026 · Kitchen Copy</div>
+      <div class="page-num">i</div>
+    `;
+  }
+
+  function indexPage(){
+    const cards = recipes.map((r,i)=>`
+      <button class="index-card" type="button" data-recipe="${i+1}">
+        <span class="index-top">
+          ${r.lf ? lfIcon() : ""}
+          <span class="index-name">${r.name}</span>
+        </span>
+        <span class="index-meta ${r.lf ? "" : "no-lf"}">${r.category}</span>
+        <span class="index-num">${i+1}</span>
+      </button>
+    `).join("");
+
+    return `
+      <div class="heading-row"><h2>Recipe Index</h2><div class="flourish"></div></div>
+      <div class="legend">${lfIcon()}<span>lactose free</span></div>
+      <div class="index-list">${cards}</div>
+      <div class="page-num">ii</div>
+    `;
+  }
+
+  function recipeLeft(index){
+    const r = recipes[index-1];
+    return `
+      <div class="eyebrow">Recipe ${index}</div>
+      <div class="recipe-title">
+        ${r.lf ? lfIcon() : ""}
+        <h2>${r.name}</h2>
+      </div>
+      <div class="category ${r.lf ? "" : "no-lf"}">${r.category}</div>
+      <section class="ingredients">
+        <div class="section-label">Ingredients</div>
+        <div class="ingredient-card">
+          <p class="coming">Ingredient list coming soon.</p>
+          <ul class="blank-list" aria-hidden="true">
+            <li></li><li></li><li></li><li></li><li></li>
+            <li></li><li></li><li></li><li></li><li></li>
+          </ul>
+        </div>
+      </section>
+      <div class="page-num">${index*2-1}</div>
+    `;
+  }
+
+  function recipeRight(index){
+    const r = recipes[index-1];
+    return `
+      <div class="instructions-head">
+        <h2>Instructions</h2>
+        <div class="flourish"></div>
+      </div>
+      <p class="coming">${r.name} directions will go here.</p>
+      <div class="instruction-lines"></div>
+      <div class="page-num">${index*2}</div>
+    `;
+  }
+
+  const spreadLeft = index => index === 0 ? titlePage() : recipeLeft(index);
+  const spreadRight = index => index === 0 ? indexPage() : recipeRight(index);
+
+  function bindIndex(){
+    if(current !== 0) return;
+    rightPage.querySelectorAll(".index-card").forEach(btn=>{
+      btn.addEventListener("click",()=>goTo(Number(btn.dataset.recipe)));
+    });
+  }
+
+  function render(){
+    leftPage.innerHTML = spreadLeft(current);
+    rightPage.innerHTML = spreadRight(current);
+    bindIndex();
+
+    stage.classList.toggle("at-index", current === 0);
+    prevBtn.disabled = busy || current === 0;
+    nextBtn.disabled = busy || current === recipes.length;
+    bookmarkIndex.disabled = busy || current === 0;
+    progress.textContent = current === 0 ? "Title + Index" : `Recipe ${current} of ${recipes.length}`;
+  }
+
+  const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
+
+  async function animateFrames(direction){
+    const angles = direction === "forward" ? FORWARD_ANGLES : BACKWARD_ANGLES;
+    for(let i=0;i<angles.length;i++){
+      const angle = angles[i];
+      turner.style.transform = `rotateY(${angle}deg)`;
+      turner.classList.toggle("mid-flip", Math.abs(angle) >= 60 && Math.abs(angle) <= 120);
+      await sleep(FRAME_MS);
+    }
+  }
+
+  async function oneForward(){
+    if(current >= recipes.length) return;
+
+    const next = current + 1;
+    turnFront.innerHTML = spreadRight(current);
+    turnBack.innerHTML = spreadLeft(next);
+
+    turner.className = "turner forward";
+    turner.style.transform = "rotateY(0deg)";
+    void turner.offsetWidth;
+
+    await animateFrames("forward");
+
+    current = next;
+    turner.className = "turner";
+    turner.style.transform = "";
+    render();
+  }
+
+  async function oneBackward(){
+    if(current <= 0) return;
+
+    const previous = current - 1;
+    turnFront.innerHTML = spreadLeft(current);
+    turnBack.innerHTML = spreadRight(previous);
+
+    turner.className = "turner backward";
+    turner.style.transform = "rotateY(0deg)";
+    void turner.offsetWidth;
+
+    await animateFrames("backward");
+
+    current = previous;
+    turner.className = "turner";
+    turner.style.transform = "";
+    render();
+  }
+
+  async function goTo(target){
+    target = Math.max(0,Math.min(recipes.length,target));
+    if(busy || target === current) return;
+
+    busy = true;
+    render();
+
+    while(current < target){
+      await oneForward();
+      if(current < target) await sleep(18);
+    }
+
+    while(current > target){
+      await oneBackward();
+      if(current > target) await sleep(18);
+    }
+
+    busy = false;
+    render();
+  }
+
+  nextBtn.addEventListener("click",()=>goTo(current+1));
+  prevBtn.addEventListener("click",()=>goTo(current-1));
+  bookmarkIndex.addEventListener("click",()=>goTo(0));
+
+  document.addEventListener("keydown",e=>{
+    if(e.key==="ArrowRight") goTo(current+1);
+    if(e.key==="ArrowLeft") goTo(current-1);
+    if(e.key==="Home") goTo(0);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
