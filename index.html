@@ -50,12 +50,12 @@
     }
 
     .hero {
-      min-height: 410px;
+      min-height: 330px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 180px;
-      gap: 36px;
+      gap: 34px;
       align-items: center;
-      padding: 54px 0 38px;
+      padding: 42px 0 16px;
     }
 
     .hero-side {
@@ -178,6 +178,8 @@
       left: 5px;
       border-radius: 50%;
       background: var(--ink);
+      transform: translate(var(--eye-x, 0px), var(--eye-y, 0px));
+      transition: transform .08s linear;
     }
     .hero-doodle .eye.one { left: 45px; }
     .hero-doodle .eye.two { right: 45px; }
@@ -200,42 +202,63 @@
       100% { transform: rotate(6deg) translateY(0); }
     }
 
-    .projects { padding: 18px 0 76px; }
+    .projects {
+      position: relative;
+      padding: 0 0 54px;
+    }
 
-    .section-head {
+    .projects::before {
+      content: "✦";
+      position: absolute;
+      left: -20px;
+      top: 18px;
+      font-size: 24px;
+      transform: rotate(-14deg);
+      opacity: .65;
+      pointer-events: none;
+    }
+
+    .about {
+      padding: 0 0 64px;
+    }
+
+    .about-head {
       display: flex;
-      justify-content: space-between;
-      align-items: end;
-      gap: 24px;
-      margin-bottom: 25px;
+      align-items: center;
+      margin: 0 0 15px;
     }
 
-    .section-head h2 {
+    .about-head h2 {
       margin: 0;
-      font-size: clamp(34px, 5vw, 55px);
+      font-size: clamp(20px, 2.2vw, 29px);
       line-height: 1;
-      letter-spacing: -.045em;
+      letter-spacing: -.03em;
     }
 
-    .count {
-      margin: 0 0 4px;
+    .row-label {
+      margin: 20px 0 11px;
+      font-size: 15px;
+      line-height: 1;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
       color: var(--muted);
-      font-weight: 750;
-      white-space: nowrap;
     }
 
     .grid {
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: 20px;
+      gap: 18px;
     }
+
+    .grid + .grid { margin-top: 18px; }
 
     .card {
       --c: #d9eaff;
       --r: 0deg;
       grid-column: span 4;
-      height: 300px;
-      min-height: 300px;
+      height: 286px;
+      min-height: 286px;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -252,6 +275,13 @@
       transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease;
       isolation: isolate;
     }
+
+    .card.feature {
+      grid-column: span 6;
+      height: 312px;
+      min-height: 312px;
+    }
+
 
     .card:nth-child(4n + 1) { --r: -.25deg; }
     .card:nth-child(4n + 3) { --r: .25deg; }
@@ -313,20 +343,6 @@
 
     .card:hover .icon { transform: rotate(5deg) scale(1.05); }
 
-    .tag {
-      display: inline-flex;
-      min-height: 30px;
-      align-items: center;
-      padding: 0 11px;
-      border: 2px solid rgba(23,23,23,.9);
-      border-radius: 999px;
-      background: rgba(255,255,255,.64);
-      font-size: 11px;
-      font-weight: 850;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-    }
-
     .copy { margin-top: 34px; }
 
     .copy h3 {
@@ -360,7 +376,6 @@
     .external .arrow { transform: rotate(-45deg); }
     .external:hover .arrow { transform: translate(4px,-4px) rotate(-45deg); }
 
-    .coming .tag::after { content: " soon"; }
     .coming { cursor: pointer; }
 
     footer {
@@ -431,19 +446,20 @@
     }
 
     @media (max-width: 900px) {
-      .hero { grid-template-columns: 1fr; min-height: auto; padding: 62px 0 56px; }
+      .hero { grid-template-columns: 1fr; min-height: auto; padding: 52px 0 30px; }
       .hero-doodle { display: none; }
-      .card { grid-column: span 6; height: 290px; min-height: 290px; }
+      .card, .card.feature { grid-column: span 6; height: 286px; min-height: 286px; }
     }
 
     @media (max-width: 620px) {
       .shell { width: min(100% - 22px, 1180px); }
-      .hero { padding-top: 46px; }
+      .hero { padding-top: 40px; padding-bottom: 24px; }
       h1 { font-size: clamp(55px, 18vw, 82px); }
-      .intro { margin-top: 24px; }
-      .section-head { align-items: start; flex-direction: column; gap: 9px; }
+      .intro { margin-top: 20px; }
       .grid { gap: 15px; }
-      .card { grid-column: 1 / -1; height: 270px; min-height: 270px; padding: 21px; }
+      .grid + .grid { margin-top: 15px; }
+      .card, .card.feature { grid-column: 1 / -1; height: 260px; min-height: 260px; padding: 21px; }
+      .about-head { margin-bottom: 12px; }
       .copy { margin-top: 31px; }
       .copy h3 { font-size: 33px; }
       footer { flex-direction: column; align-items: flex-start; }
@@ -460,7 +476,7 @@
       <div class="hero-copy">
         <p class="eyebrow">Thomas's corner of the internet</p>
         <h1>I make <span class="underline">stuff.</span></h1>
-        <p class="intro">Try it!</p>
+        <p class="intro">Try it out!</p>
       </div>
 
       <div class="hero-side">
@@ -471,15 +487,19 @@
       </div>
     </header>
 
-    <section class="projects" id="projects" aria-labelledby="projects-title">
-      <div class="section-head">
-        <div>
-          <p class="eyebrow">Projects</p>
-          <h2 id="projects-title">Choose your distraction.</h2>
-        </div>
-        <p class="count"><span id="count">0</span> projects & counting</p>
+    <section class="projects" id="projects" aria-label="Things to try">
+      <div class="grid" id="featureGrid"></div>
+      <div class="grid" id="mainGrid"></div>
+      <div class="grid" id="thirdGrid"></div>
+      <h2 class="row-label">Games</h2>
+      <div class="grid" id="gamesGrid"></div>
+    </section>
+
+    <section class="about" aria-labelledby="about-title">
+      <div class="about-head">
+        <h2 id="about-title">The Thomas Zone</h2>
       </div>
-      <div class="grid" id="grid"></div>
+      <div class="grid" id="aboutGrid"></div>
     </section>
 
     <footer>
@@ -500,79 +520,82 @@
     */
     const projects = [
       {
-        title: "Find Your Place",
-        description: "Weight what matters to you and find the U.S. places that fit you best.",
-        icon: "🗺️", tag: "recommender", color: "#addcff", href: "./Find%20Your%20Place/"
-      },
-      {
-        title: "Custom State Generator",
-        description: "Redraw the United States county by county and generate entirely new states.",
-        icon: "✂️", tag: "map tool", color: "#ffd77e", href: "./Custom%20State%20Generator/"
-      },
-      {
-        title: "Traffic Sim",
-        description: "Mess with traffic flow, signals, lanes, and watch an intersection deal with your choices.",
-        icon: "🚦", tag: "simulator", color: "#ffb38f", href: "./Traffic%20Sim/"
-      },
-      {
-        title: "Pirate Legacy",
-        description: "Build a pirate legacy through choices, upgrades, treasure, and questionable decisions.",
-        icon: "🏴‍☠️", tag: "game", color: "#9fc5ee", href: "./Pirate%20Legacy/"
-      },
-      {
         title: "Game Picker",
-        description: "Tell it who's playing and let it answer the eternal question: what should we play?",
-        icon: "🎲", tag: "recommender", color: "#bde8bf", href: "./Game%20Picker/"
-      },
-      {
-        title: "Train Clicker",
-        description: "A train-themed clicker game. Build an increasingly absurd railway empire because number go up.",
-        icon: "🚂", tag: "game", color: "#aee3d9", href: "./Train%20Clicker/"
-      },
-      {
-        title: "Rank Things",
-        description: "Build, rearrange, and export tier lists without fighting the interface.",
-        icon: "🏆", tag: "ranking tool", color: "#ffc4d5", href: "./Rank%20Things/"
+        description: "Say what you're looking for (or don't) and let it answer the eternal question: what should we play?",
+        icon: "🎲", color: "#bde8bf", href: "./Game%20Picker/", group: "feature"
       },
       {
         title: "Bike Friendliness Index",
         description: "Compare how friendly places are for getting around by bike.",
-        icon: "🚲", tag: "external", color: "#9ed9b5", href: "https://bikefriendlinessindex.org/", external: true
+        icon: "🚲", color: "#9ed9b5", href: "https://bikefriendlinessindex.org/", external: true, group: "feature"
       },
       {
-        title: "Places I Have Been",
-        description: "Countries, states, and U.S. counties I've visited, all mapped in one place.",
-        icon: "📍", tag: "personal map", color: "#ffd6a3", href: "./Places%20I%20Have%20Been/"
-      },
-      {
-        title: "Journey of My Ancestors",
-        description: "Follow my family history across places, generations, and migrations.",
-        icon: "🧭", tag: "story map", color: "#d7c4ff", href: "./Journey%20of%20my%20Ancestors/"
+        title: "Find Your Place",
+        description: "Weight what matters to you and find the U.S. places that fit you best.",
+        icon: "🗺️", color: "#addcff", href: "./Find%20Your%20Place/", group: "main"
       },
       {
         title: "House Rater",
         description: "Rate a house on the stuff that actually matters and turn gut feelings into a score.",
-        icon: "🏠", tag: "decision tool", color: "#cfc4ff", href: "./House%20Rater/"
+        icon: "🏠", color: "#cfc4ff", href: "./House%20Rater/", group: "main"
+      },
+      {
+        title: "Custom State Generator",
+        description: "Pick what should determine state boundaries and see new states be born.",
+        icon: "✂️", color: "#ffd77e", href: "./Custom%20State%20Generator/", group: "main"
+      },
+      {
+        title: "Rank Things",
+        description: "Build, rearrange, and export tier lists without fighting the interface.",
+        icon: "🏆", color: "#ffc4d5", href: "./Rank%20Things/", group: "third"
+      },
+      {
+        title: "Pirate Legacy (sneak peek)",
+        description: "Build a pirate legacy through choices, upgrades, treasure, and questionable decisions.",
+        icon: "🏴‍☠️", color: "#9fc5ee", href: "./Pirate%20Legacy/", group: "games"
+      },
+      {
+        title: "Train Clicker",
+        description: "A train-themed clicker game. Build an increasingly absurd railway empire because number go up.",
+        icon: "🚂", color: "#aee3d9", href: "./Train%20Clicker/", group: "games"
+      },
+      {
+        title: "Traffic Sim",
+        description: "Mess with traffic flow, signals, lanes, and watch an intersection deal with your choices.",
+        icon: "🚦", color: "#ffb38f", href: "./Traffic%20Sim/", group: "games"
       },
       {
         title: "Favorite Routes",
         description: "My favorite hikes, bike rides, train rides, drives, and boating routes — ranked.",
-        icon: "🥾", tag: "lists + maps", color: "#b8df96", href: "#"
+        icon: "🥾", color: "#b8df96", href: "#", group: "third"
       },
       {
         title: "Challenges",
         description: "Goals, checklists, collections, and other completely reasonable ways to gamify existing.",
-        icon: "✅", tag: "tracker", color: "#e5ca93", href: "#"
+        icon: "✅", color: "#e5ca93", href: "#", group: "third"
       },
       {
-        title: "Recipe Book",
+        title: "My Recipe Book",
         description: "Recipes worth making again, without digging through seventeen paragraphs first.",
-        icon: "🍳", tag: "collection", color: "#ffc3a8", href: "#"
+        icon: "🍳", color: "#ffc3a8", href: "#", group: "about"
+      },
+      {
+        title: "Journey of My Ancestors",
+        description: "Follow my family history across places, generations, and migrations.",
+        icon: "🧭", color: "#d7c4ff", href: "./Journey%20of%20my%20Ancestors/", group: "about"
+      },
+      {
+        title: "Places I Have Been",
+        description: "Countries, states, and U.S. counties I've visited, all mapped in one place.",
+        icon: "📍", color: "#ffd6a3", href: "./Places%20I%20Have%20Been/", group: "about"
       }
     ];
 
-    const grid = document.getElementById("grid");
-    const count = document.getElementById("count");
+    const featureGrid = document.getElementById("featureGrid");
+    const mainGrid = document.getElementById("mainGrid");
+    const thirdGrid = document.getElementById("thirdGrid");
+    const gamesGrid = document.getElementById("gamesGrid");
+    const aboutGrid = document.getElementById("aboutGrid");
     const toast = document.getElementById("toast");
     const doodle = document.getElementById("doodle");
     const surprise = document.getElementById("surprise");
@@ -583,27 +606,34 @@
       "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;"
     })[ch]);
 
-    function render() {
-      grid.innerHTML = projects.map((p, i) => {
-        const inactive = !p.href || p.href === "#";
-        const classes = ["card", p.external ? "external" : "", inactive ? "coming" : ""]
-          .filter(Boolean).join(" ");
-        return `
-          <a class="${classes}" style="--c:${escapeHTML(p.color)}" href="${escapeHTML(p.href || '#')}"
-             data-index="${i}" ${p.external && !inactive ? 'target="_blank" rel="noopener"' : ''}>
-            <div class="card-top">
-              <div class="icon" aria-hidden="true">${escapeHTML(p.icon)}</div>
-              <span class="tag">${escapeHTML(inactive ? p.tag : p.tag)}</span>
-            </div>
-            <div class="copy">
-              <h3>${escapeHTML(p.title)}</h3>
-              <p>${escapeHTML(p.description)}</p>
-            </div>
-            <span class="arrow" aria-hidden="true">→</span>
-          </a>`;
-      }).join("");
+    function cardMarkup(p, i, sizeClass = "") {
+      const inactive = !p.href || p.href === "#";
+      const classes = ["card", sizeClass, p.external ? "external" : "", inactive ? "coming" : ""]
+        .filter(Boolean).join(" ");
+      return `
+        <a class="${classes}" style="--c:${escapeHTML(p.color)}" href="${escapeHTML(p.href || '#')}"
+           data-index="${i}" ${p.external && !inactive ? 'target="_blank" rel="noopener"' : ''}>
+          <div class="card-top">
+            <div class="icon" aria-hidden="true">${escapeHTML(p.icon)}</div>
+          </div>
+          <div class="copy">
+            <h3>${escapeHTML(p.title)}</h3>
+            <p>${escapeHTML(p.description)}</p>
+          </div>
+          <span class="arrow" aria-hidden="true">→</span>
+        </a>`;
+    }
 
-      count.textContent = projects.length;
+    function render() {
+      const byGroup = group => projects
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.group === group);
+
+      featureGrid.innerHTML = byGroup("feature").map(({p, i}) => cardMarkup(p, i, "feature")).join("");
+      mainGrid.innerHTML = byGroup("main").map(({p, i}) => cardMarkup(p, i)).join("");
+      thirdGrid.innerHTML = byGroup("third").map(({p, i}) => cardMarkup(p, i)).join("");
+      gamesGrid.innerHTML = byGroup("games").map(({p, i}) => cardMarkup(p, i)).join("");
+      aboutGrid.innerHTML = byGroup("about").map(({p, i}) => cardMarkup(p, i)).join("");
 
       document.querySelectorAll(".card.coming").forEach(card => {
         card.addEventListener("click", event => {
@@ -644,6 +674,26 @@
       doodle.classList.remove("bounce");
       void doodle.offsetWidth;
       doodle.classList.add("bounce");
+    });
+
+    document.addEventListener("pointermove", event => {
+      const rect = doodle.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = event.clientX - centerX;
+      const dy = event.clientY - centerY;
+      const distance = Math.hypot(dx, dy) || 1;
+      const maxShift = 4;
+      const strength = Math.min(1, distance / 140);
+      const x = (dx / distance) * maxShift * strength;
+      const y = (dy / distance) * maxShift * strength;
+      doodle.style.setProperty("--eye-x", `${x.toFixed(2)}px`);
+      doodle.style.setProperty("--eye-y", `${y.toFixed(2)}px`);
+    });
+
+    document.addEventListener("pointerleave", () => {
+      doodle.style.setProperty("--eye-x", "0px");
+      doodle.style.setProperty("--eye-y", "0px");
     });
 
     const colors = ["#ff887c", "#ffd76a", "#7ed9a1", "#addcff", "#cfc4ff", "#ffc4d5"];
