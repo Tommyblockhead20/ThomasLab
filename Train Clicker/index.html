@@ -20,8 +20,42 @@
   }
   .wrap {
     width: min(100vw, 1000px);
-    padding: 0;
+    padding: 10px 0 0;
   }
+  .topbar {
+    height: 46px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px;
+  }
+  .home-btn {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1px solid #596375;
+    border-radius: 9px;
+    background: #2a303a;
+    color: #f4f7fb;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background .12s ease, transform .12s ease, border-color .12s ease;
+  }
+  .home-btn:hover {
+    background: #394353;
+    border-color: #7f8ca3;
+    transform: translateY(-1px);
+  }
+  .game-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    color: #f7f9fc;
+  }
+  .top-spacer { width: 78px; justify-self: end; }
   canvas {
     width: 100%;
     height: auto;
@@ -32,7 +66,7 @@
     user-select: none;
   }
   .note {
-    margin: 8px 12px 0;
+    margin: 8px 12px 10px;
     text-align: center;
     color: #aeb6c4;
     font-size: 13px;
@@ -41,8 +75,13 @@
 </head>
 <body>
 <div class="wrap">
+  <div class="topbar">
+    <a class="home-btn" href="https://thomaslab.me" aria-label="Home — Thomas Lab">⌂ Home</a>
+    <div class="game-title">Train Clicker</div>
+    <div class="top-spacer" aria-hidden="true"></div>
+  </div>
   <canvas id="game" width="1000" height="800" aria-label="Train Clicker game"></canvas>
-  <div class="note">Click tracks/cities to inspect • Click cows to clear them • Esc pauses • Progress saves in this browser</div>
+  <div class="note">Choose your routes • Click tracks/cities to inspect • Click cows for cash • Esc pauses • Progress saves in this browser</div>
 </div>
 
 <script>
@@ -52,16 +91,16 @@
   // --- 1. Initialization & Settings ---
   const WIDTH = 1000;
   const HEIGHT = 800;
+  const MAP_HEIGHT = 600;
   const FPS_REFERENCE = 60;
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
 
-  // The Pygame version rolled 1-in-600 every frame (~1 cow every 10 sec at 60 FPS).
-  // This HTML version intentionally lowers that to about 1 cow every 45 sec on average.
   const COW_SPAWN_RATE_PER_SECOND = 1 / 45;
   const SAVE_KEY = 'trainClickerSaveV1';
 
   let isPaused = false;
+  let buildMode = false;
   let keyBuffer = '';
   let lastTimestamp = performance.now();
   let hoverX = -999;
@@ -71,36 +110,90 @@
 
   const COLORS = {
     bg: 'rgb(44,94,64)',
-    water: 'rgb(60,140,180)',
+    water: 'rgb(61,139,179)',
+    waterEdge: 'rgb(42,106,144)',
     tree: 'rgb(30,70,40)',
-    city: 'rgb(180,180,180)',
+    treeLight: 'rgb(39,83,48)',
+    city: 'rgb(195,198,204)',
     house: 'rgb(220,120,50)',
     roof: 'rgb(139,0,0)',
-    track: 'rgb(120,120,120)',
-    selectedTrack: 'rgb(255,255,100)',
+    track: 'rgb(132,132,132)',
+    rail: 'rgb(205,205,205)',
+    tie: 'rgb(83,67,52)',
+    selectedTrack: 'rgb(255,231,111)',
+    hoverTrack: 'rgb(232,238,245)',
+    potentialTrack: 'rgba(235,240,245,.42)',
+    potentialHover: 'rgb(255,231,111)',
     uiBg: 'rgb(40,40,50)',
+    uiLine: 'rgb(100,100,120)',
     text: 'rgb(255,255,255)',
+    muted: 'rgb(185,191,202)',
     btn: 'rgb(70,130,180)',
-    btnHover: 'rgb(100,150,200)'
+    btnHover: 'rgb(100,150,200)',
+    btnDisabled: 'rgb(92,94,101)',
+    money: 'rgb(112,255,126)',
+    gold: 'rgb(255,205,75)'
   };
 
   const TRAIN_COLORS = [
     'rgb(100,150,255)', 'rgb(50,200,100)', 'rgb(200,100,250)',
-    'rgb(255,200,50)', 'rgb(255,50,50)'
+    'rgb(255,200,50)', 'rgb(255,70,70)'
   ];
 
   // --- 2. Environment Setup ---
   const rng = mulberry32(1337);
-  const TREES = Array.from({ length: 120 }, () => [
-    Math.floor(10 + rng() * (WIDTH - 20)),
-    Math.floor(10 + rng() * 580)
-  ]);
 
-  const LAKES = [
-    [[300,20],[380,10],[420,40],[390,80],[320,60],[280,50]],
-    [[880,250],[950,220],[980,260],[950,320],[860,300]],
-    [[20,350],[80,330],[120,380],[70,420],[10,390]]
+  const GRASS_PATCHES = Array.from({ length: 22 }, () => ({
+    x: 30 + rng() * 940,
+    y: 20 + rng() * 550,
+    rx: 35 + rng() * 95,
+    ry: 18 + rng() * 46,
+    alpha: 0.025 + rng() * 0.035
+  }));
+
+  const TREE_CLUSTERS = [
+    [72,88], [280,122], [545,88], [720,205], [946,120],
+    [93,282], [360,270], [760,415], [520,475], [205,530]
   ];
+
+  const TREE_CANDIDATES = [];
+  for (const [cx,cy] of TREE_CLUSTERS) {
+    const count = 10 + Math.floor(rng() * 10);
+    for (let i = 0; i < count; i++) {
+      const ang = rng() * Math.PI * 2;
+      const rad = Math.sqrt(rng()) * (28 + rng() * 50);
+      TREE_CANDIDATES.push([
+        Math.max(10, Math.min(WIDTH - 10, cx + Math.cos(ang) * rad)),
+        Math.max(10, Math.min(MAP_HEIGHT - 10, cy + Math.sin(ang) * rad)),
+        4 + Math.floor(rng() * 3)
+      ]);
+    }
+  }
+
+  // Water is loosely modeled after the Midwest rather than being decorative random shapes.
+  // Lake Michigan sits between Chicago and Detroit without covering the direct rail corridor,
+  // and Lake Erie runs just north of Cleveland.
+  const LAKES = [
+    {
+      name: 'Lake Michigan',
+      points: [[225,-10],[292,-16],[337,8],[355,42],[345,72],[326,101],[300,116],[270,112],[247,93],[235,64],[239,35]]
+    },
+    {
+      name: 'Lake Erie',
+      points: [[684,10],[754,2],[832,5],[908,13],[972,35],[1008,62],[982,87],[930,100],[860,105],[798,99],[746,83],[709,57]]
+    }
+  ];
+
+  // The Ohio-like river runs from Pittsburgh toward Cincinnati, then bends south and leaves
+  // the map before reaching the Mississippi-like river. The Mississippi-like river passes St. Louis,
+  // bends west of Chicago, and continues off both the top and bottom edges.
+  const RIVERS = [
+    [[1008,486],[950,493],[900,500],[846,511],[790,520],[730,518],[670,529],[610,537],[552,540],[500,544],[448,548],[405,553],[382,568],[362,585],[350,604]],
+    [[88,-8],[102,38],[116,82],[128,124],[136,166],[149,211],[171,257],[201,302],[232,337],[252,366],[263,414],[258,466],[248,522],[242,608]]
+  ];
+
+  // Keep the scenery sensible: generated trees can cluster near shorelines, but never in the lakes.
+  const TREES = TREE_CANDIDATES.filter(([x,y]) => !LAKES.some(lake => pointInPolygon(x, y, lake.points)));
 
   // --- 3. City Logic ---
   class City {
@@ -119,34 +212,39 @@
       }
     }
 
-    draw() {
+    getStage() {
+      if (this.passengers >= 1000) return 3;
+      if (this.passengers >= 100) return 2;
+      if (this.passengers >= 10) return 1;
+      return 0;
+    }
+
+    draw(isHovered, isSelected, isRouteEndpoint) {
+      const stage = this.getStage();
+      const pulse = 1 + Math.sin(performance.now() / 210) * 0.08;
+
+      if (isSelected || isRouteEndpoint || isHovered) {
+        const ringColor = isSelected || isRouteEndpoint ? COLORS.selectedTrack : 'rgba(255,255,255,.72)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, (isSelected || isRouteEndpoint ? 23 : 20) * (isRouteEndpoint ? pulse : 1), 0, Math.PI * 2);
+        ctx.strokeStyle = ringColor;
+        ctx.lineWidth = isSelected || isRouteEndpoint ? 3 : 2;
+        ctx.stroke();
+      }
+
+      drawCityBuildings(this.x, this.y, stage, this.houses);
+
+      circle(this.x, this.y, 11, COLORS.city, '#171a20', 2);
+      circle(this.x, this.y, 4, '#565c67', null, 0);
+
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.font = '24px Arial, sans-serif';
-      ctx.fillStyle = 'rgb(240,240,240)';
+      ctx.font = 'bold 21px Arial, sans-serif';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(25,35,30,.78)';
+      ctx.strokeText(this.name, this.x, this.y + 18);
+      ctx.fillStyle = 'rgb(246,247,249)';
       ctx.fillText(this.name, this.x, this.y + 18);
-
-      circle(this.x, this.y, 15, COLORS.city, '#000', 2);
-
-      for (let i = 0; i < this.houses; i++) {
-        let hx, hy;
-        if (i === 0) {
-          hx = this.x;
-          hy = this.y - 8;
-        } else {
-          const hAngle = i * (Math.PI * 2) / (this.houses - 1);
-          hx = this.x + Math.cos(hAngle) * 16;
-          hy = this.y + Math.sin(hAngle) * 16 - 8;
-        }
-
-        ctx.fillStyle = COLORS.house;
-        ctx.fillRect(hx - 6, hy - 2, 12, 10);
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(hx - 6, hy - 2, 12, 10);
-
-        polygon([[hx-8,hy-2],[hx+8,hy-2],[hx,hy-10]], COLORS.roof, '#000', 1);
-      }
     }
   }
 
@@ -173,6 +271,37 @@
   let activeRoutes = [];
   let selectedRoute = null;
   let selectedCity = null;
+  const floatingTexts = [];
+
+  class FloatingText {
+    constructor(x, y, text, color = COLORS.money) {
+      this.x = x;
+      this.y = y;
+      this.text = text;
+      this.color = color;
+      this.life = 1;
+    }
+
+    update(dt) {
+      this.y -= 30 * dt;
+      this.life -= dt / 1.15;
+    }
+
+    draw() {
+      if (this.life <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, this.life));
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 22px Arial, sans-serif';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0,0,0,.58)';
+      ctx.strokeText(this.text, this.x, this.y);
+      ctx.fillStyle = this.color;
+      ctx.fillText(this.text, this.x, this.y);
+      ctx.restore();
+    }
+  }
 
   class Cow {
     constructor(trackAngle) {
@@ -186,7 +315,6 @@
 
     update(dt) {
       if (this.offset > 0) {
-        // Pygame moved 0.5 px/frame at 60 FPS = 30 px/sec.
         this.offset = Math.max(0, this.offset - 30 * dt);
       }
     }
@@ -202,13 +330,14 @@
       this.trackAngle = Math.atan2(this.cityB.y - this.cityA.y, this.cityB.x - this.cityA.x);
       this.progress = 0;
       this.direction = 1;
-      this.waitTimer = 0; // seconds
+      this.waitTimer = 0;
       this.cow = null;
       this.upgrades = {
         speed:      { lvl: 0, max: 20, cost: 50,  mult: 1.3 },
         capacity:   { lvl: 0, max: 20, cost: 100, mult: 1.4 },
         marketing:  { lvl: 0, max: 20, cost: 150, mult: 1.5 },
-        turnaround: { lvl: 0, max: 20, cost: 200, mult: 1.6 }
+        turnaround: { lvl: 0, max: 20, cost: 200, mult: 1.6 },
+        cowcatcher: { lvl: 0, max: 20, cost: 75,  mult: 1.45 }
       };
     }
 
@@ -217,14 +346,16 @@
       return Math.floor(upg.cost * (upg.mult ** upg.lvl));
     }
 
+    getCowReward() {
+      return 10 + this.upgrades.cowcatcher.lvl * 10;
+    }
+
     update(dt) {
-      let earned = 0;
       const speedLvl = this.upgrades.speed.lvl;
       const capLvl = this.upgrades.capacity.lvl;
       const markLvl = this.upgrades.marketing.lvl;
       const turnLvl = this.upgrades.turnaround.lvl;
 
-      // Original was progress/frame. Convert to progress/second.
       const speedPerSecond = ((1 + speedLvl * 0.25) / this.length) * FPS_REFERENCE;
       const cars = 1 + Math.floor(capLvl / 4);
       const basePayout = (10 + capLvl * 5) * (1 + markLvl * 0.5);
@@ -233,7 +364,17 @@
       let blocked = false;
       if (this.cow) {
         this.cow.update(dt);
-        if (this.cow.offset <= 0) {
+
+        // At Cowcatcher level 10+, cows are automatically claimed once they reach the rails.
+        // Manual clicking still works before that point.
+        if (this.upgrades.cowcatcher.lvl >= 10 && this.cow.offset <= 0) {
+          const baseX = this.cityA.x + (this.cityB.x - this.cityA.x) * this.cow.progress;
+          const baseY = this.cityA.y + (this.cityB.y - this.cityA.y) * this.cow.progress;
+          const reward = this.getCowReward();
+          gameData.money += reward;
+          addFloatingMoney(baseX, baseY - 18, reward);
+          this.cow = null;
+        } else if (this.cow && this.cow.offset <= 0) {
           const pixelDist = (this.cow.progress - this.progress) * this.length * this.direction;
           if (pixelDist >= 0 && pixelDist < 25) blocked = true;
         }
@@ -249,30 +390,27 @@
           this.direction = -1;
           this.waitTimer = waitSeconds;
           this.cityB.addPassengers(cars);
-          earned = Math.floor(basePayout * (1 + (this.cityB.houses - 1) * 0.5));
+          const earned = Math.floor(basePayout * (1 + (this.cityB.houses - 1) * 0.5));
+          gameData.money += earned;
+          addFloatingMoney(this.cityB.x, this.cityB.y - 30, earned);
         } else if (this.progress <= 0) {
           this.progress = 0;
           this.direction = 1;
           this.waitTimer = waitSeconds;
           this.cityA.addPassengers(cars);
-          earned = Math.floor(basePayout * (1 + (this.cityA.houses - 1) * 0.5));
+          const earned = Math.floor(basePayout * (1 + (this.cityA.houses - 1) * 0.5));
+          gameData.money += earned;
+          addFloatingMoney(this.cityA.x, this.cityA.y - 30, earned);
         }
       }
-      return earned;
     }
 
-    draw(isSelected) {
-      const speedLvl = this.upgrades.speed.lvl;
-      const capLvl = this.upgrades.capacity.lvl;
-      const cars = 1 + Math.floor(capLvl / 4);
-      let blocked = false;
-
-      ctx.strokeStyle = isSelected ? COLORS.selectedTrack : COLORS.track;
-      ctx.lineWidth = isSelected ? 5 : 3;
-      ctx.beginPath();
-      ctx.moveTo(this.cityA.x, this.cityA.y);
-      ctx.lineTo(this.cityB.x, this.cityB.y);
-      ctx.stroke();
+    draw(isSelected, isHovered) {
+      drawRailTrack(
+        this.cityA.x, this.cityA.y,
+        this.cityB.x, this.cityB.y,
+        isSelected, isHovered
+      );
 
       if (this.cow) {
         const baseX = this.cityA.x + (this.cityB.x - this.cityA.x) * this.cow.progress;
@@ -280,7 +418,7 @@
         this.cow.x = baseX + Math.cos(this.cow.perpAngle) * this.cow.offset;
         this.cow.y = baseY + Math.sin(this.cow.perpAngle) * this.cow.offset;
 
-        circle(this.cow.x, this.cow.y, 12, '#fff', null, 0);
+        circle(this.cow.x, this.cow.y, 13, 'rgba(255,255,255,.93)', 'rgba(0,0,0,.35)', 1);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = '26px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
@@ -289,42 +427,360 @@
 
         if (this.cow.offset <= 0) {
           const pixelDist = (this.cow.progress - this.progress) * this.length * this.direction;
-          blocked = pixelDist >= 0 && pixelDist < 25;
-        }
-        if (blocked) {
-          ctx.font = 'bold 36px Arial, sans-serif';
-          ctx.fillStyle = 'rgb(255,50,50)';
-          ctx.fillText('!', this.cow.x, this.cow.y - 28);
+          const blocked = pixelDist >= 0 && pixelDist < 25;
+          if (blocked) {
+            ctx.font = 'bold 34px Arial, sans-serif';
+            ctx.fillStyle = 'rgb(255,70,70)';
+            ctx.fillText('!', this.cow.x, this.cow.y - 29);
+          }
         }
       }
 
+      const speedLvl = this.upgrades.speed.lvl;
+      const capLvl = this.upgrades.capacity.lvl;
+      const cars = 1 + Math.floor(capLvl / 4);
       const engineX = this.cityA.x + (this.cityB.x - this.cityA.x) * this.progress;
       const engineY = this.cityA.y + (this.cityB.y - this.cityA.y) * this.progress;
       const visualAngle = this.direction === 1 ? this.trackAngle : this.trackAngle + Math.PI;
       const trainColor = TRAIN_COLORS[Math.min(Math.floor(speedLvl / 4), TRAIN_COLORS.length - 1)];
 
-      drawTrainRect(trainColor, engineX, engineY, 16, 26, visualAngle);
+      drawLocomotive(trainColor, engineX, engineY, visualAngle);
       for (let i = 1; i < cars; i++) {
-        const offset = 25 + (i - 1) * 22;
+        const offset = 29 + (i - 1) * 25;
         const carX = engineX - Math.cos(visualAngle) * offset;
         const carY = engineY - Math.sin(visualAngle) * offset;
-        drawTrainRect('rgb(200,200,200)', carX, carY, 14, 20, visualAngle);
+        drawPassengerCar(carX, carY, visualAngle);
       }
     }
   }
 
   // --- 5. Helpers ---
-  function drawTrainRect(color, cx, cy, width, length, angle) {
-    const dx = Math.cos(angle), dy = Math.sin(angle);
-    const hw = width / 2, hl = length / 2;
-    const lx = dx * hl, ly = dy * hl;
-    const wx = -dy * hw, wy = dx * hw;
+  function drawBackground() {
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    for (const p of GRASS_PATCHES) {
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = '#b9d285';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    for (const river of RIVERS) drawRiver(river);
+
+    for (const lake of LAKES) drawLake(lake);
+
+    for (const [tx,ty,tr] of TREES) {
+      circle(tx + 1, ty + 2, tr, 'rgba(18,47,26,.35)', null, 0);
+      circle(tx, ty, tr, COLORS.tree, null, 0);
+      circle(tx - 1, ty - 1, Math.max(2, tr - 2), COLORS.treeLight, null, 0);
+    }
+  }
+
+  function traceSmoothPath(points, closed = false) {
+    if (!points.length) return;
+    ctx.beginPath();
+    if (closed) {
+      const firstMidX = (points[0][0] + points[points.length - 1][0]) / 2;
+      const firstMidY = (points[0][1] + points[points.length - 1][1]) / 2;
+      ctx.moveTo(firstMidX, firstMidY);
+      for (let i = 0; i < points.length; i++) {
+        const cur = points[i];
+        const next = points[(i + 1) % points.length];
+        const mx = (cur[0] + next[0]) / 2;
+        const my = (cur[1] + next[1]) / 2;
+        ctx.quadraticCurveTo(cur[0], cur[1], mx, my);
+      }
+      ctx.closePath();
+      return;
+    }
+
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length - 1; i++) {
+      const cur = points[i];
+      const next = points[i + 1];
+      const mx = (cur[0] + next[0]) / 2;
+      const my = (cur[1] + next[1]) / 2;
+      ctx.quadraticCurveTo(cur[0], cur[1], mx, my);
+    }
+    const last = points[points.length - 1];
+    ctx.lineTo(last[0], last[1]);
+  }
+
+  function drawRiver(points) {
+    traceSmoothPath(points, false);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(31,103,145,.45)';
+    ctx.lineWidth = 10;
+    ctx.stroke();
+
+    traceSmoothPath(points, false);
+    ctx.strokeStyle = 'rgba(73,159,199,.92)';
+    ctx.lineWidth = 7;
+    ctx.stroke();
+
+    traceSmoothPath(points, false);
+    ctx.strokeStyle = 'rgba(174,220,235,.34)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawLake(lake) {
+    const points = lake.points;
+
+    // Dark shoreline gives the lakes a much cleaner silhouette than the old polygons.
+    traceSmoothPath(points, true);
+    ctx.fillStyle = 'rgba(29,104,145,.48)';
+    ctx.fill();
+
+    traceSmoothPath(points, true);
+    ctx.fillStyle = COLORS.water;
+    ctx.fill();
+    ctx.strokeStyle = COLORS.waterEdge;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Subtle inner shoreline highlight.
+    ctx.save();
+    ctx.globalAlpha = 0.24;
+    traceSmoothPath(points, true);
+    ctx.strokeStyle = '#b6e0ec';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
+    // A few short ripple marks keep the water from reading as flat blue blobs.
+    const xs = points.map(p => p[0]);
+    const ys = points.map(p => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(205,235,243,.22)';
+    ctx.lineWidth = 1.3;
+    for (let i = 0; i < 3; i++) {
+      const y = minY + (maxY - minY) * (0.38 + i * 0.15);
+      const x = minX + (maxX - minX) * (0.34 + i * 0.10);
+      ctx.beginPath();
+      ctx.moveTo(x - 13, y);
+      ctx.quadraticCurveTo(x, y - 3, x + 13, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawCityBuildings(x, y, stage, houses) {
+    const count = Math.min(6, Math.max(1, houses + stage));
+    const widths = [10,11,12,13,14,15];
+
+    if (stage === 0) {
+      drawHouse(x - 7, y - 10, 0.85);
+      if (houses > 1) drawHouse(x + 8, y - 7, 0.72);
+      return;
+    }
+
+    if (stage === 1) {
+      drawHouse(x - 16, y - 6, 0.78);
+      drawHouse(x + 16, y - 4, 0.72);
+      drawBuilding(x, y - 9, 14, 24, 'rgb(190,158,110)', 2);
+      return;
+    }
+
+    const spacing = stage === 3 ? 10 : 11;
+    for (let i = 0; i < count; i++) {
+      const centered = i - (count - 1) / 2;
+      const bx = x + centered * spacing;
+      const h = stage === 3 ? 22 + ((i * 11) % 25) : 16 + ((i * 7) % 16);
+      const w = widths[i % widths.length];
+      const color = i % 2 === 0 ? 'rgb(158,171,181)' : 'rgb(183,164,143)';
+      drawBuilding(bx, y - 7, w, h, color, stage === 3 ? 3 : 2);
+    }
+  }
+
+  function drawHouse(x, y, scale = 1) {
+    ctx.fillStyle = COLORS.house;
+    ctx.fillRect(x - 6 * scale, y - 2 * scale, 12 * scale, 9 * scale);
+    ctx.strokeStyle = '#202226';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 6 * scale, y - 2 * scale, 12 * scale, 9 * scale);
     polygon([
-      [cx + lx + wx, cy + ly + wy],
-      [cx + lx - wx, cy + ly - wy],
-      [cx - lx - wx, cy - ly - wy],
-      [cx - lx + wx, cy - ly + wy]
-    ], color, '#000', 2);
+      [x - 8 * scale, y - 2 * scale],
+      [x + 8 * scale, y - 2 * scale],
+      [x, y - 10 * scale]
+    ], COLORS.roof, '#202226', 1);
+  }
+
+  function drawBuilding(x, groundY, w, h, color, windows) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x - w / 2, groundY - h, w, h);
+    ctx.strokeStyle = 'rgba(25,25,30,.75)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - w / 2, groundY - h, w, h);
+
+    ctx.fillStyle = 'rgba(240,223,139,.8)';
+    const rows = Math.max(1, Math.floor(h / 9));
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < windows; col++) {
+        const wx = x - w / 2 + 2 + col * ((w - 4) / windows);
+        const wy = groundY - h + 4 + row * 8;
+        ctx.fillRect(wx, wy, 2.5, 3);
+      }
+    }
+  }
+
+  function drawRailTrack(x1, y1, x2, y2, selected, hovered) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    const ux = dx / len;
+    const uy = dy / len;
+    const px = -uy;
+    const py = ux;
+    const emphasized = selected || hovered;
+    const railColor = selected ? COLORS.selectedTrack : hovered ? COLORS.hoverTrack : COLORS.rail;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+
+    ctx.strokeStyle = selected ? 'rgba(120,105,50,.95)' : 'rgba(65,65,68,.9)';
+    ctx.lineWidth = emphasized ? 10 : 8;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.strokeStyle = COLORS.tie;
+    ctx.lineWidth = emphasized ? 3 : 2.5;
+    for (let d = 8; d < len - 8; d += 13) {
+      const cx = x1 + ux * d;
+      const cy = y1 + uy * d;
+      ctx.beginPath();
+      ctx.moveTo(cx - px * 6, cy - py * 6);
+      ctx.lineTo(cx + px * 6, cy + py * 6);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = railColor;
+    ctx.lineWidth = emphasized ? 2.2 : 1.7;
+    for (const off of [-2.7, 2.7]) {
+      ctx.beginPath();
+      ctx.moveTo(x1 + px * off, y1 + py * off);
+      ctx.lineTo(x2 + px * off, y2 + py * off);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawPotentialRoute(pair, hovered) {
+    const a = CITIES[pair[0]];
+    const b = CITIES[pair[1]];
+    ctx.save();
+    ctx.setLineDash(hovered ? [10,7] : [7,8]);
+    ctx.strokeStyle = hovered ? COLORS.potentialHover : COLORS.potentialTrack;
+    ctx.lineWidth = hovered ? 5 : 3;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawLocomotive(color, x, y, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+
+    // Wheels
+    ctx.fillStyle = '#1a1b1f';
+    for (const wx of [-7, 8]) {
+      ctx.beginPath();
+      ctx.arc(wx, -8, 3.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(wx, 8, 3.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Main body and nose
+    roundRect(-13, -8, 27, 16, 3, color);
+    polygon([[14,-7],[20,-5],[20,5],[14,7]], color, '#1c1d21', 1.5);
+
+    // Cab
+    ctx.fillStyle = shadeColor(color, -22);
+    ctx.fillRect(-12, -8, 9, 16);
+    ctx.strokeStyle = '#1c1d21';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-12, -8, 9, 16);
+
+    // Windows
+    ctx.fillStyle = 'rgb(190,230,245)';
+    ctx.fillRect(-10.5, -5.5, 5, 4);
+    ctx.fillRect(-10.5, 1.5, 5, 4);
+
+    // Boiler highlight + chimney
+    ctx.fillStyle = 'rgba(255,255,255,.22)';
+    ctx.fillRect(-1, -5.5, 11, 2.5);
+    ctx.fillStyle = '#25272c';
+    ctx.fillRect(8, -11, 4, 5);
+    ctx.fillRect(6.5, -12.5, 7, 2.5);
+
+    // Animated little smoke puffs
+    const puffPhase = (performance.now() / 750) % 1;
+    ctx.globalAlpha = .42 * (1 - puffPhase);
+    ctx.fillStyle = '#e5e6e8';
+    ctx.beginPath();
+    ctx.arc(10 - puffPhase * 6, -14 - puffPhase * 8, 3 + puffPhase * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawPassengerCar(x, y, angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+
+    ctx.fillStyle = '#1a1b1f';
+    for (const wx of [-7, 7]) {
+      ctx.beginPath();
+      ctx.arc(wx, -7, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(wx, 7, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    roundRect(-11, -7, 22, 14, 3, 'rgb(203,208,214)');
+    ctx.strokeStyle = '#23252a';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(-10, -6, 20, 12);
+
+    ctx.fillStyle = 'rgb(120,174,203)';
+    for (const wx of [-6, 0, 6]) {
+      ctx.fillRect(wx - 2, -4.3, 4, 3.2);
+      ctx.fillRect(wx - 2, 1.1, 4, 3.2);
+    }
+    ctx.restore();
+  }
+
+  function shadeColor(rgb, amount) {
+    const nums = rgb.match(/\d+/g).map(Number);
+    return `rgb(${Math.max(0, Math.min(255, nums[0] + amount))},${Math.max(0, Math.min(255, nums[1] + amount))},${Math.max(0, Math.min(255, nums[2] + amount))})`;
+  }
+
+  function pointInPolygon(x, y, points) {
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const xi = points[i][0], yi = points[i][1];
+      const xj = points[j][0], yj = points[j][1];
+      const intersects = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-9) + xi);
+      if (intersects) inside = !inside;
+    }
+    return inside;
   }
 
   function pointToLineDist(px, py, x1, y1, x2, y2) {
@@ -332,7 +788,8 @@
     if (lineMag === 0) return 9999;
     const u = ((px-x1)*(x2-x1) + (py-y1)*(y2-y1)) / (lineMag ** 2);
     if (u < 0 || u > 1) return 9999;
-    const ix = x1 + u*(x2-x1), iy = y1 + u*(y2-y1);
+    const ix = x1 + u*(x2-x1);
+    const iy = y1 + u*(y2-y1);
     return Math.hypot(px-ix, py-iy);
   }
 
@@ -368,11 +825,66 @@
     };
   }
 
+  function addFloatingMoney(x, y, amount) {
+    floatingTexts.push(new FloatingText(x, y, `+${money(amount)}`, COLORS.money));
+  }
+
+  function routeKey(a, b) {
+    return a < b ? `${a}-${b}` : `${b}-${a}`;
+  }
+
+  function isPairBuilt(pair) {
+    const key = routeKey(pair[0], pair[1]);
+    return activeRoutes.some(r => routeKey(r.cityAIdx, r.cityBIdx) === key);
+  }
+
+  function getAvailablePairs() {
+    return POTENTIAL_ROUTES.filter(pair => !isPairBuilt(pair));
+  }
+
+  function getHoveredCity() {
+    if (hoverY >= MAP_HEIGHT) return null;
+    for (const city of CITIES) {
+      if (Math.hypot(hoverX-city.x, hoverY-city.y) <= 21) return city;
+    }
+    return null;
+  }
+
+  function getHoveredActiveRoute() {
+    if (hoverY >= MAP_HEIGHT) return null;
+    let closest = null;
+    let closestDist = 12;
+    for (const r of activeRoutes) {
+      const dist = pointToLineDist(hoverX,hoverY,r.cityA.x,r.cityA.y,r.cityB.x,r.cityB.y);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = r;
+      }
+    }
+    return closest;
+  }
+
+  function getHoveredPotentialPair() {
+    if (!buildMode || hoverY >= MAP_HEIGHT) return null;
+    let closest = null;
+    let closestDist = 14;
+    for (const pair of getAvailablePairs()) {
+      const a = CITIES[pair[0]];
+      const b = CITIES[pair[1]];
+      const dist = pointToLineDist(hoverX,hoverY,a.x,a.y,b.x,b.y);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = pair;
+      }
+    }
+    return closest;
+  }
+
   // --- 6. Save / Load ---
   function saveGame() {
     const data = {
       money: gameData.money,
-      routesBought: gameData.routesBought,
+      routesBought: activeRoutes.length,
       cowsEnabled: gameData.cowsEnabled,
       cities: CITIES.map(c => ({ passengers: c.passengers, houses: c.houses })),
       activeRoutes: activeRoutes.map(r => ({
@@ -395,7 +907,6 @@
     try {
       const data = JSON.parse(raw);
       gameData.money = Number(data.money ?? 500);
-      gameData.routesBought = Number(data.routesBought ?? 0);
       gameData.cowsEnabled = data.cowsEnabled !== false;
 
       if (Array.isArray(data.cities)) {
@@ -409,18 +920,24 @@
       activeRoutes = [];
       if (Array.isArray(data.activeRoutes)) {
         for (const rd of data.activeRoutes) {
+          if (!CITIES[rd.a] || !CITIES[rd.b]) continue;
           const r = new Route(rd.a, rd.b);
           if (rd.upgrades) {
             for (const [k,lvl] of Object.entries(rd.upgrades)) {
-              if (r.upgrades[k]) r.upgrades[k].lvl = Math.max(0, Math.min(r.upgrades[k].max, Number(lvl) || 0));
+              if (r.upgrades[k]) {
+                r.upgrades[k].lvl = Math.max(0, Math.min(r.upgrades[k].max, Number(lvl) || 0));
+              }
             }
           }
           activeRoutes.push(r);
         }
       }
 
+      gameData.routesBought = activeRoutes.length;
       selectedRoute = null;
       selectedCity = null;
+      buildMode = false;
+      floatingTexts.length = 0;
       flashPause('Game loaded');
     } catch (err) {
       console.error(err);
@@ -434,18 +951,40 @@
   }
 
   // --- 7. UI Setup ---
-  const routeBtn = { x:800, y:620, w:180, h:80 };
+  const routeBtn = { x:810, y:614, w:170, h:72 };
   const upgButtons = {
-    speed:      { x:50,  y:690, w:180, h:85 },
-    capacity:   { x:240, y:690, w:180, h:85 },
-    marketing:  { x:430, y:690, w:180, h:85 },
-    turnaround: { x:620, y:690, w:180, h:85 }
+    speed:      { x:25,  y:700, w:178, h:82 },
+    capacity:   { x:218, y:700, w:178, h:82 },
+    marketing:  { x:411, y:700, w:178, h:82 },
+    turnaround: { x:604, y:700, w:178, h:82 },
+    cowcatcher: { x:797, y:700, w:178, h:82 }
   };
   const labels = {
-    speed:'Train Speed', capacity:'Add Cars', marketing:'Ticket Price', turnaround:'Load Speed'
+    speed:'Train Speed',
+    capacity:'Add Cars',
+    marketing:'Ticket Price',
+    turnaround:'Load Speed',
+    cowcatcher:'Cowcatcher'
   };
   const saveBtn = { x:WIDTH/2-100, y:HEIGHT/2-60, w:200, h:50 };
   const loadBtn = { x:WIDTH/2-100, y:HEIGHT/2+10, w:200, h:50 };
+
+  function upgradeEffectText(route, key) {
+    const upg = route.upgrades[key];
+    const next = upg.lvl + 1;
+    if (key === 'speed') return '+25% train speed';
+    if (key === 'capacity') {
+      const addsCar = Math.floor(next / 4) > Math.floor(upg.lvl / 4);
+      return addsCar ? '+1 car + payout' : '+$5 base payout';
+    }
+    if (key === 'marketing') return '+50% ticket value';
+    if (key === 'turnaround') return '20% less load wait';
+    if (key === 'cowcatcher') {
+      if (upg.lvl === 9) return '+$10/cow + auto-claim';
+      return '+$10 per cow';
+    }
+    return 'Upgrade';
+  }
 
   // --- 8. Input ---
   function canvasPos(evt) {
@@ -460,9 +999,27 @@
     const p = canvasPos(evt);
     hoverX = p.x;
     hoverY = p.y;
+
+    let pointer = false;
+    if (isPaused) {
+      pointer = rectContains(saveBtn,hoverX,hoverY) || rectContains(loadBtn,hoverX,hoverY);
+    } else {
+      pointer = !!getHoveredCity() || !!getHoveredActiveRoute() || !!getHoveredPotentialPair();
+      pointer ||= rectContains(routeBtn,hoverX,hoverY);
+      if (selectedRoute && hoverY >= MAP_HEIGHT) {
+        pointer ||= Object.values(upgButtons).some(rect => rectContains(rect,hoverX,hoverY));
+      }
+      if (hoverY < MAP_HEIGHT) {
+        pointer ||= activeRoutes.some(r => r.cow && Math.hypot(hoverX-r.cow.x, hoverY-r.cow.y) <= 20);
+      }
+    }
+    canvas.style.cursor = pointer ? 'pointer' : 'default';
   });
 
-  canvas.addEventListener('mouseleave', () => { hoverX = hoverY = -999; });
+  canvas.addEventListener('mouseleave', () => {
+    hoverX = hoverY = -999;
+    canvas.style.cursor = 'default';
+  });
 
   canvas.addEventListener('click', evt => {
     const {x,y} = canvasPos(evt);
@@ -474,11 +1031,15 @@
     }
 
     const routeCost = 500 * (2 ** gameData.routesBought);
+    const maxedRoutes = gameData.routesBought >= gameData.maxRoutes;
     let clickedSomething = false;
 
-    if (y < 600) {
+    if (y < MAP_HEIGHT) {
       for (const r of activeRoutes) {
         if (r.cow && Math.hypot(x-r.cow.x, y-r.cow.y) <= 20) {
+          const reward = r.getCowReward();
+          gameData.money += reward;
+          addFloatingMoney(r.cow.x, r.cow.y - 18, reward);
           r.cow = null;
           clickedSomething = true;
           break;
@@ -486,18 +1047,49 @@
       }
     }
 
-    if (!clickedSomething && rectContains(routeBtn,x,y) && gameData.money >= routeCost && gameData.routesBought < gameData.maxRoutes) {
-      gameData.money -= routeCost;
-      const pair = POTENTIAL_ROUTES[gameData.routesBought];
-      const r = new Route(pair[0], pair[1]);
-      activeRoutes.push(r);
-      gameData.routesBought++;
-      selectedRoute = r;
-      selectedCity = null;
+    if (!clickedSomething && rectContains(routeBtn,x,y)) {
+      if (buildMode) {
+        buildMode = false;
+      } else if (!maxedRoutes && gameData.money >= routeCost) {
+        buildMode = true;
+        selectedRoute = null;
+        selectedCity = null;
+      }
       clickedSomething = true;
     }
 
-    if (!clickedSomething && selectedRoute && y >= 600) {
+    if (!clickedSomething && buildMode && y < MAP_HEIGHT) {
+      let chosenPair = null;
+      let closestDist = 14;
+      for (const pair of getAvailablePairs()) {
+        const a = CITIES[pair[0]];
+        const b = CITIES[pair[1]];
+        const dist = pointToLineDist(x,y,a.x,a.y,b.x,b.y);
+        if (dist < closestDist) {
+          closestDist = dist;
+          chosenPair = pair;
+        }
+      }
+
+      if (chosenPair && gameData.money >= routeCost) {
+        gameData.money -= routeCost;
+        const r = new Route(chosenPair[0], chosenPair[1]);
+        activeRoutes.push(r);
+        gameData.routesBought = activeRoutes.length;
+        selectedRoute = r;
+        selectedCity = null;
+        buildMode = false;
+        floatingTexts.push(new FloatingText(
+          (r.cityA.x + r.cityB.x) / 2,
+          (r.cityA.y + r.cityB.y) / 2 - 14,
+          'ROUTE BUILT!',
+          COLORS.gold
+        ));
+      }
+      clickedSomething = true;
+    }
+
+    if (!clickedSomething && selectedRoute && y >= MAP_HEIGHT) {
       for (const [key,rect] of Object.entries(upgButtons)) {
         if (rectContains(rect,x,y)) {
           const upg = selectedRoute.upgrades[key];
@@ -512,10 +1104,10 @@
       }
     }
 
-    if (!clickedSomething && y < 600) {
+    if (!clickedSomething && y < MAP_HEIGHT) {
       let clickedCity = null;
       for (const city of CITIES) {
-        if (Math.hypot(x-city.x, y-city.y) <= 15) {
+        if (Math.hypot(x-city.x, y-city.y) <= 20) {
           clickedCity = city;
           break;
         }
@@ -526,7 +1118,7 @@
         selectedRoute = null;
       } else {
         let clickedRoute = null;
-        let closestDist = 15;
+        let closestDist = 14;
         for (const r of activeRoutes) {
           const dist = pointToLineDist(x,y,r.cityA.x,r.cityA.y,r.cityB.x,r.cityB.y);
           if (dist < closestDist) {
@@ -542,7 +1134,11 @@
 
   window.addEventListener('keydown', evt => {
     if (evt.key === 'Escape') {
-      isPaused = !isPaused;
+      if (buildMode) {
+        buildMode = false;
+      } else {
+        isPaused = !isPaused;
+      }
       evt.preventDefault();
       return;
     }
@@ -570,7 +1166,6 @@
     if (isPaused) return;
 
     if (gameData.cowsEnabled && activeRoutes.length > 0) {
-      // Frame-rate-independent Poisson-ish spawn probability.
       const spawnProbability = 1 - Math.exp(-COW_SPAWN_RATE_PER_SECOND * dt);
       if (Math.random() < spawnProbability) {
         const target = activeRoutes[Math.floor(Math.random() * activeRoutes.length)];
@@ -578,82 +1173,156 @@
       }
     }
 
-    for (const r of activeRoutes) gameData.money += r.update(dt);
+    for (const r of activeRoutes) r.update(dt);
+
+    for (let i = floatingTexts.length - 1; i >= 0; i--) {
+      floatingTexts[i].update(dt);
+      if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1);
+    }
   }
 
   function draw() {
-    ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0,0,WIDTH,HEIGHT);
+    drawBackground();
 
-    for (const [tx,ty] of TREES) circle(tx,ty,6,COLORS.tree,null,0);
-    for (const lake of LAKES) polygon(lake,COLORS.water);
+    const hoveredCity = getHoveredCity();
+    const hoveredRoute = getHoveredActiveRoute();
+    const hoveredPotential = getHoveredPotentialPair();
 
-    for (const r of activeRoutes) r.draw(r === selectedRoute);
-    for (const city of CITIES) city.draw();
+    if (buildMode) {
+      for (const pair of getAvailablePairs()) {
+        drawPotentialRoute(pair, pair === hoveredPotential);
+      }
+    }
 
-    drawUI();
+    for (const r of activeRoutes) {
+      r.draw(r === selectedRoute, r === hoveredRoute && !buildMode);
+    }
+
+    for (const city of CITIES) {
+      const isEndpoint = !!selectedRoute && (selectedRoute.cityA === city || selectedRoute.cityB === city);
+      city.draw(city === hoveredCity, city === selectedCity, isEndpoint);
+    }
+
+    for (const ft of floatingTexts) ft.draw();
+
+    drawUI(hoveredPotential);
     if (isPaused) drawPauseMenu();
   }
 
-  function drawUI() {
+  function drawUI(hoveredPotential) {
     ctx.fillStyle = COLORS.uiBg;
-    ctx.fillRect(0,600,WIDTH,200);
-    ctx.strokeStyle = 'rgb(100,100,120)';
+    ctx.fillRect(0,MAP_HEIGHT,WIDTH,HEIGHT-MAP_HEIGHT);
+    ctx.strokeStyle = COLORS.uiLine;
     ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(0,600); ctx.lineTo(WIDTH,600); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0,MAP_HEIGHT);
+    ctx.lineTo(WIDTH,MAP_HEIGHT);
+    ctx.stroke();
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.font = '36px Arial, sans-serif';
-    ctx.fillStyle = 'rgb(100,255,100)';
-    ctx.fillText(`Bank: ${money(gameData.money)}`,20,620);
+    ctx.font = 'bold 34px Arial, sans-serif';
+    ctx.fillStyle = COLORS.money;
+    ctx.fillText(`Bank: ${money(gameData.money)}`,20,617);
 
     const routeCost = 500 * (2 ** gameData.routesBought);
     const maxed = gameData.routesBought >= gameData.maxRoutes;
-    drawButton(routeBtn, maxed ? 'rgb(100,100,100)' : COLORS.btn, !maxed && rectContains(routeBtn,hoverX,hoverY));
-    ctx.font = '24px Arial, sans-serif';
+    const canAfford = gameData.money >= routeCost;
+    const routeHover = rectContains(routeBtn,hoverX,hoverY);
+    const routeBase = maxed || (!canAfford && !buildMode) ? COLORS.btnDisabled : COLORS.btn;
+    drawButton(routeBtn, routeBase, routeHover && !maxed);
+
+    ctx.font = 'bold 21px Arial, sans-serif';
     ctx.fillStyle = COLORS.text;
-    ctx.fillText('Buy New Route',routeBtn.x+10,routeBtn.y+10);
-    ctx.fillText(maxed ? 'MAXED' : `Cost: ${money(routeCost)}`,routeBtn.x+10,routeBtn.y+38);
+    if (maxed) {
+      ctx.fillText('All Routes Built',routeBtn.x+10,routeBtn.y+10);
+      ctx.font = '18px Arial, sans-serif';
+      ctx.fillStyle = COLORS.muted;
+      ctx.fillText('Network complete',routeBtn.x+10,routeBtn.y+41);
+    } else if (buildMode) {
+      ctx.fillText('Cancel Build',routeBtn.x+10,routeBtn.y+10);
+      ctx.font = '18px Arial, sans-serif';
+      ctx.fillStyle = COLORS.gold;
+      ctx.fillText(`Route: ${money(routeCost)}`,routeBtn.x+10,routeBtn.y+41);
+    } else {
+      ctx.fillText('Buy New Route',routeBtn.x+10,routeBtn.y+10);
+      ctx.font = '18px Arial, sans-serif';
+      ctx.fillStyle = canAfford ? 'rgb(210,255,215)' : 'rgb(255,180,180)';
+      ctx.fillText(`Cost: ${money(routeCost)}`,routeBtn.x+10,routeBtn.y+41);
+    }
+
+    if (buildMode) {
+      ctx.font = 'bold 27px Arial, sans-serif';
+      ctx.fillStyle = COLORS.text;
+      ctx.fillText('Choose a dotted connection to build',20,664);
+      ctx.font = '19px Arial, sans-serif';
+      ctx.fillStyle = COLORS.muted;
+      if (hoveredPotential) {
+        const a = CITIES[hoveredPotential[0]].name;
+        const b = CITIES[hoveredPotential[1]].name;
+        ctx.fillStyle = COLORS.gold;
+        ctx.fillText(`${a} ↔ ${b} • ${money(routeCost)}`,20,701);
+      } else {
+        ctx.fillText('Hover a route to preview it • Esc cancels build mode',20,701);
+      }
+      return;
+    }
 
     if (selectedCity) {
-      ctx.font = '36px Arial, sans-serif';
+      ctx.font = 'bold 29px Arial, sans-serif';
       ctx.fillStyle = COLORS.text;
-      ctx.fillText(`City Inspector: ${selectedCity.name}`,20,660);
-      ctx.font = '24px Arial, sans-serif';
-      ctx.fillText(`Total Arrivals: ${selectedCity.passengers.toLocaleString('en-US')}`,20,700);
-      ctx.fillText(`Houses Built: ${selectedCity.houses}`,20,730);
-      ctx.fillStyle = 'rgb(255,200,50)';
-      ctx.fillText(`Payout Multiplier: +${(selectedCity.houses-1)*50}%`,20,760);
+      ctx.fillText(`City Inspector: ${selectedCity.name}`,20,662);
+      ctx.font = '21px Arial, sans-serif';
+      ctx.fillText(`Total Arrivals: ${selectedCity.passengers.toLocaleString('en-US')}`,20,704);
+      ctx.fillText(`Houses Built: ${selectedCity.houses}`,20,734);
+      ctx.fillStyle = COLORS.gold;
+      ctx.fillText(`Payout Multiplier: +${(selectedCity.houses-1)*50}%`,20,764);
     } else if (selectedRoute) {
-      ctx.font = '36px Arial, sans-serif';
+      ctx.font = 'bold 25px Arial, sans-serif';
       ctx.fillStyle = COLORS.text;
-      ctx.fillText('Selected Route Upgrades:',20,655);
+      ctx.fillText(`${selectedRoute.cityA.name} ↔ ${selectedRoute.cityB.name} Upgrades`,20,660);
 
       for (const [key,rect] of Object.entries(upgButtons)) {
         const upg = selectedRoute.upgrades[key];
         const maxedUpg = upg.lvl >= upg.max;
-        drawButton(rect, maxedUpg ? 'rgb(100,100,100)' : COLORS.btn, !maxedUpg && rectContains(rect,hoverX,hoverY));
-        ctx.font = '24px Arial, sans-serif';
-        ctx.fillStyle = COLORS.text;
-        ctx.fillText(labels[key],rect.x+10,rect.y+8);
-        ctx.fillText(`Lvl ${upg.lvl}/${upg.max}`,rect.x+10,rect.y+34);
-        ctx.fillStyle = 'rgb(200,255,200)';
-        ctx.fillText(maxedUpg ? 'MAXED' : money(selectedRoute.getCost(key)),rect.x+10,rect.y+59);
+        const hover = rectContains(rect,hoverX,hoverY);
+        drawButton(rect, maxedUpg ? COLORS.btnDisabled : COLORS.btn, hover && !maxedUpg);
+
+        ctx.textAlign = 'left';
+        if (hover && !maxedUpg) {
+          ctx.font = 'bold 18px Arial, sans-serif';
+          ctx.fillStyle = COLORS.text;
+          ctx.fillText(upgradeEffectText(selectedRoute,key),rect.x+9,rect.y+15);
+          ctx.font = '18px Arial, sans-serif';
+          ctx.fillStyle = 'rgb(210,255,215)';
+          ctx.fillText(`Cost: ${money(selectedRoute.getCost(key))}`,rect.x+9,rect.y+49);
+        } else {
+          ctx.font = 'bold 19px Arial, sans-serif';
+          ctx.fillStyle = COLORS.text;
+          ctx.fillText(labels[key],rect.x+9,rect.y+8);
+          ctx.font = '17px Arial, sans-serif';
+          ctx.fillStyle = COLORS.text;
+          ctx.fillText(`Lvl ${upg.lvl}/${upg.max}`,rect.x+9,rect.y+34);
+          ctx.fillStyle = maxedUpg ? 'rgb(220,220,220)' : 'rgb(210,255,215)';
+          ctx.fillText(maxedUpg ? 'MAXED' : money(selectedRoute.getCost(key)),rect.x+9,rect.y+58);
+        }
       }
     } else {
-      ctx.font = '36px Arial, sans-serif';
-      ctx.fillStyle = 'rgb(180,180,180)';
-      ctx.fillText('Click a track or city to inspect!',20,700);
+      ctx.font = '30px Arial, sans-serif';
+      ctx.fillStyle = COLORS.muted;
+      ctx.fillText('Click a track or city to inspect!',20,710);
     }
   }
 
   function drawButton(rect, baseColor, hover) {
-    roundRect(rect.x,rect.y,rect.w,rect.h,8,hover ? COLORS.btnHover : baseColor);
+    roundRect(rect.x,rect.y,rect.w,rect.h,9,hover ? COLORS.btnHover : baseColor);
+    ctx.strokeStyle = hover ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.10)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rect.x + .5, rect.y + .5, rect.w - 1, rect.h - 1);
   }
 
   function drawPauseMenu() {
-    ctx.fillStyle = 'rgba(0,0,0,.60)';
+    ctx.fillStyle = 'rgba(0,0,0,.64)';
     ctx.fillRect(0,0,WIDTH,HEIGHT);
 
     ctx.textAlign = 'center';
@@ -698,7 +1367,6 @@
   function loop(ts) {
     let dt = (ts - lastTimestamp) / 1000;
     lastTimestamp = ts;
-    // Avoid giant jumps after the tab was asleep.
     dt = Math.min(dt, 0.05);
     update(dt);
     draw();
