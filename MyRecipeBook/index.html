@@ -6,649 +6,224 @@
 <title>Thomas's Cookbook</title>
 <style>
 :root{
-  --wood1:#4f2f1e;
-  --wood2:#805033;
-  --wood3:#a16b46;
-  --paper:#f4e8ca;
-  --ink:#473729;
-  --muted:#7b6854;
-  --red:#994d43;
-  --green:#5f7258;
-  --gold:#b98a49;
+  --wood1:#4f2f1e;--wood2:#805033;--wood3:#a16b46;--paper:#f4e8ca;--ink:#473729;
+  --muted:#7b6854;--red:#994d43;--green:#5f7258;--gold:#b98a49;--line:#d5bf88;
 }
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%}
+*{box-sizing:border-box} html,body{margin:0;min-height:100%}
 body{
-  padding:40px 18px 60px;
-  color:var(--ink);
-  font-family:Georgia,"Times New Roman",serif;
-  background:
-    repeating-linear-gradient(92deg,rgba(255,255,255,.025) 0 2px,rgba(0,0,0,.025) 3px 5px,transparent 6px 20px),
-    linear-gradient(115deg,var(--wood1),var(--wood2) 48%,var(--wood3) 51%,var(--wood1));
+  padding:36px 18px 58px;color:var(--ink);font-family:Georgia,"Times New Roman",serif;
+  background:repeating-linear-gradient(92deg,rgba(255,255,255,.025) 0 2px,rgba(0,0,0,.025) 3px 5px,transparent 6px 20px),linear-gradient(115deg,var(--wood1),var(--wood2) 48%,var(--wood3) 51%,var(--wood1));
   background-attachment:fixed;
 }
-button{font:inherit}
-.stage{
-  width:min(1120px,100%);
-  margin:auto;
-  position:relative;
-  perspective:2400px;
-}
-.book{
-  position:relative;
-  z-index:20;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  min-height:720px;
-  filter:drop-shadow(0 20px 28px rgba(35,21,12,.42));
-  isolation:isolate;
-}
-.page{
-  position:relative;
-  z-index:10;
-  min-height:720px;
-  overflow:hidden;
-  padding:44px 46px 58px;
-  background:
-    radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),
-    radial-gradient(circle at 78% 74%,rgba(98,69,31,.03) 0 1px,transparent 1.6px),
-    repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),
-    var(--paper);
-  box-shadow:inset 0 0 44px rgba(93,65,31,.08);
-}
-.left-page{
-  border-radius:20px 0 0 20px;
-  box-shadow:inset -28px 0 36px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08);
-}
-.right-page{
-  border-radius:0 20px 20px 0;
-  box-shadow:inset 28px 0 36px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08);
-}
-.page:after{
-  content:"";
-  position:absolute;
-  inset:16px;
-  border:1px solid rgba(138,102,55,.14);
-  pointer-events:none;
-}
-.spine{
-  position:absolute;
-  z-index:45;
-  top:0;bottom:0;left:50%;
-  width:30px;
-  transform:translateX(-50%);
-  pointer-events:none;
-  background:linear-gradient(90deg,rgba(54,34,20,.16),rgba(50,30,17,.28) 35%,rgba(255,255,255,.26) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08));
-  box-shadow:0 0 16px rgba(63,39,22,.16);
-}
-
-/* Persistent bookmark / index tab */
-.bookmark-tab{
-  position:absolute;
-  z-index:140;
-  top:-31px;
-  left:58px;
-  width:92px;
-  height:37px;
-  border:1px solid #59271f;
-  border-bottom:0;
-  border-radius:8px 8px 0 0;
-  background:
-    repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 6px),
-    linear-gradient(#a94e45,#7c302d);
-  color:#fff0d8;
-  font-weight:bold;
-  font-size:.75rem;
-  letter-spacing:.12em;
-  cursor:pointer;
-  box-shadow:0 -2px 7px rgba(32,17,12,.22),inset 0 1px rgba(255,255,255,.18);
-}
-.bookmark-tab:before,
-.bookmark-tab:after{
-  content:"•";
-  position:absolute;
-  top:9px;
-  color:#ddb07b;
-  font-size:.62rem;
-}
-.bookmark-tab:before{left:8px}
-.bookmark-tab:after{right:8px}
-.bookmark-tab:disabled{cursor:default}
-
-.bookmark-tail{
-  position:absolute;
-  top:0;
-  left:73px;
-  width:62px;
-  height:132px;
-  z-index:1;
-  pointer-events:none;
-  background:
-    repeating-linear-gradient(90deg,rgba(255,255,255,.028) 0 1px,transparent 1px 6px),
-    linear-gradient(90deg,#742b29,#a74b42 50%,#742b29);
-  box-shadow:0 3px 7px rgba(49,24,18,.22);
-}
-.bookmark-tail:after{
-  content:"";
-  position:absolute;
-  bottom:-28px;
-  border-left:31px solid #772e2b;
-  border-right:31px solid #772e2b;
-  border-bottom:28px solid transparent;
-}
-.stage.at-index .bookmark-tail{z-index:80}
-.stage:not(.at-index) .bookmark-tail{z-index:1}
-
-/* Turning overlay */
-.turner{
-  display:none;
-  position:absolute;
-  top:0;
-  width:50%;
-  height:100%;
-  z-index:100;
-  transform-style:preserve-3d;
-  pointer-events:none;
-  will-change:transform;
-}
-.turner.forward{
-  display:block;
-  right:0;
-  transform-origin:left center;
-}
-.turner.backward{
-  display:block;
-  left:0;
-  transform-origin:right center;
-}
-.turn-face{
-  position:absolute;
-  inset:0;
-  padding:44px 46px 58px;
-  backface-visibility:hidden;
-  overflow:hidden;
-  background:
-    radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),
-    repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),
-    var(--paper);
-}
-.turner.forward .front{
-  border-radius:0 20px 20px 0;
-  box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
-}
-.turner.forward .back{
-  transform:rotateY(180deg);
-  border-radius:20px 0 0 20px;
-  box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
-}
-.turner.backward .front{
-  border-radius:20px 0 0 20px;
-  box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
-}
-.turner.backward .back{
-  transform:rotateY(180deg);
-  border-radius:0 20px 20px 0;
-  box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18);
-}
-.turner.mid-flip .turn-face{
-  box-shadow:0 10px 24px rgba(38,22,13,.28),inset 0 0 30px rgba(93,65,31,.08);
-}
-
-.eyebrow{
-  color:var(--red);
-  text-transform:uppercase;
-  letter-spacing:.16em;
-  font-size:.77rem;
-  font-weight:bold;
-}
-h1{
-  margin:8px 0 0;
-  font-size:clamp(2.7rem,5vw,4.5rem);
-  line-height:.96;
-  letter-spacing:-.04em;
-  font-weight:normal;
-}
-h2{font-weight:normal;margin:0}
-.title-rule{
-  height:3px;
-  max-width:220px;
-  margin:12px auto 26px;
-  background:linear-gradient(90deg,transparent,var(--red) 15%,var(--red) 85%,transparent);
-}
-.subtitle{
-  max-width:420px;
-  margin:18px 0 28px;
-  color:var(--muted);
-  font-size:1.06rem;
-  line-height:1.58;
-  font-style:italic;
-}
-.note{
-  margin-top:28px;
-  padding:20px 22px 18px;
-  background:#f7edcf;
-  border:1px solid #d8bd7f;
-  border-radius:4px;
-  box-shadow:0 4px 10px rgba(82,58,29,.14),inset 0 0 16px rgba(122,90,43,.08);
-  transform:rotate(-.45deg);
-  position:relative;
-}
-.note:before{
-  content:"";
-  position:absolute;
-  width:62px;height:19px;top:-10px;left:50%;
-  transform:translateX(-50%) rotate(1deg);
-  background:rgba(213,187,125,.56);
-}
-.note strong{color:var(--red)}
-.footer-stamp{
-  margin-top:34px;
-  text-align:center;
-  color:#8a6d4a;
-  font-size:.71rem;
-  letter-spacing:.15em;
-  text-transform:uppercase;
-}
-.heading-row{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin-bottom:20px;
-}
-.heading-row h2{font-size:2.08rem}
-.flourish{flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}
-.legend{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin:-7px 0 19px;
-  color:var(--green);
-  font-size:.83rem;
-  font-style:italic;
-}
-.lf{
-  width:23px;height:23px;
-  display:inline-grid;place-items:center;
-  border-radius:50%;
-  border:1px solid rgba(81,103,74,.72);
-  background:rgba(226,234,213,.55);
-  color:var(--green);
-  font-size:.7rem;
-  font-weight:bold;
-  flex:0 0 auto;
-}
-.index-list{display:grid;gap:12px}
-.index-card{
-  width:100%;
-  appearance:none;
-  border:1px solid #cbb57f;
-  border-radius:5px;
-  background:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.07)),#efdfb8;
-  color:var(--ink);
-  padding:14px 16px 13px 19px;
-  text-align:left;
-  cursor:pointer;
-  box-shadow:0 3px 7px rgba(85,61,29,.13),inset 0 1px rgba(255,255,255,.72);
-  transition:transform .12s ease,box-shadow .12s ease;
-  position:relative;
-}
-.index-card:before{
-  content:"";
-  position:absolute;left:8px;top:7px;bottom:7px;width:2px;
-  border-left:1px solid rgba(160,75,63,.5);
-  border-right:1px solid rgba(160,75,63,.18);
-}
-.index-card:hover{transform:translateY(-2px);box-shadow:0 6px 10px rgba(85,61,29,.18)}
-.index-top{display:flex;align-items:center;gap:8px;padding-right:34px}
-.index-name{font-weight:bold;font-size:1.08rem}
-.index-meta{display:block;margin-top:3px;color:var(--muted);font-size:.81rem;font-style:italic;padding-left:31px}
-.index-meta.no-lf{padding-left:0}
-.index-num{
-  position:absolute;right:14px;top:50%;transform:translateY(-50%);
-  color:#9a7c57;font-size:.83rem;font-style:italic;
-}
-.recipe-title{
-  display:flex;
-  align-items:flex-start;
-  gap:11px;
-  margin:7px 0 8px;
-}
-.recipe-title h2{
-  font-size:2.45rem;
-  line-height:1.06;
-}
-.category{
-  color:var(--muted);
-  font-size:.88rem;
-  font-style:italic;
-  margin:0 0 22px 34px;
-}
-.category.no-lf{margin-left:0}
-.section-label{
-  margin:0 0 10px;
-  color:var(--red);
-  font-size:.76rem;
-  font-weight:bold;
-  text-transform:uppercase;
-  letter-spacing:.14em;
-}
-.ingredients{
-  border-top:1px solid rgba(156,74,62,.34);
-  padding-top:17px;
-}
-.ingredient-card{
-  min-height:390px;
-  padding:17px 18px;
-  border:1px solid #d5bf88;
-  background:rgba(249,239,211,.66);
-  box-shadow:inset 0 0 18px rgba(119,87,42,.06);
-}
-.blank-list{margin:0;padding:0;list-style:none}
-.blank-list li{height:32px;border-bottom:1px solid rgba(101,118,136,.18)}
-.instructions-head{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin-bottom:16px;
-}
-.instructions-head h2{font-size:2rem}
-.instruction-lines{
-  min-height:520px;
-  background:repeating-linear-gradient(to bottom,transparent 0 31px,rgba(99,117,138,.19) 31px 32px);
-  border-top:1px solid rgba(156,74,62,.35);
-}
-.coming{
-  color:#8e7a63;
-  font-style:italic;
-  line-height:1.55;
-  margin:0 0 8px;
-}
-.page-num{
-  position:absolute;
-  bottom:22px;
-  color:#8c765b;
-  font-size:.78rem;
-  font-style:italic;
-}
-.left-page .page-num{left:28px}
-.right-page .page-num{right:28px}
-.turn-face .page-num{display:none}
-.nav{
-  position:absolute;
-  z-index:130;
-  top:50%;
-  transform:translateY(-50%);
-  width:51px;height:51px;
-  border-radius:50%;
-  border:1px solid rgba(64,38,22,.45);
-  background:linear-gradient(#b47a52,#7e4c32);
-  color:#fff4dc;
-  cursor:pointer;
-  font-size:1.65rem;
-  box-shadow:0 5px 12px rgba(38,23,14,.3),inset 0 1px rgba(255,255,255,.22);
-}
-.nav.prev{left:-68px}
-.nav.next{right:-68px}
-.nav:disabled{opacity:.28;cursor:default}
-.progress{
-  position:absolute;
-  z-index:130;
-  bottom:-34px;
-  right:6px;
-  color:#f3e4c7;
-  font-size:.82rem;
-  text-shadow:0 1px 2px rgba(42,27,17,.45);
-}
-@media(max-width:1280px){
-  .nav{top:auto;bottom:12px;transform:none;width:44px;height:44px}
-  .nav.prev{left:10px}.nav.next{right:10px}
-  .progress{bottom:26px;right:65px;color:#7c654c;text-shadow:none}
-}
-@media(max-width:830px){
-  body{padding:42px 10px 56px}
-  .book{display:block;min-height:0}
-  .page{min-height:650px;padding:40px 26px 56px}
-  .left-page{border-radius:16px 16px 0 0;box-shadow:inset 0 -25px 34px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08)}
-  .right-page{border-radius:0 0 16px 16px;box-shadow:inset 0 25px 34px rgba(72,46,27,.08),inset 0 0 44px rgba(93,65,31,.08)}
-  .spine{top:50%;left:0;right:0;width:auto;height:28px;transform:translateY(-50%);background:linear-gradient(0deg,rgba(54,34,20,.16),rgba(50,30,17,.25) 35%,rgba(255,255,255,.25) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08))}
-  .turner{display:none!important}
-  .bookmark-tab{left:28px}
-  .bookmark-tail{left:43px}
-}
-@media(max-width:520px){
-  h1{font-size:2.8rem}
-  .recipe-title h2{font-size:2.08rem}
-  .heading-row h2,.instructions-head h2{font-size:1.85rem}
-}
+button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);margin:auto;position:relative;perspective:2400px}
+.top-actions{display:flex;justify-content:space-between;align-items:center;margin:0 2px 10px;gap:10px}
+.home-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(64,38,22,.45);border-radius:999px;padding:10px 16px;background:linear-gradient(#b47a52,#7e4c32);color:#fff4dc;box-shadow:0 5px 12px rgba(38,23,14,.3),inset 0 1px rgba(255,255,255,.22)}
+.book{position:relative;z-index:20;display:grid;grid-template-columns:1fr 1fr;height:780px;filter:drop-shadow(0 20px 28px rgba(35,21,12,.42));isolation:isolate}
+.page{position:relative;z-index:10;height:780px;overflow:hidden;padding:40px 42px 54px;background:radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),radial-gradient(circle at 78% 74%,rgba(98,69,31,.03) 0 1px,transparent 1.6px),repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),var(--paper);box-shadow:inset 0 0 44px rgba(93,65,31,.08)}
+.left-page{border-radius:20px 0 0 20px;box-shadow:inset -28px 0 36px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08)}
+.right-page{border-radius:0 20px 20px 0;box-shadow:inset 28px 0 36px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08)}
+.page:after{content:"";position:absolute;inset:16px;border:1px solid rgba(138,102,55,.14);pointer-events:none}.spine{position:absolute;z-index:45;top:0;bottom:0;left:50%;width:30px;transform:translateX(-50%);pointer-events:none;background:linear-gradient(90deg,rgba(54,34,20,.16),rgba(50,30,17,.28) 35%,rgba(255,255,255,.26) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08));box-shadow:0 0 16px rgba(63,39,22,.16)}
+.bookmark-wrap{position:absolute;z-index:150;top:-20px;right:36px;width:122px;height:118px}.bookmark-tab{position:relative;width:122px;height:118px;border:1px solid #5d241e;border-radius:13px 13px 0 0;background:linear-gradient(180deg,#bd5a4e 0%,#a2483f 52%,#87352f 100%);color:#fff3dc;font-weight:bold;font-size:.79rem;line-height:1.04;letter-spacing:.1em;cursor:pointer;box-shadow:0 4px 11px rgba(32,17,12,.28),inset 0 1px rgba(255,255,255,.2);padding:12px 10px 46px;clip-path:polygon(0 0,100% 0,100% 100%,50% 84%,0 100%)}.bookmark-tab small{display:block;margin-top:4px;font-size:.59rem;letter-spacing:.13em;color:#f5dbc0}.bookmark-tab:before,.bookmark-tab:after{content:"✦";position:absolute;top:13px;color:#f0c690;font-size:.58rem}.bookmark-tab:before{left:8px}.bookmark-tab:after{right:8px}.bookmark-tab:disabled{cursor:default;opacity:.78}.bookmark-tail{display:none}
+.turner{display:none;position:absolute;top:0;width:50%;height:100%;z-index:100;transform-style:preserve-3d;pointer-events:none;will-change:transform}.turner.forward{display:block;right:0;transform-origin:left center}.turner.backward{display:block;left:0;transform-origin:right center}.turn-face{position:absolute;inset:0;padding:40px 42px 54px;backface-visibility:hidden;overflow:hidden;background:radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),var(--paper)}.turner.forward .front{border-radius:0 20px 20px 0;box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.forward .back{transform:rotateY(180deg);border-radius:20px 0 0 20px;box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.backward .front{border-radius:20px 0 0 20px;box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.backward .back{transform:rotateY(180deg);border-radius:0 20px 20px 0;box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.mid-flip .turn-face{box-shadow:0 10px 24px rgba(38,22,13,.28),inset 0 0 30px rgba(93,65,31,.08)}
+.eyebrow{color:var(--red);text-transform:uppercase;letter-spacing:.16em;font-size:.77rem;font-weight:bold}.cover-page{text-align:center;padding-top:18px}.cover-page .eyebrow{text-align:center}.cover-page h1{margin:14px auto 0;font-size:clamp(2.9rem,5vw,4.6rem);line-height:.96;letter-spacing:-.04em;font-weight:normal}.title-rule{height:3px;max-width:260px;margin:14px auto 22px;background:linear-gradient(90deg,transparent,var(--red) 15%,var(--red) 85%,transparent)}.subtitle{max-width:430px;margin:18px auto 28px;color:var(--muted);font-size:1.06rem;line-height:1.58;font-style:italic}.note{margin:28px auto 0;max-width:430px;padding:20px 22px 18px;background:#f7edcf;border:1px solid #d8bd7f;border-radius:4px;box-shadow:0 4px 10px rgba(82,58,29,.14),inset 0 0 16px rgba(122,90,43,.08);transform:rotate(-.35deg);position:relative;text-align:left}.note:before{content:"";position:absolute;width:62px;height:19px;top:-10px;left:50%;transform:translateX(-50%) rotate(1deg);background:rgba(213,187,125,.56)}.note strong{color:var(--red)}.footer-stamp{margin-top:34px;text-align:center;color:#8a6d4a;font-size:.71rem;letter-spacing:.15em;text-transform:uppercase}
+.heading-row,.instructions-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}.heading-row h2,.instructions-head h2{font-size:2rem;font-weight:normal;margin:0}.flourish{flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}.legend{display:flex;align-items:center;gap:8px;margin:-4px 0 16px;color:var(--green);font-size:.83rem;font-style:italic}.lf{width:23px;height:23px;display:inline-grid;place-items:center;border-radius:50%;border:1px solid rgba(81,103,74,.72);background:rgba(226,234,213,.55);color:var(--green);font-size:.7rem;font-weight:bold;flex:0 0 auto}
+.index-list{display:grid;gap:12px}.index-card{width:100%;appearance:none;border:1px solid #cbb57f;border-radius:5px;background:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.07)),#efdfb8;color:var(--ink);padding:14px 16px 13px 19px;text-align:left;cursor:pointer;box-shadow:0 3px 7px rgba(85,61,29,.13),inset 0 1px rgba(255,255,255,.72);transition:transform .12s ease,box-shadow .12s ease;position:relative}.index-card:before{content:"";position:absolute;left:8px;top:7px;bottom:7px;width:2px;border-left:1px solid rgba(160,75,63,.5);border-right:1px solid rgba(160,75,63,.18)}.index-card:hover{transform:translateY(-2px);box-shadow:0 6px 10px rgba(85,61,29,.18)}.index-top{display:flex;align-items:center;gap:8px;padding-right:34px}.index-name{font-weight:bold;font-size:1.08rem}.index-meta{display:block;margin-top:3px;color:var(--muted);font-size:.81rem;font-style:italic;padding-left:31px}.index-meta.no-lf{padding-left:0}.index-num{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#9a7c57;font-size:.83rem;font-style:italic}
+.recipe-title{display:flex;align-items:flex-start;gap:11px;margin:4px 0 6px}.recipe-title h2{font-size:2rem;line-height:1.04;font-weight:normal;margin:0}.category{color:var(--muted);font-size:.88rem;font-style:italic;margin:0 0 10px 34px}.category.no-lf{margin-left:0}.summary-card,.ingredient-card,.step-card,.options-card{border:1px solid var(--line);background:rgba(249,239,211,.72);box-shadow:inset 0 0 18px rgba(119,87,42,.06);border-radius:6px}.summary-card{padding:12px 14px;margin-bottom:10px}.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}.summary-pill{padding:8px 9px;background:rgba(255,250,242,.58);border:1px solid rgba(180,142,83,.35);border-radius:999px;text-align:center;font-size:.93rem}.summary-pill strong{display:block;font-size:.68rem;color:var(--red);letter-spacing:.11em;text-transform:uppercase;margin-bottom:2px}.scale-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.scale-buttons,.option-buttons{display:flex;gap:7px;flex-wrap:wrap}.scale-btn,.option-btn{border:1px solid #b88c54;background:linear-gradient(#f5e9c6,#e4cc97);color:var(--ink);border-radius:999px;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.7)}.scale-btn{padding:6px 11px;font-size:.9rem}.option-buttons{gap:4px}.option-btn{padding:3px 6px;font-size:.70rem;white-space:nowrap}.scale-btn.active,.option-btn.active{background:linear-gradient(#b05d4f,#8b3931);color:#fff4dc;border-color:#7b3028}.scale-note,.small-note{font-size:.78rem;color:var(--muted);line-height:1.38}.section-label{margin:0 0 8px;color:var(--red);font-size:.74rem;font-weight:bold;text-transform:uppercase;letter-spacing:.14em}.ingredients{border-top:1px solid rgba(156,74,62,.34);padding-top:12px}.ingredient-card{height:438px;overflow:auto;padding:12px 13px}.step-card{height:656px;overflow:auto;padding:13px 14px}.options-card{padding:10px 12px;margin-bottom:10px}.options-card .section-label{margin-bottom:7px}.options-hint{font-size:.76rem;color:var(--muted);margin-bottom:7px}.group-block + .group-block{margin-top:13px;padding-top:9px;border-top:1px dashed rgba(165,125,78,.45)}.group-title{font-size:.9rem;font-weight:bold;color:#6d5135;margin:0 0 7px}.checklist{list-style:none;margin:0;padding:0;display:grid;gap:7px}.check{display:flex;align-items:flex-start;gap:9px;line-height:1.31}.check input{accent-color:#7c302d;margin-top:3px;flex:0 0 auto}.check span{font-size:.92rem}.muted{color:var(--muted);font-style:italic}.step-section + .step-section{margin-top:15px;padding-top:11px;border-top:1px dashed rgba(165,125,78,.45)}.step-section h3{font-size:1rem;color:#6d5135;margin:0 0 8px}.step-list{list-style:none;margin:0;padding:0;display:grid;gap:9px}.step-list .check span b{display:inline-block;min-width:1.2em;color:var(--red)}.page-num{position:absolute;bottom:22px;color:#8c765b;font-size:.78rem;font-style:italic}.left-page .page-num{left:28px}.right-page .page-num{right:28px}.turn-face .page-num{display:none}.nav{position:absolute;z-index:130;top:50%;transform:translateY(-50%);width:51px;height:51px;border-radius:50%;border:1px solid rgba(64,38,22,.45);background:linear-gradient(#b47a52,#7e4c32);color:#fff4dc;cursor:pointer;font-size:1.65rem;box-shadow:0 5px 12px rgba(38,23,14,.3),inset 0 1px rgba(255,255,255,.22)}.nav.prev{left:-68px}.nav.next{right:-68px}.nav:disabled{opacity:.28;cursor:default}.progress{position:absolute;z-index:130;bottom:-34px;right:6px;color:#f3e4c7;font-size:.82rem;text-shadow:0 1px 2px rgba(42,27,17,.45)}.placeholder-box{height:520px;padding:16px;border:1px dashed rgba(165,125,78,.55);background:rgba(255,255,255,.18);color:#816b55;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.5}
+@media(max-width:1280px){.nav{top:auto;bottom:12px;transform:none;width:44px;height:44px}.nav.prev{left:10px}.nav.next{right:10px}.progress{bottom:26px;right:65px;color:#7c654c;text-shadow:none}}
+@media(max-width:900px){body{padding:28px 10px 56px}.book{display:block;height:auto}.page{height:720px;padding:36px 24px 52px}.left-page{border-radius:16px 16px 0 0}.right-page{border-radius:0 0 16px 16px}.spine{top:720px;left:0;right:0;width:auto;height:28px;transform:translateY(-50%);background:linear-gradient(0deg,rgba(54,34,20,.16),rgba(50,30,17,.25) 35%,rgba(255,255,255,.25) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08))}.turner{display:none!important}.bookmark-wrap{right:18px;top:-16px;width:110px;height:108px}.bookmark-tab{width:110px;height:108px}.summary-grid{grid-template-columns:1fr}.ingredient-card{height:378px}.step-card{height:590px}}
+@media(max-width:560px){.top-actions{flex-direction:column;align-items:stretch}.bookmark-wrap{right:12px;width:104px}.bookmark-tab{width:104px}.cover-page h1{font-size:2.5rem}.recipe-title h2{font-size:1.75rem}.heading-row h2,.instructions-head h2{font-size:1.6rem}}
 </style>
 </head>
 <body>
 <main class="stage at-index" id="stage">
-  <div class="bookmark-tail" aria-hidden="true"></div>
-  <button class="bookmark-tab" id="bookmarkIndex" type="button" title="Return to recipe index">INDEX</button>
-
+  <div class="top-actions"><a class="home-btn" href="https://thomaslab.me">← Home</a><div></div></div>
+  <div class="bookmark-wrap"><button class="bookmark-tab" id="bookmarkIndex" type="button" title="Return to recipe index">RECIPE INDEX<small>jump back</small></button><div class="bookmark-tail"></div></div>
   <button class="nav prev" id="prevBtn" type="button" aria-label="Previous recipe">‹</button>
   <button class="nav next" id="nextBtn" type="button" aria-label="Next recipe">›</button>
-
   <section class="book" aria-live="polite">
-    <article class="page left-page" id="leftPage"></article>
-    <article class="page right-page" id="rightPage"></article>
-    <div class="spine" aria-hidden="true"></div>
-
-    <div class="turner" id="turner" aria-hidden="true">
-      <div class="turn-face front" id="turnFront"></div>
-      <div class="turn-face back" id="turnBack"></div>
-    </div>
+    <article class="page left-page" id="leftPage"></article><article class="page right-page" id="rightPage"></article><div class="spine" aria-hidden="true"></div>
+    <div class="turner" id="turner" aria-hidden="true"><div class="turn-face front" id="turnFront"></div><div class="turn-face back" id="turnBack"></div></div>
   </section>
-
   <div class="progress" id="progress">Title + Index</div>
 </main>
-
 <script>
 (() => {
   const recipes = [
-    {name:"20 Layer Nacho Dip", category:"Dips & party food", lf:true},
-    {name:"Basil Pesto", category:"Sauces & spreads", lf:true},
-    {name:"French Onion Soup", category:"Soups", lf:true},
-    {name:"Tzatziki Sauce", category:"Sauces & dips", lf:true},
-    {name:"Navy Bean and Bacon Soup", category:"Soups", lf:true},
-    {name:"Dumpling Soup", category:"Soups", lf:true},
-    {name:"Goat Cheese Pizza", category:"Pizza & mains", lf:false}
+    {
+      name:"17+ Layer Nacho Dip", type:"Main", lf:true, scales:[0.5,1,2], servings:10, baseCalories:9000,
+      summaryNote:"For party portions, plan on roughly twice the displayed serving count.",
+      ingredients:[
+        {id:"beef",qty:2,unit:"lb",item:"ground beef",packQty:1,packPrice:4.50},
+        {id:"taco",qty:2,unit:"packet",item:"taco seasoning",packQty:1,packPrice:.89},
+        {id:"refried",qty:1,unit:"can",item:"regular refried beans",note:"about 16 oz",packQty:1,packPrice:1.29},
+        {id:"refriedblack",qty:1,unit:"can",item:"refried black beans",note:"about 16 oz",packQty:1,packPrice:1.49},
+        {id:"blackbeans",qty:1,unit:"can",item:"black beans",note:"about 15 oz, drained",packQty:1,packPrice:1.09},
+        {id:"peppers",qty:3,unit:"",item:"bell peppers",packQty:3,packPrice:3.29},
+        {id:"onions",qty:4,unit:"",item:"medium yellow onions",packQty:6,packPrice:3.49},
+        {id:"rotel",qty:1,unit:"can",item:"diced tomatoes with green chilies",note:"about 10 oz, drained",packQty:1,packPrice:1.49},
+        {id:"greenchiles",qty:1,unit:"small can",item:"diced green chilies",note:"about 4 oz",packQty:1,packPrice:1.29},
+        {id:"salsa",qty:1,unit:"cup",item:"thick salsa",note:"about 8 oz",packQty:2,packPrice:2.49},
+        {id:"corn",qty:2,unit:"can",item:"Mexican street corn",packQty:1,packPrice:2.39},
+        {id:"mozz",qty:1,unit:"cup",item:"lactose-free mozzarella",note:"roughly 4 oz per cup; sold in ~8 oz bags",packQty:2,packPrice:4.49},
+        {id:"cheddar",qty:1,unit:"bag",item:"lactose-free cheddar",note:"about 8 oz",packQty:1,packPrice:4.49},
+        {id:"guac",qty:1,unit:"container",item:"guacamole",note:"about 12–16 oz",packQty:1,packPrice:4.99},
+        {id:"sourcream",qty:1,unit:"container",item:"lactose-free sour cream",note:"about 16 oz",packQty:1,packPrice:4.99},
+        {id:"lettuce",qty:1,unit:"small bag",item:"shredded lettuce",note:"about 8 oz",packQty:1,packPrice:2.49},
+        {id:"pico",qty:2,unit:"container",item:"fresh pico de gallo",note:"about 10–12 oz each",packQty:1,packPrice:3.29},
+        {id:"greenonion",qty:1,unit:"bunch",item:"green onions",packQty:1,packPrice:1.09},
+        {id:"cilantro",qty:1,unit:"bunch",item:"cilantro",packQty:1,packPrice:.99},
+        {id:"chips",qty:1,unit:"bag",item:"tortilla chips or Doritos",note:"about 9–13 oz",packQty:1,packPrice:3.49},
+
+        {id:"pinto",qty:1,unit:"can",item:"pinto beans",note:"drained",packQty:1,packPrice:1.09,alt:"pinto"},
+        {id:"hominy",qty:1,unit:"can",item:"hominy",note:"drained",packQty:1,packPrice:1.59,alt:"hominy"},
+        {id:"rice",qty:1,unit:"pouch",item:"prepared Mexican rice",packQty:1,packPrice:2.49,alt:"rice"},
+        {id:"pineapple",qty:1,unit:"small can",item:"pineapple",note:"drained",packQty:1,packPrice:1.49,alt:"pineapple"},
+        {id:"olives",qty:1,unit:"can",item:"sliced olives",note:"drained",packQty:1,packPrice:1.49,alt:"olives"},
+        {id:"pickled",qty:1,unit:"jar",item:"pickled red onions",note:"drained",packQty:1,packPrice:4.99,alt:"pickled"},
+        {id:"enchilada",qty:1,unit:"small can",item:"red enchilada sauce",note:"use lightly",packQty:1,packPrice:1.49,alt:"enchilada"},
+        {id:"slawmix",qty:1,unit:"bag",item:"coleslaw mix",note:"about 12–14 oz",packQty:1,packPrice:2.00,alt:"slaw"},
+        {id:"slawlime",qty:2,unit:"",item:"limes",packQty:1,packPrice:.50,alt:"slaw"},
+        {id:"slawoil",qty:1,unit:"tbsp",item:"olive or neutral oil",packQty:34,packPrice:6.99,staple:true,alt:"slaw"},
+        {id:"slawsalt",qty:.5,unit:"tsp",item:"salt",packQty:150,packPrice:2.49,staple:true,alt:"slaw"},
+        {id:"slawcumin",qty:.5,unit:"tsp",item:"cumin",packQty:12,packPrice:2.49,staple:true,alt:"slaw"},
+        {id:"slawgarlic",qty:.5,unit:"tsp",item:"garlic powder",packQty:20,packPrice:2.49,staple:true,alt:"slaw"},
+        {id:"slawsugar",qty:.5,unit:"tsp",item:"sugar or honey",packQty:100,packPrice:3.49,staple:true,alt:"slaw"}
+      ],
+      alternatives:[
+        {id:"pinto",label:"Pinto",calories:350},{id:"hominy",label:"Hominy",calories:300},{id:"rice",label:"Rice",calories:450},{id:"pineapple",label:"Pineapple",calories:200},
+        {id:"olives",label:"Olives",calories:150},{id:"pickled",label:"Pickled onions",calories:100},{id:"enchilada",label:"Red sauce",calories:100},{id:"slaw",label:"Lime slaw",calories:400}
+      ],
+      optionsLabel:"Add-ons",
+      prepSteps:[
+        "Brown the ground beef, drain off excess grease, and stir in the taco seasoning.",
+        "Slice the onions and caramelize them over medium-low heat until very soft and deeply browned.",
+        "Roast or sauté the bell peppers until tender, then chop them.",
+        "Drain the beans, diced tomatoes, green chilies, and any selected canned add-ons.",
+        ctx=>`Heat the Mexican street corn in a saucepan and melt ${qtyWords(ctx.scale)} cup${ctx.scale>1?'s':''} of cheese into it until creamy.`,
+        {alt:"slaw",text:"Whisk together the lime juice, oil, salt, cumin, garlic powder, and sugar or honey for the slaw dressing. Keep it separate from the cabbage until serving."}
+      ],
+      cookSteps:[
+        "Heat the oven to 375°F.",
+        ctx=>`Layer the refried beans, refried black beans, ground beef, black beans, bell peppers, caramelized onions, diced tomatoes, green chilies, salsa, cheesy street corn${bakedAddonPhrase(ctx.alts)} in ${dipDishText(ctx.scale)}.`,
+        "Spread the lactose-free cheddar over the top.",
+        "Bake for about 40 minutes, until the center is thoroughly hot and the cheese is melted.",
+        "Let the dip rest for about 10 minutes.",
+        {when:ctx=>ctx.alts.olives||ctx.alts.pickled,text:ctx=>`Add ${afterBakePhrase(ctx.alts)} after baking.`},
+        ctx=>`Serve guacamole, sour cream, lettuce, pico de gallo, green onions, cilantro, and tortilla chips or Doritos separately${ctx.alts.slaw?', along with the lime slaw':''}.`
+      ]
+    },
+    {
+      name:"Basil Pesto", type:"Sauce", lf:true, scales:[0.5,1,2], servings:6,
+      ingredients:[
+        {id:"basil",qty:3,unit:"packed cup",item:"fresh basil leaves",note:scale=>`about ${qtyWords(3*scale)} oz of leaves`,packQty:3,packPrice:4.99},
+        {id:"garlic",qty:4,unit:"",item:"garlic cloves",packQty:10,packPrice:.79},
+        {id:"pinenuts",qty:.25,unit:"cup",item:"pine nuts",note:scale=>`about ${qtyWords(1.25*scale)} oz`,packQty:.4,packPrice:6.99,excludeWhen:"walnuts"},
+        {id:"walnuts",qty:.25,unit:"cup",item:"walnuts",note:scale=>`about ${qtyWords(1*scale)} oz`,packQty:3,packPrice:4.49,alt:"walnuts"},
+        {id:"parm",qty:.75,unit:"cup",item:"dairy-free Parmesan",note:scale=>`about ${qtyWords(3*scale)} oz shredded`,packQty:1,packPrice:5.49},
+        {id:"lime",qty:.5,unit:"tbsp",item:"fresh lime juice",note:"from about 1 lime",packQty:2,packPrice:.69},
+        {id:"salt",qty:.5,unit:"tsp",item:"coarse salt",packQty:150,packPrice:2.49,staple:true},
+        {id:"pepper",qty:.5,unit:"tsp",item:"black pepper",packQty:30,packPrice:3.49,staple:true},
+        {id:"oil",qty:.5,unit:"cup",item:"olive oil",packQty:2.1,packPrice:6.99,staple:true},
+        {id:"butter",qty:.25,unit:"cup",item:"melted butter",packQty:2,packPrice:4.49,staple:true}
+      ],
+      alternatives:[{id:"walnuts",label:"Use walnuts instead"}], optionsLabel:"Swap",
+      prepSteps:["Wash and dry the basil thoroughly and remove any thick stems.","Peel the garlic cloves.","Melt the butter and measure the olive oil so both are ready to stream into the processor."],
+      cookSteps:[
+        ctx=>`Place the basil, garlic, ${ctx.alts.walnuts?'walnuts':'pine nuts'}, dairy-free Parmesan, lime juice, salt, and black pepper in a food processor.`,
+        "Pulse until the mixture becomes a coarse, even crumble.",
+        "Run the processor continuously and slowly stream in the olive oil, followed by the melted butter.",
+        "Process just until the pesto becomes smooth and cohesive.",
+        "For pasta, reserve about 1/2 cup of pasta water before draining, then toss the pesto with the hot pasta and add pasta water a little at a time until the sauce turns glossy and coats the noodles."
+      ]
+    },
+    {
+      name:"French Onion Soup", type:"Soup", lf:true, scales:[0.5,1,2], servings:6,
+      ingredients:[
+        {id:"onions",qty:7,unit:"",item:"large yellow onions",packQty:1,packPrice:.79},
+        {id:"butter",qty:3,unit:"tbsp",item:"butter",packQty:32,packPrice:4.49,staple:true},
+        {id:"oil",qty:2,unit:"tbsp",item:"olive oil",packQty:34,packPrice:6.99,staple:true},
+        {id:"broth",qty:2,unit:"carton",item:"beef or chicken broth",note:"32 oz each",packQty:1,packPrice:2.99},
+        {id:"baguette",qty:1,unit:"",item:"large baguette",packQty:1,packPrice:2.49},
+        {id:"cheese",qty:1,unit:"bag",item:"dairy-free shredded cheese",note:"about 7–8 oz",packQty:1,packPrice:4.49}
+      ],
+      prepSteps:["Thinly slice the onions.","Slice the baguette into rounds.","Set out broiler-safe bowls for serving."],
+      cookSteps:[
+        "Melt the butter and olive oil in a large pot over medium heat.",
+        "Add the onions and cook them slowly until deeply browned and completely soft.",
+        "Pour in the broth, bring to a gentle simmer, and cook on low until the flavor is rich and developed.",
+        "Toast the baguette rounds until crisp.",
+        "Ladle the hot soup into broiler-safe bowls, top each with toasted baguette and dairy-free cheese, and broil just until the cheese is melted and bubbly."
+      ]
+    },
+    {
+      name:"Dairy-Free Tzatziki", type:"Sauce", lf:true, scales:[1,2,3,4], servings:6,
+      ingredients:[
+        {id:"yogurt",qty:1,unit:"cup",item:"plain unsweetened cashew yogurt",note:"about 8 oz",packQty:2,packPrice:5.49},
+        {id:"cucumber",qty:.5,unit:"",item:"medium cucumber",packQty:1,packPrice:.99},
+        {id:"garlic",qty:2,unit:"",item:"garlic cloves",packQty:10,packPrice:.79},
+        {id:"lemon",qty:1,unit:"tbsp",item:"lemon juice",note:"from about 1/2 lemon",packQty:2,packPrice:.69},
+        {id:"vinegar",qty:1,unit:"tsp",item:"vinegar",packQty:100,packPrice:3.49,staple:true},
+        {id:"oil",qty:1,unit:"tbsp",item:"olive oil",packQty:34,packPrice:6.99,staple:true},
+        {id:"dill",qty:2,unit:"tsp",item:"dried dill",packQty:12,packPrice:2.49,staple:true},
+        {id:"salt",qty:1,unit:"tsp",item:"salt",packQty:150,packPrice:2.49,staple:true},
+        {id:"pepper",qty:.5,unit:"tsp",item:"black pepper",packQty:30,packPrice:3.49,staple:true},
+        {id:"oregano",qty:.5,unit:"tsp",item:"dried oregano",packQty:12,packPrice:2.49,staple:true}
+      ],
+      prepSteps:["Grate about half a cucumber.","Sprinkle the cucumber with a little of the measured salt and let it sit for 5–10 minutes.","Wrap the cucumber in a clean towel or paper towels and squeeze out as much water as possible.","Grate or mince the garlic very finely."],
+      cookSteps:["Combine the yogurt, squeezed cucumber, garlic, lemon juice, vinegar, olive oil, dill, oregano, salt, and black pepper.","Mix thoroughly until evenly combined.","Refrigerate for at least 20–30 minutes.","Stir again before serving.","If the finished tzatziki is thinner than desired, strain it briefly before serving."]
+    },
+    {name:"Navy Bean and Bacon Soup",type:"Soup",lf:true,placeholder:true},
+    {name:"Dumpling Soup",type:"Soup",lf:true,placeholder:true},
+    {name:"Goat Cheese Pizza",type:"Main",lf:false,placeholder:true}
   ];
 
-  const stage = document.getElementById("stage");
-  const leftPage = document.getElementById("leftPage");
-  const rightPage = document.getElementById("rightPage");
-  const turner = document.getElementById("turner");
-  const turnFront = document.getElementById("turnFront");
-  const turnBack = document.getElementById("turnBack");
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
-  const bookmarkIndex = document.getElementById("bookmarkIndex");
-  const progress = document.getElementById("progress");
+  const stage=document.getElementById("stage"),leftPage=document.getElementById("leftPage"),rightPage=document.getElementById("rightPage"),turner=document.getElementById("turner"),turnFront=document.getElementById("turnFront"),turnBack=document.getElementById("turnBack"),prevBtn=document.getElementById("prevBtn"),nextBtn=document.getElementById("nextBtn"),bookmarkIndex=document.getElementById("bookmarkIndex"),progress=document.getElementById("progress");
+  const STORAGE_KEY="thomasCookbookV8State";
+  const freshState=()=>({scale:{},ingredients:{},steps:{},alts:{}});
+  let state=freshState();
+  try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");if(saved)state={...freshState(),...saved}}catch(e){}
+  const saveState=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(e){}};
 
-  let current = 0;
-  let busy = false;
+  let current=0,busy=false;
+  const FRAME_MS=16,FORWARD_ANGLES=[-15,-30,-45,-60,-75,-90,-105,-120,-135,-150,-165,-180],BACKWARD_ANGLES=[15,30,45,60,75,90,105,120,135,150,165,180];
+  const lfIcon=()=>'<span class="lf" title="Lactose free">LF</span>';
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  function defaultScale(index){if(!state.scale[index])state.scale[index]=1;return state.scale[index]}
+  function checkBucket(kind,index){if(!state[kind][index])state[kind][index]={};return state[kind][index]}
+  function altBucket(index){if(!state.alts[index])state.alts[index]={};return state.alts[index]}
+  function roundQuarter(n){return Math.round(n*4)/4}
+  function roundHalf(n){return Math.round(n*2)/2}
+  function formatQty(num){const n=roundQuarter(num),w=Math.trunc(n),f=Math.round((n-w)*4),m={0:"",1:"1/4",2:"1/2",3:"3/4"};if(f===0)return String(w);if(w===0)return m[f];return `${w} ${m[f]}`}
+  function qtyWords(n){return formatQty(n)}
+  function pluralize(unit,qty){if(!unit)return "";const n=roundQuarter(qty);if(["tsp","tbsp","cup","lb","oz"].includes(unit))return unit;if(unit==="packed cup")return n===1?"packed cup":"packed cups";if(unit==="small can")return n===1?"small can":"small cans";if(unit==="small bag")return n===1?"small bag":"small bags";if(n===1)return unit;if(unit.endsWith("s"))return unit;if(unit==="bunch")return "bunches";return unit+"s"}
+  function money(v){return `$${Math.round(v)}`}
+  function isActive(ing,index){const alts=altBucket(index);if(ing.excludeWhen&&alts[ing.excludeWhen])return false;return !ing.alt||!!alts[ing.alt]}
+  function ingredientLine(ing,scale){const q=ing.qty*scale,qty=`${formatQty(q)} `,unit=ing.unit?`${pluralize(ing.unit,q)} `:"";let n=ing.note;if(typeof n==='function')n=n(scale);const note=n?` <span class="muted">— ${n}</span>`:"";return `${qty}${unit}${ing.item}${note}`}
+  function ingredientCost(ing,scale){if(!ing.packQty||!ing.packPrice)return 0;const used=ing.qty*scale,ratio=used/ing.packQty;if(ing.staple&&ratio<(1/3))return 0;return Math.ceil(ratio-1e-9)*ing.packPrice}
+  function recipeCost(recipe,index){const scale=defaultScale(index);return recipe.ingredients.filter(i=>isActive(i,index)).reduce((sum,i)=>sum+ingredientCost(i,scale),0)}
+  function servingCount(recipe,index){const scale=defaultScale(index);let servings=recipe.servings;if(recipe.baseCalories&&recipe.alternatives){const selected=altBucket(index);const extra=recipe.alternatives.reduce((sum,a)=>sum+(selected[a.id]?(a.calories||0):0),0);servings+=extra/(recipe.baseCalories/recipe.servings)}return roundHalf(servings*scale)}
+  function bakedAddonPhrase(alts){const xs=[];if(alts.pinto)xs.push('pinto beans');if(alts.hominy)xs.push('hominy');if(alts.rice)xs.push('rice');if(alts.pineapple)xs.push('pineapple');if(alts.enchilada)xs.push('red sauce');return xs.length?`, ${xs.join(', ')}`:''}
+  function afterBakePhrase(alts){const xs=[];if(alts.olives)xs.push('olives');if(alts.pickled)xs.push('pickled red onions');return xs.join(' and ')}
+  function dipDishText(scale){if(scale===0.5)return 'one deep 9×13-inch baking dish with at least 12 cups of usable capacity';if(scale===2)return 'two 6-quart (24-cup) oven-safe casserole dishes, or four 9×13-inch baking dishes';return 'a 6-quart (24-cup) oven-safe casserole dish, or split it between two 9×13-inch baking dishes'}
+  function context(index){return {scale:defaultScale(index),alts:altBucket(index)}}
+  function resolveSteps(steps,index){const ctx=context(index);return steps.map((s,rawIndex)=>{if(typeof s==='string')return {id:rawIndex,text:s};if(typeof s==='function')return {id:rawIndex,text:s(ctx)};if(s.alt&&!ctx.alts[s.alt])return null;if(s.when&&!s.when(ctx))return null;const text=typeof s.text==='function'?s.text(ctx):s.text;return {id:rawIndex,text}}).filter(Boolean)}
 
-  /* Six deliberate animation frames. Total page turn is only ~150 ms. */
-  const FRAME_MS = 24;
-  const FORWARD_ANGLES = [-30,-60,-90,-120,-150,-180];
-  const BACKWARD_ANGLES = [30,60,90,120,150,180];
-
-  const lfIcon = () => '<span class="lf" title="Lactose free">LF</span>';
-
-  function titlePage(){
-    return `
-      <div class="eyebrow">From the kitchen of</div>
-      <h1>Thomas's<br>Cookbook</h1>
-      <div class="title-rule"></div>
-      <p class="subtitle">A growing collection of soups, sauces, dips, pizzas, and other things worth making again.</p>
-      <div class="note"><strong>Kitchen note:</strong><br>Recipes are still being written. For now, this book is the shelf they will live on.</div>
-      <div class="footer-stamp">Est. 2026 · Kitchen Copy</div>
-      <div class="page-num">i</div>
-    `;
-  }
-
-  function indexPage(){
-    const cards = recipes.map((r,i)=>`
-      <button class="index-card" type="button" data-recipe="${i+1}">
-        <span class="index-top">
-          ${r.lf ? lfIcon() : ""}
-          <span class="index-name">${r.name}</span>
-        </span>
-        <span class="index-meta ${r.lf ? "" : "no-lf"}">${r.category}</span>
-        <span class="index-num">${i+1}</span>
-      </button>
-    `).join("");
-
-    return `
-      <div class="heading-row"><h2>Recipe Index</h2><div class="flourish"></div></div>
-      <div class="legend">${lfIcon()}<span>lactose free</span></div>
-      <div class="index-list">${cards}</div>
-      <div class="page-num">ii</div>
-    `;
-  }
-
-  function recipeLeft(index){
-    const r = recipes[index-1];
-    return `
-      <div class="eyebrow">Recipe ${index}</div>
-      <div class="recipe-title">
-        ${r.lf ? lfIcon() : ""}
-        <h2>${r.name}</h2>
-      </div>
-      <div class="category ${r.lf ? "" : "no-lf"}">${r.category}</div>
-      <section class="ingredients">
-        <div class="section-label">Ingredients</div>
-        <div class="ingredient-card">
-          <p class="coming">Ingredient list coming soon.</p>
-          <ul class="blank-list" aria-hidden="true">
-            <li></li><li></li><li></li><li></li><li></li>
-            <li></li><li></li><li></li><li></li><li></li>
-          </ul>
-        </div>
-      </section>
-      <div class="page-num">${index*2-1}</div>
-    `;
-  }
-
-  function recipeRight(index){
-    const r = recipes[index-1];
-    return `
-      <div class="instructions-head">
-        <h2>Instructions</h2>
-        <div class="flourish"></div>
-      </div>
-      <p class="coming">${r.name} directions will go here.</p>
-      <div class="instruction-lines"></div>
-      <div class="page-num">${index*2}</div>
-    `;
-  }
-
-  const spreadLeft = index => index === 0 ? titlePage() : recipeLeft(index);
-  const spreadRight = index => index === 0 ? indexPage() : recipeRight(index);
-
-  function bindIndex(){
-    if(current !== 0) return;
-    rightPage.querySelectorAll(".index-card").forEach(btn=>{
-      btn.addEventListener("click",()=>goTo(Number(btn.dataset.recipe)));
-    });
-  }
-
-  function render(){
-    leftPage.innerHTML = spreadLeft(current);
-    rightPage.innerHTML = spreadRight(current);
-    bindIndex();
-
-    stage.classList.toggle("at-index", current === 0);
-    prevBtn.disabled = busy || current === 0;
-    nextBtn.disabled = busy || current === recipes.length;
-    bookmarkIndex.disabled = busy || current === 0;
-    progress.textContent = current === 0 ? "Title + Index" : `Recipe ${current} of ${recipes.length}`;
-  }
-
-  const sleep = ms => new Promise(resolve=>setTimeout(resolve,ms));
-
-  async function animateFrames(direction){
-    const angles = direction === "forward" ? FORWARD_ANGLES : BACKWARD_ANGLES;
-    for(let i=0;i<angles.length;i++){
-      const angle = angles[i];
-      turner.style.transform = `rotateY(${angle}deg)`;
-      turner.classList.toggle("mid-flip", Math.abs(angle) >= 60 && Math.abs(angle) <= 120);
-      await sleep(FRAME_MS);
-    }
-  }
-
-  async function oneForward(){
-    if(current >= recipes.length) return;
-
-    const next = current + 1;
-    turnFront.innerHTML = spreadRight(current);
-    turnBack.innerHTML = spreadLeft(next);
-
-    turner.className = "turner forward";
-    turner.style.transform = "rotateY(0deg)";
-    void turner.offsetWidth;
-
-    await animateFrames("forward");
-
-    current = next;
-    turner.className = "turner";
-    turner.style.transform = "";
-    render();
-  }
-
-  async function oneBackward(){
-    if(current <= 0) return;
-
-    const previous = current - 1;
-    turnFront.innerHTML = spreadLeft(current);
-    turnBack.innerHTML = spreadRight(previous);
-
-    turner.className = "turner backward";
-    turner.style.transform = "rotateY(0deg)";
-    void turner.offsetWidth;
-
-    await animateFrames("backward");
-
-    current = previous;
-    turner.className = "turner";
-    turner.style.transform = "";
-    render();
-  }
-
-  async function goTo(target){
-    target = Math.max(0,Math.min(recipes.length,target));
-    if(busy || target === current) return;
-
-    busy = true;
-    render();
-
-    while(current < target){
-      await oneForward();
-      if(current < target) await sleep(18);
-    }
-
-    while(current > target){
-      await oneBackward();
-      if(current > target) await sleep(18);
-    }
-
-    busy = false;
-    render();
-  }
-
-  nextBtn.addEventListener("click",()=>goTo(current+1));
-  prevBtn.addEventListener("click",()=>goTo(current-1));
-  bookmarkIndex.addEventListener("click",()=>goTo(0));
-
-  document.addEventListener("keydown",e=>{
-    if(e.key==="ArrowRight") goTo(current+1);
-    if(e.key==="ArrowLeft") goTo(current-1);
-    if(e.key==="Home") goTo(0);
-  });
-
-  render();
+  function titlePage(){return `<div class="cover-page"><div class="eyebrow">From the kitchen of</div><h1>Thomas's<br>Cookbook</h1><div class="title-rule"></div><p class="subtitle">A growing collection of soups, sauces, mains, and other things worth making again.</p><div class="note"><strong>Kitchen note:</strong><br>Ingredient quantities, serving estimates, and costs update when recipes are scaled. Checklists stay available while you move through the book.</div><div class="footer-stamp">Est. 2026 · Kitchen Copy</div></div><div class="page-num">i</div>`}
+  function indexPage(){const cards=recipes.map((r,i)=>`<button class="index-card" type="button" data-recipe="${i+1}"><span class="index-top">${r.lf?lfIcon():""}<span class="index-name">${r.name}</span></span><span class="index-meta ${r.lf?"":"no-lf"}">${r.type}</span><span class="index-num">${i+1}</span></button>`).join("");return `<div class="heading-row"><h2>Recipe Index</h2><div class="flourish"></div></div><div class="legend">${lfIcon()}<span>lactose free</span></div><div class="index-list">${cards}</div><div class="page-num">ii</div>`}
+  function summaryCard(recipe,index){const scale=defaultScale(index),cost=recipeCost(recipe,index),serv=servingCount(recipe,index);return `<section class="summary-card"><div class="summary-grid"><div class="summary-pill"><strong>Servings</strong><span>${formatQty(serv)}</span></div><div class="summary-pill"><strong>Est. cost</strong><span>${money(cost)}</span></div><div class="summary-pill"><strong>Est. per serving</strong><span>${money(cost/serv)}</span></div></div><div class="scale-row"><div class="scale-buttons">${recipe.scales.map(mult=>`<button class="scale-btn ${scale===mult?'active':''}" data-scale="${mult}" data-recipe="${index}">${mult}x</button>`).join('')}</div>${recipe.summaryNote?`<div class="scale-note">${recipe.summaryNote}</div>`:''}</div></section>`}
+  function alternativesCard(recipe,index){if(!recipe.alternatives?.length)return "";const alts=altBucket(index);return `<section class="options-card"><div class="section-label">${recipe.optionsLabel||'Options'}</div><div class="option-buttons">${recipe.alternatives.map(a=>`<button class="option-btn ${alts[a.id]?'active':''}" data-alt="${a.id}" data-recipe="${index}">${alts[a.id]?'✓ ':''}${a.label}</button>`).join('')}</div></section>`}
+  function recipeLeft(index){const r=recipes[index-1];if(r.placeholder)return `<div class="eyebrow">Recipe ${index} — ${r.type}</div><div class="recipe-title">${r.lf?lfIcon():""}<h2>${r.name}</h2></div><section class="ingredients"><div class="section-label">Ingredients</div><div class="placeholder-box">Recipe details coming soon.</div></section><div class="page-num">${index*2-1}</div>`;const scale=defaultScale(index),checks=checkBucket('ingredients',index),items=r.ingredients.filter(i=>isActive(i,index));const list=items.map(ing=>`<li><label class="check"><input type="checkbox" data-kind="ingredient" data-recipe="${index}" data-id="${ing.id}" ${checks[ing.id]?'checked':''}><span>${ingredientLine(ing,scale)}</span></label></li>`).join('');return `<div class="eyebrow">Recipe ${index} — ${r.type}</div><div class="recipe-title">${r.lf?lfIcon():""}<h2>${r.name}</h2></div>${summaryCard(r,index)}${alternativesCard(r,index)}<section class="ingredients"><div class="section-label">Ingredients</div><div class="ingredient-card"><ul class="checklist">${list}</ul></div></section><div class="page-num">${index*2-1}</div>`}
+  function stepsSection(title,steps,index,offset){const checks=checkBucket('steps',index),resolved=resolveSteps(steps,index);return `<div class="step-section"><h3>${title}</h3><ul class="step-list">${resolved.map((s,i)=>`<li><label class="check"><input type="checkbox" data-kind="step" data-recipe="${index}" data-id="${offset+s.id}" ${checks[offset+s.id]?'checked':''}><span><b>${i+1}.</b> ${s.text}</span></label></li>`).join('')}</ul></div>`}
+  function recipeRight(index){const r=recipes[index-1];if(r.placeholder)return `<div class="instructions-head"><h2>Prep & Cooking</h2><div class="flourish"></div></div><div class="placeholder-box">Recipe details coming soon.</div><div class="page-num">${index*2}</div>`;return `<div class="instructions-head"><h2>Prep & Cooking</h2><div class="flourish"></div></div><div class="step-card">${stepsSection('Prep',r.prepSteps,index,0)}${stepsSection('Cooking / assembly',r.cookSteps,index,100)}</div><div class="page-num">${index*2}</div>`}
+  const spreadLeft=i=>i===0?titlePage():recipeLeft(i),spreadRight=i=>i===0?indexPage():recipeRight(i);
+  function bindIndex(){if(current!==0)return;rightPage.querySelectorAll('.index-card').forEach(b=>b.addEventListener('click',()=>goTo(Number(b.dataset.recipe))))}
+  function bindInteractive(){if(current===0)return;leftPage.querySelectorAll('.scale-btn').forEach(b=>b.addEventListener('click',()=>{state.scale[Number(b.dataset.recipe)]=Number(b.dataset.scale);saveState();render()}));leftPage.querySelectorAll('.option-btn').forEach(b=>b.addEventListener('click',()=>{const idx=Number(b.dataset.recipe),bucket=altBucket(idx);bucket[b.dataset.alt]=!bucket[b.dataset.alt];saveState();render()}));[leftPage,rightPage].forEach(p=>p.querySelectorAll('input[type="checkbox"]').forEach(input=>input.addEventListener('change',()=>{const bucket=input.dataset.kind==='ingredient'?'ingredients':'steps';checkBucket(bucket,Number(input.dataset.recipe))[input.dataset.id]=input.checked;saveState()})))}
+  function render(){leftPage.innerHTML=spreadLeft(current);rightPage.innerHTML=spreadRight(current);bindIndex();bindInteractive();stage.classList.toggle('at-index',current===0);prevBtn.disabled=busy||current===0;nextBtn.disabled=busy||current===recipes.length;bookmarkIndex.disabled=busy||current===0;progress.textContent=current===0?'Title + Index':`Recipe ${current} of ${recipes.length}`}
+  async function animateFrames(dir){for(const angle of(dir==='forward'?FORWARD_ANGLES:BACKWARD_ANGLES)){turner.style.transform=`rotateY(${angle}deg)`;turner.classList.toggle('mid-flip',Math.abs(angle)>=60&&Math.abs(angle)<=120);await sleep(FRAME_MS)}}
+  async function oneForward(){if(current>=recipes.length)return;const next=current+1;turnFront.innerHTML=spreadRight(current);turnBack.innerHTML=spreadLeft(next);turner.className='turner forward';turner.style.transform='rotateY(0deg)';void turner.offsetWidth;await animateFrames('forward');current=next;turner.className='turner';turner.style.transform='';render()}
+  async function oneBackward(){if(current<=0)return;const previous=current-1;turnFront.innerHTML=spreadLeft(current);turnBack.innerHTML=spreadRight(previous);turner.className='turner backward';turner.style.transform='rotateY(0deg)';void turner.offsetWidth;await animateFrames('backward');current=previous;turner.className='turner';turner.style.transform='';render()}
+  async function goTo(target){target=Math.max(0,Math.min(recipes.length,target));if(busy||target===current)return;busy=true;render();while(current<target){await oneForward();if(current<target)await sleep(16)}while(current>target){await oneBackward();if(current>target)await sleep(16)}busy=false;render()}
+  nextBtn.addEventListener('click',()=>goTo(current+1));prevBtn.addEventListener('click',()=>goTo(current-1));bookmarkIndex.addEventListener('click',()=>goTo(0));document.addEventListener('keydown',e=>{if(e.key==='ArrowRight')goTo(current+1);if(e.key==='ArrowLeft')goTo(current-1);if(e.key==='Home')goTo(0)});render();
 })();
 </script>
 </body>
