@@ -17,7 +17,7 @@ body{
 }
 button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);margin:auto;position:relative;perspective:2400px}
 .top-actions{display:flex;justify-content:space-between;align-items:center;margin:0 2px 10px;gap:10px}
-.home-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(64,38,22,.45);border-radius:999px;padding:10px 16px;background:linear-gradient(#b47a52,#7e4c32);color:#fff4dc;box-shadow:0 5px 12px rgba(38,23,14,.3),inset 0 1px rgba(255,255,255,.22)}
+.home-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(64,38,22,.45);border-radius:999px;padding:9px 14px;background:linear-gradient(#b47a52,#7e4c32);color:#fff4dc;box-shadow:0 5px 12px rgba(38,23,14,.3),inset 0 1px rgba(255,255,255,.22)}.home-icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .book{position:relative;z-index:20;display:grid;grid-template-columns:1fr 1fr;height:780px;filter:drop-shadow(0 20px 28px rgba(35,21,12,.42));isolation:isolate}
 .page{position:relative;z-index:10;height:780px;overflow:hidden;padding:40px 42px 54px;background:radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),radial-gradient(circle at 78% 74%,rgba(98,69,31,.03) 0 1px,transparent 1.6px),repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),var(--paper);box-shadow:inset 0 0 44px rgba(93,65,31,.08)}
 .left-page{border-radius:20px 0 0 20px;box-shadow:inset -28px 0 36px rgba(72,46,27,.09),inset 0 0 44px rgba(93,65,31,.08)}
@@ -27,7 +27,7 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
 .turner{display:none;position:absolute;top:0;width:50%;height:100%;z-index:100;transform-style:preserve-3d;pointer-events:none;will-change:transform}.turner.forward{display:block;right:0;transform-origin:left center}.turner.backward{display:block;left:0;transform-origin:right center}.turn-face{position:absolute;inset:0;padding:40px 42px 54px;backface-visibility:hidden;overflow:hidden;background:radial-gradient(circle at 22% 17%,rgba(98,69,31,.035) 0 1px,transparent 1.5px),repeating-linear-gradient(0deg,rgba(83,58,29,.018) 0 1px,transparent 1px 5px),var(--paper)}.turner.forward .front{border-radius:0 20px 20px 0;box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.forward .back{transform:rotateY(180deg);border-radius:20px 0 0 20px;box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.backward .front{border-radius:20px 0 0 20px;box-shadow:inset -28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.backward .back{transform:rotateY(180deg);border-radius:0 20px 20px 0;box-shadow:inset 28px 0 36px rgba(72,46,27,.09),0 7px 15px rgba(45,27,15,.18)}.turner.mid-flip .turn-face{box-shadow:0 10px 24px rgba(38,22,13,.28),inset 0 0 30px rgba(93,65,31,.08)}
 .eyebrow{color:var(--red);text-transform:uppercase;letter-spacing:.16em;font-size:.77rem;font-weight:bold}.cover-page{text-align:center;padding-top:18px}.cover-page .eyebrow{text-align:center}.cover-page h1{margin:14px auto 0;font-size:clamp(2.9rem,5vw,4.6rem);line-height:.96;letter-spacing:-.04em;font-weight:normal}.title-rule{height:3px;max-width:260px;margin:14px auto 22px;background:linear-gradient(90deg,transparent,var(--red) 15%,var(--red) 85%,transparent)}.subtitle{max-width:430px;margin:18px auto 28px;color:var(--muted);font-size:1.06rem;line-height:1.58;font-style:italic}.note{margin:28px auto 0;max-width:430px;padding:20px 22px 18px;background:#f7edcf;border:1px solid #d8bd7f;border-radius:4px;box-shadow:0 4px 10px rgba(82,58,29,.14),inset 0 0 16px rgba(122,90,43,.08);transform:rotate(-.35deg);position:relative;text-align:left}.note:before{content:"";position:absolute;width:62px;height:19px;top:-10px;left:50%;transform:translateX(-50%) rotate(1deg);background:rgba(213,187,125,.56)}.note strong{color:var(--red)}.footer-stamp{margin-top:34px;text-align:center;color:#8a6d4a;font-size:.71rem;letter-spacing:.15em;text-transform:uppercase}
 .heading-row,.instructions-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}.heading-row h2,.instructions-head h2{font-size:2rem;font-weight:normal;margin:0}.flourish{flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent)}.legend{display:flex;align-items:center;gap:8px;margin:-4px 0 16px;color:var(--green);font-size:.83rem;font-style:italic}.lf{width:23px;height:23px;display:inline-grid;place-items:center;border-radius:50%;border:1px solid rgba(81,103,74,.72);background:rgba(226,234,213,.55);color:var(--green);font-size:.7rem;font-weight:bold;flex:0 0 auto}
-.index-list{display:grid;gap:12px}.index-card{width:100%;appearance:none;border:1px solid #cbb57f;border-radius:5px;background:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.07)),#efdfb8;color:var(--ink);padding:14px 16px 13px 19px;text-align:left;cursor:pointer;box-shadow:0 3px 7px rgba(85,61,29,.13),inset 0 1px rgba(255,255,255,.72);transition:transform .12s ease,box-shadow .12s ease;position:relative}.index-card:before{content:"";position:absolute;left:8px;top:7px;bottom:7px;width:2px;border-left:1px solid rgba(160,75,63,.5);border-right:1px solid rgba(160,75,63,.18)}.index-card:hover{transform:translateY(-2px);box-shadow:0 6px 10px rgba(85,61,29,.18)}.index-top{display:flex;align-items:center;gap:8px;padding-right:34px}.index-name{font-weight:bold;font-size:1.08rem}.index-meta{display:block;margin-top:3px;color:var(--muted);font-size:.81rem;font-style:italic;padding-left:31px}.index-meta.no-lf{padding-left:0}.index-num{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#9a7c57;font-size:.83rem;font-style:italic}
+.index-list{display:grid;gap:12px}.index-card{width:100%;appearance:none;border:1px solid #cbb57f;border-radius:5px;background:linear-gradient(rgba(255,255,255,.35),rgba(255,255,255,.07)),#efdfb8;color:var(--ink);padding:14px 16px 13px 19px;text-align:left;cursor:pointer;box-shadow:0 3px 7px rgba(85,61,29,.13),inset 0 1px rgba(255,255,255,.72);transition:transform .12s ease,box-shadow .12s ease;position:relative}.index-card:before{content:"";position:absolute;left:8px;top:7px;bottom:7px;width:2px;border-left:1px solid rgba(160,75,63,.5);border-right:1px solid rgba(160,75,63,.18)}.index-card:hover{transform:translateY(-2px);box-shadow:0 6px 10px rgba(85,61,29,.18)}.index-top{display:flex;align-items:center;gap:8px;padding-right:34px}.index-name{font-weight:bold;font-size:1.08rem}.index-meta{display:block;margin-top:3px;color:var(--muted);font-size:.81rem;font-style:italic;padding-left:0}.index-meta.no-lf{padding-left:0}.index-num{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#9a7c57;font-size:.83rem;font-style:italic}
 .recipe-title{display:flex;align-items:flex-start;gap:11px;margin:4px 0 6px}.recipe-title h2{font-size:2rem;line-height:1.04;font-weight:normal;margin:0}.category{color:var(--muted);font-size:.88rem;font-style:italic;margin:0 0 10px 34px}.category.no-lf{margin-left:0}.summary-card,.ingredient-card,.step-card,.options-card{border:1px solid var(--line);background:rgba(249,239,211,.72);box-shadow:inset 0 0 18px rgba(119,87,42,.06);border-radius:6px}.summary-card{padding:12px 14px;margin-bottom:10px}.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}.summary-pill{padding:8px 9px;background:rgba(255,250,242,.58);border:1px solid rgba(180,142,83,.35);border-radius:999px;text-align:center;font-size:.93rem}.summary-pill strong{display:block;font-size:.68rem;color:var(--red);letter-spacing:.11em;text-transform:uppercase;margin-bottom:2px}.scale-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.scale-buttons,.option-buttons{display:flex;gap:7px;flex-wrap:wrap}.scale-btn,.option-btn{border:1px solid #b88c54;background:linear-gradient(#f5e9c6,#e4cc97);color:var(--ink);border-radius:999px;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.7)}.scale-btn{padding:6px 11px;font-size:.9rem}.option-buttons{gap:4px}.option-btn{padding:3px 6px;font-size:.70rem;white-space:nowrap}.scale-btn.active,.option-btn.active{background:linear-gradient(#b05d4f,#8b3931);color:#fff4dc;border-color:#7b3028}.scale-note,.small-note{font-size:.78rem;color:var(--muted);line-height:1.38}.section-label{margin:0 0 8px;color:var(--red);font-size:.74rem;font-weight:bold;text-transform:uppercase;letter-spacing:.14em}.ingredients{border-top:1px solid rgba(156,74,62,.34);padding-top:12px}.ingredient-card{height:438px;overflow:auto;padding:12px 13px}.step-card{height:656px;overflow:auto;padding:13px 14px}.options-card{padding:10px 12px;margin-bottom:10px}.options-card .section-label{margin-bottom:7px}.options-hint{font-size:.76rem;color:var(--muted);margin-bottom:7px}.group-block + .group-block{margin-top:13px;padding-top:9px;border-top:1px dashed rgba(165,125,78,.45)}.group-title{font-size:.9rem;font-weight:bold;color:#6d5135;margin:0 0 7px}.checklist{list-style:none;margin:0;padding:0;display:grid;gap:7px}.check{display:flex;align-items:flex-start;gap:9px;line-height:1.31}.check input{accent-color:#7c302d;margin-top:3px;flex:0 0 auto}.check span{font-size:.92rem}.muted{color:var(--muted);font-style:italic}.step-section + .step-section{margin-top:15px;padding-top:11px;border-top:1px dashed rgba(165,125,78,.45)}.step-section h3{font-size:1rem;color:#6d5135;margin:0 0 8px}.step-list{list-style:none;margin:0;padding:0;display:grid;gap:9px}.step-list .check span b{display:inline-block;min-width:1.2em;color:var(--red)}.page-num{position:absolute;bottom:22px;color:#8c765b;font-size:.78rem;font-style:italic}.left-page .page-num{left:28px}.right-page .page-num{right:28px}.turn-face .page-num{display:none}.nav{position:absolute;z-index:130;top:50%;transform:translateY(-50%);width:51px;height:51px;border-radius:50%;border:1px solid rgba(64,38,22,.45);background:linear-gradient(#b47a52,#7e4c32);color:#fff4dc;cursor:pointer;font-size:1.65rem;box-shadow:0 5px 12px rgba(38,23,14,.3),inset 0 1px rgba(255,255,255,.22)}.nav.prev{left:-68px}.nav.next{right:-68px}.nav:disabled{opacity:.28;cursor:default}.progress{position:absolute;z-index:130;bottom:-34px;right:6px;color:#f3e4c7;font-size:.82rem;text-shadow:0 1px 2px rgba(42,27,17,.45)}.placeholder-box{height:520px;padding:16px;border:1px dashed rgba(165,125,78,.55);background:rgba(255,255,255,.18);color:#816b55;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.5}
 @media(max-width:1280px){.nav{top:auto;bottom:12px;transform:none;width:44px;height:44px}.nav.prev{left:10px}.nav.next{right:10px}.progress{bottom:26px;right:65px;color:#7c654c;text-shadow:none}}
 @media(max-width:900px){body{padding:28px 10px 56px}.book{display:block;height:auto}.page{height:720px;padding:36px 24px 52px}.left-page{border-radius:16px 16px 0 0}.right-page{border-radius:0 0 16px 16px}.spine{top:720px;left:0;right:0;width:auto;height:28px;transform:translateY(-50%);background:linear-gradient(0deg,rgba(54,34,20,.16),rgba(50,30,17,.25) 35%,rgba(255,255,255,.25) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08))}.turner{display:none!important}.bookmark-wrap{right:18px;top:-16px;width:110px;height:108px}.bookmark-tab{width:110px;height:108px}.summary-grid{grid-template-columns:1fr}.ingredient-card{height:378px}.step-card{height:590px}}
@@ -36,7 +36,7 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
 </head>
 <body>
 <main class="stage at-index" id="stage">
-  <div class="top-actions"><a class="home-btn" href="https://thomaslab.me">← Home</a><div></div></div>
+  <div class="top-actions"><a class="home-btn" href="https://thomaslab.me" aria-label="Home"><svg class="home-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7v9a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a><div></div></div>
   <div class="bookmark-wrap"><button class="bookmark-tab" id="bookmarkIndex" type="button" title="Return to recipe index">RECIPE INDEX<small>jump back</small></button><div class="bookmark-tail"></div></div>
   <button class="nav prev" id="prevBtn" type="button" aria-label="Previous recipe">‹</button>
   <button class="nav next" id="nextBtn" type="button" aria-label="Next recipe">›</button>
@@ -64,7 +64,7 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
         {id:"greenchiles",qty:1,unit:"small can",item:"diced green chilies",note:"about 4 oz",packQty:1,packPrice:1.29},
         {id:"salsa",qty:1,unit:"cup",item:"thick salsa",note:"about 8 oz",packQty:2,packPrice:2.49},
         {id:"corn",qty:2,unit:"can",item:"Mexican street corn",packQty:1,packPrice:2.39},
-        {id:"mozz",qty:1,unit:"cup",item:"lactose-free mozzarella",note:"roughly 4 oz per cup; sold in ~8 oz bags",packQty:2,packPrice:4.49},
+        {id:"mozz",qty:1,unit:"bag",item:"lactose-free mozzarella",note:"about 8 oz",packQty:1,packPrice:4.49},
         {id:"cheddar",qty:1,unit:"bag",item:"lactose-free cheddar",note:"about 8 oz",packQty:1,packPrice:4.49},
         {id:"guac",qty:1,unit:"container",item:"guacamole",note:"about 12–16 oz",packQty:1,packPrice:4.99},
         {id:"sourcream",qty:1,unit:"container",item:"lactose-free sour cream",note:"about 16 oz",packQty:1,packPrice:4.99},
@@ -112,6 +112,54 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
         ctx=>`Serve guacamole, sour cream, lettuce, pico de gallo, green onions, cilantro, and tortilla chips or Doritos separately${ctx.alts.slaw?', along with the lime slaw':''}.`
       ]
     },
+    {name:"Goat Cheese Pizza",type:"Main",lf:false,placeholder:true},
+    {
+      name:"Slow Cooker Pot Roast", type:"Main", lf:true, scales:[0.5,1,2], servings:6,
+      ingredients:[
+        {id:"roast",qty:3.5,unit:"lb",item:"beef chuck roast",note:"one 3–4 lb roast",packQty:3.5,packPrice:21.00},
+        {id:"carrots",qty:1,unit:"bag",item:"baby carrots",note:"about 1 lb",packQty:1,packPrice:1.79},
+        {id:"potatoes",qty:1,unit:"bag",item:"baby potatoes",note:"about 1.5 lb",packQty:1,packPrice:3.49},
+        {id:"onion",qty:2,unit:"",item:"large yellow onions",packQty:1,packPrice:.79},
+        {id:"broth",qty:2,unit:"cup",item:"beef broth",note:"from one 32 oz carton",packQty:4,packPrice:2.99},
+        {id:"worcestershire",qty:2,unit:"tbsp",item:"Worcestershire sauce",packQty:16,packPrice:3.49,staple:true},
+        {id:"garlic",qty:4,unit:"",item:"garlic cloves",packQty:10,packPrice:.79},
+        {id:"salt",qty:1,unit:"tsp",item:"salt",packQty:150,packPrice:2.49,staple:true},
+        {id:"pepper",qty:1,unit:"tsp",item:"black pepper",packQty:30,packPrice:3.49,staple:true}
+      ],
+      prepSteps:[
+        "Cut the onions into thick wedges.",
+        "If any potatoes are larger than about 2 inches across, cut them in half.",
+        "Season the chuck roast with the salt and black pepper."
+      ],
+      cookSteps:[
+        "Place the carrots, potatoes, and onion in the bottom of the slow cooker.",
+        "Set the chuck roast on top of the vegetables and add the garlic.",
+        "Pour in the beef broth and Worcestershire sauce.",
+        "Cover and cook on LOW for about 8 hours, or until the roast is fork-tender.",
+        "Let the roast rest for about 10 minutes, then slice or shred it and serve with the vegetables and cooking liquid."
+      ]
+    },
+    {
+      name:"French Onion Soup", type:"Soup", lf:true, scales:[0.5,1,2], servings:6,
+      ingredients:[
+        {id:"onions",qty:7,unit:"",item:"large yellow onions",packQty:1,packPrice:.79},
+        {id:"butter",qty:3,unit:"tbsp",item:"butter",packQty:32,packPrice:4.49,staple:true},
+        {id:"oil",qty:2,unit:"tbsp",item:"olive oil",packQty:34,packPrice:6.99,staple:true},
+        {id:"broth",qty:2,unit:"carton",item:"beef or chicken broth",note:"32 oz each",packQty:1,packPrice:2.99},
+        {id:"baguette",qty:1,unit:"",item:"large baguette",packQty:1,packPrice:2.49},
+        {id:"cheese",qty:1,unit:"bag",item:"dairy-free shredded cheese",note:"about 7–8 oz",packQty:1,packPrice:4.49}
+      ],
+      prepSteps:["Thinly slice the onions.","Slice the baguette into rounds.","Set out broiler-safe bowls for serving."],
+      cookSteps:[
+        "Melt the butter and olive oil in a large pot over medium heat.",
+        "Add the onions and cook them slowly until deeply browned and completely soft.",
+        "Pour in the broth, bring to a gentle simmer, and cook on low until the flavor is rich and developed.",
+        "Toast the baguette rounds until crisp.",
+        "Ladle the hot soup into broiler-safe bowls, top each with toasted baguette and dairy-free cheese, and broil just until the cheese is melted and bubbly."
+      ]
+    },
+    {name:"Navy Bean and Bacon Soup",type:"Soup",lf:true,placeholder:true},
+    {name:"Dumpling Soup",type:"Soup",lf:true,placeholder:true},
     {
       name:"Basil Pesto", type:"Sauce", lf:true, scales:[0.5,1,2], servings:6,
       ingredients:[
@@ -137,25 +185,6 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
       ]
     },
     {
-      name:"French Onion Soup", type:"Soup", lf:true, scales:[0.5,1,2], servings:6,
-      ingredients:[
-        {id:"onions",qty:7,unit:"",item:"large yellow onions",packQty:1,packPrice:.79},
-        {id:"butter",qty:3,unit:"tbsp",item:"butter",packQty:32,packPrice:4.49,staple:true},
-        {id:"oil",qty:2,unit:"tbsp",item:"olive oil",packQty:34,packPrice:6.99,staple:true},
-        {id:"broth",qty:2,unit:"carton",item:"beef or chicken broth",note:"32 oz each",packQty:1,packPrice:2.99},
-        {id:"baguette",qty:1,unit:"",item:"large baguette",packQty:1,packPrice:2.49},
-        {id:"cheese",qty:1,unit:"bag",item:"dairy-free shredded cheese",note:"about 7–8 oz",packQty:1,packPrice:4.49}
-      ],
-      prepSteps:["Thinly slice the onions.","Slice the baguette into rounds.","Set out broiler-safe bowls for serving."],
-      cookSteps:[
-        "Melt the butter and olive oil in a large pot over medium heat.",
-        "Add the onions and cook them slowly until deeply browned and completely soft.",
-        "Pour in the broth, bring to a gentle simmer, and cook on low until the flavor is rich and developed.",
-        "Toast the baguette rounds until crisp.",
-        "Ladle the hot soup into broiler-safe bowls, top each with toasted baguette and dairy-free cheese, and broil just until the cheese is melted and bubbly."
-      ]
-    },
-    {
       name:"Dairy-Free Tzatziki", type:"Sauce", lf:true, scales:[1,2,3,4], servings:6,
       ingredients:[
         {id:"yogurt",qty:1,unit:"cup",item:"plain unsweetened cashew yogurt",note:"about 8 oz",packQty:2,packPrice:5.49},
@@ -171,14 +200,11 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
       ],
       prepSteps:["Grate about half a cucumber.","Sprinkle the cucumber with a little of the measured salt and let it sit for 5–10 minutes.","Wrap the cucumber in a clean towel or paper towels and squeeze out as much water as possible.","Grate or mince the garlic very finely."],
       cookSteps:["Combine the yogurt, squeezed cucumber, garlic, lemon juice, vinegar, olive oil, dill, oregano, salt, and black pepper.","Mix thoroughly until evenly combined.","Refrigerate for at least 20–30 minutes.","Stir again before serving.","If the finished tzatziki is thinner than desired, strain it briefly before serving."]
-    },
-    {name:"Navy Bean and Bacon Soup",type:"Soup",lf:true,placeholder:true},
-    {name:"Dumpling Soup",type:"Soup",lf:true,placeholder:true},
-    {name:"Goat Cheese Pizza",type:"Main",lf:false,placeholder:true}
+    }
   ];
 
   const stage=document.getElementById("stage"),leftPage=document.getElementById("leftPage"),rightPage=document.getElementById("rightPage"),turner=document.getElementById("turner"),turnFront=document.getElementById("turnFront"),turnBack=document.getElementById("turnBack"),prevBtn=document.getElementById("prevBtn"),nextBtn=document.getElementById("nextBtn"),bookmarkIndex=document.getElementById("bookmarkIndex"),progress=document.getElementById("progress");
-  const STORAGE_KEY="thomasCookbookV8State";
+  const STORAGE_KEY="thomasCookbookV9State";
   const freshState=()=>({scale:{},ingredients:{},steps:{},alts:{}});
   let state=freshState();
   try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");if(saved)state={...freshState(),...saved}}catch(e){}
@@ -208,8 +234,8 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
   function context(index){return {scale:defaultScale(index),alts:altBucket(index)}}
   function resolveSteps(steps,index){const ctx=context(index);return steps.map((s,rawIndex)=>{if(typeof s==='string')return {id:rawIndex,text:s};if(typeof s==='function')return {id:rawIndex,text:s(ctx)};if(s.alt&&!ctx.alts[s.alt])return null;if(s.when&&!s.when(ctx))return null;const text=typeof s.text==='function'?s.text(ctx):s.text;return {id:rawIndex,text}}).filter(Boolean)}
 
-  function titlePage(){return `<div class="cover-page"><div class="eyebrow">From the kitchen of</div><h1>Thomas's<br>Cookbook</h1><div class="title-rule"></div><p class="subtitle">A growing collection of soups, sauces, mains, and other things worth making again.</p><div class="note"><strong>Kitchen note:</strong><br>Ingredient quantities, serving estimates, and costs update when recipes are scaled. Checklists stay available while you move through the book.</div><div class="footer-stamp">Est. 2026 · Kitchen Copy</div></div><div class="page-num">i</div>`}
-  function indexPage(){const cards=recipes.map((r,i)=>`<button class="index-card" type="button" data-recipe="${i+1}"><span class="index-top">${r.lf?lfIcon():""}<span class="index-name">${r.name}</span></span><span class="index-meta ${r.lf?"":"no-lf"}">${r.type}</span><span class="index-num">${i+1}</span></button>`).join("");return `<div class="heading-row"><h2>Recipe Index</h2><div class="flourish"></div></div><div class="legend">${lfIcon()}<span>lactose free</span></div><div class="index-list">${cards}</div><div class="page-num">ii</div>`}
+  function titlePage(){return `<div class="cover-page"><div class="eyebrow">From the kitchen of</div><h1>Thomas's<br>Cookbook</h1><div class="title-rule"></div><p class="subtitle">A growing collection of soups, sauces, mains, and other things worth making again.</p><div class="note">The quantities, servings, and costs are estimates. More recipes to come.</div><div class="footer-stamp">Est. 2026 · Kitchen Copy</div></div><div class="page-num">i</div>`}
+  function indexPage(){const cards=recipes.map((r,i)=>`<button class="index-card" type="button" data-recipe="${i+1}"><span class="index-top"><span class="index-name">${r.name}</span>${r.lf?lfIcon():""}</span><span class="index-meta ${r.lf?"":"no-lf"}">${r.type}</span><span class="index-num">${i+1}</span></button>`).join("");return `<div class="heading-row"><h2>Recipe Index</h2><div class="flourish"></div></div><div class="legend">${lfIcon()}<span>lactose free</span></div><div class="index-list">${cards}</div><div class="page-num">ii</div>`}
   function summaryCard(recipe,index){const scale=defaultScale(index),cost=recipeCost(recipe,index),serv=servingCount(recipe,index);return `<section class="summary-card"><div class="summary-grid"><div class="summary-pill"><strong>Servings</strong><span>${formatQty(serv)}</span></div><div class="summary-pill"><strong>Est. cost</strong><span>${money(cost)}</span></div><div class="summary-pill"><strong>Est. per serving</strong><span>${money(cost/serv)}</span></div></div><div class="scale-row"><div class="scale-buttons">${recipe.scales.map(mult=>`<button class="scale-btn ${scale===mult?'active':''}" data-scale="${mult}" data-recipe="${index}">${mult}x</button>`).join('')}</div>${recipe.summaryNote?`<div class="scale-note">${recipe.summaryNote}</div>`:''}</div></section>`}
   function alternativesCard(recipe,index){if(!recipe.alternatives?.length)return "";const alts=altBucket(index);return `<section class="options-card"><div class="section-label">${recipe.optionsLabel||'Options'}</div><div class="option-buttons">${recipe.alternatives.map(a=>`<button class="option-btn ${alts[a.id]?'active':''}" data-alt="${a.id}" data-recipe="${index}">${alts[a.id]?'✓ ':''}${a.label}</button>`).join('')}</div></section>`}
   function recipeLeft(index){const r=recipes[index-1];if(r.placeholder)return `<div class="eyebrow">Recipe ${index} — ${r.type}</div><div class="recipe-title">${r.lf?lfIcon():""}<h2>${r.name}</h2></div><section class="ingredients"><div class="section-label">Ingredients</div><div class="placeholder-box">Recipe details coming soon.</div></section><div class="page-num">${index*2-1}</div>`;const scale=defaultScale(index),checks=checkBucket('ingredients',index),items=r.ingredients.filter(i=>isActive(i,index));const list=items.map(ing=>`<li><label class="check"><input type="checkbox" data-kind="ingredient" data-recipe="${index}" data-id="${ing.id}" ${checks[ing.id]?'checked':''}><span>${ingredientLine(ing,scale)}</span></label></li>`).join('');return `<div class="eyebrow">Recipe ${index} — ${r.type}</div><div class="recipe-title">${r.lf?lfIcon():""}<h2>${r.name}</h2></div>${summaryCard(r,index)}${alternativesCard(r,index)}<section class="ingredients"><div class="section-label">Ingredients</div><div class="ingredient-card"><ul class="checklist">${list}</ul></div></section><div class="page-num">${index*2-1}</div>`}
