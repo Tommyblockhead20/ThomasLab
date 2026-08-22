@@ -4,8 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>House Rater | Thomas Lab</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root{font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;background:#eef1f3;color:#1f2930}
     *{box-sizing:border-box} body{margin:0} button,input,select,textarea{font:inherit}
@@ -83,11 +81,14 @@
     .zillowStart{max-width:900px;margin:0 auto .8rem;padding:.72rem .9rem;display:flex;align-items:center;gap:.7rem;border:2px solid #17353a;background:#fff;border-radius:13px;box-shadow:none}.zillowStart strong{font-size:.74rem;letter-spacing:.08em;color:#fff;background:#17353a;border-radius:7px;padding:.32rem .45rem;white-space:nowrap}.zillowStart span{font-size:.9rem;color:#29474d}.zillowStart b{font-weight:900}
     .zillowCard{border:2px solid #17353a;background:#fff;padding:1rem}.zillowPaste>span{font-size:.88rem;color:#17353a;letter-spacing:.035em}.listingArea textarea{min-height:220px;border:2px solid #9bb0b8;background:#fff;padding:.8rem;font-size:.93rem}.listingArea textarea:focus{outline:3px solid rgba(23,53,58,.12);border-color:#17353a}.rateButton{display:block;width:100%;margin-top:.65rem;padding:.8rem 1rem!important;font-size:1rem;border-radius:10px!important}.compactTools summary{margin:0;color:#66737b;font-size:.78rem;font-weight:800;cursor:pointer}.compactTools details[open]>summary{margin-bottom:.65rem}.compactTools{padding:.65rem .8rem;background:#f8fafb}.reviewLead{margin:.85rem 0 .2rem;padding:.55rem 0}.reviewLead h3{margin:0}.compare>.heading{margin-bottom:.4rem}.warningsPanel .heading{margin-bottom:.4rem}
     .addressCheck{margin-top:.8rem;padding:.85rem;border:1px solid #cbd8dd;border-radius:11px;background:#f8fbfc}.addressCheck h3{margin:0 0 .2rem;color:#17353a}.addressCheck .addressNote{margin:0 0 .65rem;color:#5f7077;font-size:.82rem;font-weight:700}.addressCheck .addressField span{font-size:.8rem;color:#17353a}.addressCheck .addressField input{font-size:1rem;border:2px solid #91a8b1;background:#fff}.addressCheck .grid{margin-bottom:.55rem}.runStatus{min-height:1.2em;margin:.5rem 0 0;font-size:.78rem;font-weight:800;color:#5f7077}.runStatus.ready{color:#266a3b}.runStatus.stale{color:#8a4b10}.runStatus.fail{color:#8d1f1f}.scoreDock.staleScore{opacity:.42}.scoreDock.notRunScore{opacity:.22}.secondaryRateButton{background:#fff!important;color:#17353a!important;border:1px solid #9db0b7!important}.secondaryRateButton:hover{background:#f4f8f9!important}
-    @media(max-width:720px){.siteHeader{grid-template-columns:auto 1fr}.zillowStart{align-items:flex-start;flex-direction:column;gap:.4rem}.homeButton{width:58px;height:58px}.listingArea textarea{min-height:180px}.addressCheck .grid{grid-template-columns:1fr}}
+    @media(max-width:720px){.siteHeader{grid-template-columns:auto 1fr}.zillowStart{align-items:flex-start;flex-direction:column;gap:.4rem}.homeButton{width:58px;height:58px}.listingArea textarea{min-height:180px}.addressCheck .grid,.scoreActionGrid{grid-template-columns:1fr}.mapPrimary{min-height:300px}.mapPrimary svg{height:300px}.mapPlaceholder{min-height:295px}}
 
     .topPaste{max-width:900px;margin:0 auto .8rem}.topPaste+.scoreDock{margin-top:0}
-    .warningsDetails>summary,.scoreDetails>summary{font-weight:850;cursor:pointer;list-style-position:inside;color:#29474d}.warningsDetails[open]>summary,.scoreDetails[open]>summary{margin-bottom:.65rem}.warningsDetails #warningCount{color:#8a4b10;font-size:.78rem}.warningsDetails .warn strong{display:none}.scoreDetailsBody{display:grid;gap:.55rem}.scoreSide{padding:.8rem}.scoreSide .break{margin-bottom:.45rem}.scoreSide .metric{margin-top:.2rem}
+    .warningsDetails>summary,.scoreDetails>summary{font-weight:850;cursor:pointer;color:#29474d}.warningsDetails[open]>summary,.scoreDetails[open]>summary{margin-bottom:.65rem}.warningsDetails #warningCount{color:#8a4b10;font-size:.78rem}.warningsDetails .warn strong{display:none}.scoreDetailsBody{display:grid;gap:.55rem}.scoreSide{padding:.8rem}.scoreSide .break{margin-bottom:.45rem}.scoreSide .metric{margin-top:.2rem}
     #reviewDetails{margin-top:.55rem}.compactTools{margin-bottom:.55rem}
+    .weightNote{font-weight:700;color:#617178}.scoreActionGrid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:.65rem}.scoreAction .rateButton{margin-top:0;height:100%}.locationRateButton span{font-size:.76rem;font-weight:750;opacity:.82}.rateButton:disabled{cursor:not-allowed;opacity:.5}.mapShell{margin:.2rem 0 .55rem}.mapTitle{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;margin-bottom:.28rem;color:#29474d}.mapTitle span{font-size:.74rem;color:#728188}.mapPrimary{min-height:400px;background:#f8fafb}.mapPrimary svg{height:400px}.mapPlaceholder{display:grid;place-items:center;min-height:395px;margin:0;color:#7a898f;font-size:.85rem;font-weight:700}.reviewLead h3 span{font-size:.76rem;color:#6d7c82;font-weight:700}.compactTools{padding:.55rem .7rem}.compactTools .osmEstimatorPanel{margin-top:0}
+    details>summary{position:relative;list-style:none;padding-left:1.05rem}details>summary::-webkit-details-marker{display:none}details>summary::before{content:"▸";position:absolute;left:0;top:.02em;color:#60747b;font-size:.82em}details[open]>summary::before{content:"▾"}
+    .locationWait{color:#8a4b10}.locationReady{color:#266a3b}
   </style>
 </head>
 <body>
@@ -97,7 +98,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.8 12 3l9 7.8"></path><path d="M5.5 9.5V21h13V9.5"></path><path d="M9.5 21v-6h5v6"></path></svg>
       <span>Home</span>
     </a>
-    <div class="brandCopy"><h1>House Rater</h1><p>Paste a Zillow listing. Get a score.</p></div>
+    <div class="brandCopy"><h1>House Rater</h1><p>Paste a Zillow listing. Get a score <span class="weightNote">(based on how Thomas weights things)</span>.</p></div>
   </header>
 
   <div class="zillowStart panel"><strong>START HERE</strong><span>On Zillow: <b>Ctrl+A → Ctrl+C</b> the listing page, then paste it below.</span></div>
@@ -116,8 +117,16 @@
             <label class="field"><span>State</span><select id="stateField"></select></label>
           </div>
           <details><summary class="tiny">Optional name</summary><label class="field" style="margin-top:.5rem"><span>Name</span><input id="name" placeholder="House name"></label></details>
-          <button id="rateBtn" class="rateButton">2. Run rating</button>
-          <div id="runStatus" class="runStatus">Check the address, then run.</div>
+          <div class="scoreActionGrid">
+            <div class="scoreAction">
+              <button id="houseCityBtn" class="rateButton">2. Calculate House &amp; City scores</button>
+              <div id="runStatus" class="runStatus">Check the address, then calculate.</div>
+            </div>
+            <div class="scoreAction">
+              <button id="locationScoreBtn" class="rateButton locationRateButton" disabled>3. Calculate Location score <span>(may take a minute)</span></button>
+              <div id="locationRunStatus" class="runStatus">Confirm an address first.</div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -131,13 +140,19 @@
     <section class="main panel">
       <div class="heading"><h2>Details</h2><span id="meta" class="currentStatus"></span></div>
 
+      <section class="mapShell">
+        <div class="mapTitle"><strong>Nearby map</strong><span>from Location score</span></div>
+        <div id="osmStatus" class="tiny osmStatus">Calculate the Location score to load the map.</div>
+        <div id="osmMapPreview" class="osmMapPreview mapPrimary"><p class="mapPlaceholder">Nearby places will appear here.</p></div>
+      </section>
+
       <section id="locationEstimator" class="setupCard compactTools">
-        <details class="osmEstimatorPanel"><summary>Optional: nearby map data</summary><div class="soft"><div class="buttonRow"><button id="runOsmEstimator" type="button">Scan nearby places</button><button id="testOsmServers" type="button">Test servers</button><button id="applyOsmEstimate" type="button" disabled>Apply results</button></div><div id="osmStatus" class="tiny osmStatus"></div><div class="osmPreview"><div id="osmResults" class="tablewrap osmResults"></div><div id="osmMapPreview" class="osmMapPreview"></div></div></div></details>
+        <details class="osmEstimatorPanel"><summary>Adjust location selection</summary><div class="soft"><div class="buttonRow"><button id="applyOsmEstimate" type="button" disabled>Apply selected changes</button><button id="testOsmServers" type="button">Test OSM servers</button></div><div id="osmResults" class="tablewrap osmResults"></div></div></details>
       </section>
 
       <div id="parseReview"></div>
       <div id="summary" class="summary"></div>
-      <div id="reviewDetails" class="reviewLead"><div><h3>Review details</h3></div></div>
+      <div id="reviewDetails" class="reviewLead"><div><h3>Review and finalize details <span>(needed for a fully accurate score)</span></h3></div></div>
       <details class="section"><summary>House facts & features</summary><div id="facts" class="grid five"></div><h3>Features</h3><div id="featureFacts" class="grid five"></div><label class="field"><span>Major issue flags</span><select id="majorIssuesPreset"></select></label><label class="field"><span>Issue details / parser flags</span><input id="issues" placeholder="Unknown"></label></details>
       <details class="section"><summary>Immediate location</summary><h3>Grocery stores</h3><div id="groceryState"></div><div id="groceryRows" class="list"></div><div class="row" style="justify-content:flex-end"><button id="addGrocery">Add grocery store</button></div><h3>Parks</h3><div id="parkState"></div><div id="parkRows" class="list"></div><div class="row" style="justify-content:flex-end"><button id="addPark">Add park</button></div><h3>Airports</h3><div id="airportState"></div><div id="airportRows" class="list"></div><div class="row" style="justify-content:flex-end"><button id="addAirport">Add airport</button></div><h3>Closest destinations</h3><div id="accessInputs" class="grid five"></div><h3>Transportation, safety & hospital</h3><div id="location" class="grid five"></div></details>
       <details class="section"><summary>City / metro</summary><div id="city" class="grid five"></div><div id="cityBools" style="display:none"></div></details>
@@ -228,7 +243,7 @@ function clamp(v,min,max){return Math.min(max,Math.max(min,Number.isFinite(v)?v:
 function r1(v){return Math.round(v*10)/10}
 function lin(x,a,b,sa,sb){if(x<=a)return sa;if(x>=b)return sb;return sa+(x-a)/(b-a)*(sb-sa)}
 function pct(v,max){return clamp(v,0,max)}
-function blankHouse(){return{id:uid("house"),name:"New blank house",address:"",community:null,cityName:null,metroArea:null,state:null,listingText:"",facts:{squareFeet:null,beds:null,baths:null,lotSizeAcres:null,yardSize:null,garage:null,parkingSpaces:null,basement:null,heating:null,cooling:null,dishwasher:null,pantry:null,laundry:null,outdoorSpace:null,officeFlexRoom:null,bathroomsOnMain:null,kitchenCounterSpace:null,mudroom:null,privacy:null,lotUsability:null,internet:null,yearBuilt:null,homeType:null,majorIssueLevel:null,majorIssues:null},location:{groceryStores:null,pharmacyAccess:null,householdEssentialsAccess:null,libraryAccess:null,hardwareAccess:null,restaurantLeisureAccess:null,diningAccess:null,theaterAccess:null,nightlifeAccess:null,bankAccess:null,postOfficeAccess:null,laundryAccess:null,shoppingAccess:null,sidewalkWalkability:null,walkScore:null,bikeability:null,bikeScore:null,bfiScore:null,transitRating:null,transitScore:null,freewayMinutes:null,secondFreewayMinutes:null,erMinutes:null,fullHospitalMinutes:null,commercialAirportName:null,commercialAirportDriveMinutes:null,commercialAirportTransitMinutes:null,majorAirportName:null,majorAirportDriveMinutes:null,majorAirportTransitMinutes:null,airports:null,parks:null,parksDistanceAccess:null,parkSizeRating:null,parkAmenitiesRating:null,violentCrimePer1000:null,propertyCrimePer1000:null,treeCoverPercent:null,noiseRating:null,noiseDetails:null,roadFrontageRating:null,destinationCount2mi:null,locationEntertainmentRating:null},city:{cityViolentCrimePer1000:null,cityPropertyCrimePer1000:null,jobMarketRating:null,weatherComfortRating:null,naturalHazardRisk:null,naturalHazardUnreasonablyHigh:null,airQualityRisk:null,airQualityUnreasonablyHigh:null,weeklyFlights:null,nonstopDestinations:null,airportQualityRating:null,schoolQualityRating:null,bfiCityScore:null,trafficRating:null,entertainmentRating:null},sourceSnippets:[],overrides:{house:null,location:null,city:null},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),autoSources:{}}}
+function blankHouse(){return{id:uid("house"),name:"New blank house",address:"",community:null,cityName:null,metroArea:null,state:null,listingText:"",houseCityCalculated:false,locationCalculated:false,facts:{squareFeet:null,beds:null,baths:null,lotSizeAcres:null,yardSize:null,garage:null,parkingSpaces:null,basement:null,heating:null,cooling:null,dishwasher:null,pantry:null,laundry:null,outdoorSpace:null,officeFlexRoom:null,bathroomsOnMain:null,kitchenCounterSpace:null,mudroom:null,privacy:null,lotUsability:null,internet:null,yearBuilt:null,homeType:null,majorIssueLevel:null,majorIssues:null},location:{groceryStores:null,pharmacyAccess:null,householdEssentialsAccess:null,libraryAccess:null,hardwareAccess:null,restaurantLeisureAccess:null,diningAccess:null,theaterAccess:null,nightlifeAccess:null,bankAccess:null,postOfficeAccess:null,laundryAccess:null,shoppingAccess:null,sidewalkWalkability:null,walkScore:null,bikeability:null,bikeScore:null,bfiScore:null,transitRating:null,transitScore:null,freewayMinutes:null,secondFreewayMinutes:null,erMinutes:null,fullHospitalMinutes:null,commercialAirportName:null,commercialAirportDriveMinutes:null,commercialAirportTransitMinutes:null,majorAirportName:null,majorAirportDriveMinutes:null,majorAirportTransitMinutes:null,airports:null,parks:null,parksDistanceAccess:null,parkSizeRating:null,parkAmenitiesRating:null,violentCrimePer1000:null,propertyCrimePer1000:null,treeCoverPercent:null,noiseRating:null,noiseDetails:null,roadFrontageRating:null,destinationCount2mi:null,locationEntertainmentRating:null},city:{cityViolentCrimePer1000:null,cityPropertyCrimePer1000:null,jobMarketRating:null,weatherComfortRating:null,naturalHazardRisk:null,naturalHazardUnreasonablyHigh:null,airQualityRisk:null,airQualityUnreasonablyHigh:null,weeklyFlights:null,nonstopDestinations:null,airportQualityRating:null,schoolQualityRating:null,bfiCityScore:null,trafficRating:null,entertainmentRating:null},sourceSnippets:[],overrides:{house:null,location:null,city:null},createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),autoSources:{}}}
 
 function normalizeHeating(v){
   let s=display(v);
@@ -509,25 +524,34 @@ function renderRunStatus(){
   let el=document.getElementById("runStatus");
   if(el){
     let txt=state.ratingNote;
-    if(!txt){
-      txt=state.ratingStatus==="ready"?"Rating is current.":state.ratingStatus==="stale"?"Address changed — run rating again.":state.ratingStatus==="running"?"Running rating...":"Check the address, then run.";
-    }
+    if(!txt)txt=state.houseCityReady?"House & City scores are current.":state.ratingStatus==="stale"?"Listing/address changed — recalculate House & City.":"Check the address, then calculate.";
     el.textContent=txt;
-    el.className="runStatus "+(state.ratingStatus==="ready"?"ready":state.ratingStatus==="stale"?"stale":state.ratingStatus==="failed"?"fail":"");
+    el.className="runStatus "+(state.houseCityReady?"ready":state.ratingStatus==="stale"?"stale":state.ratingStatus==="failed"?"fail":"");
   }
   let dock=document.getElementById("scoreDock");
-  if(dock){
-    dock.classList.toggle("staleScore",state.ratingStatus==="stale");
-    dock.classList.toggle("notRunScore",state.ratingStatus==="notRun");
-  }
+  if(dock){dock.classList.toggle("staleScore",state.ratingStatus==="stale");dock.classList.toggle("notRunScore",!state.houseCityReady&&!state.locationReady)}
+  updateLocationRunControl();
 }
-function markRatingStale(){
-  if(state.ratingStatus==="ready"||state.ratingStatus==="running")state.ratingStatus="stale";
+function clearOsmPreview(message="Recalculate the Location score to refresh the map."){
   lastOsmEstimate=null;
   let apply=document.getElementById("applyOsmEstimate");if(apply)apply.disabled=true;
   let results=document.getElementById("osmResults");if(results)results.innerHTML="";
-  let map=document.getElementById("osmMapPreview");if(map)map.innerHTML="";
+  let map=document.getElementById("osmMapPreview");if(map)map.innerHTML=`<p class="mapPlaceholder">${html(message)}</p>`;
+}
+function markHouseCityStale(){
+  state.houseCityReady=false;if(state.current)state.current.houseCityCalculated=false;
+  if(state.ratingStatus==="ready"||state.ratingStatus==="running")state.ratingStatus="stale";
+  state.ratingNote="Listing/address changed — recalculate House & City.";
+  renderScores();
   renderRunStatus();
+}
+function markAddressChanged(){
+  markHouseCityStale();
+  state.locationReady=false;if(state.current)state.current.locationCalculated=false;
+  clearOsmPreview();
+  osmStatus("Address changed. Recalculate the Location score when the button is available.","warn");
+  renderScores();
+  updateLocationRunControl();
 }
 
 function normalize(raw){let b=blankHouse(),r=raw||{},f=r.facts||{},l=r.location||{},c=r.city||{};return{...b,...r,community:strOrNull(r.community||f.region),cityName:strOrNull(r.cityName||r.regionCity||r.sourceCity),metroArea:strOrNull(r.metroArea),state:strOrNull(r.state),facts:{...b.facts,...f,region:undefined,squareFeet:numOrNull(f.squareFeet),beds:numOrNull(f.beds),baths:numOrNull(f.baths),lotSizeAcres:numOrNull(f.lotSizeAcres),parkingSpaces:numOrNull(f.parkingSpaces),yearBuilt:normalizeYearBuilt(f.yearBuilt),dishwasher:yesNoVal(f.dishwasher),pantry:yesNoVal(f.pantry),officeFlexRoom:yesNoVal(f.officeFlexRoom),bathroomsOnMain:yesNoVal(f.bathroomsOnMain),mudroom:yesNoVal(f.mudroom),heating:normalizeHeating(f.heating),cooling:normalizeCooling(f.cooling)},location:{...b.location,...l,groceryStores:normalizeGroceryStores(l.groceryStores),airports:normalizeAirportList(l.airports,l),parks:normalizeParkList(l.parks,l),violentCrimePer1000:round1(l.violentCrimePer1000),propertyCrimePer1000:round1(l.propertyCrimePer1000),walkScore:numOrNull(l.walkScore),sidewalkWalkability:numOrNull(l.sidewalkWalkability),bikeScore:numOrNull(l.bikeScore),bfiScore:numOrNull(l.bfiScore),bikeability:numOrNull(l.bikeability),transitScore:numOrNull(l.transitScore),transitRating:numOrNull(l.transitRating||l.transit),freewayMinutes:numOrNull(l.freewayMinutes),secondFreewayMinutes:numOrNull(l.secondFreewayMinutes),erMinutes:numOrNull(l.erMinutes),fullHospitalMinutes:numOrNull(l.fullHospitalMinutes||l.hospitalMinutes),commercialAirportName:strOrNull(l.commercialAirportName),commercialAirportDriveMinutes:numOrNull(l.commercialAirportDriveMinutes||l.airportMinutes),commercialAirportTransitMinutes:numOrNull(l.commercialAirportTransitMinutes),majorAirportName:strOrNull(l.majorAirportName),majorAirportDriveMinutes:numOrNull(l.majorAirportDriveMinutes),majorAirportTransitMinutes:numOrNull(l.majorAirportTransitMinutes),parkSizeRating:parkSizeLabel(l.parkSizeRating),parkAmenitiesRating:parkQualityLabel(l.parkAmenitiesRating),treeCoverPercent:normalizeTreeCover(l.treeCoverPercent),noiseRating:normalizeNoise(l.noiseRating),noiseDetails:strOrNull(l.noiseDetails),roadFrontageRating:normalizeRoadFrontage(l.roadFrontageRating),destinationCount2mi:numOrNull(l.destinationCount2mi),locationEntertainmentRating:ratingOrNull(l.locationEntertainmentRating)},city:{...b.city,...c,cityViolentCrimePer1000:round1(c.cityViolentCrimePer1000),cityPropertyCrimePer1000:round1(c.cityPropertyCrimePer1000),jobMarketRating:ratingOrNull(c.jobMarketRating),weatherComfortRating:ratingOrNull(c.weatherComfortRating),naturalHazardRisk:ratingOrNull(c.naturalHazardRisk),naturalHazardUnreasonablyHigh:yesNoVal(c.naturalHazardUnreasonablyHigh),airQualityRisk:ratingOrNull(c.airQualityRisk),airQualityUnreasonablyHigh:yesNoVal(c.airQualityUnreasonablyHigh),weeklyFlights:numOrNull(c.weeklyFlights),nonstopDestinations:numOrNull(c.nonstopDestinations),airportQualityRating:numOrNull(c.airportQualityRating),schoolQualityRating:ratingOrNull(c.schoolQualityRating),bfiCityScore:numOrNull(c.bfiCityScore),trafficRating:ratingOrNull(c.trafficRating),entertainmentRating:ratingOrNull(c.entertainmentRating)},sourceSnippets:Array.isArray(r.sourceSnippets)?r.sourceSnippets:[],overrides:{house:numOrNull(r.overrides&&r.overrides.house),location:numOrNull(r.overrides&&r.overrides.location),city:numOrNull(r.overrides&&r.overrides.city)},autoSources:r.autoSources&&typeof r.autoSources==="object"?r.autoSources:{}}}
@@ -570,7 +594,7 @@ function normalizeYardFromAcres(acres){let a=Number(acres);if(!Number.isFinite(a
 function normalizeTreeCover(v){if(isUnknown(v))return null;let s=String(v).trim();let n=Number(s);if(Number.isFinite(n)){if(n<=0)return"None";if(n>=30)return"Heavy";if(n>=15)return"Moderate";return"Light"}let k=s.toLowerCase();if(/none|bare|0/.test(k))return"None";if(/heavy|high|very|dense|30|40|45|50/.test(k))return"Heavy";if(/moderate|medium|some|15|20|25/.test(k))return"Moderate";if(/light|low|sparse|few|10/.test(k))return"Light";return s}
 function treeCoverRating(v){let t=normalizeTreeCover(v);if(!t)return null;return {"None":0,"Light":3,"Moderate":6,"Heavy":10}[t]??numOrNull(t)}
 function parseListingInto(h){let t=h.listingText||"",x,w=[],summary=[],foundIssue=false;const set=(k,v,found,label)=>{h.facts[k]=v;let f=cleanFound(found);let text=snip(t,f.index||0,(f.text||"").length||40);addSnippet(h,k,text);summary.push({field:label||k,value:display(v),snippet:text})};const setLoc=(k,v,found,label)=>{h.location[k]=v;let f=cleanFound(found);let text=snip(t,f.index||0,(f.text||"").length||40);addSnippet(h,k,text);summary.push({field:label||k,value:display(v),snippet:text})};
-  if(!h.address){let am=t.match(/(?:located at|address:?|property address:?)\s+([^\n.]+?\b[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i)||t.match(/\b(\d{2,6}\s+[^\n,]+,\s*[^\n,]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)\b/);if(am){h.address=am[1].trim();addSnippet(h,"address",am[0]);summary.push({field:"Address",value:h.address,snippet:am[0]})}}
+  if(!h.address){let addressText=t.replace(/\$\s*\d[\d,]*(?:\.\d{2})?/g," ");let am=addressText.match(/(?:located at|address:?|property address:?)\s+([^\n.]+?\b[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i)||addressText.match(/\b(\d{1,6}\s+(?:[NSEW]\.?\s+)?[^\n,]{1,80}?\b(?:St(?:reet)?|Ave(?:nue)?|Rd|Road|Dr|Drive|Ln|Lane|Blvd|Boulevard|Ct|Court|Cir|Circle|Way|Pkwy|Parkway|Pl|Place|Ter|Terrace|Trl|Trail|Hwy|Highway)\.?[^\n,]*,\s*[^\n,]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)\b/i)||addressText.match(/\b(\d{2,6}\s+[^\n,]+,\s*[^\n,]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)\b/);if(am){h.address=am[1].trim().replace(/\s{2,}/g," ");addSnippet(h,"address",am[0]);summary.push({field:"Address",value:h.address,snippet:am[0]})}}
   if(x=labelAny(t,["Bedrooms","Beds"],/(\d+(?:\.\d+)?)/)||matchAny(t,[/\b(\d+)\s*(?:beds?|bedrooms?|bd|br)\b/i,/\b(\d+)\s*br\s*\/\s*\d+(?:\.\d+)?\s*ba\b/i]))set("beds",Number(x.value),x,"Bedrooms");
   if(x=labelAny(t,["Bathrooms","Baths"],/(\d+(?:\.\d+)?)/)||matchAny(t,[/\b(\d+(?:\.\d+)?)\s*(?:baths?|bathrooms?|ba)\b/i,/\b\d+\s*br\s*\/\s*(\d+(?:\.\d+)?)\s*ba\b/i]))set("baths",Number(x.value),x,"Bathrooms");
   if(x=sectionAny(t,["Heating","Heat"] )||labelAny(t,["Heating","Heat type","Heating features"]))set("heating",normalizeHeating(x.value),x,"Heating");
@@ -849,7 +873,7 @@ function scoreCity(h,mode){
 function applyOverride(score,ov){return ov===null?score:clamp(Number(ov),0,100)}
 function fullScore(h,mode){let hs=scoreHouse(h,mode),ls=scoreLocation(h,mode),cs=scoreCity(h,mode);hs.score=applyOverride(hs.score,h.overrides.house);ls.score=applyOverride(ls.score,h.overrides.location);cs.score=applyOverride(cs.score,h.overrides.city);let overall=(hs.score===null||ls.score===null||cs.score===null)?null:r1(hs.score*.4+ls.score*.4+cs.score*.2);let allWarn=[...hs.warnings,...ls.warnings,...cs.warnings];if(overall===null)allWarn.push({severity:"minor",message:"Overall score not assigned because at least one section has insufficient known data."});return{mode,houseScore:hs.score,locationScore:ls.score,cityScore:cs.score,overallScore:overall,contributions:{house:hs.score===null?null:r1(hs.score*.4),location:ls.score===null?null:r1(ls.score*.4),city:cs.score===null?null:r1(cs.score*.2)},confidence:{house:hs.confidence,location:ls.confidence,city:cs.confidence,overall:Math.round(hs.confidence*.4+ls.confidence*.4+cs.confidence*.2)},breakdowns:{house:hs.lines,location:ls.lines,city:cs.lines},warnings:allWarn,unknown:{house:hs.unknown,location:ls.unknown,city:cs.unknown}}}
 function sampleHouse(){let h=blankHouse();h.id=uid("sample");h.name="Sample Perrysburg House";h.address="Perrysburg, OH";h.listingText=ZILLOW_FIXTURE;parseListingInto(h);h.metroArea="Toledo";h.state="OH";Object.assign(h.facts,{kitchenCounterSpace:"Good",pantry:false,mudroom:false,privacy:"High",lotUsability:"Good",internet:"Good",bathroomsOnMain:true,majorIssueLevel:"None known"});h.location.groceryStores=[{name:"Full Grocery",size:"Large",walkMinutes:10,walkRoute:"Qualified",bikeMinutes:5,bikeRoute:"Qualified",driveMinutes:4},{name:"Aldi",size:"Small",walkMinutes:18,walkRoute:"Not qualified",bikeMinutes:6,bikeRoute:"Qualified",driveMinutes:5}];Object.assign(h.location,{pharmacyAccess:"Drive 6-10 min",libraryAccess:"Walk/bike 16-25 min",hardwareAccess:"Drive 6-10 min",diningAccess:"Walk/bike 6-10 min",theaterAccess:"Drive 6-10 min",nightlifeAccess:"Drive 11-20 min",bankAccess:"Drive 0-5 min",postOfficeAccess:"Drive 0-5 min",laundryAccess:"Drive 6-10 min",shoppingAccess:"Drive 6-10 min",walkScore:70,bikeScore:60,bfiScore:6,transitScore:30,freewayMinutes:8,secondFreewayMinutes:15,erMinutes:14,fullHospitalMinutes:18,commercialAirportName:"TOL",commercialAirportDriveMinutes:22,commercialAirportTransitMinutes:null,majorAirportName:"DTW",majorAirportDriveMinutes:60,majorAirportTransitMinutes:null,airports:[{code:"TOL",name:"TOL - Eugene F. Kranz Toledo Express",qualityScore:3.3,driveMinutes:22,transitMinutes:null},{code:"DTW",name:"DTW - Detroit Metropolitan",qualityScore:9.5,driveMinutes:60,transitMinutes:null}],parks:[{name:"Woodland Park",access:"Qualified walk/bike 0-5 min",sizeRating:"Large",amenitiesRating:"B"}],violentCrimePer1000:1.4,propertyCrimePer1000:12,treeCoverPercent:"Heavy",noiseRating:"Quiet",roadFrontageRating:"Not on main/fast road",noiseDetails:"Manual sample: quiet suburban street; no OSM noise proxy used.",destinationCount2mi:18,locationEntertainmentRating:5});Object.assign(h.city,{cityViolentCrimePer1000:2.8,cityPropertyCrimePer1000:20,jobMarketRating:7,weatherComfortRating:6,naturalHazardRisk:7,naturalHazardUnreasonablyHigh:false,airQualityRisk:7,airQualityUnreasonablyHigh:false,weeklyFlights:null,nonstopDestinations:null,airportQualityRating:null,schoolQualityRating:8,bfiCityScore:36,trafficRating:6,entertainmentRating:5});return h}
-let state={saved:[],current:blankHouse(),mode:"noKids",lastParserWarnings:[],lastParseSummary:[],ratingStatus:"notRun",ratingNote:""};function load(){try{state.saved=(JSON.parse(localStorage.getItem(STORE)||"[]")).map(normalize)}catch{state.saved=[]}}function persist(){localStorage.setItem(STORE,JSON.stringify(state.saved,null,2))}
+let state={saved:[],current:blankHouse(),mode:"noKids",lastParserWarnings:[],lastParseSummary:[],ratingStatus:"notRun",ratingNote:"",houseCityReady:false,locationReady:false};function load(){try{state.saved=(JSON.parse(localStorage.getItem(STORE)||"[]")).map(normalize)}catch{state.saved=[]}}function persist(){localStorage.setItem(STORE,JSON.stringify(state.saved,null,2))}
 function save(){state.current.updatedAt=new Date().toISOString();state.current=normalize(state.current);let i=state.saved.findIndex(h=>h.id===state.current.id);if(i>=0)state.saved[i]=state.current;else state.saved.unshift(state.current);persist();render()}
 function html(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}function fmt(v){return v===null||v===undefined?"Not scored":Number(v).toFixed(1).replace(/\.0$/,"")}
 const CRITICAL_UNKNOWN=new Set(["facts:squareFeet","location:violentCrimePer1000","location:propertyCrimePer1000","city:naturalHazardRisk","city:airQualityRisk"]);
@@ -863,8 +887,8 @@ function textInput(sec,k,label){let v=get(sec)[k];return`<label class="field"><s
 function selectInput(sec,k,label,opts){let v=get(sec)[k],dv=display(v);let options=opts.slice();let isRating=opts.length===12&&String(opts[0])==="Unknown"&&String(opts[11])==="10";if(isRating&&dv!=="Unknown"){let n=Number(dv);if(Number.isFinite(n))dv=String(Math.round(clamp(n,0,10)))}if(!options.map(String).includes(String(dv))&&dv!=="Unknown")options=[dv,...options];return`<label class="field"><span>${label}</span><select class="${inputClass(sec,k,v)}" data-select="${sec}:${k}">${options.map(o=>`<option value="${html(o)}" ${dv===String(o)?"selected":""}>${html(o)}</option>`).join("")}</select>${hardcodedHint(sec,k)}</label>`}
 function yesNo(sec,k,label){return selectInput(sec,k,label,YESNO)}
 function get(sec){if(sec==="location")return state.current.location;if(sec==="city")return state.current.city;if(sec==="root")return state.current;return state.current.facts}
-function render(){let h=state.current;let modeInputTop=document.getElementById("mode");if(modeInputTop)modeInputTop.value=state.mode;document.getElementById("name").value=h.name||"";document.getElementById("address").value=h.address||"";document.getElementById("community").value=display(h.community);document.getElementById("community").className=isAutoPath("root","community")?"autoHardcoded":(isUnknown(h.community)?"unknown":"");document.getElementById("metroArea").value=display(h.metroArea);document.getElementById("metroArea").className=isAutoPath("root","metroArea")?"autoHardcoded":(isUnknown(h.metroArea)?"unknown":"");document.getElementById("stateField").innerHTML=STATES.map(s=>`<option value="${s}" ${display(h.state)===s?"selected":""}>${s}</option>`).join("");document.getElementById("stateField").className=isAutoPath("root","state")?"autoHardcoded":(isUnknown(h.state)?"unknown":"");document.getElementById("listing").value=h.listingText||"";document.getElementById("meta").textContent="Updated "+String(h.updatedAt).slice(0,10);document.getElementById("savedCount").textContent=state.saved.length+" saved";renderSaved();renderEditor();renderParserReview();renderScores();renderComparison();renderSnips();renderRunStatus()}
-function renderSaved(){let root=document.getElementById("saved");root.innerHTML=state.saved.length?state.saved.map(h=>{let s=fullScore(h,state.mode);return`<button data-load="${h.id}" class="${h.id===state.current.id?"sel":""}"><span>${html(h.name||h.address||"Untitled")}</span><strong>${fmt(s.overallScore)}</strong></button>`}).join(""):`<p class="muted">Nothing saved yet. Start with the current house, then click <strong>Save / update house</strong>.</p>`;root.querySelectorAll("[data-load]").forEach(b=>b.onclick=()=>{state.current=normalize(state.saved.find(h=>h.id===b.dataset.load));state.lastParserWarnings=[];state.ratingStatus="ready";state.ratingNote="Saved rating loaded.";render()})}
+function render(){let h=state.current;let modeInputTop=document.getElementById("mode");if(modeInputTop)modeInputTop.value=state.mode;document.getElementById("name").value=h.name||"";document.getElementById("address").value=h.address||"";document.getElementById("community").value=display(h.community);document.getElementById("community").className=isAutoPath("root","community")?"autoHardcoded":(isUnknown(h.community)?"unknown":"");document.getElementById("metroArea").value=display(h.metroArea);document.getElementById("metroArea").className=isAutoPath("root","metroArea")?"autoHardcoded":(isUnknown(h.metroArea)?"unknown":"");document.getElementById("stateField").innerHTML=STATES.map(s=>`<option value="${s}" ${display(h.state)===s?"selected":""}>${s}</option>`).join("");document.getElementById("stateField").className=isAutoPath("root","state")?"autoHardcoded":(isUnknown(h.state)?"unknown":"");document.getElementById("listing").value=h.listingText||"";document.getElementById("meta").textContent="Updated "+String(h.updatedAt).slice(0,10);document.getElementById("savedCount").textContent=state.saved.length+" saved";renderSaved();renderEditor();renderParserReview();renderScores();renderComparison();renderSnips();renderRunStatus();updateLocationRunControl()}
+function renderSaved(){let root=document.getElementById("saved");root.innerHTML=state.saved.length?state.saved.map(h=>{let s=fullScore(h,state.mode);return`<button data-load="${h.id}" class="${h.id===state.current.id?"sel":""}"><span>${html(h.name||h.address||"Untitled")}</span><strong>${fmt(s.overallScore)}</strong></button>`}).join(""):`<p class="muted">Nothing saved yet. Start with the current house, then click <strong>Save / update house</strong>.</p>`;root.querySelectorAll("[data-load]").forEach(b=>b.onclick=()=>{state.current=normalize(state.saved.find(h=>h.id===b.dataset.load));state.lastParserWarnings=[];state.ratingStatus=state.current.houseCityCalculated?"ready":"notRun";state.ratingNote=state.current.houseCityCalculated?"Saved House & City scores loaded.":"Calculate House & City scores.";state.houseCityReady=!!state.current.houseCityCalculated;state.locationReady=!!state.current.locationCalculated;if(state.locationReady&&!state.current.osmAddressKey)state.current.osmAddressKey=currentAddressKey();clearOsmPreview(state.locationReady?"Saved Location data has no live map. Change the address to run a new Location scan.":"Calculate the Location score to load the map.");render()})}
 function renderEditor(){let f=state.current.facts,l=state.current.location,c=state.current.city;document.getElementById("facts").innerHTML=[numInput("facts","squareFeet","Square feet"),selectInput("facts","beds","Bedrooms",["Unknown",0,1,2,3,4,5,6,"7+"]),selectInput("facts","baths","Bathrooms",["Unknown",0,1,1.5,2,2.5,3,3.5,4,"5+"]),numInput("facts","lotSizeAcres","Lot acres",.01),selectInput("facts","yardSize","Yard size",["Unknown","None","Tiny","Small","Medium","Large","Huge"]),selectInput("facts","garage","Garage",["Unknown","None","Street parking only","Driveway only","Carport only","One-car attached garage","One-car detached garage","Two-car attached garage","Two-car detached garage","3+ car garage","Both attached and detached","Attached garage","Detached garage","Garage","Other parking"]),selectInput("facts","parkingSpaces","Parking spaces",["Unknown",0,1,2,3,4,"5+"]),selectInput("facts","basement","Basement",["Unknown","None","Crawl space","Unfinished","Partially finished","Finished","Walkout basement"]),selectInput("facts","heating","Heating",["Unknown","None","Wood/fireplace only","Whole-house heating"]),selectInput("facts","cooling","Cooling",["Unknown","None","Window units only","No central AC","Central AC / heat pump"]),yesNo("facts","dishwasher","Dishwasher"),selectInput("facts","laundry","Laundry",["Unknown","None","Hookups only","Basement laundry","Main-floor laundry","Near bedrooms","In-unit laundry"]),selectInput("facts","yearBuilt","Year built",["Unknown","Before 1900","1900-1949","1950-1979","1980-1999","2000-2014","2015+"]),selectInput("facts","homeType","Home type",["Unknown","SingleFamily","Townhouse","Condo","Duplex","Other"])].join("");document.getElementById("featureFacts").innerHTML=[yesNo("facts","pantry","Pantry"),yesNo("facts","officeFlexRoom","Office/flex room"),yesNo("facts","bathroomsOnMain","Bathroom on all main/upper floors"),selectInput("facts","outdoorSpace","Outdoor space",["Unknown","None","Porch","Patio","Deck","Balcony","Screened porch / sunroom","Multiple"]),selectInput("facts","kitchenCounterSpace","Kitchen counter space",["Unknown","Poor","Okay","Good","Great"]),yesNo("facts","mudroom","Mudroom/drop zone"),selectInput("facts","privacy","Privacy",["Unknown","Low","Medium","High"]),selectInput("facts","lotUsability","Lot usability",["Unknown","Poor","Okay","Good","Great"]),selectInput("facts","internet","Internet",["Unknown","Poor","Okay","Good","Great/fiber"])].join("");document.getElementById("majorIssuesPreset").innerHTML=["Unknown","None known","Minor issues mentioned","Major issue mentioned"].map(o=>`<option ${display(f.majorIssueLevel)===o?"selected":""}>${o}</option>`).join("");document.getElementById("majorIssuesPreset").className=isUnknown(f.majorIssueLevel)?"unknown":"";document.getElementById("issues").value=display(f.majorIssues);document.getElementById("issues").className=isUnknown(f.majorIssues)?"unknown":"";
   document.getElementById("groceryState").innerHTML=`<label class="field"><span>Grocery data</span><select id="gState" class="${l.groceryStores===null?"unknown criticalUnknown":""}"><option value="Unknown" ${l.groceryStores===null?"selected":""}>Unknown</option><option value="Known" ${Array.isArray(l.groceryStores)?"selected":""}>Known stores below</option><option value="None" ${l.groceryStores===false?"selected":""}>Known: no acceptable grocery within 20 min</option></select></label>`;document.getElementById("groceryRows").innerHTML=groceryRows(l.groceryStores);
   document.getElementById("parkState").innerHTML=`<label class="field"><span>Park data</span><select id="pState" class="${l.parks===null?"unknown":""}"><option value="Unknown" ${l.parks===null?"selected":""}>Unknown</option><option value="Known" ${Array.isArray(l.parks)?"selected":""}>Known parks below</option><option value="None" ${l.parks===false?"selected":""}>Known: no useful nearby park</option></select></label>`;document.getElementById("parkRows").innerHTML=parkRows(l.parks);
@@ -891,7 +915,7 @@ function groceryChange(e){let[i,k]=e.target.dataset.grocery.split(":"),stores=Ar
 
 function airportChange(e){let[i,k]=e.target.dataset.airport.split(":"),rows=Array.isArray(state.current.location.airports)?state.current.location.airports.slice():[];rows[Number(i)]={...rows[Number(i)]};let val=e.target.value;if(["qualityScore","driveMinutes","transitMinutes"].includes(k))rows[Number(i)][k]=numOrNull(val);else rows[Number(i)][k]=strOrNull(val);if(k==="code"){let data=airportData(val);if(data){rows[Number(i)].name=`${airportCodes(val)[0]} - ${data.name}`;if(rows[Number(i)].qualityScore===null||rows[Number(i)].qualityScore===undefined)rows[Number(i)].qualityScore=data.qualityScore}}state.current.location.airports=rows;clearAuto("location","airports");state.current.updatedAt=new Date().toISOString();render()}
 
-function renderScores(){let s=fullScore(state.current,state.mode),w=[...state.lastParserWarnings,...s.warnings];document.getElementById("warnings").innerHTML=w.length?w.map(x=>`<div class="warn ${x.severity==="major"?"major":""}"><span>${html(x.message)}</span></div>`).join(""):``;let warningCount=document.getElementById("warningCount");if(warningCount)warningCount.textContent=w.length?`(${w.length})`:"";let metrics=[metric("Overall",s.overallScore),metric("House",s.houseScore,s.contributions.house===null?"Not contributing":fmt(s.contributions.house)+" / 40"),metric("Location",s.locationScore,s.contributions.location===null?"Not contributing":fmt(s.contributions.location)+" / 40"),metric("City",s.cityScore,s.contributions.city===null?"Not contributing":fmt(s.contributions.city)+" / 20")].join("");let summary=document.getElementById("summary");if(summary)summary.innerHTML=metrics;let dock=document.getElementById("scoreDock");if(dock)dock.innerHTML=[gaugeMetric("Overall",s.overallScore),gaugeMetric("House",s.houseScore),gaugeMetric("Location",s.locationScore),gaugeMetric("City",s.cityScore),`<label class="modeDock"><span>Mode</span><select id="mode"><option value="noKids" ${state.mode==="noKids"?"selected":""}>No kids</option><option value="kids" ${state.mode==="kids"?"selected":""}>Kids</option></select></label>`].join("");let modeEl=document.getElementById("mode");if(modeEl)modeEl.onchange=e=>{state.mode=e.target.value;renderScores();renderSaved();renderComparison()};document.getElementById("breakdowns").innerHTML=`<details class="scoreDetails"><summary>Score details</summary><div class="scoreDetailsBody">`+breakPanel("House",s.houseScore,s.breakdowns.house,s.confidence.house)+breakPanel("Location",s.locationScore,s.breakdowns.location,s.confidence.location)+breakPanel("City",s.cityScore,s.breakdowns.city,s.confidence.city)+`<div class="metric"><span>Data coverage</span><strong>${s.confidence.overall}%</strong></div></div></details>`}
+function renderScores(){let s=fullScore(state.current,state.mode),w=[...state.lastParserWarnings,...s.warnings];document.getElementById("warnings").innerHTML=w.length?w.map(x=>`<div class="warn ${x.severity==="major"?"major":""}"><span>${html(x.message)}</span></div>`).join(""):``;let warningCount=document.getElementById("warningCount");if(warningCount)warningCount.textContent=w.length?`(${w.length})`:"";let shownHouse=state.houseCityReady?s.houseScore:null,shownCity=state.houseCityReady?s.cityScore:null,shownLocation=state.locationReady?s.locationScore:null,shownOverall=(state.houseCityReady&&state.locationReady)?s.overallScore:null;let metrics=[metric("Overall",shownOverall),metric("House",shownHouse,state.houseCityReady?(s.contributions.house===null?"Not contributing":fmt(s.contributions.house)+" / 40"):"Calculate House & City"),metric("Location",shownLocation,state.locationReady?(s.contributions.location===null?"Not contributing":fmt(s.contributions.location)+" / 40"):"Calculate Location"),metric("City",shownCity,state.houseCityReady?(s.contributions.city===null?"Not contributing":fmt(s.contributions.city)+" / 20"):"Calculate House & City")].join("");let summary=document.getElementById("summary");if(summary)summary.innerHTML=metrics;let dock=document.getElementById("scoreDock");if(dock)dock.innerHTML=[gaugeMetric("Overall",shownOverall),gaugeMetric("House",shownHouse),gaugeMetric("Location",shownLocation),gaugeMetric("City",shownCity),`<label class="modeDock"><span>Mode</span><select id="mode"><option value="noKids" ${state.mode==="noKids"?"selected":""}>No kids</option><option value="kids" ${state.mode==="kids"?"selected":""}>Kids</option></select></label>`].join("");let modeEl=document.getElementById("mode");if(modeEl)modeEl.onchange=e=>{state.mode=e.target.value;renderScores();renderSaved();renderComparison()};let pending=(t,msg)=>`<details class="break"><summary><span>${html(t)}</span><strong>—</strong></summary><p class="soft">${html(msg)}</p></details>`;let housePanel=state.houseCityReady?breakPanel("House",s.houseScore,s.breakdowns.house,s.confidence.house):pending("House","Calculate House & City scores first."),locationPanel=state.locationReady?breakPanel("Location",s.locationScore,s.breakdowns.location,s.confidence.location):pending("Location","Calculate the Location score to scan nearby OpenStreetMap data."),cityPanel=state.houseCityReady?breakPanel("City",s.cityScore,s.breakdowns.city,s.confidence.city):pending("City","Calculate House & City scores first.");document.getElementById("breakdowns").innerHTML=`<details class="scoreDetails"><summary>Score details</summary><div class="scoreDetailsBody">${housePanel}${locationPanel}${cityPanel}<div class="metric"><span>Data coverage</span><strong>${state.houseCityReady&&state.locationReady?s.confidence.overall:"—"}</strong></div></div></details>`}
 function gaugeMetric(l,v){let na=v===null,score=na?0:clamp(Number(v)||0,0,100),pct=score;return`<div class="gauge ${na?"na":""}"><div class="gaugeTop"><span>${html(l)}</span><strong>${fmt(v)}</strong></div><div class="gaugeTrack"><div class="gaugeFill" style="width:${pct}%"></div><i class="gaugeNeedle" style="left:calc(${pct}% - 1px)"></i></div></div>`}
 function metric(l,v,sub=""){let na=v===null;return`<div class="metric ${na?"na":""}"><span>${l}</span><strong>${fmt(v)}</strong>${sub?`<small>${sub}</small>`:""}</div>`}
 function breakPanel(t,score,lines,c){return`<details class="break"><summary><span>${t}</span><strong>${fmt(score)}</strong></summary>${score===null?`<p class="soft">Not scored because more than half of the section's possible points are unknown.</p>`:""}${lines.slice().sort((a,b)=>b.max-a.max||a.label.localeCompare(b.label)).map(l=>`<details class="line"><summary><div><strong>${html(l.label)}</strong><small>${html(l.explain)}</small></div><b>${fmt(l.points)} / ${fmt(l.max)}</b></summary><div class="why"><strong>Equation</strong><p><code>${html(l.formula||`component points sum = ${fmt(l.points)} / ${fmt(l.max)}`)}</code></p><strong>Inputs and intermediate values</strong>${(l.inputs&&l.inputs.length?l.inputs:[l.explain]).map(x=>`<p>${html(x)}</p>`).join("")}<p><strong>Output:</strong> ${fmt(l.points)} / ${fmt(l.max)}</p>${l.unknown?`<p>Unknown data in this line: ${fmt(l.unknown)} possible points.</p>`:""}</div></details>`).join("")}<p class="basis">Known-data coverage: ${c}%</p></details>`}
@@ -963,7 +987,7 @@ College Readiness Rating
 9/10
 Student Progress Rating
 9/10
-More about schools`;parseListingInto(h);assert(h.city.schoolQualityRating===8,"school "+h.city.schoolQualityRating)});test("Infer fills Ohio state and Toledo metro from Perrysburg",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";inferFromText(h);assert(h.state==="OH","state");assert(h.metroArea==="Toledo","metro")});test("Hardcoded data fills Perrysburg community defaults",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(h.metroArea==="Toledo","metro");assert(h.location.bfiScore!==null,"bfi");assert(h.city.jobMarketRating!==null,"job");assert(h.city.bfiCityScore!==null,"bfi city");assert(Array.isArray(h.location.airports)&&h.location.airports.length,"airport")});test("Columbus OH metro crime uses Ohio CBSA",()=>{let h=blankHouse();h.community="Columbus";h.cityName="Columbus";h.state="OH";h.metroArea="Columbus";applyHardcodedData(h);assert(Math.abs(h.city.cityViolentCrimePer1000-3.3)<.05,"metro violent "+h.city.cityViolentCrimePer1000);assert(Math.abs(h.city.cityPropertyCrimePer1000-21.935)<.05,"metro property "+h.city.cityPropertyCrimePer1000)});test("BFI city table fills city score",()=>{let h=blankHouse();h.community="Old North Columbus";h.cityName="Columbus";h.state="OH";applyHardcodedData(h);assert(h.city.bfiCityScore===41,"bfi city "+h.city.bfiCityScore)});test("Crime atlas fills Perrysburg and Toledo metro crime",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(Math.abs(h.location.violentCrimePer1000-0.3)<0.02,"community violent "+h.location.violentCrimePer1000);assert(h.location.propertyCrimePer1000<6,"community property "+h.location.propertyCrimePer1000);assert(h.city.cityViolentCrimePer1000!==null,"metro violent");assert(h.city.cityPropertyCrimePer1000!==null,"metro property")});test("Tree cover buckets normalize",()=>{assert(normalizeTreeCover("none")==="None");assert(treeCoverRating("Very high")===10);assert(normalizeTreeCover("low")==="Light");assert(normalizeTreeCover(0)==="None")});document.getElementById("tests").innerHTML=`<p><strong>${out.filter(x=>x.pass).length}/${out.length} passing</strong></p>`+out.map(x=>`<div class="${x.pass?"pass":"fail"}">${x.pass?"PASS":"FAIL"}: ${html(x.name)}${x.error?" - "+html(x.error):""}</div>`).join("");return out}
+More about schools`;parseListingInto(h);assert(h.city.schoolQualityRating===8,"school "+h.city.schoolQualityRating)});test("Price before Zillow address does not become part of address",()=>{let h=blankHouse();h.listingText="$324,900    123 Main St, Perrysburg, OH 43551\n3 beds 2 baths";parseListingInto(h);assert(h.address==="123 Main St, Perrysburg, OH 43551","address was "+h.address)});test("Infer fills Ohio state and Toledo metro from Perrysburg",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";inferFromText(h);assert(h.state==="OH","state");assert(h.metroArea==="Toledo","metro")});test("Hardcoded data fills Perrysburg community defaults",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(h.metroArea==="Toledo","metro");assert(h.location.bfiScore!==null,"bfi");assert(h.city.jobMarketRating!==null,"job");assert(h.city.bfiCityScore!==null,"bfi city");assert(Array.isArray(h.location.airports)&&h.location.airports.length,"airport")});test("Columbus OH metro crime uses Ohio CBSA",()=>{let h=blankHouse();h.community="Columbus";h.cityName="Columbus";h.state="OH";h.metroArea="Columbus";applyHardcodedData(h);assert(Math.abs(h.city.cityViolentCrimePer1000-3.3)<.05,"metro violent "+h.city.cityViolentCrimePer1000);assert(Math.abs(h.city.cityPropertyCrimePer1000-21.935)<.05,"metro property "+h.city.cityPropertyCrimePer1000)});test("BFI city table fills city score",()=>{let h=blankHouse();h.community="Old North Columbus";h.cityName="Columbus";h.state="OH";applyHardcodedData(h);assert(h.city.bfiCityScore===41,"bfi city "+h.city.bfiCityScore)});test("Crime atlas fills Perrysburg and Toledo metro crime",()=>{let h=blankHouse();h.address="123 Main St, Perrysburg, OH 43551";applyHardcodedData(h);assert(Math.abs(h.location.violentCrimePer1000-0.3)<0.02,"community violent "+h.location.violentCrimePer1000);assert(h.location.propertyCrimePer1000<6,"community property "+h.location.propertyCrimePer1000);assert(h.city.cityViolentCrimePer1000!==null,"metro violent");assert(h.city.cityPropertyCrimePer1000!==null,"metro property")});test("Tree cover buckets normalize",()=>{assert(normalizeTreeCover("none")==="None");assert(treeCoverRating("Very high")===10);assert(normalizeTreeCover("low")==="Light");assert(normalizeTreeCover(0)==="None")});document.getElementById("tests").innerHTML=`<p><strong>${out.filter(x=>x.pass).length}/${out.length} passing</strong></p>`+out.map(x=>`<div class="${x.pass?"pass":"fail"}">${x.pass?"PASS":"FAIL"}: ${html(x.name)}${x.error?" - "+html(x.error):""}</div>`).join("");return out}
 
 
 const SHEET_COLUMNS={
@@ -986,12 +1010,27 @@ function applyHardcodedEditor(){let el=document.getElementById("hardcodedEditor"
 function exportHardcodedJson(){download("house-ratings-hardcoded-data.json",currentHardcodedBundle())}
 function downloadHtmlWithEmbeddedData(){let data;try{let txt=document.getElementById("hardcodedEditor").value.trim();data=txt?JSON.parse(txt):currentHardcodedBundle()}catch(e){document.getElementById("hardcodedEditorStatus").textContent="Could not parse JSON: "+e.message;return}let doc=document.documentElement.cloneNode(true);let el=doc.querySelector("#embeddedHardcodedData");if(el)el.textContent=JSON.stringify({metros:data.metros||{},communities:data.communities||{},airports:data.airports||{},crimes:data.crimes||{},metroCrimes:data.metroCrimes||{},bfiCities:data.bfiCities||{}});let htmlText="<!doctype html>\n"+doc.outerHTML;let blob=new Blob([htmlText],{type:"text/html"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="house-ratings-standalone-custom.html";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
 
-let lastOsmEstimate=null;
+let lastOsmEstimate=null,locationOsmBusy=false;
+const OSM_COOLDOWN_MS=60000,OSM_COOLDOWN_STORE="houseRatingsOsmLastAttemptAtV49";
 function osmStatus(msg,kind=""){
   let el=document.getElementById("osmStatus");
   if(el)el.innerHTML=`<span class="${kind}">${html(msg)}</span>`;
 }
-function setOsmBusy(busy){let b=document.getElementById("runOsmEstimator"),a=document.getElementById("applyOsmEstimate"),t=document.getElementById("testOsmServers");if(b){b.disabled=!!busy;b.textContent=busy?"Running OSM estimator...":"Run OSM estimator"}if(t)t.disabled=!!busy;if(a)a.disabled=busy||!lastOsmEstimate}
+function currentAddressKey(){return String(state.current&&state.current.address||"").trim().replace(/\s+/g," ").toLowerCase()}
+function getOsmLastAttemptAt(){try{return Number(localStorage.getItem(OSM_COOLDOWN_STORE)||0)||0}catch(_e){return 0}}
+function setOsmLastAttemptAt(v){try{localStorage.setItem(OSM_COOLDOWN_STORE,String(v))}catch(_e){}}
+function osmCooldownRemaining(){return Math.max(0,OSM_COOLDOWN_MS-(Date.now()-getOsmLastAttemptAt()))}
+function updateLocationRunControl(){
+  let btn=document.getElementById("locationScoreBtn"),status=document.getElementById("locationRunStatus");if(!btn||!status)return;
+  let key=currentAddressKey(),same=!!key&&state.current&&state.current.osmAddressKey===key,remain=osmCooldownRemaining();
+  let disabled=false,msg="Ready. Uses OpenStreetMap and may take a minute.",cls="runStatus";
+  if(locationOsmBusy){disabled=true;msg="Scanning OpenStreetMap…";cls+=" locationWait"}
+  else if(!key){disabled=true;msg="Confirm an address first."}
+  else if(same&&state.locationReady){disabled=true;msg="Location is current. Change the address to run OSM again.";cls+=" locationReady"}
+  else if(remain>0){disabled=true;msg=`OpenStreetMap is a free shared service, so scans are limited to once per minute. Try again in ${Math.ceil(remain/1000)}s.`;cls+=" locationWait"}
+  btn.disabled=disabled;status.textContent=msg;status.className=cls;
+}
+function setOsmBusy(busy){locationOsmBusy=!!busy;let a=document.getElementById("applyOsmEstimate"),t=document.getElementById("testOsmServers");if(t)t.disabled=!!busy;if(a)a.disabled=busy||!lastOsmEstimate;updateLocationRunControl()}
 function parseLatLonText(s){let m=String(s||"").match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);if(!m)return null;let lat=Number(m[1]),lon=Number(m[2]);return Number.isFinite(lat)&&Number.isFinite(lon)?{lat,lon,label:`${lat.toFixed(5)}, ${lon.toFixed(5)}`}:null}
 function osmGeocodeQuery(){let h=state.current||{},parts=[];if(h.address)parts.push(h.address);let locality=h.community||h.cityName;if(locality&&!(h.address||"").toLowerCase().includes(String(locality).toLowerCase()))parts.push(locality);if(h.state&&!(h.address||"").toLowerCase().includes(String(h.state).toLowerCase()))parts.push(h.state);return parts.filter(Boolean).join(", ")}
 async function osmGeocodeAddress(q){let direct=parseLatLonText(q);if(direct)return direct;if(!String(q||"").trim())throw new Error("Enter an address or latitude, longitude before running OSM estimator.");let url=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`;let res=await fetch(url,{headers:{"Accept":"application/json"}});if(!res.ok)throw new Error(`Nominatim geocode failed (${res.status}).`);let data=await res.json();if(!data||!data.length)throw new Error("Address was not found by Nominatim. Try a fuller address or paste coordinates.");return{lat:Number(data[0].lat),lon:Number(data[0].lon),label:data[0].display_name||q}}
@@ -1007,33 +1046,26 @@ out skel qt;`}
 function osmPoiQuery(lat,lon,miles,onlyMissingCats=null){
   let a=osmAround(lat,lon,miles),wanted=new Set(onlyMissingCats||[]);let include=(c)=>!onlyMissingCats||wanted.has(c);let blocks=[];
   if(include("grocery"))blocks.push(
-    `nwr["shop"~"^(supermarket|grocery|department_store|mall|greengrocer|food|general|wholesale)$"]${a};`,
-    `nwr["shop"]["name"~"(market|foods|food imports|grocery|supermarket|mercado|bodega|tienda|carniceria|international|mediterranean|asian|indian|halal|latin)",i]${a};`,
-    `nwr["brand"~"(Kroger|Giant Eagle|Meijer|Aldi|ALDI|Lidl|Trader Joe|Lucky|Walmart|Target|Whole Foods|Sprouts|Publix|Wegmans|Costco|Sam's|BJ's|Food Lion|Save A Lot|Grocery Outlet|Fresh Market|Fresh Thyme)",i]${a};`
+    `nw["shop"~"^(supermarket|grocery|greengrocer)$"]${a};`,
+    `nw["shop"~"^(department_store|wholesale)$"]["brand"~"(Kroger|Giant Eagle|Meijer|Aldi|ALDI|Lidl|Trader Joe|Walmart|Target|Whole Foods|Sprouts|Publix|Wegmans|Costco|Sam's|BJ's|Food Lion|Save A Lot|Grocery Outlet|Fresh Market|Fresh Thyme)",i]${a};`
   );
   if(include("park"))blocks.push(
     `nwr["leisure"~"^(park|playground|recreation_ground|nature_reserve|garden|sports_centre)$"]${a};`,
-    `nwr["landuse"~"^(recreation_ground|forest)$"]${a};`,
-    `nwr["boundary"="protected_area"]${a};`
+    `nwr["boundary"="protected_area"]["name"]${a};`
   );
   if(include("hospital"))blocks.push(
-    `nwr["amenity"~"^(hospital|clinic|doctors)$"]${a};`,
-    `nwr["healthcare"~"^(hospital|clinic|doctor|urgent_care)$"]${a};`
+    `nw["amenity"~"^(hospital|clinic|doctors)$"]${a};`,
+    `nw["healthcare"~"^(hospital|clinic|doctor|urgent_care)$"]${a};`
   );
-  if(include("freeway"))blocks.push(`way["highway"~"^(motorway|trunk|motorway_link|trunk_link)$"]${a};`);
-  if(!onlyMissingCats){
-    blocks.push(
-      `nwr["shop"~"^(hardware|doityourself|home_improvement|garden_centre|paint|laundry|chemist|department_store|mall|clothes|electronics|shoes|computer)$"]${a};`,
-      `nwr["name"~"(Lowe|LOWE|Home Depot|HOME DEPOT|Ace Hardware|ACE Hardware|Menards|MENARDS|True Value|TRUE VALUE|Harbor Freight|HARBOR FREIGHT)"]${a};`,
-      `nwr["brand"~"(Lowe|LOWE|Home Depot|HOME DEPOT|Ace Hardware|ACE Hardware|Menards|MENARDS|True Value|TRUE VALUE|Harbor Freight|HARBOR FREIGHT)"]${a};`,
-      `nwr["amenity"~"^(pharmacy|library|restaurant|cafe|fast_food|ice_cream|cinema|theatre|bar|pub|nightclub|post_office|bank)$"]${a};`,
-      `nwr["leisure"~"^(fitness_centre|sports_centre)$"]${a};`,
-      `nwr["aeroway"="aerodrome"]${a};`,
-      `node["railway"~"^(station|halt|tram_stop|subway_entrance)$"]${a};`,
-      `node["public_transport"="station"]${a};`
-    );
-  }
-  return`[out:json][timeout:90];
+  if(!onlyMissingCats)blocks.push(
+    `nw["shop"~"^(hardware|doityourself|home_improvement|garden_centre|paint|laundry|chemist|department_store|mall|clothes|electronics|shoes|computer)$"]${a};`,
+    `nw["amenity"~"^(pharmacy|library|restaurant|cafe|fast_food|ice_cream|cinema|theatre|bar|pub|nightclub|post_office|bank)$"]${a};`,
+    `nw["leisure"~"^(fitness_centre|sports_centre)$"]${a};`,
+    `nw["aeroway"="aerodrome"]${a};`,
+    `node["railway"~"^(station|halt|tram_stop|subway_entrance)$"]${a};`,
+    `node["public_transport"="station"]${a};`
+  );
+  return`[out:json][timeout:60];
 (
   ${blocks.join("\n  ")}
 );
@@ -1053,10 +1085,9 @@ function osmHardwareBrandQuery(lat,lon,miles){let a=osmAround(lat,lon,miles);ret
 out body center;`}
 function mergeOsmElements(parts,warnings=[]){let map=new Map();for(let part of parts){for(let el of (part&&part.elements)||[]){let key=(el.type||"?")+":"+el.id;if(!map.has(key))map.set(key,el)}}return{elements:[...map.values()],osmWarnings:warnings}}
 const OSM_ENDPOINTS=[
-  {name:"private.coffee",url:"https://overpass.private.coffee/api/interpreter"},
   {name:"maps.mail.ru",url:"https://maps.mail.ru/osm/tools/overpass/api/interpreter"},
-  {name:"z.overpass-api.de",url:"https://z.overpass-api.de/api/interpreter"},
-  {name:"kumi.systems",url:"https://overpass.kumi.systems/api/interpreter"}
+  {name:"kumi.systems",url:"https://overpass.kumi.systems/api/interpreter"},
+  {name:"z.overpass-api.de",url:"https://z.overpass-api.de/api/interpreter"}
 ];
 function osmEndpointOrder(){
   let last="";
@@ -1117,7 +1148,6 @@ async function fetchOverpassQuery(q,label,timeoutMs=30000,allowZero=false){
   for(let i=0;i<endpoints.length;i++){
     let endpoint=endpoints[i];
     try{
-      if(typeof osmStatus==="function")osmStatus(`Fetching ${label}: trying ${endpoint.name} (${i+1}/${endpoints.length})...`);
       osmLog(`${label}: trying ${endpoint.name}`,endpoint.url);
       let json=await postOverpass(endpoint,q,label,timeoutMs);
       if(!allowZero&&((json.elements||[]).length===0)&&!/endpoint smoke test/i.test(label)){
@@ -1129,7 +1159,7 @@ async function fetchOverpassQuery(q,label,timeoutMs=30000,allowZero=false){
       let msg=compactOverpassError(e);
       errors.push(`${endpoint.name}: ${msg}`);
       osmWarn(`${label}: ${endpoint.name} failed`,msg);
-      if(typeof osmStatus==="function")osmStatus(`${label}: ${endpoint.name} failed (${msg}). Trying next Overpass server...`,"warn");
+      if(typeof osmStatus==="function")osmStatus(`Map server ${i+1} was unavailable. Trying a backup…`,"warn");
       await new Promise(r=>setTimeout(r,500));
     }
   }
@@ -1164,19 +1194,19 @@ async function testOverpassEndpoints(){
 }
 async function fetchOsmEstimateData(lat,lon,miles,onlyMissingCats=null){
   let warnings=[],parts=[];
-  // v44: normal OSM runs use one destination/POI query plus one roads+rail query.
-  // Regex/name catch-alls for small groceries and hardware are folded into the destination query so optional fallback failures do not stop the run.
-  try{
-    parts.push(await fetchOverpassQuery(osmPoiQuery(lat,lon,miles,onlyMissingCats),`${miles}-mile OSM destinations`,55000,false));
-  }catch(e){throw e}
   let shouldFetchRoads=miles<=5&&!onlyMissingCats;
-  if(shouldFetchRoads){
-    try{parts.push(await fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile OSM roads and rail`,40000,false))}
-    catch(e){console.warn(e);warnings.push(`Road/rail fetch failed, so route times were estimated from straight-line distance. ${e.message||String(e)}`)}
-  }else if(onlyMissingCats&&onlyMissingCats.includes("freeway")){
-    try{parts.push(await fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile freeway/road fallback`,30000,false))}
-    catch(e){console.warn(e);warnings.push(`Freeway corridor fetch failed in the ${miles}-mile fallback. ${e.message||String(e)}`)}
-  }
+  let shouldFetchFallbackRoads=!!(onlyMissingCats&&onlyMissingCats.includes("freeway"));
+  let poiPromise=fetchOverpassQuery(osmPoiQuery(lat,lon,miles,onlyMissingCats),`${miles}-mile OSM destinations`,45000,false);
+  let roadPromise=null;
+  if(shouldFetchRoads)roadPromise=fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile OSM roads and rail`,40000,false);
+  else if(shouldFetchFallbackRoads)roadPromise=fetchOverpassQuery(osmRoadQuery(lat,lon,miles),`${miles}-mile freeway/road fallback`,30000,false);
+  if(roadPromise){
+    let [poiResult,roadResult]=await Promise.allSettled([poiPromise,roadPromise]);
+    if(poiResult.status!=="fulfilled")throw poiResult.reason;
+    parts.push(poiResult.value);
+    if(roadResult.status==="fulfilled")parts.push(roadResult.value);
+    else{console.warn(roadResult.reason);warnings.push(`${shouldFetchFallbackRoads?"Freeway corridor":"Road/rail"} fetch failed, so some route times may use straight-line estimates. ${roadResult.reason&&roadResult.reason.message||String(roadResult.reason)}`)}
+  }else parts.push(await poiPromise);
   return mergeOsmElements(parts,warnings);
 }
 function osmName(tags,fallback){return tags.name||tags.brand||tags.operator||tags.ref||fallback||"Unnamed"}
@@ -1439,37 +1469,21 @@ function mergeOsmEstimates(primary,fallback){if(!fallback)return primary;let out
   for(let key of ["pharmacy","household","bank","postOffice","laundry","shopping","library","hardware","dining","theater","nightlife","diningTheater","leisure"] ){if(!primary[key]&&fallback[key]){out[key]=fallback[key];out.fallbackUsed.push(key)}}
   if((primary.airports||[]).length<1&&(fallback.airports||[]).length){out.airports=fallback.airports;out.fallbackUsed.push("airports")}
   out.radiusMiles=Math.max(primary.radiusMiles||5,fallback.radiusMiles||10);out.pois=uniqueByNameDist([...primary.pois,...(fallback.pois||[])],.08).slice(0,70);out.counts={...primary.counts};for(let k in fallback.counts)out.counts[k]=Math.max(out.counts[k]||0,fallback.counts[k]||0);out.destinationCount2mi=primary.destinationCount2mi??fallback.destinationCount2mi;out.locationEntertainmentRating=primary.locationEntertainmentRating??fallback.locationEntertainmentRating;out.noise=primary.noise&&primary.noise.rating!==null?primary.noise:fallback.noise;return out}
-async function runOsmEstimator(){try{setOsmBusy(true);osmStatus("Geocoding address...");let geo=await osmGeocodeAddress(osmGeocodeQuery());let data5=await fetchOsmEstimateData(geo.lat,geo.lon,5),p5=buildOsmParsed(data5,geo,5),e5=buildOsmEstimate(p5);let missing=[];if(e5.groceries.length<2)missing.push("grocery");if(e5.parks.length<2)missing.push("park");if(e5.fullHospitals.length<1)missing.push("hospital");if(e5.freeways.length<2)missing.push("freeway");let final=e5;if(missing.length){osmStatus(`5-mile search was missing ${missing.join(", ")}; fetching 10-mile fallback for those only...`);let data10=await fetchOsmEstimateData(geo.lat,geo.lon,10,missing),p10=buildOsmParsed(data10,geo,10),e10=buildOsmEstimate(p10);final=mergeOsmEstimates(e5,e10)}final.geocodeLabel=geo.label;lastOsmEstimate=final;renderOsmEstimate(final);setOsmBusy(false);let warn=final.warnings&&final.warnings.length?` Warnings: ${final.warnings.join(" ")}`:"";osmStatus(`Ready. Found ${final.groceries.length} groceries, ${final.parks.length} valid parks, ${final.fullHospitals.length} full hospitals, ${final.freeways.length} freeway entrances, ${(final.mainRoads||[]).length} main roads, ${(final.fastRoads||[]).length} highways, and ${(final.railLines||[]).length} rail lines.${final.fallbackUsed&&final.fallbackUsed.length?" Used 10-mile fallback for "+final.fallbackUsed.join(", ")+".":""}${warn}`,final.warnings&&final.warnings.length?"warn":"pass");return final}catch(e){console.error(e);setOsmBusy(false);osmStatus(e.message||String(e),"fail");return null}}
-function routeCell(r){if(!r)return"—";if(r.status==="N/A")return`N/A`;return `${html(r.minutes+"m "+r.status)}`}
-function renderOsmEstimate(est){let apply=document.getElementById("applyOsmEstimate");if(apply)apply.disabled=false;renderOsmMap(est);let used=new Set([...(est.groceries||[]).slice(0,2),...(est.parks||[]).slice(0,2),...(est.freeways||[]).slice(0,2),...((est.fullHospitals||[]).slice(0,1)),...((est.erHospitals||[]).slice(0,1)),est.pharmacy,est.library,est.hardware,est.dining,est.theater,est.nightlife,est.bank,est.postOffice,est.laundry,est.shopping].filter(Boolean).map(p=>p.id||p.name));let rows=[];let add=(arr,label)=>{for(let p of arr||[])rows.push({label,...p})};add(est.allGroceries||est.groceries,"Grocery");add((est.allParks||est.parks||[]).slice(0,6),"Park");add((est.fullHospitals||[]).slice(0,4),"Hospital");add((est.urgentHospitals||[]).slice(0,2),"Urgent care");add(est.freeways,"Freeway");add(est.airports,"Airport");add([est.pharmacy].filter(Boolean),"Pharmacy");add([est.library].filter(Boolean),"Library");add([est.hardware].filter(Boolean),"Hardware");add([est.dining].filter(Boolean),"Dining");add([est.theater].filter(Boolean),"Theater");add([est.nightlife].filter(Boolean),"Nightlife");add([est.bank].filter(Boolean),"Bank");add([est.postOffice].filter(Boolean),"Post office");add([est.laundry].filter(Boolean),"Laundry");add([est.shopping].filter(Boolean),"Shopping");add(est.mainRoads,"Main road");add(est.fastRoads,"Highway");add(est.railLines,"Rail");let requiredLabels=["Grocery","Park","Hospital","Urgent care","Freeway","Airport","Pharmacy","Library","Hardware","Dining","Theater","Nightlife","Bank","Post office","Laundry","Shopping","Main road","Highway","Rail"];for(let lab of requiredLabels){if(!rows.some(r=>r.label===lab))rows.push({label:lab,category:"placeholder",name:"Not found",dist:null,walk:null,bike:null,drive:null,notes:"not found"})}let summary=`<p class="tiny"><strong>Route method:</strong> walk/bike/drive follow the OSM road/path graph when possible. Approx still counts for destination buckets unless the route is N/A. <strong>Noise:</strong> ${html(est.noise&&est.noise.label||"Unknown")}</p>`;document.getElementById("osmResults").innerHTML=summary+`<table><thead><tr><th>Use</th><th>Type</th><th>Name</th><th>Dist</th><th>Walk</th><th>Bike</th><th>Drive</th><th>Notes</th></tr></thead><tbody>${rows.slice(0,70).map(p=>{let note=p.hospitalKind||p.notes||(p.parkRatings?`${p.parkRatings.sizeRating}, quality ${p.parkRatings.amenitiesRating}`:(p.category==="grocery"?`${classifyGrocerySize(p)}, score ${r1(p.utility??groceryUtilityScore(p))}/10`:null))||(p.tags&&((p.tags.shop)||(p.tags.amenity)||(p.tags.highway)))||"";let id=String(p.id||p.name||"");let nameHtml=`<span class="osmName">${html(p.name)}</span>`;return`<tr><td><input type="checkbox" class="osmUseCheck" data-osm-label="${html(p.label)}" data-osm-id="${html(id)}" ${used.has(id)?"checked":""} title="Use/apply this OSM result"></td><td>${html(p.label)}</td><td>${nameHtml}</td><td>${Number.isFinite(Number(p.dist))?r1(p.dist)+" mi":"—"}</td><td>${routeCell(p.walk)}</td><td>${routeCell(p.bike)}</td><td>${routeCell(p.drive)}</td><td>${html(note)}</td></tr>`}).join("")}</tbody></table>`}
-function renderOsmMap(est){
-  let el=document.getElementById("osmMapPreview");if(!el)return;
-  let center=est.center,colors={grocery:"#2563eb",dining:"#38bdf8",park:"#84cc16",hospital:"#dc2626",pharmacy:"#fb7185",freeway:"#111827",highway:"#f97316",fastroad:"#f97316",mainroad:"#facc15",rail:"#7c3aed",airport:"#0f766e",library:"#92400e",hardware:"#64748b",theater:"#6d28d9",nightlife:"#1e40af",bank:"#166534",postOffice:"#facc15",laundry:"#ea580c",shopping:"#d2a679"};
-  let legendItems=[
-    ["#2563eb","grocery"],["#38bdf8","dining"],["#84cc16","park"],["#dc2626","hospital"],["#fb7185","pharmacy"],["#92400e","library"],["#64748b","hardware"],["#6d28d9","theater"],["#1e40af","nightlife"],["#166534","bank"],["#facc15","post office"],["#ea580c","laundry"],["#d2a679","shopping"],["#0f766e","airport"],["#94a3b8","local roads & paths"],["#facc15","main road"],["#f97316","55+ highway"],["#111827","freeway/interstate"],["#7c3aed","rail line"]
-  ];
-  let legend=`<div class="osmLegend">${legendItems.map(([c,t])=>`<span style="background:${c}"></span>${t}`).join(" ")}</div>`;
-  let maxR=est.radiusMiles>=10?10:5,sz=720,c=sz/2,scale=(sz*.45)/maxR;
-  let xy=p=>{let dx=(p.lon-center.lon)*Math.cos(center.lat*Math.PI/180)*69.172,dy=(p.lat-center.lat)*69,x=c+dx*scale,y=c-dy*scale;return{x,y}};
-  let roadPriority=w=>w.kind==="freeway"?5:w.kind==="highway"?4:w.kind==="mainroad"?3:w.kind==="rail"?3:w.kind==="major"?1:0;
-  let selectRoads=roads=>{
-    let arr=(roads||[]).filter(w=>w&&w.coords&&w.coords.length>1);
-    // Always keep rail/main/highway/freeway across the full 5-mile area. Only draw local/other roads near the house so major lines are not crowded out.
-    let important=arr.filter(w=>roadPriority(w)>0);
-    let localNear=arr.filter(w=>roadPriority(w)===0&&(w.coords||[]).some(p=>osmDistMi(center,p)<=1.0));
-    let maxLocal=3600;
-    let localStep=Math.max(1,Math.ceil(localNear.length/maxLocal));
-    let sampledLocal=[];
-    for(let i=0;i<localNear.length;i+=localStep)sampledLocal.push(localNear[i]);
-    // Put minor roads first and high-priority layers last so important roads/rail are visible on top.
-    return [...sampledLocal,...important].sort((a,b)=>roadPriority(a)-roadPriority(b));
-  };
-  let roadLine=w=>{let pts=(w.coords||[]).map(xy).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>-40&&p.x<sz+40&&p.y>-40&&p.y<sz+40);if(pts.length<2)return"";let col=w.kind==="rail"?"#7c3aed":w.kind==="freeway"?"#111827":w.kind==="highway"?"#f97316":w.kind==="mainroad"?"#facc15":w.kind==="major"?"#64748b":"#94a3b8";let width=w.kind==="rail"?2.3:w.kind==="freeway"?4.1:w.kind==="highway"?3.1:w.kind==="mainroad"?2.6:w.kind==="major"?2.0:1.25;let dash=w.kind==="rail"?' stroke-dasharray="6 4"':"";return`<polyline points="${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"${dash}/>`};
-  let pin=p=>{let q=xy(p);if(!Number.isFinite(q.x)||!Number.isFinite(q.y)||q.x<0||q.x>sz||q.y<0||q.y>sz)return"";let col=colors[p.category]||"#111827";return`<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="6.8" fill="${col}" stroke="white" stroke-width="1.6"><title>${html(p.name)} (${p.category})</title></circle>`};
-  let roads=selectRoads(est.mapRoads).map(roadLine).join("");
-  let pts=[...(est.pois||[]),...(est.freeways||[])].filter(p=>p.category!=="rail"&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)).slice(0,180);
-  el.innerHTML=`<svg viewBox="0 0 ${sz} ${sz}" role="img" aria-label="OSM static preview"><rect width="${sz}" height="${sz}" fill="#f8fafb"/><circle cx="${c}" cy="${c}" r="${5*scale}" fill="none" stroke="#93c5fd" stroke-width="2"/>${(est.radiusMiles||5)>=10?`<circle cx="${c}" cy="${c}" r="${10*scale}" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7 5"/>`:""}<g>${roads}</g><circle cx="${c}" cy="${c}" r="8" fill="#111827" stroke="white" stroke-width="2"><title>House / start</title></circle>${pts.map(pin).join("")}</svg>${legend}`
-}
+async function runOsmEstimator(){try{
+  setOsmBusy(true);osmStatus("1/5 · Confirming the address…");
+  let geo=await osmGeocodeAddress(osmGeocodeQuery());
+  osmStatus("2/5 · Finding nearby places and loading the road network…");
+  let data5=await fetchOsmEstimateData(geo.lat,geo.lon,5);
+  osmStatus("3/5 · Calculating routes and nearby-place matches…");
+  let p5=buildOsmParsed(data5,geo,5),e5=buildOsmEstimate(p5),missing=[];
+  if(e5.groceries.length<2)missing.push("grocery");if(e5.parks.length<2)missing.push("park");if(e5.fullHospitals.length<1)missing.push("hospital");if(e5.freeways.length<2)missing.push("freeway");
+  let final=e5;
+  if(missing.length){osmStatus(`4/5 · Checking a wider area for ${missing.join(", ")}…`);let data10=await fetchOsmEstimateData(geo.lat,geo.lon,10,missing),p10=buildOsmParsed(data10,geo,10),e10=buildOsmEstimate(p10);final=mergeOsmEstimates(e5,e10)}
+  else osmStatus("4/5 · Nearby coverage looks complete.");
+  osmStatus("5/5 · Building the map and Location score…");final.geocodeLabel=geo.label;lastOsmEstimate=final;renderOsmEstimate(final);setOsmBusy(false);
+  let warn=final.warnings&&final.warnings.length?` ${final.warnings.join(" ")}`:"";osmStatus(`Location scan complete.${final.fallbackUsed&&final.fallbackUsed.length?" Wider search used for "+final.fallbackUsed.join(", ")+".":""}${warn}`,final.warnings&&final.warnings.length?"warn":"pass");return final
+}catch(e){console.error(e);setOsmBusy(false);osmStatus(e.message||String(e),"fail");return null}}
+
 function selectedOsmRows(label,candidates,fallback){let boxes=[...document.querySelectorAll(".osmUseCheck")].filter(b=>b.dataset.osmLabel===label);if(!boxes.length)return fallback||[];let ids=boxes.filter(b=>b.checked).map(b=>String(b.dataset.osmId));let pool=candidates||[];return ids.map(id=>pool.find(p=>String(p.id||p.name)===id)).filter(Boolean)}
 function applyOsmEstimate(){let est=lastOsmEstimate;if(!est){osmStatus("Run the estimator first.","fail");return}let h=state.current,l=h.location,applied=[];let fill=(k,v,label,source="osm-direct")=>{if(v===undefined||v===null||v==="")return;let can=isUnknown(l[k])||(h.autoSources&&h.autoSources[pathKey("location",k)]);if(can){l[k]=v;markAuto(h,"location",k,label||"OSM estimate",source);applied.push(label||k)}};
   let chosenGroceries=selectedOsmRows("Grocery",est.allGroceries||est.groceries,est.groceries).slice(0,2);if((isUnknown(l.groceryStores)||(h.autoSources&&h.autoSources[pathKey("location","groceryStores")]))&&chosenGroceries.length){l.groceryStores=chosenGroceries.map(p=>({name:p.name,size:classifyGrocerySize(p),walkMinutes:p.walk&&p.walk.minutes,walkRoute:p.walk&&p.walk.qualified?"Qualified":"Not qualified",bikeMinutes:p.bike&&p.bike.minutes,bikeRoute:p.bike&&p.bike.qualified?"Qualified":"Not qualified",driveMinutes:p.drive&&p.drive.minutes}));markAuto(h,"location","groceryStores","OSM grocery names + route estimates","osm-direct");applied.push("grocery stores")}
@@ -1480,89 +1494,35 @@ function applyOsmEstimate(){let est=lastOsmEstimate;if(!est){osmStatus("Run the 
   fill("pharmacyAccess",accessBucket(pharmacy),"OSM pharmacy estimate");fill("libraryAccess",accessBucket(library),"OSM library estimate");fill("hardwareAccess",accessBucket(hardware),"OSM hardware estimate");fill("diningAccess",accessBucket(dining),"OSM dining estimate");fill("theaterAccess",accessBucket(theater),"OSM theater estimate");fill("nightlifeAccess",accessBucket(nightlife),"OSM nightlife estimate");fill("bankAccess",accessBucket(bank),"OSM bank estimate");fill("postOfficeAccess",accessBucket(postOffice),"OSM post office estimate");fill("laundryAccess",accessBucket(laundry),"OSM laundry estimate");fill("shoppingAccess",accessBucket(shopping),"OSM shopping estimate");let commercialAirport=selectedOsmRows("Airport",est.airports||[],est.airports||[]).find(a=>a.airportMatch&&a.drive&&a.drive.minutes);if(commercialAirport){let code=commercialAirport.airportMatch.code;let data=commercialAirport.airportMatch.data;fill("commercialAirportName",`${code} - ${data.name||commercialAirport.name}`,"OSM matched commercial airport name");fill("commercialAirportDriveMinutes",commercialAirport.drive.minutes,"OSM commercial airport drive estimate")}
   fill("destinationCount2mi",est.destinationCount2mi,"OSM 2-mile destination count");fill("locationEntertainmentRating",est.locationEntertainmentRating,"OSM local entertainment/destination density estimate");fill("noiseRating",est.noise&&est.noise.rating,"OSM fast-road/airport/rail/destination noise proxy","assumed");fill("noiseDetails",est.noise&&est.noise.causes?est.noise.causes.map(c=>`${c.name}: ${Number.isFinite(Number(c.dist))?(c.key==="destinations"?c.dist:display(r1(c.dist))+" mi"):"not found"} → ${c.level}`).concat([`Moderate causes: ${est.noise.components.moderateCount}`,`Loud causes: ${est.noise.components.loudCount}`,`Chosen noise category: ${est.noise.components.chosenLabel}`]).join("\n"):null,"OSM noise explanation","assumed");state.current.updatedAt=new Date().toISOString();osmStatus(`Applied ${applied.length} OSM estimate group(s).`,"pass");render()}
 function handleTopInputs(){
-  let osmRun=document.getElementById("runOsmEstimator"),osmApply=document.getElementById("applyOsmEstimate"),osmTest=document.getElementById("testOsmServers");
-  if(osmRun)osmRun.onclick=runOsmEstimator;
-  if(osmApply)osmApply.onclick=applyOsmEstimate;
+  let osmApply=document.getElementById("applyOsmEstimate"),osmTest=document.getElementById("testOsmServers");
+  if(osmApply)osmApply.onclick=()=>{applyOsmEstimate();state.locationReady=true;state.current.locationCalculated=true;renderScores()};
   if(osmTest)osmTest.onclick=testOverpassEndpoints;
-  let modeInput=document.getElementById("mode");
-  if(modeInput)modeInput.onchange=e=>{state.mode=e.target.value;renderScores();renderSaved();renderComparison()};
+  let modeInput=document.getElementById("mode");if(modeInput)modeInput.onchange=e=>{state.mode=e.target.value;renderScores();renderSaved();renderComparison()};
 
-  document.getElementById("newBtn").onclick=()=>{state.current=blankHouse();state.lastParserWarnings=[];state.lastParseSummary=[];state.ratingStatus="notRun";state.ratingNote="";lastOsmEstimate=null;render()};
-  document.getElementById("sampleBtn").onclick=()=>{state.current=sampleHouse();state.lastParserWarnings=[];state.lastParseSummary=[];state.ratingStatus="ready";state.ratingNote="Sample rating loaded.";lastOsmEstimate=null;render()};
+  document.getElementById("newBtn").onclick=()=>{state.current=blankHouse();state.lastParserWarnings=[];state.lastParseSummary=[];state.ratingStatus="notRun";state.ratingNote="";state.houseCityReady=false;state.locationReady=false;clearOsmPreview("Nearby places will appear here.");osmStatus("Calculate the Location score to load the map.");render()};
+  document.getElementById("sampleBtn").onclick=()=>{state.current=sampleHouse();state.lastParserWarnings=[];state.lastParseSummary=[];state.ratingStatus="ready";state.ratingNote="Sample House & City scores loaded.";state.houseCityReady=true;state.locationReady=true;state.current.houseCityCalculated=true;state.current.locationCalculated=true;state.current.osmAddressKey=currentAddressKey();clearOsmPreview("Sample data has no live OSM map. Change the address to run a Location scan.");render()};
   document.getElementById("saveBtn").onclick=save;
-  document.getElementById("deleteBtn").onclick=()=>{state.saved=state.saved.filter(h=>h.id!==state.current.id);persist();state.current=blankHouse();state.ratingStatus="notRun";state.ratingNote="";lastOsmEstimate=null;render()};
-  document.getElementById("testBtn").onclick=runTests;
-  document.getElementById("loadHardcodedEditor").onclick=loadHardcodedEditor;
-  document.getElementById("applyHardcodedEditor").onclick=applyHardcodedEditor;
-  document.getElementById("exportHardcodedJson").onclick=exportHardcodedJson;
-  document.getElementById("downloadHardcodedHtml").onclick=downloadHtmlWithEmbeddedData;
-  document.getElementById("renderHardcodedSheet").onclick=renderHardcodedSheet;
-  document.getElementById("applyHardcodedSheet").onclick=applyHardcodedSheet;
-  document.getElementById("hardcodedSheetType").onchange=renderHardcodedSheet;
-  document.getElementById("hardcodedSheetFilter").oninput=renderHardcodedSheet;
-  document.getElementById("exportOne").onclick=()=>download((state.current.name||"house")+".json",state.current);
-  document.getElementById("exportAll").onclick=()=>download("house-ratings.json",state.saved);
+  document.getElementById("deleteBtn").onclick=()=>{state.saved=state.saved.filter(h=>h.id!==state.current.id);persist();state.current=blankHouse();state.ratingStatus="notRun";state.ratingNote="";state.houseCityReady=false;state.locationReady=false;clearOsmPreview("Nearby places will appear here.");render()};
+  document.getElementById("testBtn").onclick=runTests;document.getElementById("loadHardcodedEditor").onclick=loadHardcodedEditor;document.getElementById("applyHardcodedEditor").onclick=applyHardcodedEditor;document.getElementById("exportHardcodedJson").onclick=exportHardcodedJson;document.getElementById("downloadHardcodedHtml").onclick=downloadHtmlWithEmbeddedData;document.getElementById("renderHardcodedSheet").onclick=renderHardcodedSheet;document.getElementById("applyHardcodedSheet").onclick=applyHardcodedSheet;document.getElementById("hardcodedSheetType").onchange=renderHardcodedSheet;document.getElementById("hardcodedSheetFilter").oninput=renderHardcodedSheet;document.getElementById("exportOne").onclick=()=>download((state.current.name||"house")+".json",state.current);document.getElementById("exportAll").onclick=()=>download("house-ratings.json",state.saved);
 
-  document.getElementById("parseBtn").onclick=()=>{
-    let ok=fillAddressInfoFromListing(state.current);
-    state.lastParserWarnings=[];
-    state.lastParseSummary=[];
-    state.ratingStatus="notRun";
-    state.ratingNote=ok?"Address filled. Check it, then run.":"Could not find an address. Enter it below.";
-    lastOsmEstimate=null;
-    render();
-  };
+  document.getElementById("parseBtn").onclick=()=>{let before=currentAddressKey(),ok=fillAddressInfoFromListing(state.current),after=currentAddressKey();state.lastParserWarnings=[];state.lastParseSummary=[];state.houseCityReady=false;state.current.houseCityCalculated=false;state.ratingStatus="notRun";state.ratingNote=ok?"Address filled. Make sure it is correct, then calculate House & City.":"Could not find an address. Enter it below.";if(before!==after){state.locationReady=false;state.current.locationCalculated=false;clearOsmPreview("Address ready. Calculate the Location score to load nearby places.")}render()};
 
-  document.getElementById("rateBtn").onclick=async()=>{
-    if(!String(state.current.address||"").trim()){
-      setRatingStatus("failed","Enter a correct address first.");
-      document.getElementById("address").focus();
-      return;
-    }
-    let btn=document.getElementById("rateBtn");
-    btn.disabled=true;
-    btn.textContent="Running...";
-    setRatingStatus("running","Running rating...");
-    let parsed=parseListingInto(state.current);
-    inferFromText(state.current);
-    let applied=applyHardcodedData(state.current);
-    if(!state.current.name||state.current.name==="New blank house")state.current.name=state.current.address||"House";
-    state.lastParserWarnings=parsed.warnings||[];
-    state.lastParseSummary=[...(parsed.summary||[]),...applied.map(x=>({field:"Auto-fill",value:x,snippet:"Built-in location data"}))];
-    render();
+  document.getElementById("houseCityBtn").onclick=()=>{if(!String(state.current.address||"").trim()){setRatingStatus("failed","Enter a correct address first.");document.getElementById("address").focus();return}setRatingStatus("running","Calculating House & City scores…");let parsed=parseListingInto(state.current);inferFromText(state.current);let applied=applyHardcodedData(state.current);if(!state.current.name||state.current.name==="New blank house")state.current.name=state.current.address||"House";state.lastParserWarnings=parsed.warnings||[];state.lastParseSummary=[...(parsed.summary||[]),...applied.map(x=>({field:"Auto-fill",value:x,snippet:"Built-in location data"}))];state.houseCityReady=true;state.current.houseCityCalculated=true;state.ratingStatus="ready";state.ratingNote="House & City scores calculated.";render()};
 
-    let osm=await runOsmEstimator();
-    if(osm){
-      applyOsmEstimate();
-      state.ratingStatus="ready";
-      state.ratingNote="Rating complete.";
-    }else{
-      state.ratingStatus="ready";
-      state.ratingNote="Rating complete. Nearby scan failed.";
-    }
-    btn=document.getElementById("rateBtn");
-    if(btn){btn.disabled=false;btn.textContent="2. Run rating";}
-    render();
-  };
+  document.getElementById("locationScoreBtn").onclick=async()=>{let key=currentAddressKey();if(!key){osmStatus("Confirm the address first.","fail");updateLocationRunControl();return}if(state.current.osmAddressKey===key&&state.locationReady){updateLocationRunControl();return}if(osmCooldownRemaining()>0){updateLocationRunControl();return}setOsmLastAttemptAt(Date.now());state.locationReady=false;renderScores();updateLocationRunControl();let osm=await runOsmEstimator();if(osm){applyOsmEstimate();state.current.osmAddressKey=key;state.locationReady=true;state.current.locationCalculated=true;state.current.updatedAt=new Date().toISOString();osmStatus("Location score calculated. Use ‘Adjust location selection’ if anything on the map looks wrong.","pass")}else{state.locationReady=false;state.current.locationCalculated=false;osmStatus("Location scan failed. You can retry after the one-minute cooldown.","fail")}render()};
 
   document.getElementById("name").oninput=e=>{state.current.name=e.target.value;renderSaved()};
-  document.getElementById("address").oninput=e=>{state.current.address=e.target.value;markRatingStale();renderSaved()};
-  document.getElementById("community").onfocus=e=>{if(e.target.value==="Unknown")e.target.value=""};
-  document.getElementById("community").onblur=e=>{state.current.community=strOrNull(e.target.value);clearAuto("root","community");markRatingStale();render()};
-  document.getElementById("metroArea").onfocus=e=>{if(e.target.value==="Unknown")e.target.value=""};
-  document.getElementById("metroArea").onblur=e=>{state.current.metroArea=strOrNull(e.target.value);clearAuto("root","metroArea");markRatingStale();render()};
-  document.getElementById("stateField").onchange=e=>{state.current.state=e.target.value==="Unknown"?null:e.target.value;clearAuto("root","state");markRatingStale();render()};
-  document.getElementById("listing").oninput=e=>{state.current.listingText=e.target.value;if(state.ratingStatus==="ready")markRatingStale()};
-
-  document.getElementById("majorIssuesPreset").onchange=e=>{state.current.facts.majorIssueLevel=e.target.value==="Unknown"?null:e.target.value;render()};
-  document.getElementById("issues").onfocus=e=>{if(e.target.value==="Unknown")e.target.value=""};
-  document.getElementById("issues").onblur=e=>{state.current.facts.majorIssues=strOrNull(e.target.value);render()};
-  document.getElementById("addGrocery").onclick=()=>{let stores=Array.isArray(state.current.location.groceryStores)?state.current.location.groceryStores.slice():[];stores.push({name:"New grocery",size:"Large",walkMinutes:null,walkRoute:"Unknown",bikeMinutes:null,bikeRoute:"Unknown",driveMinutes:null});state.current.location.groceryStores=stores;render()};
-  document.getElementById("addAirport").onclick=()=>{let rows=Array.isArray(state.current.location.airports)?state.current.location.airports.slice():[];rows.push({code:"",name:"New airport",qualityScore:null,driveMinutes:null,transitMinutes:null});state.current.location.airports=rows;clearAuto("location","airports");render()};
-  document.getElementById("addPark").onclick=()=>{let rows=Array.isArray(state.current.location.parks)?state.current.location.parks.slice():[];rows.push({name:"New park",access:"Unknown",sizeRating:null,amenitiesRating:"C"});state.current.location.parks=rows;clearAuto("location","parks");render()};
-  document.getElementById("importFile").onchange=async e=>{let file=e.target.files[0];if(!file)return;let parsed=JSON.parse(await file.text()),arr=(Array.isArray(parsed)?parsed:[parsed]).map(normalize).map(h=>({...h,id:uid("imported")}));state.saved=arr.concat(state.saved);state.current=arr[0];state.ratingStatus="ready";state.ratingNote="Imported rating loaded.";persist();e.target.value="";render()};
+  document.getElementById("address").oninput=e=>{state.current.address=e.target.value;markAddressChanged();renderSaved()};
+  document.getElementById("community").onfocus=e=>{if(e.target.value==="Unknown")e.target.value=""};document.getElementById("community").onblur=e=>{state.current.community=strOrNull(e.target.value);clearAuto("root","community");markHouseCityStale();render()};
+  document.getElementById("metroArea").onfocus=e=>{if(e.target.value==="Unknown")e.target.value=""};document.getElementById("metroArea").onblur=e=>{state.current.metroArea=strOrNull(e.target.value);clearAuto("root","metroArea");markHouseCityStale();render()};
+  document.getElementById("stateField").onchange=e=>{state.current.state=e.target.value==="Unknown"?null:e.target.value;clearAuto("root","state");markHouseCityStale();render()};
+  document.getElementById("listing").oninput=e=>{state.current.listingText=e.target.value;markHouseCityStale()};
+  document.getElementById("majorIssuesPreset").onchange=e=>{state.current.facts.majorIssueLevel=e.target.value==="Unknown"?null:e.target.value;render()};document.getElementById("issues").onfocus=e=>{if(e.target.value==="Unknown")e.target.value=""};document.getElementById("issues").onblur=e=>{state.current.facts.majorIssues=strOrNull(e.target.value);render()};
+  document.getElementById("addGrocery").onclick=()=>{let stores=Array.isArray(state.current.location.groceryStores)?state.current.location.groceryStores.slice():[];stores.push({name:"New grocery",size:"Large",walkMinutes:null,walkRoute:"Unknown",bikeMinutes:null,bikeRoute:"Unknown",driveMinutes:null});state.current.location.groceryStores=stores;render()};document.getElementById("addAirport").onclick=()=>{let rows=Array.isArray(state.current.location.airports)?state.current.location.airports.slice():[];rows.push({code:"",name:"New airport",qualityScore:null,driveMinutes:null,transitMinutes:null});state.current.location.airports=rows;clearAuto("location","airports");render()};document.getElementById("addPark").onclick=()=>{let rows=Array.isArray(state.current.location.parks)?state.current.location.parks.slice():[];rows.push({name:"New park",access:"Unknown",sizeRating:null,amenitiesRating:"C"});state.current.location.parks=rows;clearAuto("location","parks");render()};
+  document.getElementById("importFile").onchange=async e=>{let file=e.target.files[0];if(!file)return;let parsed=JSON.parse(await file.text()),arr=(Array.isArray(parsed)?parsed:[parsed]).map(normalize).map(h=>({...h,id:uid("imported")}));state.saved=arr.concat(state.saved);state.current=arr[0];state.ratingStatus="ready";state.ratingNote="Imported House & City scores loaded.";state.houseCityReady=true;state.locationReady=true;state.current.houseCityCalculated=true;state.current.locationCalculated=true;if(!state.current.osmAddressKey)state.current.osmAddressKey=currentAddressKey();persist();e.target.value="";clearOsmPreview("Imported data has no live OSM map. Change the address to run a new Location scan.");render()};
 }
-load();handleTopInputs();state.current=blankHouse();state.ratingStatus="notRun";render();window.HouseRatings={blankHouse,normalize,parseListingInto,scoreHouse,scoreLocation,scoreCity,fullScore,groceryLine,runTests,sampleHouse,ZILLOW_FIXTURE,applyHardcodedData,currentHardcodedBundle,activeHardcodedData,findCrimeData,applyCrimeData,applyMetroCrimeData,airportAccessLine,airportRowScore,runOsmEstimator,applyOsmEstimate,testOverpassEndpoints};
+setInterval(updateLocationRunControl,1000);
+load();handleTopInputs();state.current=blankHouse();state.ratingStatus="notRun";state.houseCityReady=false;state.locationReady=false;render();window.HouseRatings={blankHouse,normalize,parseListingInto,scoreHouse,scoreLocation,scoreCity,fullScore,groceryLine,runTests,sampleHouse,ZILLOW_FIXTURE,applyHardcodedData,currentHardcodedBundle,activeHardcodedData,findCrimeData,applyCrimeData,applyMetroCrimeData,airportAccessLine,airportRowScore,runOsmEstimator,applyOsmEstimate,testOverpassEndpoints};
 </script>
 </body>
 </html>
