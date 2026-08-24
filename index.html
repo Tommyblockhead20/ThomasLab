@@ -6,6 +6,7 @@
   <meta name="description" content="Interactive projects, games, maps, rankings, and other things Thomas made.">
   <meta name="theme-color" content="#fff8ed">
   <title>Thomas Made This</title>
+  <!-- v27 -->
   <style>
     :root {
       --bg: #fff8ed;
@@ -178,10 +179,12 @@
       box-shadow: 8px 8px 0 var(--line);
       transform: rotate(6deg);
       cursor: pointer;
-      transition: transform .2s ease;
+      translate: var(--mascot-x, 0px) var(--mascot-y, 0px);
+      transition: transform .2s ease, translate .12s ease-out;
     }
 
     .hero-doodle:hover { transform: rotate(-3deg) scale(1.04); }
+    .hero-doodle.avoiding { transition: transform .16s ease, translate .1s ease-out; }
     .hero-doodle.bounce { animation: bounce .62s cubic-bezier(.2,.85,.2,1); }
 
     .hero-doodle .eye {
@@ -270,62 +273,6 @@
       line-height: 1;
       color: #e5a900;
       transform: rotate(-10deg);
-    }
-
-    .party-hat {
-      position: absolute;
-      width: 0;
-      height: 0;
-      left: 50%;
-      top: -36px;
-      z-index: 3;
-      border-left: 30px solid transparent;
-      border-right: 30px solid transparent;
-      border-bottom: 70px solid #ffd76a;
-      transform: translateX(-50%) rotate(-4deg) scale(.8);
-      transform-origin: bottom center;
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .party-hat::after {
-      content: "";
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      left: -8px;
-      top: 55px;
-      border: 2px solid var(--line);
-      border-radius: 50%;
-      background: #addcff;
-    }
-
-    .hero-doodle.party .party-hat {
-      opacity: 1;
-      animation: hatpop .48s cubic-bezier(.2,.9,.25,1.2);
-    }
-
-    @keyframes hatpop {
-      0% { transform: translateX(-50%) rotate(-10deg) scale(.2); }
-      70% { transform: translateX(-50%) rotate(5deg) scale(1.08); }
-      100% { transform: translateX(-50%) rotate(-4deg) scale(.8); }
-    }
-
-    .face-spark {
-      position: fixed;
-      z-index: 120;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      pointer-events: none;
-      animation: facespark .7s ease-out forwards;
-    }
-
-    @keyframes facespark {
-      to {
-        opacity: 0;
-        transform: translate(var(--sx), var(--sy)) scale(.2);
-      }
     }
 
     .about {
@@ -517,6 +464,17 @@
       100% { transform: translateX(0) rotate(0); }
     }
 
+    .train-icon.active .train-glyph { animation: trainDash .68s ease 1; }
+    .steam.extra-steam {
+      opacity: 0;
+      animation: extraSteam var(--dur, .8s) ease-out forwards !important;
+    }
+    @keyframes extraSteam {
+      0% { opacity: 0; transform: translate(0, 6px) scale(.35); }
+      18% { opacity: .95; }
+      100% { opacity: 0; transform: translate(var(--sx, -12px), var(--sy, -30px)) scale(1.65); }
+    }
+
     .traffic-case {
       width: 29px;
       height: 51px;
@@ -618,7 +576,7 @@
     }
 
     .card:hover .compass-icon .compass-needle { animation: compassWander 12s ease-in-out infinite; }
-    .card:hover .compass-icon.active .compass-needle { animation: compassSpin 1.5s cubic-bezier(.2,.8,.2,1); }
+    .card:hover .compass-icon.active .compass-needle, .compass-icon.active .compass-needle { animation: compassSpin 1.5s cubic-bezier(.2,.8,.2,1); }
     @keyframes compassSpin { to { transform: rotate(720deg); } }
 
     .dice-face {
@@ -676,6 +634,13 @@
       24%, 42%, 51%, 67% { opacity: .82; transform: translateX(-4px) scaleX(-1) scale(1); }
       46%, 46.1% { opacity: 0; }
     }
+    .bike-icon.active .bike-pack { animation: bikeRide 2.5s ease-in-out 1; }
+    .bike-icon.active .bike-dust { animation: bikeDust 2.5s linear 1; }
+    .bike-icon.boost .bike-pack { animation: bikeRide 1.15s ease-in-out 1; }
+    .bike-icon.boost .bike-dust { animation: bikeDust 1.15s linear 1; }
+    .card:hover .bike-icon.boost .bike-pack { animation: bikeRide 1.15s ease-in-out 1; }
+    .card:hover .bike-icon.boost .bike-dust { animation: bikeDust 1.15s linear 1; }
+
 
     .map-stage {
       width: 58px;
@@ -699,7 +664,28 @@
       transform-box: fill-box;
       transform-origin: center;
     }
+    .us-backdrop {
+      fill: #f5f1e7;
+      stroke: rgba(23,23,23,.34);
+      stroke-width: .72;
+      vector-effect: non-scaling-stroke;
+    }
+    .us-outline {
+      fill: none;
+      stroke: rgba(23,23,23,.42);
+      stroke-width: .72;
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+    }
+    .map-water {
+      fill: #d8efff;
+      stroke: rgba(23,23,23,.18);
+      stroke-width: .32;
+      vector-effect: non-scaling-stroke;
+      pointer-events: none;
+    }
     .state-cell.good { fill: #73d596; }
+    .state-cell.mid { fill: #ffd166; }
     .state-cell.bad { fill: #ff8e86; }
     .state-cell.just-flipped { transform: scale(.84); }
     .map-icon.active .us-score-map { animation: mapScorePop .55s ease; }
@@ -711,6 +697,18 @@
       background: rgba(255,255,255,.76);
       overflow: hidden;
     }
+    .house-icon.manual .house-body,
+    .house-icon.manual .house-roof,
+    .house-icon.manual .house-door,
+    .house-icon.manual .house-mark,
+    .house-icon.manual .house-chimney,
+    .house-icon.manual .house-hedge,
+    .house-icon.manual .house-window-box,
+    .house-icon.manual .house-dormer,
+    .house-icon.manual .house-dormer::before { animation: none !important; }
+    .house-icon.house-pop .house-stage { animation: housePop .42s cubic-bezier(.2,.9,.2,1); }
+    @keyframes housePop { 45% { transform: scale(1.1) rotate(-3deg); } }
+
     .house-stage {
       width: 58px;
       height: 54px;
@@ -995,7 +993,7 @@
     @keyframes scissorB { 0%,100% { transform: rotate(25deg); } 50% { transform: rotate(-5deg); } }
 
     .card:hover .scissors-icon .icon-glyph { animation: simpleScissors 1.7s ease-in-out infinite; }
-    .card:hover .scissors-icon.active .icon-glyph { animation: simpleScissors .7s ease-in-out 2; }
+    .card:hover .scissors-icon.active .icon-glyph, .scissors-icon.active .icon-glyph { animation: simpleScissors .7s ease-in-out 2; }
     @keyframes simpleScissors { 0%,100% { transform: rotate(-4deg); } 50% { transform: rotate(8deg) scale(1.08); } }
 
     .tier-board {
@@ -1012,10 +1010,11 @@
       height: 33.333%;
       display: flex;
       align-items: center;
+      width: 100%;
       padding-left: 3px;
       border-bottom: 1px solid rgba(23,23,23,.35);
-      font-size: 8px;
-      font-weight: 900;
+      font-size: 7px;
+      font-weight: 950;
     }
     .tier-row:last-child { border-bottom: 0; }
     .tier-row.s { background: #ffb3ae; }
@@ -1026,15 +1025,15 @@
       left: 0;
       top: 0;
       z-index: 2;
-      width: 11px;
-      height: 11px;
+      width: 9px;
+      height: 9px;
       display: grid;
       place-items: center;
       font-style: normal;
-      font-size: 10px;
+      font-size: 8.5px;
       line-height: 1;
       opacity: 0;
-      transform: translate(25px,22px) scale(.25) rotate(-18deg);
+      transform: translate(28px,22px) scale(.25) rotate(-18deg);
       transition: transform .24s cubic-bezier(.2,.82,.2,1), opacity .16s ease;
       filter: drop-shadow(.5px .5px 0 rgba(23,23,23,.18));
     }
@@ -1042,10 +1041,14 @@
       opacity: 1;
       transform: translate(var(--tx),var(--ty)) scale(1) rotate(var(--rot));
     }
+    .tier-item.reranked { animation: tierAppeal .36s cubic-bezier(.2,.9,.2,1); }
+    @keyframes tierAppeal {
+      45% { scale: 1.35; }
+    }
 
     .pirate-icon .icon-glyph { transform-origin: 25% 65%; }
     .card:hover .pirate-icon .icon-glyph { animation: flagWave 3.25s ease-in-out infinite; }
-    .card:hover .pirate-icon.active .icon-glyph { animation: pirateSwing 1.15s ease; }
+    .card:hover .pirate-icon.active .icon-glyph, .pirate-icon.active .icon-glyph { animation: pirateSwing 1.15s ease; }
     @keyframes flagWave { 0%,100% { transform: rotate(-5deg) skewY(-2deg); } 50% { transform: rotate(6deg) skewY(3deg); } }
     @keyframes pirateSwing { 50% { transform: rotate(18deg) scale(1.18); } }
 
@@ -1099,7 +1102,31 @@
     @keyframes pirateLoot { 0%,42% { opacity:0; } 43%,100% { opacity:1; } }
     @keyframes stolenArrow { 0%,42% { opacity:1; } 43%,100% { opacity:0; } }
 
-    .card:hover .boot-icon .icon-glyph, .card:hover .boot-icon.active .icon-glyph { animation: bootStep 1.35s ease; }
+    .pirate-bribe-label {
+      position: absolute;
+      right: 18px;
+      bottom: 17px;
+      z-index: 24;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 12px;
+      border: 2px solid var(--line);
+      border-radius: 999px;
+      background: #ffd76a;
+      box-shadow: 3px 3px 0 var(--line);
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 950;
+      transform: rotate(-2deg);
+      pointer-events: none;
+    }
+    .card.pirate-locked > .arrow { opacity: 0; }
+    .card.pirate-locked .pirate-bribe-label { display: inline-flex; }
+    .card.pirate-locked { cursor: pointer; }
+
+    .card:hover .boot-icon .icon-glyph, .card:hover .boot-icon.active .icon-glyph, .boot-icon.active .icon-glyph { animation: bootStep 1.35s ease; }
     @keyframes bootStep { 45% { transform: translate(7px,-5px) rotate(-9deg); } }
 
     .challenge-stage {
@@ -1116,6 +1143,72 @@
       pointer-events: none;
     }
     .challenge-scene.one { opacity: 1; }
+    /* A click creates a temporary copy of the current challenge, sabotages it, then removes it completely. */
+    .challenge-icon.failing .challenge-scene:not(.challenge-fail-copy) {
+      /* Keep the underlying 9s challenge timeline running while the failure copy plays.
+         If we cancel the original animations here, the scene and its child props restart
+         at different phases afterward and later challenges look broken. */
+      opacity: 0 !important;
+      visibility: hidden;
+    }
+    .challenge-fail-copy {
+      opacity: 1 !important;
+      z-index: 9;
+      animation: none !important;
+    }
+    .challenge-fail-copy.run.fail-one .throw-ball {
+      opacity: 1 !important;
+      offset-path: path("M 6 40 Q 17 2 34 10 Q 54 -2 71 2");
+      animation: challengeBallMiss .78s cubic-bezier(.18,.76,.25,1) 1 both !important;
+    }
+    .challenge-fail-copy.run.fail-one .throw-cup {
+      animation: failedTargetWobble .78s ease 1 both !important;
+    }
+    @keyframes challengeBallMiss {
+      0% { offset-distance: 0%; opacity: 1; transform: scale(.92); }
+      45% { offset-distance: 54%; opacity: 1; transform: scale(1); }
+      100% { offset-distance: 100%; opacity: 0; transform: scale(.78); }
+    }
+    @keyframes failedTargetWobble {
+      0%,48% { transform: rotate(-2deg); }
+      64% { transform: rotate(5deg); }
+      80% { transform: rotate(-4deg); }
+      100% { transform: rotate(-2deg); }
+    }
+
+    .challenge-fail-copy.run.fail-two .stack-cup { opacity: 1 !important; }
+    .challenge-fail-copy.run.fail-two .stack-cup.c::after {
+      content: "";
+      position: absolute;
+      width: 2px;
+      height: 12px;
+      left: 7px;
+      top: 0;
+      border-radius: 2px;
+      background: var(--line);
+      transform: rotate(23deg);
+      transform-origin: top center;
+      animation: crackAppear .82s steps(1,end) 1 both;
+    }
+    @keyframes crackAppear { 0%,18% { opacity:0; } 19%,100% { opacity:1; } }
+    .challenge-fail-copy.run.fail-two .stack-cup.a { animation: failedCupA .82s cubic-bezier(.18,.8,.2,1) 1 both !important; }
+    .challenge-fail-copy.run.fail-two .stack-cup.b { animation: failedCupB .82s cubic-bezier(.18,.8,.2,1) 1 both !important; }
+    .challenge-fail-copy.run.fail-two .stack-cup.c { animation: failedCupC .82s cubic-bezier(.18,.8,.2,1) 1 both !important; }
+    @keyframes failedCupA { 0% { transform:translate(0,0) rotate(0); opacity:1; } 100% { transform:translate(-15px,8px) rotate(-58deg); opacity:0; } }
+    @keyframes failedCupB { 0% { transform:translate(0,0) rotate(0); opacity:1; } 100% { transform:translate(15px,9px) rotate(54deg); opacity:0; } }
+    @keyframes failedCupC { 0% { transform:translate(0,0) rotate(0); opacity:1; } 100% { transform:translate(7px,17px) rotate(86deg); opacity:0; } }
+
+    .challenge-fail-copy.run.fail-three .paper-plane {
+      opacity: 1 !important;
+      animation: planeMissRing .82s cubic-bezier(.18,.75,.23,1) 1 both !important;
+    }
+    .challenge-fail-copy.run.fail-three .plane-ring { animation: ringWobble .82s ease 1 both !important; }
+    @keyframes planeMissRing {
+      0% { transform:translate(-5px,8px) rotate(-12deg) scale(.8); opacity:1; }
+      55% { transform:translate(22px,12px) rotate(18deg) scale(1); opacity:1; }
+      100% { transform:translate(58px,24px) rotate(38deg) scale(.8); opacity:0; }
+    }
+    @keyframes ringWobble { 0%,45% { transform:rotate(0); } 60% { transform:rotate(11deg); } 76% { transform:rotate(-8deg); } 100% { transform:rotate(0); } }
     .card:hover .challenge-icon .challenge-scene.one { animation: sceneOne 9s steps(1,end) infinite; }
     .card:hover .challenge-icon .challenge-scene.two { animation: sceneTwo 9s steps(1,end) infinite; }
     .card:hover .challenge-icon .challenge-scene.three { animation: sceneThree 9s steps(1,end) infinite; }
@@ -1336,7 +1429,7 @@
       pointer-events: none;
       will-change: transform, opacity;
     }
-    .recipe-turning-page.flipping { animation: recipePageSweep .78s cubic-bezier(.36,.02,.24,1) 1; }
+    .recipe-turning-page.flipping { animation: recipePageSweep .54s cubic-bezier(.36,.02,.24,1) 1; }
     @keyframes recipePageSweep {
       0% { transform: translateX(0) scaleX(1) skewY(0deg); opacity: 0; }
       8% { opacity: 1; }
@@ -1426,6 +1519,16 @@
     .card:hover .visited-icon.active .visited-bike { animation: visitRoute 1.4s ease-in-out .18s 1; }
     .card:hover .visited-icon.active .visited-train { animation: visitRoute 1.4s ease-in-out .36s 1; }
     .card:hover .visited-icon.active .visited-car { animation: visitRoute 1.4s ease-in-out .54s 1; }
+    .visited-icon.active .visited-stamp.one { animation: visitStamp 1.4s ease-out 1; }
+    .visited-icon.active .visited-stamp.two { animation: visitStamp 1.4s ease-out .16s 1; }
+    .visited-icon.active .visited-stamp.three { animation: visitStamp 1.4s ease-out .32s 1; }
+    .card:hover .visited-icon.active .visited-stamp.one { animation: visitStamp 1.4s ease-out 1; }
+    .card:hover .visited-icon.active .visited-stamp.two { animation: visitStamp 1.4s ease-out .16s 1; }
+    .card:hover .visited-icon.active .visited-stamp.three { animation: visitStamp 1.4s ease-out .32s 1; }
+    .visited-icon.active .visited-plane { animation: visitRoute 1.4s ease-in-out 1; }
+    .visited-icon.active .visited-bike { animation: visitRoute 1.4s ease-in-out .14s 1; }
+    .visited-icon.active .visited-train { animation: visitRoute 1.4s ease-in-out .28s 1; }
+    .visited-icon.active .visited-car { animation: visitRoute 1.4s ease-in-out .42s 1; }
     @keyframes visitStamp {
       0%,10% { opacity:0; transform:scale(1.7) rotate(-18deg); }
       17%,76% { opacity:1; transform:scale(1) rotate(-8deg); }
@@ -1436,6 +1539,13 @@
       14% { opacity:1; }
       76% { offset-distance:100%; opacity:1; }
       88%,100% { offset-distance:100%; opacity:0; }
+    }
+
+    .dog-icon.woof .icon-glyph { animation: dogWoof .46s cubic-bezier(.2,.9,.2,1) 1; }
+    @keyframes dogWoof {
+      0%,100% { transform: translateY(0) rotate(0); }
+      30% { transform: translateY(-6px) rotate(-8deg) scale(1.12); }
+      58% { transform: translateY(1px) rotate(7deg) scale(.98); }
     }
 
     .copy {
@@ -1496,24 +1606,76 @@
     .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
     @media (max-width: 900px) {
-      .hero { grid-template-columns: 1fr; min-height: auto; padding: 52px 0 30px; }
-      .hero-doodle { display: none; }
-      .card, .card.feature { grid-column: span 6; height: 286px; min-height: 286px; }
+      .hero { grid-template-columns: 1fr; min-height: auto; padding: 44px 0 26px; gap: 22px; }
+      .hero-side { flex-direction: row; justify-content: flex-start; align-items: center; gap: 18px; }
+      .hero-side .button { width: auto; min-width: 150px; }
+      .hero-doodle {
+        display: block;
+        width: 112px;
+        height: 112px;
+        border-radius: 27px;
+        box-shadow: 6px 6px 0 var(--line);
+        transform: rotate(5deg);
+      }
+      .hero-doodle .eye { width: 15px; height: 20px; top: 35px; }
+      .hero-doodle .eye::after { width: 5px; height: 7px; top: 5px; left: 4px; }
+      .hero-doodle .eye.one { left: 29px; }
+      .hero-doodle .eye.two { right: 29px; }
+      .hero-doodle .mouth { width: 42px; height: 20px; bottom: 25px; }
+      .card, .card.feature { grid-column: span 6; height: 270px; min-height: 270px; }
       #gamesGrid .card, #aboutGrid .card { grid-column: span 6; }
     }
 
     @media (max-width: 620px) {
-      .shell { width: min(100% - 22px, 1180px); }
-      .hero { padding-top: 40px; padding-bottom: 24px; }
-      h1 { font-size: clamp(55px, 18vw, 82px); }
-      .intro { margin-top: 20px; }
-      .grid { gap: 15px; }
-      .grid + .grid { margin-top: 15px; }
-      .card, .card.feature { grid-column: 1 / -1; height: 260px; min-height: 260px; padding: 21px; }
+      .shell { width: min(100% - 20px, 1180px); }
+      .hero { padding-top: 30px; padding-bottom: 22px; gap: 18px; }
+      h1 { font-size: clamp(52px, 17vw, 76px); }
+      .intro { margin-top: 17px; font-size: clamp(18px, 5.3vw, 22px); }
+      .project-count { margin-top: 8px; }
+      .hero-side { gap: 14px; }
+      .hero-side .button { min-width: 0; min-height: 48px; padding-inline: 17px; }
+      .hero-doodle { width: 82px; height: 82px; border-width: 2px; border-radius: 21px; box-shadow: 4px 4px 0 var(--line); }
+      .hero-doodle .eye { width: 12px; height: 16px; top: 25px; border-width: 2px; }
+      .hero-doodle .eye::after { width: 4px; height: 5px; top: 4px; left: 3px; }
+      .hero-doodle .eye.one { left: 21px; }
+      .hero-doodle .eye.two { right: 21px; }
+      .hero-doodle .mouth { width: 31px; height: 14px; bottom: 18px; border-width: 2px; }
+      .grid { gap: 13px; }
+      .grid + .grid { margin-top: 13px; }
+      .card, .card.feature {
+        grid-column: 1 / -1;
+        height: 220px;
+        min-height: 220px;
+        padding: 18px;
+        border-width: 2px;
+        border-radius: 21px;
+        box-shadow: 4px 4px 0 var(--line);
+      }
       #gamesGrid .card, #aboutGrid .card { grid-column: 1 / -1; }
-      .copy { margin-top: 31px; }
-      .copy h3 { font-size: 33px; }
+      .icon { width: 58px; height: 58px; border-radius: 17px; font-size: 29px; }
+      .copy { margin-top: 19px; padding-right: 30px; }
+      .copy h3 { font-size: clamp(26px, 8.4vw, 31px); line-height: 1; }
+      .copy p { margin-top: 8px; font-size: 14px; line-height: 1.34; }
+      .arrow { right: 17px; bottom: 14px; font-size: 27px; }
+      .pirate-bribe-label { right: 14px; bottom: 13px; min-height: 36px; padding-inline: 10px; font-size: 11px; }
       .spark-star { left: 2px; }
+      .toast { bottom: 16px; max-width: calc(100% - 24px); text-align: center; border-radius: 18px; }
+    }
+
+    @media (hover: none), (pointer: coarse) {
+      .button:hover { transform: none; box-shadow: 4px 4px 0 var(--line); }
+      .button.primary:hover { box-shadow: 4px 4px 0 #ff9f91; }
+      .card:hover { transform: rotate(var(--r)); box-shadow: var(--shadow); }
+      .card:hover .icon { transform: rotate(-3deg); }
+      .card:hover .arrow { transform: none; }
+      .external:hover .arrow { transform: rotate(-45deg); }
+      .card:hover .animated-icon:not(.active),
+      .card:hover .animated-icon:not(.active) *,
+      .card:hover .animated-icon:not(.active) *::before,
+      .card:hover .animated-icon:not(.active) *::after { animation: none !important; }
+      .card:active { transform: translate(2px, 2px) scale(.985) rotate(0deg); box-shadow: 2px 2px 0 var(--line); }
+      .button:active { transform: translate(1px, 1px) scale(.985); }
+      .animated-icon, .button, .hero-doodle, .card { touch-action: manipulation; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1529,13 +1691,12 @@
         <h1>I make <span class="underline">stuff.</span></h1>
         <p class="intro">Try it out!</p>
         <p class="project-count" id="projectCount">14 incomplete projects &amp; counting</p>
-        <p class="traffic-fine" id="trafficFine" hidden>Traffic fine today <strong>$100</strong> 🚦</p>
+        <p class="traffic-fine" id="trafficFine" hidden>Money lost today <strong>$100</strong> 💸</p>
       </div>
 
       <div class="hero-side">
         <button class="button" id="surprise">Surprise me ✨</button>
         <button class="hero-doodle" id="doodle" aria-label="Poke the little square face">
-          <span class="party-hat" aria-hidden="true"></span>
           <span class="eye one"></span><span class="eye two"></span><span class="mouth"></span>
         </button>
       </div>
@@ -1589,7 +1750,7 @@
       {
         title: "House Rater",
         description: "Rate a house on the stuff that actually matters and turn gut feelings into a score.",
-        icon: "🏠", color: "#cfc4ff", href: "./HouseRater/", group: "main", action: "house"
+        icon: "🏠", color: "#cfc4ff", href: "./HouseRater/", group: "third", action: "house"
       },
       {
         title: "Custom State Generator",
@@ -1599,10 +1760,10 @@
       {
         title: "Rank Things",
         description: "Build, rearrange, and export tier lists without fighting the interface.",
-        icon: "🥇", color: "#ffc4d5", href: "./RankThings/", group: "third", action: "medals"
+        icon: "🥇", color: "#ffc4d5", href: "./RankThings/", group: "main", action: "medals"
       },
       {
-        title: "Pirate Legacy (sneak peek)",
+        title: "Pirate Legacy",
         description: "Build a pirate legacy through choices, upgrades, treasure, and questionable decisions.",
         icon: "🏴‍☠️", color: "#9fc5ee", href: "./PirateLegacy/", group: "games", action: "pirate"
       },
@@ -1617,9 +1778,14 @@
         icon: "🚦", color: "#ffb38f", href: "./TrafficSim/", group: "games", action: "traffic"
       },
       {
-        title: "Challenges (coming soon)",
+        title: "Doggy Style",
+        description: "Explore the world from a dog's point of view, sniff out secrets, and solve dog-sized problems.",
+        icon: "🐕", color: "#c7e6a4", href: "./DoggyStyle/", group: "games", action: "dog"
+      },
+      {
+        title: "Challenges",
         description: "A grab bag of simple challenges inspired by Taskmaster, Jet Lag: The Game, and Minute to Win It.",
-        icon: "⚪", color: "#e5ca93", href: "./Challenges/", group: "third", comingSoon: true, action: "challenge"
+        icon: "⚪", color: "#e5ca93", href: "./Challenges/", group: "third", action: "challenge"
       },
       {
         title: "My Recipe Book",
@@ -1637,9 +1803,9 @@
         icon: "📍", color: "#ffd6a3", href: "./PlacesIHaveBeen/", group: "about", action: "visited"
       },
       {
-        title: "Favorite Routes (coming soon)",
-        description: "My favorite hikes, bike rides, train rides, drives, and boating routes, ranked.",
-        icon: "🥾", color: "#b8df96", href: "./FavoriteRoutes/", group: "third", comingSoon: true, action: "boot"
+        title: "Recommended",
+        description: "My recommended hikes, bike rides, train rides, drives, and boating routes, ranked.",
+        icon: "🥾", color: "#b8df96", href: "./FavoriteRoutes/", group: "third", action: "boot"
       }
     ];
 
@@ -1659,6 +1825,8 @@
       "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;"
     })[ch]);
 
+    const hoverCapable = window.matchMedia ? window.matchMedia("(hover: hover) and (pointer: fine)").matches : true;
+
     function iconMarkup(p) {
       const action = p.action || "plain";
       if (action === "dice") {
@@ -1675,9 +1843,17 @@
         return `<div class="icon animated-icon scissors-icon" data-action="scissors" aria-label="Animate scissors" role="button" tabindex="0"><span class="icon-glyph" aria-hidden="true">✂️</span></div>`;
       }
       if (action === "medals") {
-        const starterAnimals = ["🐶","🐱","🦊","🐼","🐸","🐧","🐵","🐯","🐰"];
-        return `<div class="icon animated-icon medals-icon" data-action="medals" aria-label="Randomize tier list" role="button" tabindex="0">
-          <span class="tier-board" aria-hidden="true"><i class="tier-row s">S</i><i class="tier-row a">A</i><i class="tier-row b">B</i>${starterAnimals.map((thing, n) => `<i class="tier-item" data-tier-item="${n}">${thing}</i>`).join("")}</span>
+        // Pick a different category on each page load so Animals does not always go first.
+        const starterSetName = tierSetOrder[Math.floor(Math.random() * tierSetOrder.length)];
+        const starterThings = shuffleTierThings(tierSets[starterSetName]);
+        const starterXs = [14, 28, 42];
+        const starterYs = [4, 21, 38];
+        return `<div class="icon animated-icon medals-icon" data-action="medals" data-next-tier-set="${starterSetName}" aria-label="Randomize tier list" role="button" tabindex="0">
+          <span class="tier-board" aria-hidden="true"><i class="tier-row s">S</i><i class="tier-row a">A</i><i class="tier-row b">B</i>${starterThings.map((thing, n) => {
+            const row = Math.floor(n / 3);
+            const slot = n % 3;
+            return `<i class="tier-item placed" data-tier-item="${n}" data-row="${row}" data-slot="${slot}" style="--tx:${starterXs[slot]}px;--ty:${starterYs[row]}px;--rot:${[-2,2,-1][slot]}deg">${thing}</i>`;
+          }).join("")}</span>
         </div>`;
       }
       if (action === "challenge") {
@@ -1707,13 +1883,54 @@
       if (action === "map") {
         return `<div class="icon animated-icon map-icon" data-action="map" aria-label="Animate place scores" role="button" tabindex="0">
           <span class="map-stage" aria-hidden="true">
-            <svg class="us-score-map" viewBox="0 0 64 38" role="presentation">
-              <rect class="state-cell" x="19" y="5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="24" y="5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="29" y="5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="34" y="5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="39" y="5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="44" y="5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="13" y="9.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="18" y="9.5" width="4.5" height="4" rx=".65"/>
-              <rect class="state-cell" x="23" y="9.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="28" y="9.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="33" y="9.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="38" y="9.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="43" y="9.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="48" y="9.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="8" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="13" y="14" width="4.5" height="4" rx=".65"/>
-              <rect class="state-cell" x="18" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="23" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="28" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="33" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="38" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="43" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="48" y="14" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="53" y="14" width="4.5" height="4" rx=".65"/>
-              <rect class="state-cell" x="5.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="10.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="15.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="20.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="25.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="30.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="35.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="40.5" y="18.5" width="4.5" height="4" rx=".65"/>
-              <rect class="state-cell" x="45.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="50.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="55.5" y="18.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="9" y="23" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="14" y="23" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="19" y="23" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="24" y="23" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="29" y="23" width="4.5" height="4" rx=".65"/>
-              <rect class="state-cell" x="34" y="23" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="39" y="23" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="44" y="23" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="20" y="27.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="25" y="27.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="30" y="27.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="42.5" y="27.5" width="4.5" height="4" rx=".65"/> <rect class="state-cell" x="47" y="31" width="4.5" height="4" rx=".65"/>
+            <svg class="us-score-map" viewBox="0 0 72 44" role="presentation">
+              <defs>
+                <clipPath id="usShapeClip">
+                  <path d="M6 8 L13 5 L20 5.4 L26 6.6 L32 5.8 L38 6.4 L45 5.8 L51 6.6 L56 8.3 L59 10.5 L62 11.5 L64 10.3 L65.2 7.4 L67.5 6.4 L69 8.3 L67.8 10.8 L69.2 12.2 L67 14 L64.4 14.7 L63.1 16.8 L64.3 18.2 L62 19.5 L61.1 22 L59.3 23.8 L57 26.2 L58.2 28.8 L57.2 31.2 L55.7 31.4 L55.2 35.6 L53.4 40 L51.8 36 L50.5 31.4 L47 30.5 L43.4 31.4 L40.2 30.2 L37.4 32.2 L34.1 31 L31.4 34.4 L29.2 34.1 L27.4 30.5 L23.5 29.8 L20.3 28 L16.2 27.6 L13.1 25.7 L9.4 24.6 L7.4 21.9 L4.8 20.3 L5.4 16 L4.7 12.4 Z"/>
+                </clipPath>
+              </defs>
+              <path class="us-backdrop" d="M6 8 L13 5 L20 5.4 L26 6.6 L32 5.8 L38 6.4 L45 5.8 L51 6.6 L56 8.3 L59 10.5 L62 11.5 L64 10.3 L65.2 7.4 L67.5 6.4 L69 8.3 L67.8 10.8 L69.2 12.2 L67 14 L64.4 14.7 L63.1 16.8 L64.3 18.2 L62 19.5 L61.1 22 L59.3 23.8 L57 26.2 L58.2 28.8 L57.2 31.2 L55.7 31.4 L55.2 35.6 L53.4 40 L51.8 36 L50.5 31.4 L47 30.5 L43.4 31.4 L40.2 30.2 L37.4 32.2 L34.1 31 L31.4 34.4 L29.2 34.1 L27.4 30.5 L23.5 29.8 L20.3 28 L16.2 27.6 L13.1 25.7 L9.4 24.6 L7.4 21.9 L4.8 20.3 L5.4 16 L4.7 12.4 Z"/>
+              <g clip-path="url(#usShapeClip)">
+                <polygon class="state-cell" points="1,3 11,3 12,12 0,13"/>
+                <polygon class="state-cell" points="11,3 21,3 22,12 12,12"/>
+                <polygon class="state-cell" points="21,3 31,3 31,12 22,12"/>
+                <polygon class="state-cell" points="31,3 41,3 42,12 31,12"/>
+                <polygon class="state-cell" points="41,3 51,3 52,12 42,12"/>
+                <polygon class="state-cell" points="51,3 61,3 61,12 52,12"/>
+                <polygon class="state-cell" points="61,3 72,3 72,13 61,12"/>
+
+                <polygon class="state-cell" points="0,12 12,12 11,21 0,21"/>
+                <polygon class="state-cell" points="12,12 22,12 23,21 11,21"/>
+                <polygon class="state-cell" points="22,12 31,12 32,21 23,21"/>
+                <polygon class="state-cell" points="31,12 42,12 41,21 32,21"/>
+                <polygon class="state-cell" points="42,12 52,12 53,21 41,21"/>
+                <polygon class="state-cell" points="52,12 61,12 62,21 53,21"/>
+                <polygon class="state-cell" points="61,12 72,13 72,21 62,21"/>
+
+                <polygon class="state-cell" points="0,21 11,21 13,30 0,30"/>
+                <polygon class="state-cell" points="11,21 23,21 22,30 13,30"/>
+                <polygon class="state-cell" points="23,21 32,21 33,30 22,30"/>
+                <polygon class="state-cell" points="32,21 41,21 42,30 33,30"/>
+                <polygon class="state-cell" points="41,21 53,21 52,30 42,30"/>
+                <polygon class="state-cell" points="53,21 62,21 63,30 52,30"/>
+                <polygon class="state-cell" points="62,21 72,21 72,30 63,30"/>
+
+                <polygon class="state-cell" points="0,30 13,30 12,43 0,43"/>
+                <polygon class="state-cell" points="13,30 22,30 24,43 12,43"/>
+                <polygon class="state-cell" points="22,30 33,30 34,43 24,43"/>
+                <polygon class="state-cell" points="33,30 42,30 43,43 34,43"/>
+                <polygon class="state-cell" points="42,30 52,30 53,43 43,43"/>
+                <polygon class="state-cell" points="52,30 63,30 62,43 53,43"/>
+                <polygon class="state-cell" points="63,30 72,30 72,43 62,43"/>
+              </g>
+              <path class="map-water" d="M48.5 11.8 C50.3 10.6 52.2 11.1 53.2 12.3 C51.8 13 50.5 13.4 48.9 13.2 Z"/>
+              <path class="map-water" d="M53.6 12.6 C55.2 11.7 57.2 12.2 58.1 13.5 C56.8 14.3 55.1 14.4 53.8 13.8 Z"/>
+              <path class="map-water" d="M55.9 14.2 C57.2 13.8 58.8 14.2 59.4 15.3 C58.2 15.9 57 15.8 56.1 15.4 Z"/>
+              <path class="us-outline" d="M6 8 L13 5 L20 5.4 L26 6.6 L32 5.8 L38 6.4 L45 5.8 L51 6.6 L56 8.3 L59 10.5 L62 11.5 L64 10.3 L65.2 7.4 L67.5 6.4 L69 8.3 L67.8 10.8 L69.2 12.2 L67 14 L64.4 14.7 L63.1 16.8 L64.3 18.2 L62 19.5 L61.1 22 L59.3 23.8 L57 26.2 L58.2 28.8 L57.2 31.2 L55.7 31.4 L55.2 35.6 L53.4 40 L51.8 36 L50.5 31.4 L47 30.5 L43.4 31.4 L40.2 30.2 L37.4 32.2 L34.1 31 L31.4 34.4 L29.2 34.1 L27.4 30.5 L23.5 29.8 L20.3 28 L16.2 27.6 L13.1 25.7 L9.4 24.6 L7.4 21.9 L4.8 20.3 L5.4 16 L4.7 12.4 Z"/>
+              <polygon class="state-cell" points="3,34 9,31 14,33 12,39 6,40 1,37"/>
+              <polygon class="state-cell" points="16,39.2 18.2,38.6 19.4,39.7 17.4,40.8"/>
+              <polygon class="state-cell" points="20.3,40.4 22.3,39.8 23.4,40.8 21.6,41.7"/>
+              <polygon class="state-cell" points="24.4,41.2 26.1,40.7 27.1,41.6 25.4,42.4"/>
             </svg>
           </span>
         </div>`;
@@ -1765,9 +1982,12 @@
         .map((p, i) => ({ p, i }))
         .filter(({ p }) => p.group === group);
 
+      const mainOrder = ["Find Your Place", "Rank Things", "Custom State Generator"];
+      const thirdOrder = ["House Rater", "Recommended", "Challenges"];
       featureGrid.innerHTML = byGroup("feature").map(({p, i}) => cardMarkup(p, i, "feature")).join("");
-      mainGrid.innerHTML = byGroup("main").map(({p, i}) => cardMarkup(p, i)).join("");
-      const thirdOrder = ["Rank Things", "Favorite Routes (coming soon)", "Challenges (coming soon)"];
+      mainGrid.innerHTML = byGroup("main")
+        .sort((a, b) => mainOrder.indexOf(a.p.title) - mainOrder.indexOf(b.p.title))
+        .map(({p, i}) => cardMarkup(p, i)).join("");
       thirdGrid.innerHTML = byGroup("third")
         .sort((a, b) => thirdOrder.indexOf(a.p.title) - thirdOrder.indexOf(b.p.title))
         .map(({p, i}) => cardMarkup(p, i)).join("");
@@ -1810,35 +2030,46 @@
     });
 
     let facePokes = 0;
+    let recentMascotPresses = [];
+    let mascotSpamCooldownUntil = 0;
+    let mascotAvoiding = false;
+    let mascotHomeRect = null;
+
+    function startMascotAvoiding() {
+      if (!doodle || mascotAvoiding) return;
+      mascotAvoiding = true;
+      mascotHomeRect = doodle.getBoundingClientRect();
+      doodle.classList.add("avoiding");
+      doodle.setAttribute("aria-label", "Poke the little square face (he is now avoiding the mouse)");
+    }
+
+    function registerMascotPress() {
+      const now = performance.now();
+      recentMascotPresses = recentMascotPresses.filter(time => now - time <= 5000);
+      recentMascotPresses.push(now);
+      if (recentMascotPresses.length < 5 || now < mascotSpamCooldownUntil) return false;
+
+      recentMascotPresses = [];
+      mascotSpamCooldownUntil = now + 5000;
+      addMoneyLost(50);
+      startMascotAvoiding();
+      showToast("Mascot spam fine — $50. Now he's avoiding you. 👀");
+      tone(165, .16, "square", .015);
+      return true;
+    }
+
     doodle.addEventListener("click", () => {
       facePokes += 1;
       doodle.classList.remove("bounce");
       void doodle.offsetWidth;
       doodle.classList.add("bounce");
       tone(330 + (facePokes % 4) * 55, .065, "sine", .018);
-
-      if (facePokes % 5 === 0) {
-        doodle.classList.add("party");
-        const rect = doodle.getBoundingClientRect();
-        const colors = ["#ff887c", "#ffd76a", "#7ed9a1", "#addcff", "#cfc4ff", "#ffc4d5"];
-        for (let i = 0; i < 12; i++) {
-          const spark = document.createElement("i");
-          spark.className = "face-spark";
-          spark.style.left = `${rect.left + rect.width / 2}px`;
-          spark.style.top = `${rect.top + 16}px`;
-          spark.style.background = colors[i % colors.length];
-          const angle = (Math.PI * 2 * i) / 12;
-          const distance = 42 + (i % 3) * 14;
-          spark.style.setProperty("--sx", `${Math.cos(angle) * distance}px`);
-          spark.style.setProperty("--sy", `${Math.sin(angle) * distance}px`);
-          document.body.appendChild(spark);
-          spark.addEventListener("animationend", () => spark.remove());
-        }
-        setTimeout(() => doodle.classList.remove("party"), 1800);
-      }
+      registerMascotPress();
     });
 
+    let sparkFinds = 0;
     sparkStar.addEventListener("click", () => {
+      sparkFinds += 1;
       tone(740, .07, "sine", .018);
       tone(1040, .10, "sine", .014, .06);
       sparkStar.animate([
@@ -1846,6 +2077,30 @@
         { transform: "rotate(170deg) scale(1.5)" },
         { transform: "rotate(350deg) scale(1)" }
       ], { duration: 560, easing: "cubic-bezier(.2,.8,.2,1)" });
+      const messages = [
+        "Tiny star acquired ✦",
+        "Another sparkle. Extremely productive.",
+        "You found the decorative gameplay loop ✨",
+        "Yep. It still does that.",
+        "The star has no additional features.",
+        "Please stop QA testing the star.",
+        "Seven star clicks. Historic stuff.",
+        "You have unlocked absolutely nothing.",
+        "The star is beginning to feel observed.",
+        "Double digits. This is a lifestyle now.",
+        "Achievement unlocked: persistence without reward.",
+        "I promise there is not a secret project in here.",
+        "The star would like to speak to management.",
+        "Still clicking? Respect, honestly.",
+        "The decorative gameplay loop has become gameplay.",
+        "This is more attention than the star was budgeted for.",
+        "Star click seventeen. Nobody planned for this.",
+        "You may now consider the star thoroughly clicked.",
+        "The star has filed an incident report.",
+        "Fine. You win. The star is yours now. ✦ Now Fuck Off!"
+      ];
+      // Run through the chain once, then permanently stay on the final message.
+      showToast(messages[Math.min(sparkFinds - 1, messages.length - 1)]);
     });
 
     let audioContext;
@@ -1874,7 +2129,16 @@
     }
 
     function playIconSound(action) {
-      if (action === "train") {
+      if (action === "trainWhistle") {
+        tone(554, .34, "triangle", .032);
+        tone(740, .40, "triangle", .026, .03);
+        tone(554, .24, "triangle", .026, .42);
+      } else if (action === "dog") {
+        tone(155, .08, "sawtooth", .032);
+        tone(105, .11, "sawtooth", .025, .055);
+        tone(165, .07, "sawtooth", .026, .20);
+        tone(112, .10, "sawtooth", .020, .25);
+      } else if (action === "train") {
         tone(392, .16, "triangle", .035);
         tone(523, .22, "triangle", .03, .10);
       } else if (action === "traffic") {
@@ -1940,8 +2204,13 @@
 
     const tierSets = {
       animals: ["🐶","🐱","🦊","🐼","🐸","🐧","🐵","🐯","🐰"],
-      foods: ["🍕","🍔","🍣","🌮","🍩","🍓","🍜","🥨","🧁"]
+      foods: ["🍕","🍔","🍣","🌮","🍩","🍓","🍜","🥨","🧁"],
+      places: ["🏖️","🏔️","🏙️","🏕️","🏰","🏝️","🌋","🏟️","🎡"],
+      rides: ["🚗","🚲","🚂","✈️","🚀","⛵","🚌","🚁","🛵"]
     };
+    const tierSetOrder = ["animals", "foods", "places", "rides"];
+    const tierXs = [14, 28, 42];
+    const tierYs = [4, 21, 38];
 
     function shuffleTierThings(things) {
       const copy = [...things];
@@ -1958,40 +2227,150 @@
       icon.tierTimer = null;
     }
 
+    function scheduleNextTierPlacement(icon, callback, baseDelay = 1450) {
+      if (!icon || typeof callback !== "function") return;
+      clearTierTimer(icon);
+      icon.nextTierPlacementAt = performance.now() + baseDelay;
+      icon.tierTimer = setTimeout(callback, baseDelay);
+    }
+
+    function extendTierPlacementGrace(icon, extraMs = 500) {
+      if (!icon || typeof icon.resumeTierPlacement !== "function" || icon.dataset.tierCycling !== "1") return;
+      const now = performance.now();
+      const currentDeadline = Number(icon.nextTierPlacementAt || now);
+      icon.nextTierPlacementAt = Math.max(currentDeadline, now) + extraMs;
+      clearTierTimer(icon);
+      icon.tierTimer = setTimeout(icon.resumeTierPlacement, Math.max(0, icon.nextTierPlacementAt - performance.now()));
+    }
+
+    function setTierItemPosition(item, row, slot, reranked = false) {
+      item.dataset.row = String(row);
+      item.dataset.slot = String(slot);
+      item.style.setProperty("--tx", `${tierXs[slot]}px`);
+      item.style.setProperty("--ty", `${tierYs[row]}px`);
+      item.style.setProperty("--rot", `${(-4 + Math.random() * 8).toFixed(1)}deg`);
+      if (reranked) {
+        item.classList.remove("reranked");
+        void item.offsetWidth;
+        item.classList.add("reranked");
+        setTimeout(() => item.classList.remove("reranked"), 390);
+      }
+    }
+
+    function placedTierItems(icon) {
+      return [...icon.querySelectorAll(".tier-item.placed")];
+    }
+
+    function tierRowItems(icon, row, except = null) {
+      return placedTierItems(icon).filter(item => item !== except && Number(item.dataset.row) === row);
+    }
+
+    function repackTierRow(icon, row) {
+      if (!icon) return;
+      // Keep every occupied tier compact: left slot first, then middle, then right.
+      // Preserve the items' existing left-to-right order when closing a gap.
+      const rowItems = tierRowItems(icon, row)
+        .sort((a, b) => Number(a.dataset.slot) - Number(b.dataset.slot));
+      rowItems.forEach((rowItem, slot) => {
+        if (Number(rowItem.dataset.slot) !== slot) {
+          setTierItemPosition(rowItem, row, slot, false);
+        }
+      });
+    }
+
+    function placeTierItemInOpenSlot(icon, item, preferredRow = null, reranked = false) {
+      if (!icon || !item) return false;
+      const currentRow = Number(item.dataset.row);
+      let choices = [0,1,2].filter(row => tierRowItems(icon, row, item).length < 3);
+      if (preferredRow !== null) choices = choices.filter(row => row === preferredRow);
+      if (reranked) choices = choices.filter(row => row !== currentRow);
+      if (!choices.length) return false;
+
+      const row = choices[Math.floor(Math.random() * choices.length)];
+
+      // First close any old gaps, then append the new/reranked emoji immediately
+      // after the current items. This guarantees the leftmost possible position.
+      repackTierRow(icon, row);
+      const slot = tierRowItems(icon, row, item).length;
+      if (slot >= 3) return false;
+      setTierItemPosition(item, row, slot, reranked);
+
+      // Moving an existing emoji can leave a hole behind, so close that too.
+      if (reranked && Number.isFinite(currentRow) && currentRow >= 0 && currentRow <= 2 && currentRow !== row) {
+        repackTierRow(icon, currentRow);
+      }
+      return true;
+    }
+
     function runTierSet(icon, setName) {
       if (!icon || icon.dataset.tierCycling !== "1") return;
       clearTierTimer(icon);
       const items = [...icon.querySelectorAll(".tier-item")];
       const rankedThings = shuffleTierThings(tierSets[setName]);
-      const ys = [3, 20, 37];
-      const rowOrder = shuffleTierThings([0,0,0,1,1,1,2,2,2]);
-      const rowSlots = [0,0,0];
+      const placementOrder = shuffleTierThings([...Array(items.length).keys()]);
 
       items.forEach((item, index) => {
-        const row = rowOrder[index];
-        const slot = rowSlots[row]++;
-        item.classList.remove("placed");
+        item.classList.remove("placed", "reranked");
         item.textContent = rankedThings[index];
-        item.style.setProperty("--tx", `${10 + slot * 17}px`);
-        item.style.setProperty("--ty", `${ys[row]}px`);
-        item.style.setProperty("--rot", `${(-5 + Math.random() * 10).toFixed(1)}deg`);
+        item.dataset.row = "";
+        item.dataset.slot = "";
       });
+      icon.dataset.lastRated = "";
+      icon.lastRatedItem = null;
 
       let step = 0;
       const placeNext = () => {
         if (icon.dataset.tierCycling !== "1") return;
-        if (step < items.length) {
-          items[step].classList.add("placed");
+        if (step < placementOrder.length) {
+          const itemIndex = placementOrder[step];
+          const item = items[itemIndex];
+          // Choose the tier only when the item is actually rated, so user reranks
+          // cannot collide with slots reserved for future items.
+          if (!placeTierItemInOpenSlot(icon, item)) return;
+          item.classList.add("placed");
+          icon.dataset.lastRated = String(itemIndex);
+          icon.lastRatedItem = item;
           step += 1;
-          icon.tierTimer = setTimeout(placeNext, 500);
+          // Leave a real reaction window after each rating so the user can move it.
+          // Repeated rerank clicks extend this deadline by another 0.5s each.
+          scheduleNextTierPlacement(icon, placeNext, 1450);
           return;
         }
-        const nextSet = setName === "animals" ? "foods" : "animals";
+        const currentSetIndex = tierSetOrder.indexOf(setName);
+        const nextSet = tierSetOrder[(currentSetIndex + 1) % tierSetOrder.length];
         icon.dataset.nextTierSet = nextSet;
+        icon.lastRatedItem = null;
+        icon.nextTierPlacementAt = 0;
         icon.tierTimer = setTimeout(() => runTierSet(icon, nextSet), 1100);
       };
 
-      icon.tierTimer = setTimeout(placeNext, 120);
+      icon.resumeTierPlacement = placeNext;
+      scheduleNextTierPlacement(icon, placeNext, 120);
+    }
+
+    function rerankLastTierItem(icon) {
+      if (!icon) return false;
+      // Keep a direct reference to the exact emoji that most recently appeared.
+      // This avoids accidentally acting on another item as the animation advances.
+      let item = icon.lastRatedItem;
+      if (!item || !item.isConnected || !item.classList.contains("placed")) {
+        const index = Number(icon.dataset.lastRated);
+        const items = [...icon.querySelectorAll(".tier-item")];
+        item = items[index];
+      }
+      if (!item || !item.classList.contains("placed")) return false;
+
+      const sourceRow = Number(item.dataset.row);
+      const choices = [0,1,2].filter(row => row !== sourceRow && tierRowItems(icon, row, item).length < 3);
+      if (!choices.length) return false;
+      const row = choices[Math.floor(Math.random() * choices.length)];
+      if (!placeTierItemInOpenSlot(icon, item, row, true)) return false;
+
+      // Every click grants another half-second to move THIS SAME emoji again.
+      // Crucially this extends the existing deadline instead of shortening it to 0.5s.
+      icon.lastRatedItem = item;
+      extendTierPlacementGrace(icon, 500);
+      return true;
     }
 
     function setRecipeDish(icon, index) {
@@ -2013,11 +2392,11 @@
       void page.offsetWidth;
       page.classList.add("flipping");
       if (withSound) playIconSound("recipe");
-      setTimeout(() => setRecipeDish(icon, next), 285);
+      setTimeout(() => setRecipeDish(icon, next), 28);
       setTimeout(() => {
         page.classList.remove("flipping");
         icon.dataset.recipeFlipping = "0";
-      }, 800);
+      }, 570);
     }
 
     function startTierCycle(icon, withSound = false) {
@@ -2033,7 +2412,8 @@
       if (!icon) return;
       icon.dataset.tierCycling = "0";
       clearTierTimer(icon);
-      icon.querySelectorAll(".tier-item").forEach(item => item.classList.remove("placed"));
+      icon.nextTierPlacementAt = 0;
+      icon.querySelectorAll(".tier-item").forEach(item => item.classList.remove("placed", "reranked"));
     }
 
     function localDayKey() {
@@ -2076,13 +2456,142 @@
         return;
       }
       trafficFine.hidden = false;
-      trafficFine.innerHTML = `Traffic fines today <strong>$${amount}</strong> 🚦`;
+      trafficFine.innerHTML = `Money lost today <strong>$${amount}</strong> 💸`;
+    }
+
+    function addMoneyLost(dollars) {
+      const amount = readTrafficFine() + dollars;
+      writeTrafficFine(amount);
+      return amount;
     }
 
     function addTrafficFine() {
-      const amount = readTrafficFine() + 100;
-      writeTrafficFine(amount);
-      return amount;
+      return addMoneyLost(100);
+    }
+
+    let recentIconPresses = [];
+    let iconSpamCooldownUntil = 0;
+    function registerIconPress() {
+      const now = performance.now();
+      recentIconPresses = recentIconPresses.filter(time => now - time <= 5000);
+      recentIconPresses.push(now);
+      if (recentIconPresses.length < 10 || now < iconSpamCooldownUntil) return false;
+
+      recentIconPresses = [];
+      iconSpamCooldownUntil = now + 5000;
+      addMoneyLost(25);
+      showToast("Icon spam fine — $25. 🚨");
+      tone(190, .14, "square", .015);
+      return true;
+    }
+
+    function randomizeHouse(icon, withSound = true) {
+      if (!icon) return;
+      const variants = [
+        { body:"#a9dfb7", roof:"#d8785a", door:"#315b78", check:1, cross:0, chimney:1, lh:1, rh:0, lb:1, rb:0, dormer:0 },
+        { body:"#ffb9b0", roof:"#6f7279", door:"#8c3546", check:0, cross:1, chimney:0, lh:0, rh:0, lb:0, rb:1, dormer:1 },
+        { body:"#a9d6ff", roof:"#48576b", door:"#f1c75b", check:1, cross:0, chimney:1, lh:0, rh:1, lb:1, rb:1, dormer:1 },
+        { body:"#f5d37b", roof:"#9a694d", door:"#3f8c82", check:0, cross:1, chimney:0, lh:1, rh:1, lb:0, rb:0, dormer:0 }
+      ];
+      const current = Number(icon.dataset.houseVariant || -1);
+      let next = current;
+      while (next === current) next = Math.floor(Math.random() * variants.length);
+      const v = variants[next];
+      const q = sel => icon.querySelector(sel);
+      q(".house-body").style.background = v.body;
+      q(".house-roof").style.background = v.roof;
+      q(".house-door").style.background = v.door;
+      q(".house-mark.check").style.opacity = v.check;
+      q(".house-mark.cross").style.opacity = v.cross;
+      q(".house-chimney").style.opacity = v.chimney;
+      q(".house-hedge.left").style.opacity = v.lh;
+      q(".house-hedge.right").style.opacity = v.rh;
+      q(".house-window-box.left").style.opacity = v.lb;
+      q(".house-window-box.right").style.opacity = v.rb;
+      q(".house-dormer").style.opacity = v.dormer;
+      icon.dataset.houseVariant = String(next);
+      icon.classList.add("manual");
+      icon.classList.remove("house-pop");
+      void icon.offsetWidth;
+      icon.classList.add("house-pop");
+      clearTimeout(icon.houseManualTimer);
+      icon.houseManualTimer = setTimeout(() => icon.classList.remove("manual", "house-pop"), 1200);
+      if (withSound) playIconSound("pan");
+    }
+
+    function failCurrentChallenge(icon) {
+      if (!icon || icon.classList.contains("failing")) return;
+      const stage = icon.querySelector(".challenge-stage");
+      const scenes = [...icon.querySelectorAll(".challenge-scene:not(.challenge-fail-copy)")];
+      if (!stage || !scenes.length) return;
+
+      // Fail whichever scene is actually on screen at the instant of the click.
+      let currentIndex = 0;
+      let bestOpacity = -1;
+      scenes.forEach((scene, index) => {
+        const opacity = Number.parseFloat(getComputedStyle(scene).opacity) || 0;
+        if (opacity > bestOpacity) {
+          bestOpacity = opacity;
+          currentIndex = index;
+        }
+      });
+
+      const copy = scenes[currentIndex].cloneNode(true);
+      copy.className = `challenge-scene challenge-fail-copy fail-${["one","two","three"][currentIndex]}`;
+      stage.appendChild(copy);
+      icon.classList.add("failing");
+      void copy.offsetWidth;
+      copy.classList.add("run");
+      playIconSound("challenge");
+
+      clearTimeout(icon.challengeFailTimer);
+      icon.challengeFailTimer = setTimeout(() => {
+        copy.remove();
+        icon.classList.remove("failing");
+      }, 900);
+    }
+
+    function boostTrain(icon) {
+      if (!icon) return;
+      icon.classList.remove("active");
+      void icon.offsetWidth;
+      icon.classList.add("active");
+      clearTimeout(icon.trainActiveTimer);
+      icon.trainActiveTimer = setTimeout(() => icon.classList.remove("active"), 720);
+      for (let i = 0; i < 7; i += 1) {
+        const puff = document.createElement("i");
+        puff.className = "steam extra-steam";
+        puff.style.left = `${12 + Math.random() * 8}px`;
+        puff.style.top = `${5 + Math.random() * 7}px`;
+        puff.style.setProperty("--sx", `${-8 - Math.random() * 20}px`);
+        puff.style.setProperty("--sy", `${-22 - Math.random() * 24}px`);
+        puff.style.setProperty("--dur", `${(.55 + Math.random() * .45).toFixed(2)}s`);
+        puff.style.animationDelay = `${(i * .045).toFixed(2)}s`;
+        icon.appendChild(puff);
+        setTimeout(() => puff.remove(), 1250);
+      }
+      playIconSound("trainWhistle");
+    }
+
+    function woofDog(icon) {
+      if (!icon) return;
+      icon.classList.remove("woof");
+      void icon.offsetWidth;
+      icon.classList.add("woof");
+      clearTimeout(icon.woofTimer);
+      icon.woofTimer = setTimeout(() => icon.classList.remove("woof"), 500);
+      playIconSound("dog");
+    }
+
+    function runBikeClick(icon) {
+      if (!icon) return;
+      const alreadyMoving = icon.classList.contains("active") || icon.classList.contains("boost");
+      icon.classList.remove("active", "boost");
+      void icon.offsetWidth;
+      icon.classList.add(alreadyMoving ? "boost" : "active");
+      clearTimeout(icon.bikeClickTimer);
+      icon.bikeClickTimer = setTimeout(() => icon.classList.remove("active", "boost"), alreadyMoving ? 1200 : 2550);
+      playIconSound("bike");
     }
 
     function wireThemedCards() {
@@ -2095,6 +2604,7 @@
           const die = card.querySelector(".dice-icon");
           let dieTimer;
           card.addEventListener("pointerenter", () => {
+            if (!hoverCapable) return;
             rollDie(die, false);
             clearInterval(dieTimer);
             dieTimer = setInterval(() => {
@@ -2110,24 +2620,33 @@
         if (project.action === "map") {
           const mapIcon = card.querySelector(".map-icon");
           let mapTimer;
-          const randomizeStates = (burst = false) => {
+          const statuses = ["good", "mid", "bad"];
+          const setStatus = (cell, status) => {
+            statuses.forEach(name => cell.classList.toggle(name, name === status));
+          };
+          const randomizeStates = (full = false) => {
             if (!mapIcon) return;
             const cells = [...mapIcon.querySelectorAll(".state-cell")];
-            const count = burst ? cells.length : 4;
-            const picks = burst ? cells : shuffleTierThings(cells).slice(0, count);
-            picks.forEach((cell, index) => {
-              if (burst || !cell.classList.contains("good") && !cell.classList.contains("bad")) {
-                cell.classList.toggle("good", Math.random() >= .5);
-                cell.classList.toggle("bad", !cell.classList.contains("good"));
-              } else {
-                cell.classList.toggle("good");
-                cell.classList.toggle("bad");
-              }
+            if (full) {
+              const balanced = shuffleTierThings(cells.map((_, index) => statuses[index % statuses.length]));
+              cells.forEach((cell, index) => {
+                setStatus(cell, balanced[index]);
+                cell.classList.add("just-flipped");
+                setTimeout(() => cell.classList.remove("just-flipped"), 140 + (index % 8) * 12);
+              });
+              return;
+            }
+            shuffleTierThings(cells).slice(0, 5).forEach((cell, index) => {
+              const current = statuses.find(name => cell.classList.contains(name));
+              const choices = statuses.filter(name => name !== current);
+              setStatus(cell, choices[Math.floor(Math.random() * choices.length)]);
               cell.classList.add("just-flipped");
-              setTimeout(() => cell.classList.remove("just-flipped"), 170 + index * 10);
+              setTimeout(() => cell.classList.remove("just-flipped"), 150 + index * 12);
             });
           };
+          if (mapIcon) mapIcon.rerollAll = () => randomizeStates(true);
           card.addEventListener("pointerenter", () => {
+            if (!hoverCapable) return;
             randomizeStates(true);
             clearInterval(mapTimer);
             mapTimer = setInterval(() => {
@@ -2144,21 +2663,34 @@
           const recipeIcon = card.querySelector(".recipe-icon");
           let recipeTimer = null;
           if (recipeIcon) setRecipeDish(recipeIcon, Number(recipeIcon.dataset.recipeIndex || 0));
+          let recipeFirstTimer = null;
           card.addEventListener("pointerenter", () => {
+            if (!hoverCapable) return;
+            clearTimeout(recipeFirstTimer);
             clearInterval(recipeTimer);
-            recipeTimer = setInterval(() => {
-              if (card.matches(":hover")) flipRecipePage(recipeIcon, false);
-            }, 3200);
+            // Give the hover just enough time to feel intentional, then turn the first page quickly.
+            recipeFirstTimer = setTimeout(() => {
+              if (!card.matches(":hover")) return;
+              flipRecipePage(recipeIcon, false);
+              recipeTimer = setInterval(() => {
+                if (card.matches(":hover")) flipRecipePage(recipeIcon, false);
+              }, 2500);
+            }, 520);
           });
           card.addEventListener("pointerleave", () => {
+            clearTimeout(recipeFirstTimer);
             clearInterval(recipeTimer);
+            recipeFirstTimer = null;
             recipeTimer = null;
           });
         }
 
         if (project.action === "medals") {
           const tierIcon = card.querySelector(".medals-icon");
-          card.addEventListener("pointerenter", () => startTierCycle(tierIcon, false));
+          card.addEventListener("pointerenter", () => {
+            if (!hoverCapable) return;
+            startTierCycle(tierIcon, false);
+          });
           card.addEventListener("pointerleave", () => stopTierCycle(tierIcon));
         }
 
@@ -2172,9 +2704,33 @@
             { name: "green", ms: 3000 },
             { name: "amber", ms: 1200 }
           ];
+          const forceRed = () => {
+            clearTimeout(signalTimer);
+            signalTimer = null;
+            signalIndex = 0;
+            if (trafficIcon) trafficIcon.dataset.signal = "red";
+          };
+          const advanceSignal = () => {
+            if (!trafficIcon) return;
+            clearTimeout(signalTimer);
+            signalTimer = null;
+            const currentName = trafficIcon.dataset.signal || "red";
+            const currentIndex = signals.findIndex(signal => signal.name === currentName);
+            signalIndex = (currentIndex + 1) % signals.length;
+            const next = signals[signalIndex];
+            trafficIcon.dataset.signal = next.name;
+            if (trafficHovering && hoverCapable) {
+              signalTimer = setTimeout(() => {
+                if (!trafficHovering) return;
+                signalIndex = (signalIndex + 1) % signals.length;
+                runSignal();
+              }, next.ms);
+            }
+          };
+          if (trafficIcon) trafficIcon.advanceSignal = advanceSignal;
           const runSignal = () => {
             clearTimeout(signalTimer);
-            if (!trafficIcon || !trafficHovering) return;
+            if (!trafficIcon || !trafficHovering || !hoverCapable) return;
             const signal = signals[signalIndex];
             trafficIcon.dataset.signal = signal.name;
             signalTimer = setTimeout(() => {
@@ -2184,26 +2740,30 @@
             }, signal.ms);
           };
           card.addEventListener("pointerenter", () => {
+            if (!hoverCapable) return;
             trafficHovering = true;
             signalIndex = 0;
             runSignal();
           });
           card.addEventListener("pointerleave", () => {
             trafficHovering = false;
-            clearTimeout(signalTimer);
-            signalTimer = null;
-            signalIndex = 0;
-            if (trafficIcon) trafficIcon.dataset.signal = "red";
+            forceRed();
+          });
+          card.addEventListener("pointerdown", event => {
+            // Tapping the card itself still springs the red-light trap; tapping the icon advances the light normally.
+            if (event.target.closest(".animated-icon")) return;
+            forceRed();
           });
           card.addEventListener("click", event => {
             if (event.defaultPrevented || event.target.closest(".animated-icon")) return;
-            if (!trafficIcon || trafficIcon.dataset.signal !== "red") return;
+            if (!trafficIcon) return;
             event.preventDefault();
+            forceRed();
             addTrafficFine();
             showToast("Red means stop. That will be $100. 🚦");
             tone(165, .16, "square", .018);
             const href = card.getAttribute("href");
-            setTimeout(() => { window.location.href = href; }, 1050);
+            setTimeout(() => { window.location.href = href; }, 900);
           });
         }
 
@@ -2218,42 +2778,128 @@
             raider.innerHTML = `<b class="pirate-ship-emoji">⛵</b><i class="loot-arrow">→</i>`;
             card.appendChild(raider);
           }
+          let bribe = card.querySelector(".pirate-bribe-label");
+          if (!bribe) {
+            bribe = document.createElement("span");
+            bribe.className = "pirate-bribe-label";
+            bribe.textContent = "Pay $200 bribe";
+            card.appendChild(bribe);
+          }
+
+          const lockPirateCard = () => {
+            card.classList.add("pirate-locked");
+            card.setAttribute("aria-label", "Pirate Legacy is locked. Click to pay a $200 bribe.");
+          };
+
+          const triggerPirateRaid = () => {
+            if (card.classList.contains("pirate-locked")) return;
+            clearTimeout(raidCleanup);
+            card.classList.remove("pirate-raid");
+            void card.offsetWidth;
+            card.classList.add("pirate-raid");
+            playIconSound("pirate");
+            raidCleanup = setTimeout(() => {
+              card.classList.remove("pirate-raid");
+              lockPirateCard();
+              showToast("The pirate stole your button. Ransom terms have been posted. 🏴‍☠️");
+            }, 1850);
+          };
+
           card.addEventListener("pointerenter", () => {
+            if (!hoverCapable || card.classList.contains("pirate-locked")) return;
             clearTimeout(raidTimer);
             clearTimeout(raidCleanup);
             card.classList.remove("pirate-raid");
             raidTimer = setTimeout(() => {
               if (!card.matches(":hover")) return;
-              card.classList.remove("pirate-raid");
-              void card.offsetWidth;
-              card.classList.add("pirate-raid");
-              playIconSound("pirate");
-              raidCleanup = setTimeout(() => card.classList.remove("pirate-raid"), 1900);
+              triggerPirateRaid();
             }, 5000);
           });
           card.addEventListener("pointerleave", () => {
             clearTimeout(raidTimer);
-            clearTimeout(raidCleanup);
             raidTimer = null;
-            raidCleanup = null;
-            card.classList.remove("pirate-raid");
           });
+          card.addEventListener("click", event => {
+            if (!card.classList.contains("pirate-locked")) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            card.classList.remove("pirate-locked");
+            card.removeAttribute("aria-label");
+            addMoneyLost(200);
+            showToast("Bribe accepted. No receipt. $200 gone. 🏴‍☠️");
+            tone(245, .12, "triangle", .016);
+          }, true);
         }
       });
     }
 
     function activateIcon(icon) {
       const action = icon.dataset.action || "plain";
+      // Rank Things is intentionally click-heavy: reranking during its grace window
+      // should never count toward the general animation-icon spam fine.
+      if (action !== "medals") registerIconPress();
       if (action === "dice") {
         rollDie(icon, true);
         return;
       }
+      if (action === "bike") {
+        runBikeClick(icon);
+        return;
+      }
+      if (action === "map") {
+        if (typeof icon.rerollAll === "function") icon.rerollAll();
+        icon.classList.remove("active");
+        void icon.offsetWidth;
+        icon.classList.add("active");
+        setTimeout(() => icon.classList.remove("active"), 620);
+        playIconSound("map");
+        return;
+      }
+      if (action === "house") {
+        randomizeHouse(icon);
+        return;
+      }
       if (action === "medals") {
-        startTierCycle(icon, true);
+        if (icon.dataset.tierCycling === "1" && rerankLastTierItem(icon)) {
+          playIconSound("medals");
+        } else {
+          startTierCycle(icon, true);
+        }
+        return;
+      }
+      if (action === "challenge") {
+        failCurrentChallenge(icon);
+        return;
+      }
+      if (action === "train") {
+        boostTrain(icon);
+        return;
+      }
+      if (action === "traffic") {
+        if (typeof icon.advanceSignal === "function") icon.advanceSignal();
+        else {
+          const order = ["red", "green", "amber"];
+          const current = order.indexOf(icon.dataset.signal || "red");
+          icon.dataset.signal = order[(current + 1) % order.length];
+        }
+        playIconSound("traffic");
+        return;
+      }
+      if (action === "dog") {
+        woofDog(icon);
         return;
       }
       if (action === "recipe") {
         flipRecipePage(icon, true);
+        return;
+      }
+      if (action === "visited") {
+        icon.classList.remove("active");
+        void icon.offsetWidth;
+        icon.classList.add("active");
+        playIconSound("visited");
+        clearTimeout(icon.visitedTimer);
+        icon.visitedTimer = setTimeout(() => icon.classList.remove("active"), 2050);
         return;
       }
       icon.classList.remove("active");
@@ -2280,6 +2926,44 @@
     });
 
     document.addEventListener("pointermove", event => {
+      if (!hoverCapable || !doodle) return;
+
+      if (mascotAvoiding && mascotHomeRect) {
+        const homeX = mascotHomeRect.left + mascotHomeRect.width / 2;
+        const homeY = mascotHomeRect.top + mascotHomeRect.height / 2;
+        const distanceFromHome = Math.hypot(event.clientX - homeX, event.clientY - homeY);
+
+        if (distanceFromHome < 320) {
+          const candidates = [
+            [0, 0], [-105, -28], [105, -28], [-88, 50], [88, 50], [0, 62]
+          ];
+          const minX = 10 - mascotHomeRect.left;
+          const maxX = window.innerWidth - 10 - mascotHomeRect.right;
+          let best = [0, 0];
+          let bestScore = -Infinity;
+
+          for (const [rawX, rawY] of candidates) {
+            const x = Math.max(minX, Math.min(maxX, rawX));
+            const y = rawY;
+            const cx = homeX + x;
+            const cy = homeY + y;
+            const mouseDistance = Math.hypot(event.clientX - cx, event.clientY - cy);
+            const travelPenalty = Math.hypot(x, y) * 0.08;
+            const score = mouseDistance - travelPenalty;
+            if (score > bestScore) {
+              bestScore = score;
+              best = [x, y];
+            }
+          }
+
+          doodle.style.setProperty("--mascot-x", `${best[0]}px`);
+          doodle.style.setProperty("--mascot-y", `${best[1]}px`);
+        } else {
+          doodle.style.setProperty("--mascot-x", "0px");
+          doodle.style.setProperty("--mascot-y", "0px");
+        }
+      }
+
       const rect = doodle.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
@@ -2295,8 +2979,13 @@
     });
 
     document.addEventListener("pointerleave", () => {
+      if (!doodle) return;
       doodle.style.setProperty("--eye-x", "0px");
       doodle.style.setProperty("--eye-y", "0px");
+      if (mascotAvoiding) {
+        doodle.style.setProperty("--mascot-x", "0px");
+        doodle.style.setProperty("--mascot-y", "0px");
+      }
     });
 
 
@@ -2307,6 +2996,10 @@
     setInterval(() => updateTrafficFineDisplay(), 60000);
     render();
     wireThemedCards();
+    document.querySelectorAll(".map-icon").forEach(icon => {
+      if (typeof icon.rerollAll === "function") icon.rerollAll();
+    });
+    document.querySelectorAll(".house-icon").forEach(icon => randomizeHouse(icon, false));
   </script>
 </body>
 </html>
