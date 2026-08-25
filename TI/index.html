@@ -24,7 +24,7 @@
   }
 
   *{box-sizing:border-box}
-  html,body{height:100%}
+  html,body{height:100%;min-height:100%}
   body{
     margin:0;
     font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -35,7 +35,7 @@
   button,input,textarea{font:inherit}
   button{color:inherit}
 
-  .app{height:100%; display:grid; grid-template-columns:var(--sidebar) 1fr;}
+  .app{height:100%;height:100dvh;min-height:0; display:grid; grid-template-columns:var(--sidebar) 1fr;}
   .sidebar{
     background:#efefec;
     border-right:1px solid var(--border);
@@ -95,7 +95,7 @@
   .side-link:hover{background:#e2e2de}
   .side-link span:first-child{width:19px;text-align:center}
 
-  .main{min-width:0;height:100%;display:flex;flex-direction:column;background:var(--panel);}
+  .main{min-width:0;min-height:0;height:100%;overflow:hidden;display:flex;flex-direction:column;background:var(--panel);}
   .topbar{
     min-height:58px;border-bottom:1px solid rgba(222,223,217,.75);
     display:flex;align-items:center;justify-content:space-between;
@@ -131,9 +131,12 @@
     border:1px solid var(--border);background:white;padding:7px 10px;border-radius:999px;
     font-size:12px;font-weight:700;color:#646760;
   }
+  .unlock-count{
+    color:#9a9c96;font-size:11px;font-weight:650;white-space:nowrap;padding:0 3px;
+  }
 
   .conversation{
-    flex:1; overflow:auto; scroll-behavior:smooth;
+    flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; scroll-behavior:smooth;
     background:
       radial-gradient(circle at 50% -10%, rgba(109,94,252,.035), transparent 30%),
       white;
@@ -181,7 +184,7 @@
   .assistant-content{min-width:0}
   .assistant-name{font-size:12px;font-weight:800;margin:0 0 8px;color:#53564f}
   .answer{
-    font-size:16px;line-height:1.62;word-wrap:break-word;
+    font-size:16px;line-height:1.62;word-wrap:break-word;white-space:pre-wrap;
   }
   .answer.big-answer{
     font-size:30px;font-weight:840;letter-spacing:-.035em;line-height:1.2;
@@ -333,6 +336,7 @@
       </div>
 
       <div class="top-actions">
+        <span class="unlock-count" id="unlockCount">1/10 responses unlocked</span>
         <span class="pill">100% benchmark score</span>
         <button class="icon-btn" id="shareBtn" title="Share">↗</button>
       </div>
@@ -387,10 +391,80 @@
 
 <script>
 (() => {
-  const ANSWERS = ["Milk", "Bicycle", "Thomas", "Alexis", "Zion", "Trains", "Avalon", "Cow", "Minecraft", "5' 11\\\""];
+  const ANSWERS = ["Milk", "Bicycle", "Thomas", "Alexis", "Zion", "Trains", "Avalon", "Cow", "Minecraft", `5'11"`];
 
-  // Includes common variants of cute / pretty / beautiful / smart.
-  const ALEXIS_TRIGGER = /\b(cute(?:r|st|ly|ness)?|cutie(?:s)?|pretty|prettier|prettiest|prettily|beautiful(?:ly|ness)?|beauty|smart|smarter|smartest|smartly|smarty|smartypants)\b/i;
+  const TRIGGERS = {
+    "Milk": ["drink", "thirsty", "water", "tea", "ice", "cow"],
+    "Bicycle": ["ride", "go", "how to get", "fast", "fall", "fun"],
+    "Thomas": ["handsome", "tall", "engineer", "ravenclaw", "milk", "m"],
+    "Alexis": ["wife", "girlfriend", "fiance", "love", "cute", "pretty", "beautiful", "smart", "adorable", "sexy", "hot", "gorgeous", "clever", "slytherin", "emo", "goth", "s"],
+    "Zion": ["dog", "crazy", "beagle", "bark", "walk", "national park", "hike", "park", "nature"],
+    "Trains": ["ride", "fast", "cargo", "passenger", "fun", "rail"],
+    "Avalon": ["merlin", "percival", "loyal servant", "arthur", "assassin", "morgana", "mordred", "oberon", "minion", "claim", "council", "mission", "fails", "game", "board"],
+    "Cow": ["animal", "milk", "moo", "black", "white", "horns", "grass", "poop"],
+    "Minecraft": ["creeper", "dirt", "block", "sand", "steve", "chicken", "jockey", "lava", "zombie", "villager", "survive", "stone", "game", "video"],
+    "5'11\"": ["height", "tall", "short", "small", "tiny", "average", "penis", "feet", "foot", "inch", "meter"]
+  };
+
+  const VARIANT_PATTERNS = {
+    "drink": "drink|drinks|drinking|drank|drunk",
+    "thirsty": "thirsty|thirstier|thirstiest|thirst",
+    "cow": "cow|cows",
+    "ride": "ride|rides|riding|rode|ridden|rider|riders",
+    "go": "go|goes|going|went|gone",
+    "fast": "fast|faster|fastest",
+    "fall": "fall|falls|falling|fell|fallen",
+    "fun": "fun|funner|funnest",
+    "handsome": "handsome|handsomer|handsomest",
+    "tall": "tall|taller|tallest",
+    "engineer": "engineer|engineers|engineering|engineered",
+    "wife": "wife|wives",
+    "love": "love|loves|loved|loving|lover|lovers",
+    "girlfriend": "girlfriend|girlfriends",
+    "fiance": "fiance|fiancé|fiancee|fiancée|fiances|fiancés|fiancees|fiancées",
+    "cute": "cute|cuter|cutest|cutie|cuties|cuteness|cutely",
+    "pretty": "pretty|prettier|prettiest|prettily|prettiness",
+    "beautiful": "beautiful|beautifully|beauty|beauties",
+    "smart": "smart|smarter|smartest|smarty|smarties|smartypants|smartly",
+    "adorable": "adorable|adorably|adorableness",
+    "sexy": "sexy|sexier|sexiest|sexiness",
+    "hot": "hot|hotter|hottest",
+    "gorgeous": "gorgeous|gorgeously",
+    "clever": "clever|cleverer|cleverest|cleverly",
+    "dog": "dog|dogs|doggy|doggie|doggies",
+    "crazy": "crazy|crazier|craziest|crazily",
+    "bark": "bark|barks|barking|barked",
+    "walk": "walk|walks|walking|walked|walker|walkers",
+    "hike": "hike|hikes|hiking|hiked|hiker|hikers",
+    "park": "park|parks|parked|parking",
+    "nature": "nature|natural|naturally",
+    "rail": "rail|rails|railway|railways|railroad|railroads",
+    "passenger": "passenger|passengers",
+    "fails": "fail|fails|failed|failing|failure|failures",
+    "mission": "mission|missions",
+    "game": "game|games|gaming|gamer|gamers",
+    "board": "board|boards|boardgame|boardgames|board game|board games",
+    "animal": "animal|animals",
+    "horns": "horn|horns|horned",
+    "grass": "grass|grassy",
+    "poop": "poop|poops|pooped|pooping",
+    "creeper": "creeper|creepers",
+    "block": "block|blocks|blocked|blocking",
+    "chicken": "chicken|chickens",
+    "jockey": "jockey|jockeys",
+    "zombie": "zombie|zombies",
+    "villager": "villager|villagers",
+    "survive": "survive|survives|survived|surviving|survival",
+    "video": "video|videos",
+    "height": "height|heights",
+    "short": "short|shorter|shortest",
+    "small": "small|smaller|smallest",
+    "tiny": "tiny|tinier|tiniest",
+    "foot": "foot|feet",
+    "feet": "foot|feet",
+    "inch": "inch|inches",
+    "meter": "meter|meters|metre|metres"
+  };
 
   const promptEl = document.getElementById('prompt');
   const sendBtn = document.getElementById('sendBtn');
@@ -407,6 +481,8 @@
   let busy = false;
   let chats = JSON.parse(localStorage.getItem('thomasAIChats') || '[]');
   let currentChat = { id: Date.now(), messages: [] };
+  let unlocked = JSON.parse(localStorage.getItem('thomasAIUnlocked') || 'null') || ['Thomas'];
+  let lastRandomAnswer = localStorage.getItem('thomasAILastRandom') || null;
 
   function saveChats() {
     const existing = chats.findIndex(c => c.id === currentChat.id);
@@ -445,7 +521,7 @@
     thread.innerHTML = '';
     currentChat.messages.forEach(m => {
       if (m.role === 'user') addUserMessage(m.text, false);
-      else addAssistantMessage(m.text, m.seconds, false);
+      else addAssistantMessage(m.text, m.seconds, false, {index: !!m.index});
     });
     closeSidebar();
     scrollBottom();
@@ -510,7 +586,8 @@
     return wrap;
   }
 
-  function addAssistantMessage(text, seconds, record=true) {
+  function addAssistantMessage(text, seconds, record=true, options={}) {
+    const isIndex = !!options.index;
     const msg = document.createElement('div');
     msg.className = 'message assistant';
     msg.innerHTML = `
@@ -518,7 +595,7 @@
         <div class="avatar">TI</div>
         <div class="assistant-content">
           <div class="assistant-name">Thomas Intelligence</div>
-          <div class="answer big-answer"></div>
+          <div class="answer${isIndex ? '' : ' big-answer'}"></div>
           <div class="meta-row">
             <span>Thought for ${Number(seconds || 0).toFixed(1)} seconds</span>
             <span>·</span>
@@ -537,9 +614,34 @@
       showToast('Copied perfect answer');
     });
     thread.appendChild(msg);
-    if (record) currentChat.messages.push({role:'assistant', text, seconds});
+    if (record) currentChat.messages.push({role:'assistant', text, seconds, index:isIndex});
+    if (!isIndex && options.unlockAnswers) unlockAnswers(options.unlockAnswers);
     scrollBottom();
     return msg;
+  }
+
+  function unlockAnswers(items) {
+    let changed = false;
+    for (const item of items) {
+      if (ANSWERS.includes(item) && !unlocked.includes(item)) {
+        unlocked.push(item);
+        changed = true;
+      }
+    }
+    if (changed) localStorage.setItem('thomasAIUnlocked', JSON.stringify(unlocked));
+    updateUnlockCounter();
+  }
+
+  function updateUnlockCounter() {
+    const count = Math.min(ANSWERS.length, unlocked.length);
+    const el = document.getElementById('unlockCount');
+    if (!el) return;
+    if (count === 0) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    el.textContent = `${count}/${ANSWERS.length} responses unlocked`;
   }
 
   function createThinkingMessage() {
@@ -607,6 +709,74 @@
     return line;
   }
 
+  function escapeRegex(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function triggerRegex(trigger) {
+    const t = trigger.toLowerCase();
+    if (t === 'm' || t === 's') return new RegExp(`(?:^|\\s)${t}(?:$|\\s|[.!?,;:])`, 'i');
+    if (t.includes(' ')) {
+      const phrase = t.split(/\s+/).map(escapeRegex).join('\\s+');
+      return new RegExp(`\\b${phrase}\\b`, 'i');
+    }
+    if (VARIANT_PATTERNS[t]) return new RegExp(`\\b(?:${VARIANT_PATTERNS[t]})\\b`, 'i');
+    const escaped = escapeRegex(t);
+    return new RegExp(`\\b${escaped}(?:s|es|ed|ing|er|est|ly|ness)?\\b`, 'i');
+  }
+
+  function matchedTriggers(query) {
+    const triggerOwners = new Map();
+    for (const [answer, triggers] of Object.entries(TRIGGERS)) {
+      for (const trigger of triggers) {
+        if (!triggerRegex(trigger).test(query)) continue;
+        const key = trigger.toLowerCase();
+        if (!triggerOwners.has(key)) triggerOwners.set(key, []);
+        triggerOwners.get(key).push(answer);
+      }
+    }
+    return triggerOwners;
+  }
+
+  function chooseResponse(query) {
+    const matches = matchedTriggers(query);
+    const candidates = new Set();
+
+    for (const owners of matches.values()) {
+      // Exact shared triggers pick one owner at equal odds. Two owners = 50/50.
+      candidates.add(owners[Math.floor(Math.random() * owners.length)]);
+    }
+
+    const selected = [];
+    for (const answer of candidates) {
+      if (Math.random() < 0.90) selected.push(answer);
+    }
+
+    if (selected.length) {
+      lastRandomAnswer = null;
+      localStorage.removeItem('thomasAILastRandom');
+      return { text: selected.join(', '), answers: selected, random:false };
+    }
+
+    // If a trigger's 90% roll misses, prefer a non-triggered random fallback.
+    let pool = ANSWERS.filter(a => !candidates.has(a));
+    if (!pool.length) pool = [...ANSWERS];
+    if (lastRandomAnswer && pool.length > 1) pool = pool.filter(a => a !== lastRandomAnswer);
+
+    const answer = pool[Math.floor(Math.random() * pool.length)];
+    lastRandomAnswer = answer;
+    localStorage.setItem('thomasAILastRandom', answer);
+    return { text: answer, answers:[answer], random:true };
+  }
+
+  function indexText() {
+    return 'Thomas Intelligence Response Index\n\n' +
+      Object.entries(TRIGGERS)
+        .map(([answer, triggers]) => `${answer}: ${triggers.join(', ')}`)
+        .join('\n\n') +
+      '\n\nVariants are recognized automatically. If an exact trigger belongs to multiple responses, one owner is chosen at random.';
+  }
+
   async function submit() {
     const text = promptEl.value.trim();
     if (!text || busy) return;
@@ -650,13 +820,15 @@
     const elapsedSoFar = performance.now() - start;
     if (elapsedSoFar < totalMs) await sleep(totalMs - elapsedSoFar);
 
-    const answer = ALEXIS_TRIGGER.test(text)
-      ? 'Alexis'
-      : ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-
     const elapsed = (performance.now() - start) / 1000;
     thinking.remove();
-    addAssistantMessage(answer, elapsed);
+
+    if (text.trim().toLowerCase() === 'index') {
+      addAssistantMessage(indexText(), elapsed, true, {index:true});
+    } else {
+      const result = chooseResponse(text);
+      addAssistantMessage(result.text, elapsed, true, {unlockAnswers: result.answers});
+    }
     saveChats();
 
     busy = false;
@@ -748,6 +920,7 @@
 
   bindChips();
   renderHistory();
+  updateUnlockCounter();
   resizePrompt();
 
   // A tiny console easter egg, because serious AI products have serious developer tools.
