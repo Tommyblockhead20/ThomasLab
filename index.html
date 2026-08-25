@@ -184,7 +184,8 @@
     }
 
     .hero-doodle:hover { transform: rotate(-3deg) scale(1.04); }
-    .hero-doodle.avoiding { transition: transform .16s ease, translate .1s ease-out; }
+    .hero-doodle.avoiding { transition: transform .12s ease, translate .10s cubic-bezier(.15,.85,.2,1); }
+    .hero-doodle.avoiding.panic { transition: transform .07s ease, translate .035s cubic-bezier(.1,.95,.2,1); pointer-events: none; }
     .hero-doodle.bounce { animation: bounce .62s cubic-bezier(.2,.85,.2,1); }
 
     .hero-doodle .eye {
@@ -279,7 +280,7 @@
 
     .about {
       position: relative;
-      padding: 0 0 64px;
+      padding: 0 0 104px;
     }
 
     .about-head {
@@ -314,19 +315,19 @@
 
     .grid + .grid { margin-top: 18px; }
 
-    /* Four Thomas Zone cards read better as a balanced 2×2 block on desktop. */
-    #aboutGrid .card { grid-column: span 6; }
+    /* Four-card sections read better as balanced 2×2 blocks on desktop. */
+    #gamesGrid .card, #aboutGrid .card { grid-column: span 6; }
 
     .card {
       --c: #d9eaff;
       --r: 0deg;
       grid-column: span 4;
-      height: 286px;
-      min-height: 286px;
+      height: auto;
+      min-height: 250px;
       position: relative;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
       overflow: hidden;
       padding: 24px;
       border: 3px solid var(--line);
@@ -342,8 +343,8 @@
 
     .card.feature {
       grid-column: span 6;
-      height: 286px;
-      min-height: 286px;
+      height: auto;
+      min-height: 250px;
       --r: 0deg;
     }
 
@@ -393,16 +394,16 @@
     }
 
     .icon {
-      width: 67px;
-      height: 67px;
+      width: 74px;
+      height: 74px;
       flex: 0 0 auto;
       display: grid;
       place-items: center;
       border: 2px solid var(--line);
-      border-radius: 20px;
+      border-radius: 21px;
       background: rgba(255,255,255,.76);
       box-shadow: 3px 3px 0 rgba(23,23,23,.18);
-      font-size: 32px;
+      font-size: 35px;
       transform: rotate(-3deg);
       transition: transform .2s ease;
     }
@@ -1437,7 +1438,7 @@
     }
     .recipe-turning-page.flipping { animation: recipePageSweep .54s cubic-bezier(.36,.02,.24,1) 1; }
     @keyframes recipePageSweep {
-      0% { transform: translateX(0) scaleX(1) skewY(0deg); opacity: 0; }
+      0% { transform: translateX(0) scaleX(1) skewY(0deg); opacity: 1; }
       8% { opacity: 1; }
       46% { transform: translateX(-12px) scaleX(.14) skewY(-5deg); opacity: 1; }
       54% { transform: translateX(-16px) scaleX(.10) skewY(4deg); opacity: 1; }
@@ -1554,8 +1555,191 @@
       58% { transform: translateY(1px) rotate(7deg) scale(.98); }
     }
 
+    /* v37: expressive icon interactions + accomplishments */
+    .hero-doodle.avoiding .mouth {
+      height: 23px;
+      bottom: 24px;
+      border-top: 3px solid var(--line);
+      border-bottom: 0;
+      border-radius: 50px 50px 0 0;
+    }
+    .hero-doodle.avoiding.tempted .mouth {
+      width: 22px;
+      height: 18px;
+      bottom: 29px;
+      border: 3px solid var(--line);
+      border-radius: 50%;
+      background: rgba(255,255,255,.12);
+    }
+    .hero-doodle.caught { animation: mascotCaught .38s ease 1; }
+    @keyframes mascotCaught { 35% { transform: rotate(-10deg) scale(.92); } 70% { transform: rotate(12deg) scale(1.06); } }
+
+    .spark-star {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      overflow: visible;
+      transition: left .55s cubic-bezier(.2,.8,.2,1), right .55s cubic-bezier(.2,.8,.2,1), bottom .55s cubic-bezier(.2,.8,.2,1), transform .18s ease;
+    }
+    .spark-star.moved { right: calc(89% - 34px); left: auto; bottom: 2px; }
+    .spark-star.star-rattle { animation: starRattle .25s ease 1; }
+    @keyframes starRattle { 25% { transform: translateX(-3px) rotate(-17deg); } 50% { transform: translateX(3px) rotate(9deg); } 75% { transform: translateX(-2px) rotate(-13deg); } }
+    .star-glyph { display:block; font-size:31px; line-height:34px; filter: drop-shadow(1px 1px 0 rgba(23,23,23,.16)); }
+    .star-face { position:absolute; left:50%; top:50%; width:17px; height:14px; transform:translate(-47%,-48%); pointer-events:none; }
+    .star-eye { position:absolute; top:3px; width:2.5px; height:3px; border-radius:50%; background:#4f3a00; }
+    .star-eye.left { left:4px; } .star-eye.right { right:4px; }
+    .star-mouth { position:absolute; left:50%; bottom:2px; width:6px; height:3px; border-bottom:1.5px solid #4f3a00; border-radius:0 0 8px 8px; transform:translateX(-50%); }
+    .spark-star.annoyed .star-mouth { border-bottom:0; border-top:1.5px solid #4f3a00; border-radius:8px 8px 0 0; bottom:0; }
+
+    .state-morph-stage { width:58px; height:53px; position:relative; display:grid; place-items:center; }
+    .state-morph-svg { width:59px; height:51px; overflow:visible; transform-origin:center; }
+    .state-morph-shape { fill:#ffd76a; stroke:var(--line); stroke-width:2.15; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; filter:drop-shadow(1px 1px 0 rgba(23,23,23,.14)); }
+    .state-morph-label { position:absolute; right:0; bottom:0; min-width:18px; padding:2px 3px; border:1.5px solid rgba(23,23,23,.72); border-radius:999px; background:rgba(255,255,255,.9); font-size:7px; font-weight:950; line-height:1; text-align:center; opacity:.88; pointer-events:none; }
+    .state-icon.scrambling .state-morph-svg { animation: stateBorderScramble .52s cubic-bezier(.25,.05,.2,1) 1; }
+    .state-icon.scrambling .state-morph-shape { stroke-dasharray:5 3; animation: stateStrokeScramble .19s linear infinite; }
+    .state-icon.scrambling .state-morph-label { transform:rotate(-8deg) scale(1.08); background:#fff0ae; }
+    .state-icon.generated .state-morph-shape { stroke-dasharray:none; animation:none; }
+    .state-icon.generated .state-morph-label { transform:none; background:#fff0ae; }
+    @keyframes stateBorderScramble {
+      0% { transform:scale(1) rotate(0deg) skew(0deg); }
+      14% { transform:scale(.90,.98) rotate(-5deg) skewX(-8deg); }
+      25% { transform:scale(.78,1.04) rotate(5deg) skewY(8deg); }
+      34% { transform:scale(.90,.88) rotate(-4deg) skewX(6deg); }
+      43%,66% { transform:scale(.98) rotate(1deg) skew(0deg); }
+      78% { transform:scale(.80,.92) rotate(6deg) skewY(-7deg); }
+      89% { transform:scale(.91,1.02) rotate(-4deg) skewX(5deg); }
+      100% { transform:scale(1) rotate(0deg) skew(0deg); }
+    }
+    @keyframes stateStrokeScramble { to { stroke-dashoffset:-16; } }
+
+    .routes-stage { width:58px; height:52px; position:relative; display:block; overflow:hidden; }
+    .route-scene { position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-style:normal; }
+    .route-scene.current { display:flex; }
+    .route-hike.current .route-main { animation: routeWalk 1.35s ease-in-out 1; }
+    .route-footprints { position:absolute; left:5px; bottom:8px; font-size:10px; letter-spacing:3px; opacity:.65; transform:rotate(-8deg); }
+    @keyframes routeWalk { 0% { transform:translateX(-25px) rotate(-8deg); } 45% { transform:translateX(0) rotate(6deg); } 100% { transform:translateX(24px) rotate(-6deg); } }
+    .route-climb .mountain { position:absolute; right:1px; bottom:2px; font-size:34px; filter:grayscale(.08); }
+    .route-climb .route-main { z-index:2; font-size:22px; animation: routeClimb 1.45s ease-in-out 1; }
+    @keyframes routeClimb { 0% { transform:translate(-16px,16px) rotate(-9deg); } 100% { transform:translate(9px,-9px) rotate(5deg); } }
+    .route-drive::after { content:""; position:absolute; left:2px; right:2px; bottom:12px; height:7px; border-top:2px solid var(--line); border-bottom:2px solid var(--line); opacity:.35; }
+    .route-drive .route-main, .route-train .route-main, .route-boat .route-main { font-size:31px; z-index:2; }
+    .route-drive .route-main, .route-train .route-main { animation: routePassForward 1.25s ease-in-out 1; }
+    /* The car and locomotive emoji face left on the common platforms this page targets,
+       so flip them while they travel left-to-right. */
+    @keyframes routePassForward { 0% { transform:translateX(-48px) scaleX(-1); } 100% { transform:translateX(48px) scaleX(-1); } }
+    .route-boat::after { content:"≈≈≈"; position:absolute; bottom:1px; left:6px; font-size:17px; letter-spacing:1px; opacity:.55; }
+    .route-boat .route-main { animation:routeBoat 1.25s ease-in-out 1; }
+    @keyframes routeBoat { 0% { transform:translateX(-45px) rotate(-4deg); } 50% { transform:translateX(0) rotate(4deg); } 100% { transform:translateX(45px) rotate(-3deg); } }
+
+    :is(.card:hover, .card.mobile-focus) .brain-icon .brain-glyph { animation: brainThink 1s ease-in-out infinite alternate; }
+    @keyframes brainThink { from { transform:translateY(1px) rotate(-3deg); } to { transform:translateY(-3px) rotate(3deg) scale(1.06); } }
+    .brain-stage { width:58px; height:52px; position:relative; display:grid; place-items:center; }
+    .brain-glyph { font-size:33px; line-height:1; display:block; }
+    .brain-dots { position:absolute; right:0; top:-1px; font-size:13px; font-style:normal; font-weight:950; opacity:0; letter-spacing:1px; }
+    :is(.card:hover, .card.mobile-focus) .brain-dots { animation: thinkDots 1.15s steps(3,end) infinite; }
+    @keyframes thinkDots { 0%,18% { opacity:0; } 35%,100% { opacity:1; } }
+    .brain-answer { position:absolute; z-index:9; left:42px; top:-16px; width:max-content; max-width:150px; padding:5px 7px; border:2px solid var(--line); border-radius:10px; background:white; box-shadow:2px 2px 0 var(--line); font-size:9px; line-height:1.15; font-style:normal; font-weight:900; opacity:0; transform:translateY(5px) scale(.8); pointer-events:none; }
+    .brain-icon.answering .brain-answer { animation: brainAnswer 1.65s ease 1; }
+    @keyframes brainAnswer { 10%,75% { opacity:1; transform:translateY(0) scale(1); } 100% { opacity:0; transform:translateY(-4px) scale(.95); } }
+
+    :is(.card:hover, .card.mobile-focus) .dog-icon:not(.woof) .icon-glyph { animation: dogCurious 1.4s ease-in-out infinite alternate; }
+    @keyframes dogCurious { from { transform:rotate(-8deg) translateY(1px); } to { transform:rotate(10deg) translateY(-2px); } }
+    .dog-bubble { position:absolute; right:-4px; top:-9px; min-width:17px; padding:2px 4px; border:1.5px solid var(--line); border-radius:999px; background:white; font-size:9px; font-weight:950; opacity:0; pointer-events:none; }
+    .dog-icon.woof .dog-bubble { animation: dogBubble .55s ease 1; }
+    @keyframes dogBubble { 10%,70% { opacity:1; transform:translateY(-3px) scale(1); } 100% { opacity:0; transform:translateY(-8px) scale(.8); } }
+
+    .pirate-coin { position:absolute; z-index:30; left:18px; top:19px; font-style:normal; font-size:18px; pointer-events:none; animation: pirateCoin .85s cubic-bezier(.2,.8,.2,1) forwards; }
+    @keyframes pirateCoin { 0% { opacity:0; transform:translateY(8px) scale(.4) rotate(0); } 22% { opacity:1; } 70% { opacity:1; transform:translate(18px,-18px) scale(1.15) rotate(220deg); } 100% { opacity:0; transform:translate(24px,-28px) scale(.8) rotate(360deg); } }
+
+    .pirate-treasure { position:absolute; z-index:34; left:16px; top:17px; width:34px; height:30px; pointer-events:none; animation:treasurePop 1.15s cubic-bezier(.2,.85,.2,1) forwards; }
+    .pirate-treasure .chest-base { position:absolute; left:3px; bottom:1px; width:28px; height:17px; border:2px solid var(--line); border-radius:3px 3px 6px 6px; background:#8d552f; box-shadow:inset 0 6px 0 #b97842; }
+    .pirate-treasure .chest-lid { position:absolute; left:3px; top:2px; width:28px; height:13px; border:2px solid var(--line); border-radius:14px 14px 3px 3px; background:#b97842; transform-origin:left bottom; animation:treasureLid 1.15s ease forwards; }
+    .pirate-treasure .chest-lock { position:absolute; z-index:2; left:14px; top:13px; width:7px; height:8px; border:1.5px solid var(--line); border-radius:2px; background:#ffd76a; }
+    .pirate-treasure b { position:absolute; z-index:3; left:29px; top:-5px; width:max-content; padding:2px 4px; border:1.5px solid var(--line); border-radius:999px; background:#fff7c7; font-size:9px; font-weight:950; font-style:normal; opacity:0; animation:treasureValue 1.15s ease forwards; }
+    @keyframes treasurePop { 0% { opacity:0; transform:translateY(7px) scale(.45) rotate(-7deg); } 18%,76% { opacity:1; transform:translateY(-3px) scale(1.08) rotate(2deg); } 100% { opacity:0; transform:translateY(-12px) scale(.9); } }
+    @keyframes treasureLid { 0%,20% { transform:rotate(0); } 45%,78% { transform:rotate(-28deg) translateY(-1px); } 100% { transform:rotate(-18deg); } }
+    @keyframes treasureValue { 0%,30% { opacity:0; transform:translateY(5px) scale(.7); } 45%,82% { opacity:1; transform:translateY(-4px) scale(1); } 100% { opacity:0; transform:translateY(-12px) scale(.85); } }
+
+    .mega-steam-cloud { position:fixed; z-index:220; width:0; height:0; pointer-events:none; overflow:visible; }
+    .mega-steam-cloud i {
+      position:absolute; left:0; top:0; width:var(--ms,58px); height:var(--ms,58px);
+      margin-left:calc(var(--ms,58px) * -.5); margin-top:calc(var(--ms,58px) * -.5);
+      border:2px solid rgba(23,23,23,.22); border-radius:50%; background:rgba(255,255,255,.95);
+      box-shadow:inset 0 0 14px rgba(120,120,120,.05); opacity:0;
+      animation:megaSteam var(--md,1.85s) cubic-bezier(.16,.7,.2,1) forwards;
+    }
+    @keyframes megaSteam {
+      0% { opacity:0; transform:translate(0,8px) scale(.18); }
+      10% { opacity:.95; }
+      60% { opacity:.94; }
+      100% { opacity:0; transform:translate(var(--mx),var(--my)) scale(var(--mz,1.7)); }
+    }
+
+    /* Make the physical page turn visible immediately on touch/mobile previews. */
+    .recipe-turning-page.flipping { opacity:1; }
+    @media (hover:none), (pointer:coarse) {
+      .recipe-turning-page.flipping { box-shadow:-3px 1px 5px rgba(23,23,23,.18); }
+    }
+
+    .achievement-zone { position:relative; padding:0 0 34px; display:flex; flex-direction:column; align-items:flex-end; }
+    .achievement-peek { min-height:40px; padding:0 10px; display:inline-flex; align-items:center; gap:6px; border:0; border-radius:999px; background:transparent; color:var(--muted); font:inherit; font-size:11px; font-weight:900; opacity:.55; cursor:pointer; }
+    .achievement-peek:hover, .achievement-peek:focus-visible { opacity:1; background:rgba(255,255,255,.65); outline:2px solid var(--line); outline-offset:2px; }
+    .achievement-panel { width:min(760px,100%); margin-top:12px; padding:18px; border:3px solid var(--line); border-radius:22px; background:var(--paper); box-shadow:5px 5px 0 var(--line); }
+    .achievement-panel[hidden] { display:none; }
+    .achievement-panel-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+    .achievement-kicker { margin:0 0 3px; color:var(--muted); font-size:10px; font-weight:950; letter-spacing:.12em; text-transform:uppercase; }
+    .achievement-panel h2 { margin:0; font-size:28px; line-height:1; }
+    .achievement-close { width:40px; height:40px; border:2px solid var(--line); border-radius:50%; background:white; font-size:25px; line-height:1; cursor:pointer; }
+    .achievement-hint { margin:9px 0 15px; color:var(--muted); font-size:12px; font-weight:700; }
+    .achievement-groups { display:grid; gap:12px; }
+    .achievement-group { border-top:2px dashed rgba(23,23,23,.18); padding-top:11px; }
+    .achievement-group:first-child { border-top:0; padding-top:0; }
+    .achievement-group-title { margin:0 0 8px; display:flex; justify-content:space-between; gap:10px; font-size:13px; font-weight:950; }
+    .achievement-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .achievement-card { min-width:0; padding:9px 10px; border:2px solid rgba(23,23,23,.22); border-radius:13px; background:rgba(255,255,255,.6); }
+    .achievement-card.unlocked { border-color:var(--line); background:#fff7ce; }
+    .achievement-name { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:950; }
+    .achievement-page { margin-top:2px; color:var(--muted); font-size:9px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; }
+    .achievement-description { margin:5px 0 0; color:#4a4742; font-size:11px; line-height:1.3; font-weight:650; }
+    .achievement-card.locked .achievement-description { letter-spacing:.12em; font-weight:950; }
+
+    /* A deliberately easy-to-overlook peace offering for the mascot. */
+    .mascot-treat {
+      position:absolute;
+      left:7px;
+      top:4px;
+      z-index:25;
+      width:34px;
+      height:34px;
+      display:grid;
+      place-items:center;
+      padding:0;
+      border:0;
+      background:transparent;
+      font-size:19px;
+      line-height:1;
+      opacity:.34;
+      cursor:grab;
+      user-select:none;
+      touch-action:none;
+      filter:drop-shadow(1px 1px 0 rgba(23,23,23,.14));
+      transform:translate(var(--treat-x,0px),var(--treat-y,0px)) rotate(-9deg);
+      transition:opacity .18s ease, transform .24s cubic-bezier(.2,.8,.2,1);
+    }
+    .mascot-treat:hover, .mascot-treat:focus-visible { opacity:.9; outline:2px dashed rgba(23,23,23,.45); outline-offset:2px; border-radius:50%; }
+    .mascot-treat.dragging { opacity:1; cursor:grabbing; transition:opacity .1s ease; transform:translate(var(--treat-x,0px),var(--treat-y,0px)) rotate(7deg) scale(1.12); }
+    .mascot-treat.eaten { animation:treatEaten .34s ease forwards; pointer-events:none; }
+    @keyframes treatEaten { to { opacity:0; transform:translate(var(--treat-x,0px),var(--treat-y,0px)) scale(.2) rotate(35deg); } }
+    @media (max-width:620px) {
+      .achievement-zone { padding-bottom:20px; }
+      .achievement-list { grid-template-columns:1fr; }
+      .achievement-panel { padding:15px; }
+      .spark-star.moved { right:calc(82% - 34px); left:auto; bottom:0; }
+    }
+
     .copy {
-      margin-top: 34px;
+      margin-top: 22px;
       padding-right: 42px;
     }
 
@@ -1708,7 +1892,7 @@
       .hero-doodle .eye.one { left: 29px; }
       .hero-doodle .eye.two { right: 29px; }
       .hero-doodle .mouth { width: 42px; height: 20px; bottom: 25px; }
-      .card, .card.feature { grid-column: span 6; height: 270px; min-height: 270px; }
+      .card, .card.feature { grid-column: span 6; height: auto; min-height: 242px; }
       #gamesGrid .card, #aboutGrid .card { grid-column: span 6; }
     }
 
@@ -1730,16 +1914,16 @@
       .grid + .grid { margin-top: 13px; }
       .card, .card.feature {
         grid-column: 1 / -1;
-        height: 220px;
-        min-height: 220px;
+        height: auto;
+        min-height: 205px;
         padding: 18px;
         border-width: 2px;
         border-radius: 21px;
         box-shadow: 4px 4px 0 var(--line);
       }
       #gamesGrid .card, #aboutGrid .card { grid-column: 1 / -1; }
-      .icon { width: 58px; height: 58px; border-radius: 17px; font-size: 29px; }
-      .copy { margin-top: 19px; padding-right: 30px; }
+      .icon { width: 64px; height: 64px; border-radius: 18px; font-size: 32px; }
+      .copy { margin-top: 12px; padding-right: 30px; }
       .copy h3 { font-size: clamp(26px, 8.4vw, 31px); line-height: 1; }
       .copy p { margin-top: 8px; font-size: 14px; line-height: 1.34; }
       .arrow { right: 17px; bottom: 14px; font-size: 27px; }
@@ -1811,7 +1995,25 @@
         <h2 id="about-title">The Thomas Zone</h2>
       </div>
       <div class="grid" id="aboutGrid"></div>
-      <span class="visual-doodle spark-star" id="sparkStar" aria-hidden="true">✦</span>
+      <button class="visual-doodle spark-star" id="sparkStar" type="button" aria-label="Poke the suspicious little star">
+        <span class="star-glyph" aria-hidden="true">✦</span>
+        <span class="star-face" aria-hidden="true"><i class="star-eye left"></i><i class="star-eye right"></i><i class="star-mouth"></i></span>
+      </button>
+    </section>
+
+    <section class="achievement-zone" aria-label="Accomplishments">
+      <button class="mascot-treat" id="mascotTreat" type="button" aria-label="A suspicious little cookie. Maybe it belongs somewhere else?">🍪</button>
+      <button class="achievement-peek" id="achievementPeek" type="button" aria-expanded="false" aria-controls="achievementPanel">
+        <span aria-hidden="true">🏆</span><span id="achievementTotal">0/0</span>
+      </button>
+      <div class="achievement-panel" id="achievementPanel" hidden>
+        <div class="achievement-panel-head">
+          <div><p class="achievement-kicker">ThomasLab</p><h2>Accomplishments</h2></div>
+          <button class="achievement-close" id="achievementClose" type="button" aria-label="Close accomplishments">×</button>
+        </div>
+        <p class="achievement-hint">Locked accomplishments only give you a clue.</p>
+        <div class="achievement-groups" id="achievementGroups"></div>
+      </div>
     </section>
 
   </main>
@@ -1854,7 +2056,7 @@
       {
         title: "Custom State Generator",
         description: "Pick what should determine state boundaries and see new states be born.",
-        icon: "✂️", color: "#ffd77e", href: "./CustomStateGenerator/", group: "main", action: "scissors"
+        icon: "🗺️", color: "#ffd77e", href: "./CustomStateGenerator/", group: "main", action: "state"
       },
       {
         title: "Rank Things",
@@ -1902,9 +2104,9 @@
         icon: "📍", color: "#ffd6a3", href: "./PlacesIHaveBeen/", group: "about", action: "visited"
       },
       {
-        title: "Recommended",
+        title: "Recommended Routes",
         description: "My recommended hikes, bike rides, train rides, drives, and boating routes, ranked.",
-        icon: "🥾", color: "#b8df96", href: "./FavoriteRoutes/", group: "third", action: "boot"
+        icon: "🥾", color: "#b8df96", href: "./RecommendedRoutes/", group: "third", action: "routes"
       },
       {
         title: "Thomas Intelligence",
@@ -1924,6 +2126,7 @@
     const doodle = document.getElementById("doodle");
     const surprise = document.getElementById("surprise");
     const sparkStar = document.getElementById("sparkStar");
+    const mascotTreat = document.getElementById("mascotTreat");
     const creditsOverlay = document.getElementById("creditsOverlay");
     const creditsTrack = document.getElementById("creditsTrack");
     const creditsSkip = document.getElementById("creditsSkip");
@@ -1933,6 +2136,184 @@
     })[ch]);
 
     const hoverCapable = window.matchMedia ? window.matchMedia("(hover: hover) and (pointer: fine)").matches : true;
+
+    /*
+      THOMASLAB ACCOMPLISHMENT API (v1)
+      ---------------------------------
+      Every thomaslab.me page can use the same localStorage record. Future pages can copy
+      this tiny API (or move it into a shared /achievements.js file) and call, for example:
+        ThomasAchievements.unlock("traffic-moving-people");
+        ThomasAchievements.increment("ti.questions", 1);
+        ThomasAchievements.setStat("dog.discoveries", 69);
+      The homepage listens for storage changes, so accomplishments earned elsewhere appear
+      here automatically on the next visit / open tab. Locked accomplishments intentionally
+      reveal only their vague clue-name and page.
+    */
+    const ACHIEVEMENT_STORAGE_KEY = "thomaslabAchievementsV1";
+    const ACHIEVEMENTS = [
+      { id:"home-lucky-number", name:"Lucky Number", page:"ThomasLab", description:"Rolled a 6 on the Game Picker icon." },
+      { id:"home-indecisive", name:"Indecisive", page:"ThomasLab", description:"Finished a full Rank Things icon set after making at least 6 manual reranks." },
+      { id:"home-completionist", name:"Completionist", page:"ThomasLab", description:"Clicked every project icon on the ThomasLab homepage." },
+      { id:"home-tourist", name:"Tourist", page:"ThomasLab", description:"Visited every project from the ThomasLab homepage." },
+      { id:"home-wanted", name:"Wanted", page:"ThomasLab", description:"Got caught by the Traffic Sim red-light trap." },
+      { id:"home-button-masher", name:"Button Masher", page:"ThomasLab", description:"Clicked animation icons 12 times within 5 seconds." },
+      { id:"home-expensive-hobby", name:"Expensive Hobby", page:"ThomasLab", description:"Accumulated at least $500 in fines in a single day." },
+      { id:"home-personal-space", name:"Personal Space", page:"ThomasLab", description:"Clicked the mascot 5 times within 5 seconds." },
+      { id:"home-gotcha", name:"Gotcha!", page:"ThomasLab", description:"Caught the mascot while it was actively avoiding the mouse." },
+      { id:"home-peace-offering", name:"Peace Offering", page:"ThomasLab", description:"Fed the hidden cookie to the unhappy mascot." },
+      { id:"home-last-straw", name:"Last Straw", page:"ThomasLab", description:"Made the mascot angry again after winning him back with the cookie." },
+      { id:"home-highway-robbery", name:"Highway Robbery", page:"ThomasLab", description:"Had the Pirate Legacy card stolen." },
+      { id:"home-clean-slate", name:"Clean Slate", page:"ThomasLab", description:"Worked a positive Money Lost Today balance back to $0 using pirate coins." },
+      { id:"home-full-steam", name:"Full Steam Ahead", page:"ThomasLab", description:"Clicked the Train Clicker icon 20 times and unleashed the massive steam cloud." },
+      { id:"home-persistent", name:"Persistent", page:"ThomasLab", description:"Reached the star's final message." },
+      { id:"home-you-again", name:"You Again?", page:"ThomasLab", description:"Found and clicked the star after it moved." },
+      { id:"home-scenic-route", name:"Taking the Scenic Route", page:"ThomasLab", description:"Saw all five Recommended Routes icon animations." },
+
+      { id:"game-picker-picked", name:"Dealer's Choice", page:"Game Picker", description:"Picked a game." },
+      { id:"find-your-place-10-weights", name:"Tweaker", page:"Find Your Place", description:"Changed 10 weights." },
+      { id:"rank-things-10-items", name:"Getting Crowded", page:"Rank Things", description:"Placed 10 things." },
+      { id:"custom-state-3-maps", name:"New Management", page:"Custom State Generator", description:"Generated 3 custom state maps." },
+      { id:"house-rater-complete", name:"Home Inspector", page:"House Rater", description:"Fully rated a house." },
+      { id:"challenges-all-categories", name:"Variety Pack", page:"Challenges", description:"Got a recommendation from all 8 challenge categories." },
+      { id:"challenges-complete", name:"Actually Did It", page:"Challenges", description:"Completed a challenge." },
+      { id:"pirate-start-campaign", name:"Set Sail", page:"Pirate Legacy", description:"Started a Pirate Legacy campaign." },
+      { id:"train-2026", name:"It's 2026 Somewhere", page:"Train Clicker", description:"Reached $2,026." },
+      { id:"traffic-all-scenarios", name:"Try Everything", page:"Traffic Sim", description:"Tried every Traffic Sim scenario." },
+      { id:"traffic-queue-250", name:"Traffic Jam", page:"Traffic Sim", description:"Reached a queue of 250 cars." },
+      { id:"traffic-longest-wait-500", name:"Are We There Yet?", page:"Traffic Sim", description:"Reached a longest wait time of 500 seconds." },
+      { id:"traffic-moving-people", name:"Moving People", page:"Traffic Sim", description:"Reached a 1-minute throughput of at least 75 vehicles per minute." },
+      { id:"traffic-engineer", name:"Traffic Engineer", page:"Traffic Sim", description:"After at least 2 minutes of simulation time, exceeded 2,000 vehicles/hour with under 7 seconds average delay." },
+      { id:"dog-25-discoveries", name:"Good Boy", page:"Doggy Style", description:"Made 25 discoveries." },
+      { id:"dog-69-discoveries", name:"Nice.", page:"Doggy Style", description:"Made 69 discoveries." },
+      { id:"recipes-view-all", name:"Clean Plate Club", page:"My Recipe Book", description:"Viewed every recipe." },
+      { id:"ancestors-view-all", name:"Family Reunion", page:"Journey of My Ancestors", description:"Viewed the entire ancestral journey." },
+      { id:"places-viewed", name:"Been Around", page:"Places I Have Been", description:"Saw where Thomas has been." },
+      { id:"ti-5-questions", name:"Curious", page:"Thomas Intelligence", description:"Asked Thomas Intelligence 5 questions." },
+      { id:"ti-all-responses", name:"Know-It-All", page:"Thomas Intelligence", description:"Got every Thomas Intelligence response." }
+    ];
+    const achievementById = new Map(ACHIEVEMENTS.map(a => [a.id, a]));
+    const achievementPeek = document.getElementById("achievementPeek");
+    const achievementPanel = document.getElementById("achievementPanel");
+    const achievementClose = document.getElementById("achievementClose");
+    const achievementTotal = document.getElementById("achievementTotal");
+    const achievementGroups = document.getElementById("achievementGroups");
+
+    function defaultAchievementState() {
+      return { version:1, unlocked:{}, stats:{}, iconClicks:{}, visits:{} };
+    }
+    function readAchievementState() {
+      try {
+        const raw = localStorage.getItem(ACHIEVEMENT_STORAGE_KEY);
+        if (!raw) return defaultAchievementState();
+        const parsed = JSON.parse(raw);
+        return {
+          version:1,
+          unlocked: parsed && typeof parsed.unlocked === "object" ? parsed.unlocked : {},
+          stats: parsed && typeof parsed.stats === "object" ? parsed.stats : {},
+          iconClicks: parsed && typeof parsed.iconClicks === "object" ? parsed.iconClicks : {},
+          visits: parsed && typeof parsed.visits === "object" ? parsed.visits : {}
+        };
+      } catch { return defaultAchievementState(); }
+    }
+    function writeAchievementState(state) {
+      try { localStorage.setItem(ACHIEVEMENT_STORAGE_KEY, JSON.stringify(state)); } catch {}
+      renderAchievements();
+    }
+    function unlockAchievement(id, quiet = false) {
+      if (!achievementById.has(id)) return false;
+      const state = readAchievementState();
+      if (state.unlocked[id]) return false;
+      state.unlocked[id] = Date.now();
+      writeAchievementState(state);
+      const achievement = achievementById.get(id);
+      if (!quiet) showToast(`Achievement unlocked: ${achievement.name} 🏆`);
+      window.dispatchEvent(new CustomEvent("thomaslab-achievement-unlocked", { detail:{ id, achievement } }));
+      return true;
+    }
+    function setAchievementStat(key, value) {
+      const state = readAchievementState();
+      state.stats[key] = value;
+      writeAchievementState(state);
+      return value;
+    }
+    function incrementAchievementStat(key, amount = 1) {
+      const state = readAchievementState();
+      const next = Number(state.stats[key] || 0) + amount;
+      state.stats[key] = next;
+      writeAchievementState(state);
+      return next;
+    }
+    function projectStorageKey(projectOrTitle) {
+      const title = typeof projectOrTitle === "string" ? projectOrTitle : projectOrTitle?.title || "project";
+      return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    }
+    function markProjectIconClicked(project) {
+      if (!project) return;
+      const state = readAchievementState();
+      state.iconClicks[projectStorageKey(project)] = true;
+      writeAchievementState(state);
+      const needed = projects.map(projectStorageKey);
+      if (needed.every(key => state.iconClicks[key])) unlockAchievement("home-completionist");
+    }
+    function markProjectVisited(project) {
+      if (!project) return;
+      const state = readAchievementState();
+      state.visits[projectStorageKey(project)] = true;
+      writeAchievementState(state);
+      const needed = projects.map(projectStorageKey);
+      if (needed.every(key => state.visits[key])) unlockAchievement("home-tourist");
+    }
+    function renderAchievements() {
+      if (!achievementGroups || !achievementTotal) return;
+      const state = readAchievementState();
+      const unlockedCount = ACHIEVEMENTS.filter(a => state.unlocked[a.id]).length;
+      achievementTotal.textContent = `${unlockedCount}/${ACHIEVEMENTS.length}`;
+      const pages = [];
+      ACHIEVEMENTS.forEach(a => { if (!pages.includes(a.page)) pages.push(a.page); });
+      achievementGroups.innerHTML = pages.map(page => {
+        const list = ACHIEVEMENTS.filter(a => a.page === page);
+        const count = list.filter(a => state.unlocked[a.id]).length;
+        return `<section class="achievement-group">
+          <h3 class="achievement-group-title"><span>${escapeHTML(page)}</span><span>${count}/${list.length}</span></h3>
+          <div class="achievement-list">${list.map(a => {
+            const unlocked = !!state.unlocked[a.id];
+            return `<article class="achievement-card ${unlocked ? "unlocked" : "locked"}">
+              <div class="achievement-name"><span>${unlocked ? "✓" : "○"}</span><span>${escapeHTML(a.name)}</span></div>
+              <div class="achievement-page">${escapeHTML(a.page)}</div>
+              <p class="achievement-description">${unlocked ? escapeHTML(a.description) : "???"}</p>
+            </article>`;
+          }).join("")}</div>
+        </section>`;
+      }).join("");
+    }
+    function setAchievementPanel(open) {
+      if (!achievementPanel || !achievementPeek) return;
+      achievementPanel.hidden = !open;
+      achievementPeek.setAttribute("aria-expanded", String(open));
+      if (open) renderAchievements();
+    }
+    if (achievementPeek) achievementPeek.addEventListener("click", () => setAchievementPanel(achievementPanel.hidden));
+    if (achievementClose) achievementClose.addEventListener("click", () => setAchievementPanel(false));
+    window.addEventListener("storage", event => { if (event.key === ACHIEVEMENT_STORAGE_KEY) renderAchievements(); });
+
+    window.ThomasAchievements = {
+      version:1,
+      definitions: ACHIEVEMENTS.map(a => ({...a})),
+      unlock: unlockAchievement,
+      has(id) { return !!readAchievementState().unlocked[id]; },
+      getState: readAchievementState,
+      setStat: setAchievementStat,
+      increment: incrementAchievementStat,
+      markVisited(title) { const project = projects.find(p => p.title === title); if (project) markProjectVisited(project); },
+      receive(message) {
+        if (!message || typeof message !== "object") return false;
+        if (message.type === "unlock") return unlockAchievement(String(message.id || ""));
+        if (message.type === "setStat") { setAchievementStat(String(message.key || ""), message.value); return true; }
+        if (message.type === "increment") { incrementAchievementStat(String(message.key || ""), Number(message.amount || 1)); return true; }
+        return false;
+      }
+    };
+    renderAchievements();
 
     function iconMarkup(p) {
       const action = p.action || "plain";
@@ -1946,8 +2327,13 @@
           <span class="bike-pack" aria-hidden="true"><i class="bike-dust">💨</i><span class="bike-rider">🚴</span></span>
         </div>`;
       }
-      if (action === "scissors") {
-        return `<div class="icon animated-icon scissors-icon" data-action="scissors" aria-label="Animate scissors" role="button" tabindex="0"><span class="icon-glyph" aria-hidden="true">✂️</span></div>`;
+      if (action === "state") {
+        return `<div class="icon animated-icon state-icon" data-action="state" aria-label="Morph a state" role="button" tabindex="0">
+          <span class="state-morph-stage" aria-hidden="true">
+            <svg class="state-morph-svg" viewBox="0 0 64 54" preserveAspectRatio="xMidYMid meet" role="presentation"><path class="state-morph-shape" d=""/></svg>
+            <b class="state-morph-label">TX</b>
+          </span>
+        </div>`;
       }
       if (action === "medals") {
         // Pick a different category on each page load so Animals does not always go first.
@@ -2058,6 +2444,25 @@
           <span class="traffic-case" aria-hidden="true"><i class="light red"></i><i class="light amber"></i><i class="light green"></i></span>
         </div>`;
       }
+      if (action === "routes") {
+        return `<div class="icon animated-icon routes-icon" data-action="routes" data-route-index="0" aria-label="Cycle recommended route types" role="button" tabindex="0">
+          <span class="routes-stage" aria-hidden="true">
+            <i class="route-scene route-hike current"><span class="route-footprints">•••</span><b class="route-main">🥾</b></i>
+            <i class="route-scene route-climb"><b class="mountain">⛰️</b><b class="route-main">🧗</b></i>
+            <i class="route-scene route-drive"><b class="route-main">🚗</b></i>
+            <i class="route-scene route-train"><b class="route-main">🚂</b></i>
+            <i class="route-scene route-boat"><b class="route-main">⛵</b></i>
+          </span>
+        </div>`;
+      }
+      if (action === "brain") {
+        return `<div class="icon animated-icon brain-icon" data-action="brain" aria-label="Ask Thomas Intelligence" role="button" tabindex="0">
+          <span class="brain-stage"><span class="brain-glyph" aria-hidden="true">🧠</span><i class="brain-dots" aria-hidden="true">...</i><b class="brain-answer" aria-hidden="true">The answer is Thomas.</b></span>
+        </div>`;
+      }
+      if (action === "dog") {
+        return `<div class="icon animated-icon dog-icon" data-action="dog" aria-label="Make the dog react" role="button" tabindex="0"><span class="icon-glyph" aria-hidden="true">🐕</span><i class="dog-bubble" aria-hidden="true">WOOF!</i></div>`;
+      }
       if (action === "compass") {
         return `<div class="icon animated-icon compass-icon" data-action="compass" aria-label="Spin compass" role="button" tabindex="0">
           <span class="compass-face" aria-hidden="true"><b>N</b><i class="compass-needle"></i></span>
@@ -2090,7 +2495,7 @@
         .filter(({ p }) => p.group === group);
 
       const mainOrder = ["Find Your Place", "Rank Things", "Custom State Generator"];
-      const thirdOrder = ["House Rater", "Recommended", "Challenges"];
+      const thirdOrder = ["House Rater", "Recommended Routes", "Challenges"];
       featureGrid.innerHTML = byGroup("feature").map(({p, i}) => cardMarkup(p, i, "feature")).join("");
       mainGrid.innerHTML = byGroup("main")
         .sort((a, b) => mainOrder.indexOf(a.p.title) - mainOrder.indexOf(b.p.title))
@@ -2151,6 +2556,7 @@
       const live = projects.map((p, i) => ({...p, i})).filter(p => p.href && p.href !== "#" && !p.comingSoon);
       if (live.length) {
         const pick = live[Math.floor(Math.random() * live.length)];
+        markProjectVisited(pick);
         if (pick.external) window.open(pick.href, "_blank", "noopener");
         else window.location.href = pick.href;
         return;
@@ -2172,16 +2578,120 @@
     let mascotSpamCooldownUntil = 0;
     let mascotAvoiding = false;
     let mascotHomeRect = null;
+    let mascotInvulnerableUntil = 0;
+    let mascotPanicTimer = null;
+    let mascotTargetX = 0;
+    let mascotTargetY = 0;
+    let mascotLastDodgeAt = 0;
+    let mascotTreatHeld = false;
+    let mascotWasFed = false;
+    let recentMascotRects = [];
+    let lastMascotPointerInsideAt = 0;
+    let mascotLastGotchaAt = -Infinity;
+    let lastPointerX = window.innerWidth / 2;
+    let lastPointerY = 0;
+    let lastPointerAt = performance.now();
+    let pointerSpeed = 0;
+
+    function rememberMascotRect(rect, now = performance.now()) {
+      if (!rect) return;
+      recentMascotRects.push({
+        left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, at: now
+      });
+      recentMascotRects = recentMascotRects.filter(item => now - item.at <= 180);
+    }
+
+    function pointNearRecentMascot(x, y, now = performance.now()) {
+      recentMascotRects = recentMascotRects.filter(item => now - item.at <= 180);
+      const pad = 7;
+      return recentMascotRects.some(rect =>
+        x >= rect.left - pad && x <= rect.right + pad &&
+        y >= rect.top - pad && y <= rect.bottom + pad
+      );
+    }
+
+    function awardMascotGotcha() {
+      const now = performance.now();
+      if (!mascotAvoiding || now < mascotInvulnerableUntil || now - mascotLastGotchaAt < 320) return false;
+      mascotLastGotchaAt = now;
+      unlockAchievement("home-gotcha");
+      doodle.classList.remove("caught");
+      void doodle.offsetWidth;
+      doodle.classList.add("caught");
+      showToast("HOW? 🏆");
+      tone(880, .07, "square", .018);
+      tone(1175, .10, "square", .014, .06);
+      return true;
+    }
+
+    function moveMascotAwayFrom(pointerX, pointerY, force = false) {
+      if (!doodle || !mascotAvoiding || !mascotHomeRect || mascotTreatHeld) return;
+      const now = performance.now();
+      const rect = doodle.getBoundingClientRect();
+      rememberMascotRect(rect, now);
+      const currentX = rect.left + rect.width / 2;
+      const currentY = rect.top + rect.height / 2;
+      const cursorDistance = Math.hypot(pointerX - currentX, pointerY - currentY);
+
+      // Slow approaches make him react only a little earlier; the longer dodge cooldown
+      // prevents him from jittering between escape spots while the pointer creeps nearby.
+      const reactionDistance = pointerSpeed < .45 ? 145 : pointerSpeed < 1.15 ? 124 : 82;
+      if (!force && (cursorDistance > reactionDistance || now - mascotLastDodgeAt < 190)) return;
+
+      const homeX = mascotHomeRect.left + mascotHomeRect.width / 2;
+      const homeY = mascotHomeRect.top + mascotHomeRect.height / 2;
+      const candidates = [
+        [-175,-55],[175,-55],[-170,64],[170,64],[-120,98],[120,98],
+        [-205,12],[205,12],[0,108],[0,-88],[-82,-82],[82,-82]
+      ];
+      const minX = 10 - mascotHomeRect.left;
+      const maxX = window.innerWidth - 10 - mascotHomeRect.right;
+      const minY = 8 - mascotHomeRect.top;
+      const maxY = Math.min(125, window.innerHeight - 8 - mascotHomeRect.bottom);
+      let best = [mascotTargetX, mascotTargetY];
+      let bestScore = -Infinity;
+
+      for (const [rawX, rawY] of candidates) {
+        const x = Math.max(minX, Math.min(maxX, rawX));
+        const y = Math.max(minY, Math.min(maxY, rawY));
+        const cx = homeX + x;
+        const cy = homeY + y;
+        const mouseDistance = Math.hypot(pointerX - cx, pointerY - cy);
+        const travelPenalty = Math.hypot(x, y) * .025;
+        const repeatPenalty = Math.hypot(x - mascotTargetX, y - mascotTargetY) < 20 ? 75 : 0;
+        const score = mouseDistance - travelPenalty - repeatPenalty;
+        if (score > bestScore) {
+          bestScore = score;
+          best = [x, y];
+        }
+      }
+
+      if (!force && Math.hypot(best[0] - mascotTargetX, best[1] - mascotTargetY) < 34) return;
+      mascotTargetX = best[0];
+      mascotTargetY = best[1];
+      mascotLastDodgeAt = now;
+      doodle.style.setProperty("--mascot-x", `${mascotTargetX}px`);
+      doodle.style.setProperty("--mascot-y", `${mascotTargetY}px`);
+    }
 
     function startMascotAvoiding() {
       if (!doodle || mascotAvoiding) return;
       mascotAvoiding = true;
       mascotHomeRect = doodle.getBoundingClientRect();
-      doodle.classList.add("avoiding");
+      mascotTargetX = 0;
+      mascotTargetY = 0;
+      mascotInvulnerableUntil = performance.now() + 520;
+      doodle.classList.add("avoiding", "panic");
       doodle.setAttribute("aria-label", "Poke the little square face (he is now avoiding the mouse)");
+      clearTimeout(mascotPanicTimer);
+      mascotPanicTimer = setTimeout(() => doodle.classList.remove("panic"), 520);
+      // Move on the very frame he becomes unhappy so repeated clicks cannot catch him
+      // sitting at his old location before the next pointermove event arrives.
+      requestAnimationFrame(() => moveMascotAwayFrom(lastPointerX, lastPointerY, true));
     }
 
     function registerMascotPress() {
+      if (mascotAvoiding) return false;
       const now = performance.now();
       recentMascotPresses = recentMascotPresses.filter(time => now - time <= 5000);
       recentMascotPresses.push(now);
@@ -2189,8 +2699,10 @@
 
       recentMascotPresses = [];
       mascotSpamCooldownUntil = now + 5000;
-      addMoneyLost(50);
+      addFine(50);
       startMascotAvoiding();
+      unlockAchievement("home-personal-space");
+      if (mascotWasFed) unlockAchievement("home-last-straw");
       showToast("Mascot spam fine — $50. Now he's avoiding you. 👀");
       tone(165, .16, "square", .015);
       return true;
@@ -2198,6 +2710,14 @@
 
     doodle.addEventListener("click", () => {
       facePokes += 1;
+      if (mascotAvoiding) {
+        if (performance.now() < mascotInvulnerableUntil) {
+          moveMascotAwayFrom(lastPointerX, lastPointerY, true);
+          return;
+        }
+        awardMascotGotcha();
+        return;
+      }
       doodle.classList.remove("bounce");
       void doodle.offsetWidth;
       doodle.classList.add("bounce");
@@ -2205,9 +2725,159 @@
       registerMascotPress();
     });
 
+    function makeMascotHappyAgain() {
+      if (!doodle || !mascotAvoiding) return false;
+      mascotAvoiding = false;
+      mascotInvulnerableUntil = 0;
+      mascotTargetX = 0;
+      mascotTargetY = 0;
+      mascotHomeRect = null;
+      recentMascotPresses = [];
+      clearTimeout(mascotPanicTimer);
+      doodle.classList.remove("avoiding", "panic", "caught", "tempted");
+      mascotTreatHeld = false;
+      recentMascotRects = [];
+      lastMascotPointerInsideAt = 0;
+      doodle.style.setProperty("--mascot-x", "0px");
+      doodle.style.setProperty("--mascot-y", "0px");
+      doodle.style.setProperty("--eye-x", "0px");
+      doodle.style.setProperty("--eye-y", "0px");
+      doodle.setAttribute("aria-label", "Poke the little square face");
+      mascotWasFed = true;
+      showToast("Peace offering accepted. 🍪");
+      tone(523, .08, "sine", .015);
+      tone(659, .10, "sine", .012, .05);
+      return true;
+    }
+
+    if (mascotTreat) {
+      let treatPointerId = null;
+      let treatGrabOffsetX = 0;
+      let treatGrabOffsetY = 0;
+      let treatWasMovedToBody = false;
+
+      function putTreatAtDocumentPosition(left, top) {
+        mascotTreat.style.position = "absolute";
+        mascotTreat.style.left = `${left}px`;
+        mascotTreat.style.top = `${top}px`;
+        mascotTreat.style.setProperty("--treat-x", "0px");
+        mascotTreat.style.setProperty("--treat-y", "0px");
+      }
+
+      mascotTreat.addEventListener("pointerdown", event => {
+        if (event.button != null && event.button !== 0) return;
+
+        const rect = mascotTreat.getBoundingClientRect();
+        treatGrabOffsetX = event.clientX - rect.left;
+        treatGrabOffsetY = event.clientY - rect.top;
+        treatPointerId = event.pointerId;
+
+        // Move the cookie out of the bottom achievement section the first time it is
+        // picked up. During the drag it is viewport-fixed, so wheel-scrolling the page
+        // does not leave the cookie behind at the bottom of the document.
+        if (!treatWasMovedToBody) {
+          document.body.appendChild(mascotTreat);
+          treatWasMovedToBody = true;
+        }
+        mascotTreat.style.position = "fixed";
+        mascotTreat.style.left = `${rect.left}px`;
+        mascotTreat.style.top = `${rect.top}px`;
+        mascotTreat.style.setProperty("--treat-x", "0px");
+        mascotTreat.style.setProperty("--treat-y", "0px");
+        mascotTreat.classList.add("dragging");
+        mascotTreatHeld = true;
+        if (mascotAvoiding) doodle?.classList.add("tempted");
+
+        try { mascotTreat.setPointerCapture(event.pointerId); } catch {}
+        event.preventDefault();
+      });
+
+      mascotTreat.addEventListener("pointermove", event => {
+        if (event.pointerId !== treatPointerId) return;
+        mascotTreat.style.left = `${event.clientX - treatGrabOffsetX}px`;
+        mascotTreat.style.top = `${event.clientY - treatGrabOffsetY}px`;
+      });
+
+      const finishTreatDrag = event => {
+        if (event.pointerId !== treatPointerId) return;
+        treatPointerId = null;
+        mascotTreat.classList.remove("dragging");
+        mascotTreatHeld = false;
+        doodle?.classList.remove("tempted");
+        try { mascotTreat.releasePointerCapture(event.pointerId); } catch {}
+
+        const treatRect = mascotTreat.getBoundingClientRect();
+        const mascotRect = doodle?.getBoundingClientRect();
+        const tx = treatRect.left + treatRect.width / 2;
+        const ty = treatRect.top + treatRect.height / 2;
+        const closeEnough = mascotRect &&
+          tx >= mascotRect.left - 20 && tx <= mascotRect.right + 20 &&
+          ty >= mascotRect.top - 20 && ty <= mascotRect.bottom + 20;
+
+        if (closeEnough && makeMascotHappyAgain()) {
+          unlockAchievement("home-peace-offering");
+          mascotTreat.classList.add("eaten");
+          setTimeout(() => { mascotTreat.hidden = true; }, 330);
+          return;
+        }
+
+        // Keep the cookie wherever it was dropped. Convert its viewport position to a
+        // document position so it scrolls normally with the page until picked up again.
+        putTreatAtDocumentPosition(treatRect.left + window.scrollX, treatRect.top + window.scrollY);
+      };
+
+      mascotTreat.addEventListener("pointerup", finishTreatDrag);
+      mascotTreat.addEventListener("pointercancel", finishTreatDrag);
+    }
+
+    const starMessages = [
+      "Tiny star acquired ✦",
+      "Another sparkle. Extremely productive.",
+      "You found the decorative gameplay loop ✨",
+      "Yep. It still does that.",
+      "The star has no additional features.",
+      "Please stop QA testing the star.",
+      "Seven star clicks. Historic stuff.",
+      "You have unlocked absolutely nothing.",
+      "The star is beginning to feel observed.",
+      "Double digits. This is a lifestyle now.",
+      "Persistence without reward. Impressive.",
+      "I promise there is not a secret project in here.",
+      "The star would like to speak to management.",
+      "Still clicking? Respect, honestly.",
+      "The decorative gameplay loop has become gameplay.",
+      "Actually, you know what? I'm leaving.",
+      "Oh come on. You found me again.",
+      "Star click eighteen. Nobody planned for this.",
+      "The star has filed an incident report.",
+      "You have got to be kidding me.",
+      "There is literally nothing else here.",
+      "STOP CLICKING ME.",
+      "I am begging you to find a hobby.",
+      "This is harassment.",
+      "Fine. You win. The star is yours now. ✦ NOW SCREW OFF!"
+    ];
     let sparkFinds = 0;
+    let starLockedUntil = 0;
+    let starMoved = false;
+    const STAR_MOVE_MESSAGE = 16;
     sparkStar.addEventListener("click", () => {
+      const now = performance.now();
+      if (now < starLockedUntil) {
+        sparkStar.classList.remove("star-rattle");
+        void sparkStar.offsetWidth;
+        sparkStar.classList.add("star-rattle");
+        return;
+      }
+      starLockedUntil = now + 1000;
+
+      if (sparkFinds >= starMessages.length) {
+        showToast(starMessages[starMessages.length - 1]);
+        return;
+      }
+
       sparkFinds += 1;
+      if (starMoved && sparkFinds > STAR_MOVE_MESSAGE) unlockAchievement("home-you-again");
       tone(740, .07, "sine", .018);
       tone(1040, .10, "sine", .014, .06);
       sparkStar.animate([
@@ -2215,30 +2885,17 @@
         { transform: "rotate(170deg) scale(1.5)" },
         { transform: "rotate(350deg) scale(1)" }
       ], { duration: 560, easing: "cubic-bezier(.2,.8,.2,1)" });
-      const messages = [
-        "Tiny star acquired ✦",
-        "Another sparkle. Extremely productive.",
-        "You found the decorative gameplay loop ✨",
-        "Yep. It still does that.",
-        "The star has no additional features.",
-        "Please stop QA testing the star.",
-        "Seven star clicks. Historic stuff.",
-        "You have unlocked absolutely nothing.",
-        "The star is beginning to feel observed.",
-        "Double digits. This is a lifestyle now.",
-        "Achievement unlocked: persistence without reward.",
-        "I promise there is not a secret project in here.",
-        "The star would like to speak to management.",
-        "Still clicking? Respect, honestly.",
-        "The decorative gameplay loop has become gameplay.",
-        "This is more attention than the star was budgeted for.",
-        "Star click seventeen. Nobody planned for this.",
-        "You may now consider the star thoroughly clicked.",
-        "The star has filed an incident report.",
-        "Fine. You win. The star is yours now. ✦ Now Fuck Off!"
-      ];
-      // Run through the chain once, then permanently stay on the final message.
-      showToast(messages[Math.min(sparkFinds - 1, messages.length - 1)]);
+
+      if (sparkFinds >= 10) sparkStar.classList.add("annoyed");
+      showToast(starMessages[sparkFinds - 1]);
+
+      if (sparkFinds === STAR_MOVE_MESSAGE) {
+        setTimeout(() => {
+          sparkStar.classList.add("moved");
+          starMoved = true;
+        }, 540);
+      }
+      if (sparkFinds === starMessages.length) unlockAchievement("home-persistent", true);
     });
 
     let audioContext;
@@ -2336,6 +2993,7 @@
         const face = icon.querySelector(".dice-face");
         if (face) face.textContent = dieFaces[next - 1];
         icon.dataset.face = String(next);
+        if (next === 6) unlockAchievement("home-lucky-number");
       }, 560);
       icon.rollClassTimer = setTimeout(() => icon.classList.remove("rolling"), 1080);
     }
@@ -2455,6 +3113,7 @@
       });
       icon.dataset.lastRated = "";
       icon.lastRatedItem = null;
+      icon.dataset.tierManualChanges = "0";
 
       let step = 0;
       const placeNext = () => {
@@ -2474,6 +3133,7 @@
           scheduleNextTierPlacement(icon, placeNext, 1450);
           return;
         }
+        if (Number(icon.dataset.tierManualChanges || 0) >= 6) unlockAchievement("home-indecisive");
         const currentSetIndex = tierSetOrder.indexOf(setName);
         const nextSet = tierSetOrder[(currentSetIndex + 1) % tierSetOrder.length];
         icon.dataset.nextTierSet = nextSet;
@@ -2507,6 +3167,7 @@
       // Every click grants another half-second to move THIS SAME emoji again.
       // Crucially this extends the existing deadline instead of shortening it to 0.5s.
       icon.lastRatedItem = item;
+      icon.dataset.tierManualChanges = String(Number(icon.dataset.tierManualChanges || 0) + 1);
       extendTierPlacementGrace(icon, 500);
       return true;
     }
@@ -2603,8 +3264,35 @@
       return amount;
     }
 
+    function readFineOnlyTotal() {
+      try {
+        const today = localDayKey();
+        if (localStorage.getItem("thomasFineOnlyDay") !== today) {
+          localStorage.setItem("thomasFineOnlyDay", today);
+          localStorage.setItem("thomasFineOnlyAmount", "0");
+          return 0;
+        }
+        return Number(localStorage.getItem("thomasFineOnlyAmount") || 0);
+      } catch {
+        return Number(document.body.dataset.fineOnlyAmount || 0);
+      }
+    }
+
+    function addFine(dollars) {
+      const moneyLost = addMoneyLost(dollars);
+      const fineTotal = readFineOnlyTotal() + dollars;
+      try {
+        localStorage.setItem("thomasFineOnlyDay", localDayKey());
+        localStorage.setItem("thomasFineOnlyAmount", String(fineTotal));
+      } catch {
+        document.body.dataset.fineOnlyAmount = String(fineTotal);
+      }
+      if (fineTotal >= 500) unlockAchievement("home-expensive-hobby");
+      return moneyLost;
+    }
+
     function addTrafficFine() {
-      return addMoneyLost(100);
+      return addFine(100);
     }
 
     let recentIconPresses = [];
@@ -2613,11 +3301,12 @@
       const now = performance.now();
       recentIconPresses = recentIconPresses.filter(time => now - time <= 5000);
       recentIconPresses.push(now);
-      if (recentIconPresses.length < 10 || now < iconSpamCooldownUntil) return false;
+      if (recentIconPresses.length < 12 || now < iconSpamCooldownUntil) return false;
 
       recentIconPresses = [];
       iconSpamCooldownUntil = now + 5000;
-      addMoneyLost(25);
+      addFine(25);
+      unlockAchievement("home-button-masher");
       showToast("Icon spam fine — $25. 🚨");
       tone(190, .14, "square", .015);
       return true;
@@ -2689,6 +3378,37 @@
       }, 900);
     }
 
+    function unleashMegaSteam(icon) {
+      if (!icon) return;
+      const rect = icon.getBoundingClientRect();
+      // Match the ordinary steam origin near the locomotive's chimney, then let it escape the card.
+      const originX = rect.left + rect.width * .27;
+      const originY = rect.top + rect.height * .17;
+      const cloud = document.createElement("span");
+      cloud.className = "mega-steam-cloud";
+      cloud.style.left = `${originX}px`;
+      cloud.style.top = `${originY}px`;
+      for (let i = 0; i < 34; i += 1) {
+        const puff = document.createElement("i");
+        const spread = i / 33;
+        const side = (Math.random() - .5) * (85 + spread * 190);
+        const rise = -(55 + Math.random() * 115 + spread * 125);
+        const size = 34 + Math.random() * 58;
+        puff.style.setProperty("--ms", `${size.toFixed(0)}px`);
+        puff.style.setProperty("--mx", `${side.toFixed(0)}px`);
+        puff.style.setProperty("--my", `${rise.toFixed(0)}px`);
+        puff.style.setProperty("--mz", `${(1.15 + Math.random() * 1.1).toFixed(2)}`);
+        puff.style.setProperty("--md", `${(1.35 + Math.random() * .85).toFixed(2)}s`);
+        puff.style.animationDelay = `${(i * .025 + Math.random() * .12).toFixed(2)}s`;
+        cloud.appendChild(puff);
+      }
+      document.body.appendChild(cloud);
+      setTimeout(() => cloud.remove(), 2800);
+      playIconSound("trainWhistle");
+      setTimeout(() => playIconSound("trainWhistle"), 290);
+      unlockAchievement("home-full-steam");
+    }
+
     function boostTrain(icon) {
       if (!icon) return;
       icon.classList.remove("active");
@@ -2708,17 +3428,459 @@
         icon.appendChild(puff);
         setTimeout(() => puff.remove(), 1250);
       }
-      playIconSound("trainWhistle");
+      const clicks = Number(icon.dataset.trainClicks || 0) + 1;
+      icon.dataset.trainClicks = String(clicks);
+      if (clicks % 20 === 0) unleashMegaSteam(icon);
+      else playIconSound("trainWhistle");
     }
 
     function woofDog(icon) {
       if (!icon) return;
+      const bubble = icon.querySelector(".dog-bubble");
+      const glyph = icon.querySelector(".icon-glyph");
       icon.classList.remove("woof");
       void icon.offsetWidth;
       icon.classList.add("woof");
+      if (bubble) bubble.textContent = "WOOF!";
+      if (glyph) glyph.textContent = "🐕";
       clearTimeout(icon.woofTimer);
-      icon.woofTimer = setTimeout(() => icon.classList.remove("woof"), 500);
+      icon.woofTimer = setTimeout(() => icon.classList.remove("woof"), 520);
       playIconSound("dog");
+    }
+
+    /* Real state outline paths adapted from an open SVG U.S. state map. The icon
+       auto-fits each source path to its tiny viewport, so even multipart states retain
+       recognizable geography instead of being hand-drawn approximations. */
+    const STATE_SHAPES = [
+      { id:"TX", d:`M531.1,433.4l22.7,1.1l31.1,1.1l-2.3,23.5l-0.3,18.2l0.1,2.1l4.3,3.8l1.7,0.8l1.8,0.3l0.7-1.3 l0.9,0.9l1.7,0.5l1.6-0.7l1.1,0.4l-0.3,3.4l4.3,1l2.7,0.8l4,0.5l2.2,1.8l3.2-1.6l2.8,0.4l2,2.8l1.1,0.3l-0.2,2l3.1,1.2l2.8-1.8 l1.5,0.4l2.4,0.2l0.4,1.9l4.6,2l2.7-0.2l2-4.1h0.3l1.1,1.9l4.4,1l3.3,1.2l3.3,0.8l2.1-0.8l0.8-2.5h3.7l1.9,0.8l3.1-1.6h0.7l0.4,1.1 h4.3l2.4-1.3l1.7,0.3l1.4,1.9l2.9,1.7l3.5,1.1l2.7,1.4l2.4,1.6l3.3-0.9l1.9,1l0.5,10.1l0.3,9.7l0.7,9.5l0.5,4l2.7,4.6l1.1,4.1 l3.9,6.3l0.5,2.9l0.5,1l-0.7,7.5l-2.7,4.4l1,2.9l-0.4,2.5l-0.8,7.3l-1.4,2.7l0.6,4.4l-5.7,1.6l-9.9,4.5l-1,1.9l-2.6,1.9l-2.1,1.5 l-1.3,0.8l-5.7,5.3l-2.7,2.1l-5.3,3.2l-5.7,2.4l-6.3,3.4l-1.8,1.5l-5.8,3.6l-3.4,0.6l-3.9,5.5l-4,0.3l-1,1.9l2.3,1.9l-1.5,5.5 l-1.3,4.5l-1.1,3.9l-0.8,4.5l0.8,2.4l1.8,7l1,6.1l1.8,2.7l-1,1.5l-3.1,1.9l-5.7-3.9l-5.5-1.1l-1.3,0.5l-3.2-0.6l-4.2-3.1l-5.2-1.1 l-7.6-3.4l-2.1-3.9l-1.3-6.5l-3.2-1.9l-0.6-2.3l0.6-0.6l0.3-3.4l-1.3-0.6l-0.6-1l1.3-4.4l-1.6-2.3l-3.2-1.3l-3.4-4.4l-3.6-6.6 l-4.2-2.6l0.2-1.9l-5.3-12.3l-0.8-4.2l-1.8-1.9l-0.2-1.5l-6-5.3l-2.6-3.1v-1.1l-2.6-2.1l-6.8-1.1l-7.4-0.6l-3.1-2.3l-4.5,1.8 l-3.6,1.5l-2.3,3.2l-1,3.7l-4.4,6.1l-2.4,2.4l-2.6-1l-1.8-1.1l-1.9-0.6l-3.9-2.3v-0.6l-1.8-1.9l-5.2-2.1l-7.4-7.8l-2.3-4.7v-8.1 l-3.2-6.5l-0.5-2.7l-1.6-1l-1.1-2.1l-5-2.1l-1.3-1.6l-7.1-7.9l-1.3-3.2l-4.7-2.3l-1.5-4.4l-2.6-2.9l-1.9-0.5l-0.6-4.7l8,0.7l29,2.7 l29,1.6l2.3-23.8l3.9-55.6l1.6-18.7l1.4,0 M631.2,667.3l-0.6-7.1l-2.7-7.2l-0.6-7l1.5-8.2l3.3-6.9l3.5-5.4l3.2-3.6l0.6,0.2 l-4.8,6.6l-4.4,6.5l-2,6.6l-0.3,5.2l0.9,6.1l2.6,7.2l0.5,5.2l0.2,1.5L631.2,667.3z` },
+      { id:"OH", d:`M905.4,295l-6.1,4.1l-3.9,2.3l-3.4,3.7l-4,3.9l-3.2,0.8l-2.9,0.5l-5.5,2.6l-2.1,0.2l-3.4-3.1 l-5.2,0.6l-2.6-1.5l-2.4-1.4l-4.9,0.7l-10.2,1.6l-7.8,1.2l1.3,14.6l1.8,13.7l2.6,23.4l0.6,4.8l4.1-0.1l2.4-0.8l3.4,1.5l2.1,4.4 l5.1,0l1.9,2.1l1.8-0.1l2.5-1.3l2.5,0.4l2,1.5l1.7-2.1l2.3-1.3l2.1-0.7l0.6,2.7l1.8,1l3.5,2.3l2.2-0.1l1.1-1.1l-0.1-1.4l1.6-1.5 l0.2-5l1-3.9l1.5-1.4l1.5,0.9l0.8,1.2l1.2-0.2l-0.4-2.4l-0.6-0.6v-2.4l1-1.3l2.3-3.4l1.3-1.5l2.1,0.5l2.3-1.6l3.1-3.4l2.3-3.9 l0.2-5.4l0.5-5v-4.7l-1.1-3.1l1-1.5l0.9-1l-1.4-9.8L905.4,295z` },
+      { id:"FL", d:`M929.4,545.5l2.3,7.3l3.7,9.7l5.3,9.4l3.7,6.3l4.8,5.5l4,3.7l1.6,2.9l-1.1,1.3L953,593l2.9,7.4 l2.9,2.9l2.6,5.3l3.6,5.8l4.5,8.2l1.3,7.6l0.5,12l0.6,1.8l-0.3,3.4l-2.4,1.3l0.3,1.9l-0.6,1.9l0.3,2.4l0.5,1.9l-2.7,3.2l-3.1,1.5 l-3.9,0.2l-1.5,1.6l-2.4,1l-1.3-0.5l-1.1-1l-0.3-2.9l-0.8-3.4l-3.4-5.2l-3.6-2.3l-3.9-0.3l-0.8,1.3l-3.1-4.4l-0.6-3.6l-2.6-4 l-1.8-1.1l-1.6,2.1l-1.8-0.3l-2.1-5l-2.9-3.9l-2.9-5.3l-2.6-3.1l-3.6-3.7l2.1-2.4l3.2-5.5l-0.2-1.6l-4.5-1l-1.6,0.6l0.3,0.6l2.6,1 l-1.5,4.5l-0.8,0.5l-1.8-4l-1.3-4.8l-0.3-2.7l1.5-4.7v-9.5L910,585l-1.3-3.1l-5.2-1.3l-1.9-0.6l-1.6-2.6l-3.4-1.6l-1.1-3.4l-2.7-1 l-2.4-3.7l-4.2-1.5l-2.9-1.5h-2.6l-4,0.8l-0.2,1.9l0.8,1l-0.5,1.1l-3.1-0.2l-3.7,3.6l-3.6,1.9h-3.9l-3.2,1.3l-0.3-2.7l-1.6-1.9 l-2.9-1.1l-1.6-1.5l-8.1-3.9l-7.6-1.8l-4.4,0.6l-6,0.5l-6,2.1l-3.5,0.6l-0.2-8l-2.6-1.9l-1.8-1.8l0.3-3.1l10.2-1.3l25.5-2.9 l6.8-0.6l5.4,0.3l2.6,3.9l1.5,1.5l8.1,0.5l10.8-0.6l21.5-1.3l5.4-0.7l4.6,0l0.2,2.9l3.8,0.8l0.3-4.8l-1.6-4.5l1-0.7l5.1,0.5 L929.4,545.5z M941.9,677.9l2.4-0.6l1.3-0.2l1.5-2.3l2.3-1.6l1.3,0.5l1.7,0.3l0.4,1.1l-3.5,1.2l-4.2,1.5l-2.3,1.2L941.9,677.9z M955.4,672.9l1.2,1.1l2.7-2.1l5.3-4.2l3.7-3.9l2.5-6.6l1-1.7l0.2-3.4l-0.7,0.5l-1,2.8l-1.5,4.6l-3.2,5.3l-4.4,4.2l-3.4,1.9 L955.4,672.9z` },
+      { id:"CA", d:`M310.7,486.8l3.8-0.5l1.5-2l0.7-1.9l-3.2-0.1l-1.1-1.8l0.8-1.7l0-6.2l2.2-1.3l2.7-2.6l0.4-4.9 l1.6-3.5l1.9-2.1l3.3-1.7l1.3-0.7l0.8-1.5l-0.9-0.9l-1-1.5l-0.9-5.3l-2.9-5.2l0.1-2.8l-2.2-3.2l-15-23.2l-19.4-28.7l-22.4-33 l-12.7-19.5l1.8-7.2l6.8-25.9l8.1-31.4l-12.4-3.3l-13.5-3.4l-12.6-4.1l-7.5-2.1l-11.4-3l-7.1-2.4l-1.6,4.7l-0.2,7.4l-5.2,11.8 l-3.1,2.6l-0.3,1.1l-1.8,0.8l-1.5,4.2l-0.8,3.2l2.7,4.2l1.6,4.2l1.1,3.6l-0.3,6.5l-1.8,3.1l-0.6,5.8l-1,3.7l1.8,3.9l2.7,4.5 l2.3,4.8l1.3,4l-0.3,3.2l-0.3,0.5v2.1l5.7,6.3l-0.5,2.4l-0.6,2.3l-0.6,1.9l0.2,8.2l2.1,3.7l1.9,2.6l2.7,0.5l1,2.7l-1.1,3.6 l-2.1,1.6h-1.1l-0.8,3.9l0.5,2.9l3.2,4.4l1.6,5.3l1.5,4.7l1.3,3.1l3.4,5.8l1.5,2.6l0.5,2.9l1.6,1v2.4l-0.8,1.9l-1.8,7.1l-0.5,1.9 l2.4,2.7l4.2,0.5l4.5,1.8l3.9,2.1h2.9l2.9,3.1l2.6,4.8l1.1,2.3l3.9,2.1l4.8,0.8l1.5,2.1l0.6,3.2l-1.5,0.6l0.3,1l3.2,0.8l2.7,0.2 l2.9,4.7l3.9,4.2l0.8,2.3l2.6,4.2l0.3,3.2v9.4l0.5,1.8l10,1.5l19.7,2.7L310.7,486.8z M222.8,437l1.3,1.5l-0.2,1.3l-3.2-0.1 l-0.6-1.2l-0.6-1.5L222.8,437z M224.7,437l1.2-0.6l3.6,2.1l3.1,1.2l-0.9,0.6l-4.5-0.2l-1.6-1.6L224.7,437z M245.4,456.8l1.8,2.3 l0.8,1l1.5,0.6l0.6-1.5l-1-1.8l-2.7-2l-1.1,0.2V456.8z M244,465.5l1.8,3.2l1.2,1.9l-1.5,0.2l-1.3-1.2c0,0-0.7-1.5-0.7-1.9 s0-2.2,0-2.2L244,465.5z` },
+      { id:"MI", d:`M755.6,182.1l1.8-2.1l2.2-0.8l5.4-3.9l2.3-0.6l0.5,0.5l-5.1,5.1l-3.3,1.9l-2.1,0.9L755.6,182.1z M841.8,214.2l0.6,2.5l3.2,0.2l1.3-1.2c0,0-0.1-1.5-0.4-1.6c-0.3-0.2-1.6-1.9-1.6-1.9l-2.2,0.2l-1.6,0.2l-0.3,1.1L841.8,214.2z M871.9,277.2l-3.2-8.2l-2.3-9.1l-2.4-3.2l-2.6-1.8l-1.6,1.1l-3.9,1.8l-1.9,5l-2.7,3.7l-1.1,0.6l-1.5-0.6c0,0-2.6-1.5-2.4-2.1 c0.2-0.6,0.5-5,0.5-5l3.4-1.3l0.8-3.4l0.6-2.6l2.4-1.6l-0.3-10l-1.6-2.3l-1.3-0.8l-0.8-2.1l0.8-0.8l1.6,0.3l0.2-1.6L850,231 l-1.3-2.6h-2.6l-4.5-1.5l-5.5-3.4h-2.7l-0.6,0.6l-1-0.5l-3.1-2.3l-2.9,1.8l-2.9,2.3l0.3,3.6l1,0.3l2.1,0.5l0.5,0.8l-2.6,0.8 l-2.6,0.3l-1.5,1.8l-0.3,2.1l0.3,1.6l0.3,5.5l-3.6,2.1l-0.6-0.2v-4.2l1.3-2.4l0.6-2.4l-0.8-0.8l-1.9,0.8l-1,4.2l-2.7,1.1l-1.8,1.9 l-0.2,1l0.6,0.8l-0.6,2.6l-2.3,0.5v1.1l0.8,2.4l-1.1,6.1l-1.6,4l0.6,4.7l0.5,1.1l-0.8,2.4l-0.3,0.8l-0.3,2.7l3.6,6l2.9,6.5l1.5,4.8 l-0.8,4.7l-1,6l-2.4,5.2l-0.3,2.7l-3.3,3.1l4.4-0.2l21.4-2.3l7.3-1l0.1,1.7l6.9-1.2l10.3-1.5l3.9-0.5l0.1-0.6l0.2-1.5l2.1-3.7 l2-1.7l-0.2-5.1l1.6-1.6l1.1-0.3l0.2-3.6l1.5-3l1.1,0.6l0.2,0.6l0.8,0.2l1.9-1L871.9,277.2z M741.5,211.2l0.7-0.6l2.7-0.8l3.6-2.3 v-1l0.6-0.6l6-1l2.4-1.9l4.4-2.1l0.2-1.3l1.9-2.9l1.8-0.8l1.3-1.8l2.3-2.3l4.4-2.4l4.7-0.5l1.1,1.1l-0.3,1l-3.7,1l-1.5,3.1 l-2.3,0.8l-0.5,2.4l-2.4,3.2l-0.3,2.6l0.8,0.5l1-1.1l3.6-2.9l1.3,1.3h2.3l3.2,1l1.5,1.1l1.5,3.1l2.7,2.7l3.9-0.2l1.5-1l1.6,1.3 l1.6,0.5l1.3-0.8h1.1l1.6-1l4-3.6l3.4-1.1l6.6-0.3l4.5-1.9l2.6-1.3l1.5,0.2v5.7l0.5,0.3l2.9,0.8l1.9-0.5l6.1-1.6l1.1-1.1l1.5,0.5v7 l3.2,3.1l1.3,0.6l1.3,1l-1.3,0.3l-0.8-0.3l-3.7-0.5l-2.1,0.6l-2.3-0.2l-3.2,1.5h-1.8l-5.8-1.3l-5.2,0.2l-1.9,2.6l-7,0.6l-2.4,0.8 l-1.1,3.1l-1.3,1.1l-0.5-0.2l-1.5-1.6l-4.5,2.4h-0.6l-1.1-1.6l-0.8,0.2l-1.9,4.4l-1,4l-3.2,7l-1.2-1l-1.4-1l-1.9-10.3l-3.5-1.4 l-2.1-2.3l-12.1-2.7l-2.9-1l-8.2-2.2l-7.9-1.1L741.5,211.2z` },
+      { id:"NY", d:`M1002.6,289.4l-1.1-1l-2.6-0.2l-2.3-1.9l-1.6-6.1l-3.5,0.1l-2.4-2.7l-19.4,4.4l-43,8.7l-7.5,1.2 l-0.7-6.5l1.4-1.1l1.3-1.1l1-1.6l1.8-1.1l1.9-1.8l0.5-1.6l2.1-2.7l1.1-1l-0.2-1l-1.3-3.1l-1.8-0.2l-1.9-6.1l2.9-1.8l4.4-1.5l4-1.3 l3.2-0.5l6.3-0.2l1.9,1.3l1.6,0.2l2.1-1.3l2.6-1.1l5.2-0.5l2.1-1.8l1.8-3.2l1.6-1.9h2.1l1.9-1.1l0.2-2.3l-1.5-2.1l-0.3-1.5l1.1-2.1 v-1.5h-1.8l-1.8-0.8l-0.8-1.1l-0.2-2.6l5.8-5.5l0.6-0.8l1.5-2.9l2.9-4.5l2.7-3.7l2.1-2.4l2.4-1.8l3.1-1.2l5.5-1.3l3.2,0.2l4.5-1.5 l7.6-2.1l0.5,5l2.4,6.5l0.8,5.2l-1,3.9l2.6,4.5l0.8,2.1l-0.8,2.9l2.9,1.3l0.6,0.3l3.1,11l-0.5,5.1l-0.5,10.8l0.8,5.5l0.8,3.6 l1.5,7.3v8.1l-1.1,2.3l1.8,2l0.8,1.7l-1.9,1.8l0.3,1.3l1.3-0.3l1.5-1.3l2.3-2.6l1.1-0.6l1.6,0.6l2.3,0.2l7.9-3.9l2.9-2.7l1.3-1.5 l4.2,1.6l-3.4,3.6l-3.9,2.9l-7.1,5.3l-2.6,1l-5.8,1.9l-4,1.1l-1.2-0.5l-0.2-3.7l0.5-2.7l-0.2-2.1l-2.8-1.7l-4.5-1l-3.9-1.1 L1002.6,289.4z` },
+      { id:"MA", d:`M1074,273.9l2.2-0.7l0.5-1.7l1,0.1l1,2.3l-1.3,0.5l-3.9,0.1L1074,273.9z M1064.6,274.7l2.3-2.6h1.6 l1.8,1.5l-2.4,1l-2.2,1L1064.6,274.7z M1029.8,252.7l17.5-4.2l2.3-0.6l2.1-3.2l3.7-1.7l2.9,4.4l-2.4,5.2l-0.3,1.5l1.9,2.6l1.1-0.8 h1.8l2.3,2.6l3.9,6l3.6,0.5l2.3-1l1.8-1.8l-0.8-2.7l-2.1-1.6l-1.5,0.8l-1-1.3l0.5-0.5l2.1-0.2l1.8,0.8l1.9,2.4l1,2.9l0.3,2.4 l-4.2,1.5l-3.9,1.9l-3.9,4.5l-1.9,1.5v-1l2.4-1.5l0.5-1.8l-0.8-3.1l-2.9,1.5l-0.8,1.5l0.5,2.3l-2.1,1l-2.7-4.5l-3.4-4.4l-2.1-1.8 l-6.5,1.9l-5.1,1.1l-21.8,4.8l-0.4-4.9l0.6-10.6l5.2-0.9L1029.8,252.7z` }
+    ];
+
+    function fitStateViewBox(icon, path) {
+      const svg = icon?.querySelector(".state-morph-svg");
+      if (!svg || !path) return;
+      requestAnimationFrame(() => {
+        try {
+          const box = path.getBBox();
+          if (!(box.width > 0 && box.height > 0)) return;
+          const pad = Math.max(box.width, box.height) * .065;
+          svg.setAttribute("viewBox", `${box.x-pad} ${box.y-pad} ${box.width+pad*2} ${box.height+pad*2}`);
+        } catch {}
+      });
+    }
+
+    function setStateShape(icon, state) {
+      const path = icon?.querySelector(".state-morph-shape");
+      const label = icon?.querySelector(".state-morph-label");
+      if (!path || !state) return;
+      path.setAttribute("d", state.d);
+      if (label) label.textContent = state.id;
+      icon.dataset.stateIndex = String(STATE_SHAPES.indexOf(state));
+      fitStateViewBox(icon, path);
+    }
+
+    /* Invented states are generated from state-like boundary recipes rather than
+       low-vertex cartoon polygons. Straight survey lines stay mostly straight, while
+       river/coast borders visibly meander at multiple scales so the extra vertices
+       actually change the silhouette at icon size. */
+    function fakeEdge(a, b, count, style = "survey", amp = 1.0) {
+      const pts = [];
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const len = Math.max(.001, Math.hypot(dx, dy));
+      const nx = -dy / len, ny = dx / len;
+      const p1 = Math.random() * Math.PI * 2;
+      const p2 = Math.random() * Math.PI * 2;
+      const p3 = Math.random() * Math.PI * 2;
+      let walk = 0;
+
+      for (let i = 0; i < count; i++) {
+        const t = i / count;
+        let offset = 0;
+        const taper = Math.sin(Math.PI * t);
+
+        if (style === "river") {
+          walk = walk * .62 + (Math.random() - .5) * .95;
+          offset = taper * amp * (
+            .58 * Math.sin(t * Math.PI * 4 + p1) +
+            .27 * Math.sin(t * Math.PI * 9 + p2) +
+            .13 * Math.sin(t * Math.PI * 17 + p3)
+          ) + walk * .35;
+        } else if (style === "coast") {
+          walk = walk * .55 + (Math.random() - .5) * 1.25;
+          offset = taper * amp * (
+            .52 * Math.sin(t * Math.PI * 3 + p1) +
+            .30 * Math.sin(t * Math.PI * 8 + p2) +
+            .16 * Math.sin(t * Math.PI * 19 + p3)
+          ) + walk * .48;
+        } else if (style === "rough") {
+          offset = taper * amp * (
+            .66 * Math.sin(t * Math.PI * 5 + p1) +
+            .24 * Math.sin(t * Math.PI * 11 + p2)
+          );
+        } else {
+          // Surveyed borders are not mathematically perfect, but should still read straight.
+          offset = taper * amp * (
+            .72 * Math.sin(t * Math.PI * 2 + p1) +
+            .18 * Math.sin(t * Math.PI * 6 + p2)
+          );
+        }
+
+        pts.push([
+          a[0] + dx * t + nx * offset,
+          a[1] + dy * t + ny * offset
+        ]);
+      }
+      return pts;
+    }
+
+    function fakePart(segments) {
+      const pts = [];
+      segments.forEach(seg => {
+        const [a,b,count,style,amp] = seg;
+        pts.push(...fakeEdge(a,b,count,style,amp));
+      });
+      return pts;
+    }
+
+    function fakePathFromParts(parts) {
+      return parts.map(part =>
+        `M${part.map(([x,y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" L")} Z`
+      ).join(" ");
+    }
+
+    const FAKE_STATE_BUILDERS = [
+      // Broad inland state: straight north/west, big river east, irregular southern border.
+      () => [fakePart([
+        [[17,13],[67,11],12,"survey",.55],
+        [[67,11],[80,27],8,"rough",2.0],
+        [[80,27],[77,69],21,"river",4.7],
+        [[77,69],[56,87],10,"coast",3.1],
+        [[56,87],[22,80],13,"rough",2.2],
+        [[22,80],[14,55],10,"river",3.0],
+        [[14,55],[17,13],12,"survey",.55],
+      ])],
+
+      // Long panhandle feeding into a river-bounded body.
+      () => [fakePart([
+        [[7,20],[59,20],15,"survey",.45],
+        [[59,20],[59,12],5,"survey",.35],
+        [[59,12],[94,12],12,"survey",.45],
+        [[94,12],[94,28],6,"survey",.45],
+        [[94,28],[73,29],8,"rough",1.4],
+        [[73,29],[80,70],20,"river",4.4],
+        [[80,70],[61,84],9,"coast",3.0],
+        [[61,84],[25,83],12,"rough",1.8],
+        [[25,83],[13,66],8,"river",2.8],
+        [[13,66],[15,42],8,"rough",1.6],
+        [[15,42],[7,39],4,"survey",.45],
+        [[7,39],[7,20],6,"survey",.45],
+      ])],
+
+      // Coastal peninsula: surveyed panhandle, then two visibly natural coasts.
+      () => [fakePart([
+        [[7,24],[58,23],15,"survey",.5],
+        [[58,23],[71,30],7,"rough",1.8],
+        [[71,30],[76,47],9,"coast",3.0],
+        [[76,47],[84,68],11,"coast",4.8],
+        [[84,68],[80,86],9,"coast",5.2],
+        [[80,86],[69,96],7,"coast",4.2],
+        [[69,96],[59,82],8,"coast",3.8],
+        [[59,82],[54,61],10,"river",3.2],
+        [[54,61],[50,45],8,"river",2.7],
+        [[50,45],[8,45],13,"survey",.55],
+        [[8,45],[7,24],6,"survey",.45],
+      ])],
+
+      // Western state: strong diagonal survey lines plus a jagged mountain/river side.
+      () => [fakePart([
+        [[26,7],[72,11],14,"survey",.55],
+        [[72,11],[88,65],18,"rough",2.7],
+        [[88,65],[72,92],10,"river",3.8],
+        [[72,92],[42,84],11,"rough",2.3],
+        [[42,84],[13,24],20,"river",3.8],
+        [[13,24],[26,7],7,"survey",.5],
+      ])],
+
+      // Compact eastern state with a lake-ish north notch and strongly meandering southeast.
+      () => [fakePart([
+        [[19,15],[55,12],11,"survey",.5],
+        [[55,12],[68,17],6,"coast",2.3],
+        [[68,17],[77,14],5,"coast",2.7],
+        [[77,14],[83,29],7,"rough",1.7],
+        [[83,29],[79,53],12,"river",3.9],
+        [[79,53],[73,69],8,"river",4.3],
+        [[73,69],[61,80],7,"river",3.5],
+        [[61,80],[48,75],7,"coast",2.8],
+        [[48,75],[39,84],6,"river",3.2],
+        [[39,84],[25,79],7,"rough",1.8],
+        [[25,79],[17,65],7,"river",2.9],
+        [[17,65],[16,39],9,"survey",.55],
+        [[16,39],[19,15],7,"survey",.45],
+      ])],
+
+      // Long Appalachian-ish state: narrow body, natural borders on both long sides.
+      () => [fakePart([
+        [[7,31],[86,27],20,"survey",.55],
+        [[86,27],[96,38],6,"rough",2.0],
+        [[96,38],[85,49],7,"river",3.6],
+        [[85,49],[67,53],8,"river",3.0],
+        [[67,53],[55,58],7,"river",3.4],
+        [[55,58],[38,55],8,"coast",2.6],
+        [[38,55],[23,61],8,"river",3.6],
+        [[23,61],[9,58],7,"river",3.1],
+        [[9,58],[7,31],7,"survey",.5],
+      ])],
+
+      // Northeastern arm/cape shape, with a natural southern coast and hooked eastern end.
+      () => [fakePart([
+        [[8,39],[47,28],13,"survey",.6],
+        [[47,28],[66,25],8,"rough",1.5],
+        [[66,25],[73,33],5,"coast",2.7],
+        [[73,33],[84,32],5,"coast",3.0],
+        [[84,32],[96,42],7,"coast",4.0],
+        [[96,42],[92,54],7,"coast",4.6],
+        [[92,54],[83,63],7,"coast",4.3],
+        [[83,63],[77,58],5,"coast",3.8],
+        [[77,58],[82,49],5,"coast",3.2],
+        [[82,49],[70,47],6,"coast",3.1],
+        [[70,47],[63,59],6,"river",3.1],
+        [[63,59],[16,65],15,"river",3.2],
+        [[16,65],[8,52],6,"rough",1.6],
+        [[8,52],[8,39],5,"survey",.45],
+      ])],
+
+      // Gulf-ish boot shape with a long river boundary and heavily cut-up coast.
+      () => [fakePart([
+        [[18,12],[69,12],15,"survey",.5],
+        [[69,12],[70,45],11,"survey",.6],
+        [[70,45],[86,51],7,"river",3.2],
+        [[86,51],[83,67],8,"coast",4.8],
+        [[83,67],[72,65],6,"coast",4.5],
+        [[72,65],[67,83],8,"coast",5.0],
+        [[67,83],[55,91],7,"coast",4.5],
+        [[55,91],[46,76],7,"coast",4.0],
+        [[46,76],[27,74],8,"river",3.5],
+        [[27,74],[18,59],7,"river",3.4],
+        [[18,59],[11,52],5,"river",3.0],
+        [[11,52],[18,41],6,"river",3.2],
+        [[18,41],[18,12],9,"survey",.5],
+      ])],
+
+      // Great-Lakes-ish split state: two independently irregular landmasses.
+      () => [
+        fakePart([
+          [[11,27],[30,13],9,"coast",3.3],
+          [[30,13],[52,16],9,"coast",3.8],
+          [[52,16],[66,26],8,"coast",3.5],
+          [[66,26],[57,39],7,"coast",4.2],
+          [[57,39],[38,36],8,"coast",3.6],
+          [[38,36],[24,44],7,"coast",4.1],
+          [[24,44],[10,36],7,"coast",3.9],
+          [[10,36],[11,27],4,"coast",2.7],
+        ]),
+        fakePart([
+          [[48,50],[66,42],8,"coast",3.5],
+          [[66,42],[84,49],8,"coast",4.1],
+          [[84,49],[86,67],8,"coast",4.6],
+          [[86,67],[72,86],10,"coast",4.4],
+          [[72,86],[55,80],8,"coast",4.0],
+          [[55,80],[45,64],8,"coast",3.7],
+          [[45,64],[48,50],6,"coast",3.2],
+        ])
+      ],
+
+      // River-delta state with a pronounced inward notch and a broad natural southern edge.
+      () => [fakePart([
+        [[20,10],[72,11],15,"survey",.5],
+        [[72,11],[79,31],8,"river",2.8],
+        [[79,31],[73,45],7,"river",3.7],
+        [[73,45],[87,54],7,"river",3.2],
+        [[87,54],[79,69],8,"coast",4.6],
+        [[79,69],[62,76],8,"coast",4.4],
+        [[62,76],[51,91],8,"coast",4.0],
+        [[51,91],[39,78],8,"river",3.5],
+        [[39,78],[24,75],7,"river",3.2],
+        [[24,75],[16,59],8,"river",3.5],
+        [[16,59],[10,52],5,"river",3.0],
+        [[10,52],[19,41],6,"river",3.4],
+        [[19,41],[20,10],9,"survey",.5],
+      ])],
+    ];
+
+    function makeIntermediateStatePath(icon) {
+      if (!FAKE_STATE_BUILDERS.length) return "";
+      const previous = Number(icon?.dataset.fakeStateIndex ?? -1);
+      let next = previous;
+      if (FAKE_STATE_BUILDERS.length === 1) next = 0;
+      else while (next === previous) next = Math.floor(Math.random() * FAKE_STATE_BUILDERS.length);
+      if (icon) icon.dataset.fakeStateIndex = String(next);
+      return fakePathFromParts(FAKE_STATE_BUILDERS[next]());
+    }
+
+    const STATE_MORPH_MS = 520;
+    const STATE_HOLD_MS = 1500;
+    const STATE_CYCLE_MS = STATE_MORPH_MS * 2 + STATE_HOLD_MS * 2;
+
+    function clearStateMorphTimers(icon) {
+      (icon.stateMorphTimers || []).forEach(clearTimeout);
+      icon.stateMorphTimers = [];
+      clearTimeout(icon.stateMorphDoneTimer);
+      clearTimeout(icon.statePreviewTimer);
+      icon.statePreviewTimer = null;
+    }
+
+    function restartStateScramble(icon) {
+      icon.classList.remove("scrambling");
+      void icon.offsetWidth;
+      icon.classList.add("scrambling");
+    }
+
+    function morphToState(icon, index, withSound = false) {
+      if (!icon || !STATE_SHAPES.length) return;
+      const path = icon.querySelector(".state-morph-shape");
+      const label = icon.querySelector(".state-morph-label");
+      if (!path) return;
+      const current = Number(icon.dataset.stateIndex || 0);
+      const next = ((Number(index) % STATE_SHAPES.length) + STATE_SHAPES.length) % STATE_SHAPES.length;
+      clearStateMorphTimers(icon);
+      const intermediate = makeIntermediateStatePath(icon);
+
+      // Beat 1: real state -> moving/dashed border.
+      icon.classList.remove("generated");
+      if (label) label.textContent = "?";
+      restartStateScramble(icon);
+
+      // Beat 2: the invented state fully settles. It is now treated exactly like a
+      // real state: solid border, stable label, and a full hold before anything moves.
+      icon.stateMorphTimers.push(setTimeout(() => {
+        path.setAttribute("d", intermediate);
+        fitStateViewBox(icon, path);
+        icon.classList.remove("scrambling");
+        icon.classList.add("generated");
+        if (label) label.textContent = "?";
+      }, STATE_MORPH_MS));
+
+      // Beat 3: after the same-length pause, scramble away from ? toward the next state.
+      icon.stateMorphTimers.push(setTimeout(() => {
+        icon.classList.remove("generated");
+        if (label) label.textContent = "?";
+        restartStateScramble(icon);
+      }, STATE_MORPH_MS + STATE_HOLD_MS));
+
+      // Beat 4: next real state settles solid, then gets the exact same hold duration.
+      icon.stateMorphTimers.push(setTimeout(() => {
+        setStateShape(icon, STATE_SHAPES[next]);
+        icon.classList.remove("scrambling", "generated");
+      }, STATE_MORPH_MS * 2 + STATE_HOLD_MS));
+
+      if (withSound) playIconSound("scissors");
+      return next !== current;
+    }
+
+    function morphStateRandom(icon, withSound = false) {
+      if (!icon) return;
+      const settled = Number(icon.dataset.stateIndex || 0);
+      const previousChoice = Number(icon.dataset.lastRealStateChoice ?? settled);
+      let next = previousChoice;
+      if (STATE_SHAPES.length === 1) next = 0;
+      else while (next === previousChoice) next = Math.floor(Math.random() * STATE_SHAPES.length);
+      icon.dataset.lastRealStateChoice = String(next);
+      morphToState(icon, next, withSound);
+    }
+
+    function startStatePreview(icon) {
+      if (!icon) return;
+      clearTimeout(icon.statePreviewTimer);
+      morphStateRandom(icon, false);
+      const loop = () => {
+        icon.statePreviewTimer = setTimeout(() => {
+          morphStateRandom(icon, false);
+          loop();
+        }, STATE_CYCLE_MS);
+      };
+      loop();
+    }
+    function stopStatePreview(icon) {
+      if (!icon) return;
+      clearTimeout(icon.statePreviewTimer);
+      clearTimeout(icon.stateResumeTimer);
+      icon.statePreviewTimer = null;
+      icon.stateResumeTimer = null;
+    }
+
+    const ROUTE_COUNT = 5;
+    function showRouteScene(icon, index, countSeen = true) {
+      if (!icon) return;
+      const scenes = [...icon.querySelectorAll(".route-scene")];
+      if (!scenes.length) return;
+      const next = ((index % scenes.length) + scenes.length) % scenes.length;
+      scenes.forEach((scene, i) => scene.classList.toggle("current", i === next));
+      icon.dataset.routeIndex = String(next);
+      // Restart the scene animation when revisiting it.
+      void scenes[next].offsetWidth;
+      if (countSeen) {
+        const seen = new Set(String(icon.dataset.routesSeen || "").split(",").filter(Boolean));
+        seen.add(String(next));
+        icon.dataset.routesSeen = [...seen].join(",");
+        if (seen.size >= ROUTE_COUNT) unlockAchievement("home-scenic-route");
+      }
+    }
+    function nextRouteScene(icon) { showRouteScene(icon, Number(icon?.dataset.routeIndex || 0) + 1, true); }
+    function startRoutePreview(icon) {
+      if (!icon) return;
+      clearInterval(icon.routePreviewTimer);
+      showRouteScene(icon, Number(icon.dataset.routeIndex || 0), true);
+      icon.routePreviewTimer = setInterval(() => nextRouteScene(icon), 1700);
+    }
+    function stopRoutePreview(icon) { if (icon) { clearInterval(icon.routePreviewTimer); icon.routePreviewTimer = null; } }
+
+    function answerThomas(icon) {
+      if (!icon) return;
+      icon.classList.remove("answering");
+      void icon.offsetWidth;
+      icon.classList.add("answering");
+      clearTimeout(icon.brainAnswerTimer);
+      icon.brainAnswerTimer = setTimeout(() => icon.classList.remove("answering"), 1700);
+      tone(520, .08, "sine", .014);
+      tone(780, .12, "sine", .012, .08);
+    }
+
+    function pirateCoinPayback(icon) {
+      if (!icon) return;
+      const treasure = Math.floor(Math.random() * 20) === 0;
+      const payout = treasure ? 20 : 1;
+
+      if (treasure) {
+        const chest = document.createElement("span");
+        chest.className = "pirate-treasure";
+        chest.innerHTML = '<i class="chest-base"></i><i class="chest-lid"></i><i class="chest-lock"></i><b>+20 🪙</b>';
+        icon.appendChild(chest);
+        setTimeout(() => chest.remove(), 1250);
+        showToast("Treasure chest! 20 coins recovered. 🏴‍☠️");
+        tone(660, .07, "triangle", .018);
+        tone(990, .09, "triangle", .015, .06);
+        tone(1320, .12, "triangle", .012, .13);
+      } else {
+        const coin = document.createElement("i");
+        coin.className = "pirate-coin";
+        coin.textContent = "🪙";
+        icon.appendChild(coin);
+        setTimeout(() => coin.remove(), 900);
+        tone(980, .05, "triangle", .015);
+        tone(1320, .08, "triangle", .011, .05);
+      }
+
+      const before = readTrafficFine();
+      if (before > 0) {
+        const after = Math.max(0, before - payout);
+        writeTrafficFine(after);
+        if (after === 0) unlockAchievement("home-clean-slate");
+      }
     }
 
     function runBikeClick(icon) {
@@ -2738,6 +3900,10 @@
       clearTimeout(card.mobilePreviewFirstTimer);
       card.mobilePreviewTimer = null;
       card.mobilePreviewFirstTimer = null;
+      const routeIcon = card.querySelector(".routes-icon");
+      if (routeIcon) stopRoutePreview(routeIcon);
+      const stateIcon = card.querySelector(".state-icon");
+      if (stateIcon) stopStatePreview(stateIcon);
       if (stopTier) {
         const tierIcon = card.querySelector(".medals-icon");
         if (tierIcon) stopTierCycle(tierIcon);
@@ -2773,10 +3939,14 @@
         }, 380);
       } else if (action === "medals") {
         startTierCycle(icon, false);
+      } else if (action === "state") {
+        startStatePreview(icon);
+      } else if (action === "routes") {
+        startRoutePreview(icon);
       } else if (action === "traffic") {
-        if (typeof icon.advanceSignal === "function") icon.advanceSignal();
+        if (typeof icon.previewAdvanceSignal === "function") icon.previewAdvanceSignal();
         card.mobilePreviewTimer = setInterval(() => {
-          if (card.classList.contains("mobile-focus") && typeof icon.advanceSignal === "function") icon.advanceSignal();
+          if (card.classList.contains("mobile-focus") && typeof icon.previewAdvanceSignal === "function") icon.previewAdvanceSignal();
         }, 1700);
       }
     }
@@ -2899,6 +4069,18 @@
           });
         }
 
+        if (project.action === "state") {
+          const stateIcon = card.querySelector(".state-icon");
+          card.addEventListener("pointerenter", () => { if (hoverCapable) startStatePreview(stateIcon); });
+          card.addEventListener("pointerleave", () => stopStatePreview(stateIcon));
+        }
+
+        if (project.action === "routes") {
+          const routeIcon = card.querySelector(".routes-icon");
+          card.addEventListener("pointerenter", () => { if (hoverCapable) startRoutePreview(routeIcon); });
+          card.addEventListener("pointerleave", () => stopRoutePreview(routeIcon));
+        }
+
         if (project.action === "recipe") {
           const recipeIcon = card.querySelector(".recipe-icon");
           let recipeTimer = null;
@@ -2937,60 +4119,60 @@
         if (project.action === "traffic") {
           const trafficIcon = card.querySelector(".traffic-icon");
           let signalTimer = null;
-          let signalIndex = 0;
           let trafficHovering = false;
+          let trafficManualUntil = 0;
           const signals = [
             { name: "red", ms: 2200 },
             { name: "green", ms: 3000 },
             { name: "amber", ms: 1200 }
           ];
-          const forceRed = () => {
-            clearTimeout(signalTimer);
-            signalTimer = null;
-            signalIndex = 0;
-            if (trafficIcon) trafficIcon.dataset.signal = "red";
+          const signalIndexFor = name => Math.max(0, signals.findIndex(signal => signal.name === name));
+          const setSignal = name => { if (trafficIcon) trafficIcon.dataset.signal = name; };
+          const nextSignal = () => {
+            const current = signalIndexFor(trafficIcon?.dataset.signal || "red");
+            const next = signals[(current + 1) % signals.length].name;
+            setSignal(next);
+            return next;
           };
-          const advanceSignal = () => {
-            if (!trafficIcon) return;
-            clearTimeout(signalTimer);
-            signalTimer = null;
-            const currentName = trafficIcon.dataset.signal || "red";
-            const currentIndex = signals.findIndex(signal => signal.name === currentName);
-            signalIndex = (currentIndex + 1) % signals.length;
-            const next = signals[signalIndex];
-            trafficIcon.dataset.signal = next.name;
-            if (trafficHovering && hoverCapable) {
-              signalTimer = setTimeout(() => {
-                if (!trafficHovering) return;
-                signalIndex = (signalIndex + 1) % signals.length;
-                runSignal();
-              }, next.ms);
-            }
-          };
-          if (trafficIcon) trafficIcon.advanceSignal = advanceSignal;
-          const runSignal = () => {
-            clearTimeout(signalTimer);
-            if (!trafficIcon || !trafficHovering || !hoverCapable) return;
-            const signal = signals[signalIndex];
-            trafficIcon.dataset.signal = signal.name;
+          const clearSignalTimer = () => { clearTimeout(signalTimer); signalTimer = null; };
+          const schedulePassive = () => {
+            clearSignalTimer();
+            if (!trafficHovering || !hoverCapable || !trafficIcon) return;
+            const current = signals[signalIndexFor(trafficIcon.dataset.signal || "red")];
+            const wait = Math.max(current.ms, trafficManualUntil - performance.now());
             signalTimer = setTimeout(() => {
               if (!trafficHovering) return;
-              signalIndex = (signalIndex + 1) % signals.length;
-              runSignal();
-            }, signal.ms);
+              if (performance.now() < trafficManualUntil) { schedulePassive(); return; }
+              nextSignal();
+              schedulePassive();
+            }, wait);
           };
+          const forceRed = () => { clearSignalTimer(); setSignal("red"); };
+          const advanceSignal = () => {
+            if (!trafficIcon) return;
+            clearSignalTimer();
+            nextSignal();
+            trafficManualUntil = performance.now() + 1800;
+            if (trafficHovering && hoverCapable) signalTimer = setTimeout(schedulePassive, 1810);
+          };
+          const previewAdvanceSignal = () => {
+            if (!trafficIcon || performance.now() < trafficManualUntil) return;
+            nextSignal();
+          };
+          if (trafficIcon) {
+            trafficIcon.advanceSignal = advanceSignal;
+            trafficIcon.previewAdvanceSignal = previewAdvanceSignal;
+          }
           card.addEventListener("pointerenter", () => {
             if (!hoverCapable) return;
             trafficHovering = true;
-            signalIndex = 0;
-            runSignal();
+            schedulePassive();
           });
           card.addEventListener("pointerleave", () => {
             trafficHovering = false;
-            forceRed();
+            clearSignalTimer();
           });
           card.addEventListener("pointerdown", event => {
-            // Tapping the card itself still springs the red-light trap; tapping the icon advances the light normally.
             if (event.target.closest(".animated-icon")) return;
             forceRed();
           });
@@ -3000,6 +4182,7 @@
             event.preventDefault();
             forceRed();
             addTrafficFine();
+            unlockAchievement("home-wanted");
             showToast("Red means stop. That will be $100. 🚦");
             tone(165, .16, "square", .018);
             const href = card.getAttribute("href");
@@ -3041,24 +4224,36 @@
             raidCleanup = setTimeout(() => {
               card.classList.remove("pirate-raid");
               lockPirateCard();
+              unlockAchievement("home-highway-robbery");
               showToast("The pirate stole your button. Ransom terms have been posted. 🏴‍☠️");
             }, 1850);
           };
 
-          card.addEventListener("pointerenter", () => {
-            if (!hoverCapable || card.classList.contains("pirate-locked")) return;
-            clearTimeout(raidTimer);
-            clearTimeout(raidCleanup);
-            card.classList.remove("pirate-raid");
-            raidTimer = setTimeout(() => {
-              if (!card.matches(":hover")) return;
-              triggerPirateRaid();
-            }, 5000);
-          });
-          card.addEventListener("pointerleave", () => {
+          const clearPirateRaidTimer = () => {
             clearTimeout(raidTimer);
             raidTimer = null;
+          };
+          const schedulePirateRaid = () => {
+            clearPirateRaidTimer();
+            if (!hoverCapable || card.classList.contains("pirate-locked") || !card.matches(":hover")) return;
+            raidTimer = setTimeout(() => {
+              raidTimer = null;
+              if (!card.matches(":hover") || card.classList.contains("pirate-locked")) return;
+              triggerPirateRaid();
+            }, 5000);
+          };
+          card.addEventListener("pointerenter", () => {
+            if (!hoverCapable || card.classList.contains("pirate-locked")) return;
+            clearTimeout(raidCleanup);
+            card.classList.remove("pirate-raid");
+            schedulePirateRaid();
           });
+          card.addEventListener("pointerleave", clearPirateRaidTimer);
+          // Any interaction means the pirate has to wait through a fresh five seconds of inactivity.
+          card.addEventListener("click", () => {
+            clearPirateRaidTimer();
+            setTimeout(schedulePirateRaid, 0);
+          }, true);
           card.addEventListener("click", event => {
             if (!card.classList.contains("pirate-locked")) return;
             event.preventDefault();
@@ -3075,6 +4270,9 @@
 
     function activateIcon(icon) {
       const action = icon.dataset.action || "plain";
+      const card = icon.closest(".card");
+      const project = card ? projects[Number(card.dataset.index)] : null;
+      if (project) markProjectIconClicked(project);
       // Rank Things is intentionally click-heavy: reranking during its grace window
       // should never count toward the general animation-icon spam fine.
       if (action !== "medals") registerIconPress();
@@ -3084,6 +4282,15 @@
       }
       if (action === "bike") {
         runBikeClick(icon);
+        return;
+      }
+      if (action === "state") {
+        stopStatePreview(icon);
+        morphStateRandom(icon, true);
+        const parentCard = icon.closest(".card");
+        if ((hoverCapable && parentCard?.matches(":hover")) || parentCard?.classList.contains("mobile-focus")) {
+          icon.stateResumeTimer = setTimeout(() => startStatePreview(icon), STATE_CYCLE_MS);
+        }
         return;
       }
       if (action === "map") {
@@ -3125,6 +4332,27 @@
         playIconSound("traffic");
         return;
       }
+      if (action === "routes") {
+        nextRouteScene(icon);
+        if (icon.routePreviewTimer) {
+          clearInterval(icon.routePreviewTimer);
+          icon.routePreviewTimer = setInterval(() => nextRouteScene(icon), 1700);
+        }
+        playIconSound("visited");
+        return;
+      }
+      if (action === "brain") {
+        answerThomas(icon);
+        return;
+      }
+      if (action === "pirate") {
+        pirateCoinPayback(icon);
+        icon.classList.remove("active");
+        void icon.offsetWidth;
+        icon.classList.add("active");
+        setTimeout(() => icon.classList.remove("active"), 720);
+        return;
+      }
       if (action === "dog") {
         woofDog(icon);
         return;
@@ -3156,6 +4384,13 @@
       event.stopPropagation();
       activateIcon(icon);
     });
+
+    document.addEventListener("click", event => {
+      const card = event.target.closest(".card");
+      if (!card || event.target.closest(".animated-icon")) return;
+      const project = projects[Number(card.dataset.index)];
+      if (project) markProjectVisited(project);
+    }, true);
 
     document.addEventListener("keydown", event => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -3197,43 +4432,24 @@
     document.addEventListener("pointermove", event => {
       if (!hoverCapable || !doodle) return;
 
-      if (mascotAvoiding && mascotHomeRect) {
-        const homeX = mascotHomeRect.left + mascotHomeRect.width / 2;
-        const homeY = mascotHomeRect.top + mascotHomeRect.height / 2;
-        const distanceFromHome = Math.hypot(event.clientX - homeX, event.clientY - homeY);
-
-        if (distanceFromHome < 320) {
-          const candidates = [
-            [0, 0], [-105, -28], [105, -28], [-88, 50], [88, 50], [0, 62]
-          ];
-          const minX = 10 - mascotHomeRect.left;
-          const maxX = window.innerWidth - 10 - mascotHomeRect.right;
-          let best = [0, 0];
-          let bestScore = -Infinity;
-
-          for (const [rawX, rawY] of candidates) {
-            const x = Math.max(minX, Math.min(maxX, rawX));
-            const y = rawY;
-            const cx = homeX + x;
-            const cy = homeY + y;
-            const mouseDistance = Math.hypot(event.clientX - cx, event.clientY - cy);
-            const travelPenalty = Math.hypot(x, y) * 0.08;
-            const score = mouseDistance - travelPenalty;
-            if (score > bestScore) {
-              bestScore = score;
-              best = [x, y];
-            }
-          }
-
-          doodle.style.setProperty("--mascot-x", `${best[0]}px`);
-          doodle.style.setProperty("--mascot-y", `${best[1]}px`);
-        } else {
-          doodle.style.setProperty("--mascot-x", "0px");
-          doodle.style.setProperty("--mascot-y", "0px");
-        }
-      }
+      const now = performance.now();
+      const dt = Math.max(1, now - lastPointerAt);
+      const dxPointer = event.clientX - lastPointerX;
+      const dyPointer = event.clientY - lastPointerY;
+      pointerSpeed = Math.hypot(dxPointer, dyPointer) / dt;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+      lastPointerAt = now;
 
       const rect = doodle.getBoundingClientRect();
+      if (mascotAvoiding && mascotHomeRect) {
+        const nowInside = event.clientX >= rect.left && event.clientX <= rect.right &&
+          event.clientY >= rect.top && event.clientY <= rect.bottom;
+        if (nowInside) lastMascotPointerInsideAt = now;
+        rememberMascotRect(rect, now);
+        if (!mascotTreatHeld) moveMascotAwayFrom(event.clientX, event.clientY, false);
+      }
+
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
       const dx = event.clientX - centerX;
@@ -3247,11 +4463,27 @@
       doodle.style.setProperty("--eye-y", `${y.toFixed(2)}px`);
     });
 
+    // A tiny amount of forgiveness for Gotcha: if the mascot moved between the
+    // frame where the cursor was visibly over him and the actual pointerdown event,
+    // count the catch. The initial panic/invulnerability window still cannot earn it.
+    document.addEventListener("pointerdown", event => {
+      if (!hoverCapable || !mascotAvoiding || mascotTreatHeld) return;
+      const now = performance.now();
+      if (now < mascotInvulnerableUntil) return;
+      const current = doodle?.getBoundingClientRect();
+      if (current) rememberMascotRect(current, now);
+      if (pointNearRecentMascot(event.clientX, event.clientY, now)) {
+        awardMascotGotcha();
+      }
+    }, true);
+
     document.addEventListener("pointerleave", () => {
       if (!doodle) return;
       doodle.style.setProperty("--eye-x", "0px");
       doodle.style.setProperty("--eye-y", "0px");
       if (mascotAvoiding) {
+        mascotTargetX = 0;
+        mascotTargetY = 0;
         doodle.style.setProperty("--mascot-x", "0px");
         doodle.style.setProperty("--mascot-y", "0px");
       }
@@ -3264,6 +4496,7 @@
     updateTrafficFineDisplay();
     setInterval(() => updateTrafficFineDisplay(), 60000);
     render();
+    document.querySelectorAll(".state-icon").forEach(icon => setStateShape(icon, STATE_SHAPES[0]));
     wireThemedCards();
     setupMobileCardFocus();
     document.querySelectorAll(".map-icon").forEach(icon => {
