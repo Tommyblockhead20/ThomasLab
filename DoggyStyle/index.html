@@ -30,6 +30,768 @@
   body.sniffing #sniffPanel{display:flex}
   .scentChip{background:rgba(27,37,40,.72);color:#f8f2df;border:1px solid rgba(255,255,255,.13);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #hear{position:absolute;left:50%;top:42%;width:220px;height:120px;margin-left:-110px;pointer-events:none}
+  .hearPing{position:absolute;left:50%;top:50%;width:10px;height:10px;border:2px solid rgba(247,240,218,.82);border-left-color:transparent;border-bottom-color:transparent;border-radius:50%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));transition:opacity .2s;pointer-events:none}
+  #toast{position:absolute;left:50%;top:12%;transform:translateX(-50%) translateY(-10px);background:var(--glass);padding:12px 16px;border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.18);opacity:0;transition:.25s;max-width:min(520px,88vw);text-align:center;font-weight:900}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #speech{position:absolute;left:50%;bottom:23%;transform:translateX(-50%);padding:8px 12px;border-radius:13px;background:rgba(247,240,218,.88);font-weight:800;font-size:14px;opacity:0;transition:.2s;max-width:min(600px,88vw);text-align:center}
+  #speech.show{opacity:1}
+  #topButtons{position:absolute;right:18px;bottom:18px;display:none;gap:8px;pointer-events:auto}
+  .miniBtn{padding:9px 12px;border-radius:12px;font-size:12px;box-shadow:0 3px 0 rgba(24,31,29,.22)}
+  .overlay{position:fixed;inset:0;z-index:30;background:linear-gradient(rgba(45,60,56,.58),rgba(28,38,36,.78));display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto}
+  .card{width:min(760px,94vw);max-height:92vh;overflow:auto;background:rgba(247,240,218,.96);border:1px solid rgba(255,255,255,.4);border-radius:28px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.25)}
+  .card h1{font-size:clamp(36px,8vw,70px);line-height:.92;margin:2px 0 10px;letter-spacing:-.045em}
+  .card h2{margin:4px 0 14px;font-size:28px}
+  .eyebrow{font-weight:900;text-transform:uppercase;letter-spacing:.16em;font-size:11px;color:#647166}
+  .lede{font-size:17px;line-height:1.45;max-width:650px;margin:0 0 18px}
+  .controlsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:18px 0;padding:14px;border-radius:18px;background:#e6e5cc;font-size:13px}
+  .controlsGrid b{display:inline-block;min-width:72px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grow{flex:1}
+  #startOverlay.hidden,#pauseOverlay.hidden,#journalOverlay.hidden,#errorOverlay.hidden{display:none}
+  .settings{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin:18px 0}
+  .setting{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:800}
+  input[type=range]{width:100%;accent-color:#6f8eaf}
+  select{padding:9px;border-radius:10px;border:1px solid #aab19c;background:#fffceb}
+  .journalGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .journalList{margin:0;padding-left:20px;line-height:1.7;font-size:14px}
+  .empty{opacity:.6;font-style:italic}
+  #mobile{position:fixed;inset:0;z-index:20;pointer-events:none;display:none}
+  body.mobile #mobile{display:block}
+  body.mobile #topButtons{display:flex;bottom:auto;top:max(12px,env(safe-area-inset-top))}
+  body.mobile #hint{top:max(58px,calc(env(safe-area-inset-top) + 50px));left:10px;max-width:64vw;font-size:11px}
+  body.mobile #sniffPanel{top:max(58px,calc(env(safe-area-inset-top) + 50px));right:10px;width:34vw}
+  body.mobile #prompt{bottom:26%;font-size:12px}
+  #lookZone{position:absolute;inset:0 0 0 36%;pointer-events:auto}
+  #joyBase{position:absolute;left:max(20px,env(safe-area-inset-left));bottom:max(24px,env(safe-area-inset-bottom));width:118px;height:118px;border-radius:50%;background:rgba(240,237,213,.25);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
+  #joyKnob{position:absolute;width:54px;height:54px;border-radius:50%;left:32px;top:32px;background:rgba(247,240,218,.72);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+  #mobileButtons{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(18px,env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(3,64px);gap:10px;pointer-events:auto}
+  .touchBtn{height:58px;padding:4px;border-radius:19px;background:rgba(247,240,218,.78);backdrop-filter:blur(5px);font-size:12px;box-shadow:0 4px 0 rgba(20,28,27,.2);touch-action:none}
+  #jumpBtn{grid-column:1 / 2}
+  #pawBtn,#actBtn{height:58px;font-size:12px;background:rgba(247,240,218,.93)}
+  #orientation{display:none;position:fixed;z-index:60;inset:auto 12px 12px 12px;padding:9px;background:rgba(30,41,39,.88);color:white;border-radius:12px;text-align:center;font-size:12px}
+  @media (max-width:650px){.controlsGrid,.settings,.journalGrid{grid-template-columns:1fr}.card{padding:18px;border-radius:22px}.card h1{font-size:45px}.lede{font-size:15px}}
+  @media (orientation:portrait) and (max-width:700px){body.mobile #orientation{display:block}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="vignette"></div><div id="sniffWash"></div>
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="hint"><span id="objectiveDot"></span><span id="hintText">Wake up. The house smells normal. Mostly.</span></div>
+  <div id="sniffPanel"></div>
+  <div id="hear"></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="speech"></div>
+  <div id="topButtons"><button class="miniBtn" id="journalBtn">Journal</button><button class="miniBtn" id="menuBtn">Menu</button></div>
+</div>
+
+<div id="mobile">
+  <div id="lookZone"></div>
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <div id="mobileButtons">
+    <button id="sniffBtn" class="touchBtn">SNIFF</button><button id="barkBtn" class="touchBtn">BARK</button><button id="crawlBtn" class="touchBtn">CRAWL</button>
+    <button id="jumpBtn" class="touchBtn">JUMP</button><button id="pawBtn" class="touchBtn">PAW</button><button id="actBtn" class="touchBtn">MOUTH</button>
+  </div>
+</div>
+<div id="orientation">Landscape gives your paws more room, but portrait still works.</div>
+
+<div id="startOverlay" class="overlay">
+  <div class="card">
+    <div class="eyebrow">A tiny one-file dog adventure · v9.1 Stability</div>
+    <h1>Nose First</h1>
+    <p class="lede">You are a dog. The world is full of tall furniture, confusing human color choices, suspicious smells, and one visitor scent that keeps getting more complicated the farther your nose follows it.</p>
+    <div class="controlsGrid">
+      <div><b>WASD</b> trot</div><div><b>Mouse</b> look</div>
+      <div><b>Shift</b> run</div><div><b>Space</b> jump</div>
+      <div><b>E</b> mouth / interact / carry</div><div><b>Q</b> paw / dig / nudge</div>
+      <div><b>F / RMB</b> sniff</div><div><b>B</b> bark</div>
+      <div><b>C</b> crawl / stand</div><div><b>J</b> journal</div><div><b>Esc</b> menu</div><div><b>Menu</b> save & quit to thomaslab.me</div>
+    </div>
+    <p id="saveNote" style="font-size:13px;font-weight:800;opacity:.72">Progress saves automatically in this browser.</p>
+    <div class="row"><button id="startBtn" disabled>Loading paws…</button><button id="freshBtn" class="secondary" style="display:none">Start fresh</button></div>
+  </div>
+</div>
+
+<div id="pauseOverlay" class="overlay hidden">
+ <div class="card">
+  <div class="eyebrow">Paused</div><h2>Dog thoughts</h2>
+  <div class="row"><button id="resumeBtn">Back to sniffing</button><button id="openJournalBtn" class="secondary">Discovery journal</button><button id="quitBtn" class="secondary">Save &amp; quit</button></div>
+  <div class="controlsGrid" style="margin-top:14px">
+    <div><b>WASD</b> trot</div><div><b>Mouse</b> look</div>
+    <div><b>Shift</b> run</div><div><b>Space</b> jump</div>
+    <div><b>E</b> mouth / interact / carry</div><div><b>Q</b> paw / dig / nudge</div>
+    <div><b>F / RMB</b> sniff</div><div><b>B</b> bark</div>
+    <div><b>C</b> crawl / stand</div><div><b>J</b> journal</div>
+    <div><b>Esc</b> pause / resume</div><div><b>M</b> menu</div>
+  </div>
+  <div class="settings">
+    <label class="setting">Mouse / look sensitivity <input id="sens" type="range" min="0.3" max="1.8" step="0.1"></label>
+    <label class="setting">Volume <input id="volume" type="range" min="0" max="1" step="0.05"></label>
+    <label class="setting">Field of view <input id="fov" type="range" min="65" max="95" step="1"></label>
+    <label class="setting">Graphics <select id="quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+    <label class="setting">Reduced motion <select id="reduced"><option value="false">Off</option><option value="true">On</option></select></label>
+    <label class="setting">Touch controls <select id="touchSetting"><option value="auto">Auto</option><option value="on">Always on</option><option value="off">Always off</option></select></label>
+  </div>
+  <div class="row"><button id="resetBtn" class="danger">Reset save</button><span class="grow"></span><span style="font-size:12px;opacity:.65">Everything except Three.js is inside this file.</span></div>
+ </div>
+</div>
+
+<div id="journalOverlay" class="overlay hidden">
+ <div class="card">
+  <div class="eyebrow">Things worth knowing, according to a dog</div><h2>Discovery Journal</h2>
+  <div class="journalGrid">
+    <div><h3>Current objective</h3><ul id="objectiveList" class="journalList"></ul><h3>Story discoveries</h3><ul id="discoveryList" class="journalList"></ul></div>
+    <div><h3>Things my nose knows</h3><ul id="noseList" class="journalList"></ul><h3>Optional accomplishments</h3><ul id="achievementList" class="journalList"></ul></div>
+   </div>
+  <div class="row" style="margin-top:18px"><button id="closeJournalBtn">Back</button></div>
+ </div>
+</div>
+
+<div id="errorOverlay" class="overlay hidden">
+ <div class="card"><h2>Something chewed the game cable.</h2><p id="errorText">Three.js did not load. Check your internet connection and reload.</p><button onclick="location.reload()">Reload</button></div>
+</div>
+
+<script>
+window.__dogGameReady=false;
+setTimeout(()=>{if(!window.__dogGameReady){document.getElementById('errorOverlay').classList.remove('hidden');}},9000);
+window.addEventListener('error',e=>{ if(!window.__dogGameReady && e.message){ document.getElementById('errorText').textContent=e.message; document.getElementById('errorOverlay').classList.remove('hidden'); }});
+</script>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js';
+
+const $=s=>document.querySelector(s), clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
+const SAVE_KEY='nose-first-save-v1';
+const defaultState={version:9,tvUnplugged:false,toyFound:false,gateOpen:false,squirrelDone:false,colorDone:false,gloveScented:false,gloveFound:false,gloveReturned:false,digCount:0,digDone:false,garageDone:false,yardScentFound:false,creekReacquired:false,creekMudDug:false,raccoonMet:false,pizzaBoxMoved:false,shortcutPassed:false,culvertFound:false,keyDropped:false,keyReturned:false,kitchenDrawerOpen:false,kitchenCabinetOpen:false,fridgeOpened:false,foodEaten:0,waterDrunk:0,gardenDig:0,fenceDig:0,neighborBarkClue:false,fenceShortcutUsed:false,mysteryComplete:false,mysteryClues:[],hydrants:[],discoveries:[],achievements:[],settings:{sensitivity:0.9,volume:0.55,fov:78,quality:'medium',reducedMotion:false,touch:'auto'}};
+function loadState(){try{
+ const p=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(!p)return structuredClone(defaultState);
+ const migrated={...structuredClone(defaultState),...p,settings:{...defaultState.settings,...(p.settings||{})},discoveries:[...(p.discoveries||[])],achievements:[...(p.achievements||[])],mysteryClues:[...(p.mysteryClues||[])],hydrants:[...(p.hydrants||[])]};
+ // v7's raccoon reveal was the old ending. Preserve completed saves rather than forcing them through new beats.
+ if((p.version||7)<8&&p.mysteryComplete){migrated.toyFound=true;migrated.tvUnplugged=true;migrated.gateOpen=true;migrated.yardScentFound=true;migrated.creekReacquired=true;migrated.raccoonMet=true;migrated.pizzaBoxMoved=true;migrated.shortcutPassed=true;migrated.culvertFound=true;migrated.keyDropped=true;migrated.keyReturned=true;migrated.mysteryComplete=true;}else if((p.version||7)<8&&p.gateOpen&&((p.mysteryClues||[]).length>0)){migrated.yardScentFound=true;}
+ if((p.version||7)<9)migrated.creekReacquired=!!(migrated.creekReacquired||migrated.mysteryClues.includes('creek')||migrated.raccoonMet||migrated.mysteryComplete);
+ if(migrated.mysteryComplete){migrated.toyFound=true;migrated.tvUnplugged=true;migrated.gateOpen=true;migrated.yardScentFound=true;migrated.creekReacquired=true;migrated.raccoonMet=true;migrated.pizzaBoxMoved=true;migrated.shortcutPassed=true;migrated.culvertFound=true;migrated.keyDropped=true;migrated.keyReturned=true;}
+ migrated.version=9;return migrated;
+ }catch(e){return structuredClone(defaultState)}}
+let state=loadState();
+let saveTimer=0,suppressPagehideSave=false;function saveGameNow(){clearTimeout(saveTimer);saveTimer=0;try{localStorage.setItem(SAVE_KEY,JSON.stringify(state))}catch(e){if(DEBUG)console.warn('SAVE FAILED',e)}}function saveGame(){clearTimeout(saveTimer);saveTimer=setTimeout(saveGameNow,120)}function resetPersistentState(){suppressPagehideSave=true;clearTimeout(saveTimer);saveTimer=0;clearAudioTimers?.();try{localStorage.removeItem(SAVE_KEY)}catch(e){}location.reload()}
+
+const gameEl=$('#game'), startOverlay=$('#startOverlay'), pauseOverlay=$('#pauseOverlay'), journalOverlay=$('#journalOverlay');
+const promptEl=$('#prompt'), hintText=$('#hintText'), sniffPanel=$('#sniffPanel'), hearEl=$('#hear'), toastEl=$('#toast'), speechEl=$('#speech');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0xaeb68b); scene.fog=new THREE.Fog(0xaeb68b,34,96);
+const camera=new THREE.PerspectiveCamera(state.settings.fov,innerWidth/innerHeight,.05,120); camera.rotation.order='YXZ';
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'}); renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05; renderer.shadowMap.type=THREE.PCFSoftShadowMap; gameEl.appendChild(renderer.domElement);
+
+const C={grass:0x999755,grass2:0x878a51,road:0x58616a,walk:0xc3bea4,wood:0x9c835c,darkwood:0x625540,wall:0xe6dfbf,blue:0x547ca9,yellow:0xd4b955,redgreen:0x8a7a51,white:0xe9e5ce,black:0x27302f,water:0x628daa,dirt:0x887454,leaf:0x6f8053,leaf2:0x7e8958,dog:0x9c7955,furDark:0x493e33,pink:0xb98d87,metal:0x8a9694,orange:0xba9752,hedge:0x65754e,flower:0xc9a4b2,stone:0x8f9185};
+const materials=new Map(),geometryCache={box:new Map(),sphere:new Map(),cyl:new Map(),cone:new Map()};
+function M(color,opts={}){const k=color+JSON.stringify(opts);if(materials.has(k))return materials.get(k);const m=new THREE.MeshStandardMaterial({color,roughness:opts.roughness??.86,metalness:opts.metalness??0,transparent:!!opts.transparent,opacity:opts.opacity??1,emissive:opts.emissive??0,emissiveIntensity:opts.emissiveIntensity??0,side:opts.side??THREE.FrontSide});materials.set(k,m);return m}
+function cachedGeometry(bucket,key,create){let g=bucket.get(key);if(!g){g=create();bucket.set(key,g)}return g}
+function mesh(g,m,pos,parent=scene){const o=new THREE.Mesh(g,m);o.position.set(...pos);parent.add(o);return o}
+function box(w,h,d,color,pos,parent=scene){const k=`${w}|${h}|${d}`;return mesh(cachedGeometry(geometryCache.box,k,()=>new THREE.BoxGeometry(w,h,d)),M(color),pos,parent)}
+function sphere(r,color,pos,parent=scene,seg=12){const k=`${r}|${seg}`;return mesh(cachedGeometry(geometryCache.sphere,k,()=>new THREE.SphereGeometry(r,seg,Math.max(6,seg>>1))),M(color),pos,parent)}
+function cyl(rt,rb,h,color,pos,parent=scene,seg=10){const k=`${rt}|${rb}|${h}|${seg}`;return mesh(cachedGeometry(geometryCache.cyl,k,()=>new THREE.CylinderGeometry(rt,rb,h,seg)),M(color),pos,parent)}
+function cone(r,h,color,pos,parent=scene,seg=8){const k=`${r}|${h}|${seg}`;return mesh(cachedGeometry(geometryCache.cone,k,()=>new THREE.ConeGeometry(r,h,seg)),M(color),pos,parent)}
+function setShadow(o,cast=true,receive=true){o.traverse?.(x=>{if(x.isMesh){x.castShadow=cast;x.receiveShadow=receive}});if(o.isMesh){o.castShadow=cast;o.receiveShadow=receive}return o}
+
+scene.add(new THREE.HemisphereLight(0xdde3c8,0x667056,1.8));
+const sun=new THREE.DirectionalLight(0xfff4cf,2.4);sun.position.set(-18,32,12);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-45;sun.shadow.camera.right=55;sun.shadow.camera.top=42;sun.shadow.camera.bottom=-42;sun.shadow.camera.near=1;sun.shadow.camera.far=80;scene.add(sun);
+// Cheap sky dome: richer atmosphere without external textures.
+const skyGeo=new THREE.SphereGeometry(108,24,14);const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:{top:{value:new THREE.Color(0x7f9fc0)},bottom:{value:new THREE.Color(0xe4dfbd)},exponent:{value:.72}},vertexShader:`varying float vSkyY;void main(){vSkyY=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,fragmentShader:`uniform vec3 top;uniform vec3 bottom;uniform float exponent;varying float vSkyY;void main(){float h=clamp(vSkyY*.5+.5,0.0,1.0);float t=pow(h,exponent);gl_FragColor=vec4(mix(bottom,top,t),1.0);}`});const skyDome=new THREE.Mesh(skyGeo,skyMat);scene.add(skyDome);
+
+const DOG_BED_SPAWN={x:-5.80,z:2.35,yaw:-Math.PI/2,y:.20};
+// v9 movement foundation. `jumpY` remains the feet/base Y for save-compatible surrounding code,
+// but collisions now test the dog's complete vertical interval rather than only the feet height.
+const player={pos:new THREE.Vector3(DOG_BED_SPAWN.x,0,DOG_BED_SPAWN.z),radius:.36,baseRadius:.36,crawlRadius:.29,standingHeight:.84,crawlHeight:.48,head:.56,crawlHead:.33,currentHead:.56,currentHeight:.84,yaw:DOG_BED_SPAWN.yaw,pitch:0,vy:0,jumpY:DOG_BED_SPAWN.y,grounded:true,supportingSurface:'dogBedCushion',bob:0,wet:false,crawling:false,headDip:0};
+const DEBUG=false;
+const ROLE=Object.freeze({SOLID:1,WALKABLE:2,OVERHEAD:4,MOVABLE:8,TRIGGER:16,DECORATIVE:32,ACTOR:64,DYNAMIC:128});
+const colliders=[],platforms=[],ramps=[],actorOnlyColliders=[],dynamicColliders=[];
+const COLLISION_EPS=.012,MAX_STEP=.22,COLLISION_CELL=4;
+function supportRadius(){return player.radius}
+let collisionGridReady=false,collisionQueryStamp=1;const collisionGrid=new Map(),_collisionScratch=[],_blockerScratch=[];
+function colliderRoleMask(minY,maxY,opts={}){let mask=ROLE.SOLID;if(opts.walkable)mask|=ROLE.WALKABLE|ROLE.OVERHEAD;if(minY>COLLISION_EPS)mask|=ROLE.OVERHEAD;if(opts.dynamic)mask|=ROLE.DYNAMIC;if(opts.actor)mask|=ROLE.ACTOR;if(opts.movable)mask|=ROLE.MOVABLE;return mask}
+function registerCollider(c){colliders.push(c);if(c.dynamic)dynamicColliders.push(c);return c}
+function addCollider(x,z,w,d,height=5,active=()=>true,id='',root=null,offsetX=0,offsetZ=0){const actor=!!root?.userData?.isActor;return registerCollider({x,z,w,d,minY:0,maxY:height,height,active,id,root,offsetX,offsetZ,local:false,yawOffset:0,walkable:false,followY:!!root,shape:'box',solidRadius:0,dynamic:!!root,roleMask:colliderRoleMask(0,height,{dynamic:!!root,actor})})}
+function addSolid(x,z,w,d,minY,maxY,opts={}){const actor=!!(opts.actor||opts.root?.userData?.isActor);return registerCollider({x,z,w,d,minY,maxY,height:maxY,active:opts.active||(()=>true),id:opts.id||'',root:opts.root||null,offsetX:opts.offsetX||0,offsetZ:opts.offsetZ||0,local:!!opts.local,yawOffset:opts.yawOffset||0,walkable:!!opts.walkable,followY:opts.followY??!!opts.root,shape:opts.shape||'box',solidRadius:opts.solidRadius||0,dynamic:!!(opts.dynamic||actor),roleMask:opts.roleMask??colliderRoleMask(minY,maxY,{...opts,dynamic:!!(opts.dynamic||actor),actor})})}
+function addLocalSolid(root,localX,localZ,w,d,minY,maxY,opts={}){return addSolid(localX,localZ,w,d,minY,maxY,{...opts,root,local:true,followY:true})}
+const _q=new THREE.Quaternion(),_e=new THREE.Euler(0,0,0,'YXZ'),_v3=new THREE.Vector3(),_poseScratch={x:0,z:0,yaw:0},_rootYPos=new THREE.Vector3();
+function colliderYBounds(c){let y=0;if(c.root&&c.followY){c.root.getWorldPosition(_rootYPos);y=_rootYPos.y}return {min:c.minY+y,max:c.maxY+y}}
+function solidBox(w,h,d,color,pos,parent=scene,opts={}){const o=box(w,h,d,color,pos,parent),minY=pos[1]-h/2,maxY=pos[1]+h/2;let c;if(parent===scene)c=addSolid(pos[0],pos[2],w,d,minY,maxY,{id:opts.id||'solidBox',walkable:!!opts.walkable,active:opts.active});else c=addLocalSolid(parent,pos[0],pos[2],w,d,minY,maxY,{id:opts.id||'solidBox',walkable:!!opts.walkable,active:opts.active});o.userData.solidCollider=c;return o}
+function solidCylinder(radius,height,color,pos,parent=scene,opts={}){const o=cyl(radius,radius,height,color,pos,parent,opts.segments||10),diam=radius*2,minY=pos[1]-height/2,maxY=pos[1]+height/2,co={id:opts.id||'solidCylinder',active:opts.active,shape:'circle',solidRadius:radius,walkable:!!opts.walkable};let c;if(parent===scene)c=addSolid(pos[0],pos[2],diam,diam,minY,maxY,co);else c=addLocalSolid(parent,pos[0],pos[2],diam,diam,minY,maxY,co);o.userData.solidCollider=c;return o}
+function addPlatform(x,z,w,d,height,id='',active=()=>true){const p={x,z,w,d,height,id,active,roleMask:ROLE.WALKABLE};platforms.push(p);return p}
+function addRamp(x1,z1,y1,x2,z2,y2,width,id='ramp',active=()=>true){const r={x1,z1,y1,x2,z2,y2,width,id,active,roleMask:ROLE.WALKABLE|ROLE.SOLID};ramps.push(r);return r}
+function addActorOnlyCollider(x,z,w,d,id=''){const c={x,z,w,d,minY:0,maxY:99,height:99,active:()=>true,id,root:null,offsetX:0,offsetZ:0,local:false,yawOffset:0,walkable:false,roleMask:ROLE.SOLID|ROLE.ACTOR};actorOnlyColliders.push(c);return c}
+function colliderPose(c,out=_poseScratch){let x=c.x,z=c.z,yaw=c.yawOffset||0;if(c.root){if(c.local){_v3.set(c.x,0,c.z);c.root.localToWorld(_v3);x=_v3.x;z=_v3.z}else{c.root.getWorldPosition(_v3);x=_v3.x+(c.offsetX||0);z=_v3.z+(c.offsetZ||0)}c.root.getWorldQuaternion(_q);_e.setFromQuaternion(_q,'YXZ');yaw+=_e.y}out.x=x;out.z=z;out.yaw=yaw;return out}
+function worldPosSafe(root,out=new THREE.Vector3()){root.getWorldPosition(out);return out}
+function circleHitsCollider(x,z,r,c){if(!c.active())return false;const p=colliderPose(c),dx=x-p.x,dz=z-p.z;if(c.shape==='circle'){const rr=r+(c.solidRadius||Math.min(c.w,c.d)/2);return dx*dx+dz*dz<rr*rr-COLLISION_EPS}const co=Math.cos(p.yaw),si=Math.sin(p.yaw),lx=dx*co-dz*si,lz=dx*si+dz*co,qx=clamp(lx,-c.w/2,c.w/2),qz=clamp(lz,-c.d/2,c.d/2),ex=lx-qx,ez=lz-qz;return ex*ex+ez*ez<r*r-COLLISION_EPS}
+function verticalOverlap(base,height,c){const top=base+height,yb=colliderYBounds(c);return top>yb.min+COLLISION_EPS&&base<yb.max-COLLISION_EPS}
+function gridKey(ix,iz){return `${ix},${iz}`}
+function buildCollisionSpatialHash(){collisionGrid.clear();dynamicColliders.length=0;for(const c of colliders){c._queryStamp=0;if(c.dynamic){dynamicColliders.push(c);continue}const p=colliderPose(c),co=Math.abs(Math.cos(p.yaw)),si=Math.abs(Math.sin(p.yaw)),ex=co*c.w/2+si*c.d/2,ez=si*c.w/2+co*c.d/2,minX=Math.floor((p.x-ex)/COLLISION_CELL),maxX=Math.floor((p.x+ex)/COLLISION_CELL),minZ=Math.floor((p.z-ez)/COLLISION_CELL),maxZ=Math.floor((p.z+ez)/COLLISION_CELL);for(let ix=minX;ix<=maxX;ix++)for(let iz=minZ;iz<=maxZ;iz++){const k=gridKey(ix,iz);let bucket=collisionGrid.get(k);if(!bucket){bucket=[];collisionGrid.set(k,bucket)}bucket.push(c)}}collisionGridReady=true}
+function collisionCandidatesInto(x,z,r,out){out.length=0;if(!collisionGridReady){for(const c of colliders)out.push(c);return out}const stamp=++collisionQueryStamp,minX=Math.floor((x-r)/COLLISION_CELL),maxX=Math.floor((x+r)/COLLISION_CELL),minZ=Math.floor((z-r)/COLLISION_CELL),maxZ=Math.floor((z+r)/COLLISION_CELL);for(let ix=minX;ix<=maxX;ix++)for(let iz=minZ;iz<=maxZ;iz++){const bucket=collisionGrid.get(gridKey(ix,iz));if(!bucket)continue;for(const c of bucket)if(c._queryStamp!==stamp){c._queryStamp=stamp;out.push(c)}}for(const c of dynamicColliders)if(c._queryStamp!==stamp){c._queryStamp=stamp;out.push(c)}return out}
+function blockersAt(x,z,base,height,r=player.radius,ignoreRoot=null,ignoreActors=false,out=[]){out.length=0;const candidates=collisionCandidatesInto(x,z,r,_collisionScratch);for(const c of candidates){if(!c.active()||ignoreRoot&&c.root===ignoreRoot||ignoreActors&&(c.roleMask&ROLE.ACTOR))continue;if(!verticalOverlap(base,height,c)||!circleHitsCollider(x,z,r,c))continue;out.push(c)}return out}
+function canOccupy(x,z,base,height=player.crawling?player.crawlHeight:player.standingHeight,r=player.radius,ignoreRoot=null,ignoreActors=false){const candidates=collisionCandidatesInto(x,z,r,_collisionScratch);for(const c of candidates){if(!c.active()||ignoreRoot&&c.root===ignoreRoot||ignoreActors&&(c.roleMask&ROLE.ACTOR))continue;if(verticalOverlap(base,height,c)&&circleHitsCollider(x,z,r,c))return false}for(const ramp of ramps){if(!ramp.active())continue;const rh=rampHeightAt(ramp,x,z,r*.70);if(rh!==null&&base<rh-COLLISION_EPS)return false}return true}
+function platformContains(p,x,z,r=supportRadius()){return x+r>p.x-p.w/2&&x-r<p.x+p.w/2&&z+r>p.z-p.d/2&&z-r<p.z+p.d/2}
+function rampHeightAt(r,x,z,rad=supportRadius()){const vx=r.x2-r.x1,vz=r.z2-r.z1,len2=vx*vx+vz*vz;if(len2<.001)return null;const t=clamp(((x-r.x1)*vx+(z-r.z1)*vz)/len2,0,1),px=r.x1+vx*t,pz=r.z1+vz*t,side=Math.hypot(x-px,z-pz);if(side>r.width/2+rad)return null;return lerp(r.y1,r.y2,t)}
+function supportInfoAt(x,z,ceilingY=Infinity){let best={height:0,id:'ground'};for(const p of platforms){if(!p.active()||p.height>ceilingY+COLLISION_EPS)continue;if(platformContains(p,x,z)&&p.height>best.height)best={height:p.height,id:p.id||'platform'}}for(const r of ramps){if(!r.active())continue;const h=rampHeightAt(r,x,z);if(h!==null&&h<=ceilingY+COLLISION_EPS&&h>best.height)best={height:h,id:r.id}}const sr=supportRadius(),candidates=collisionCandidatesInto(x,z,sr,_collisionScratch);for(const c of candidates){if(!c.active()||!c.walkable)continue;const yb=colliderYBounds(c);if(yb.max>ceilingY+COLLISION_EPS)continue;if(circleHitsCollider(x,z,sr,c)&&yb.max>best.height)best={height:yb.max,id:c.id||'solidTop'}}return best}
+function tryHorizontalPosition(nx,nz){const h=player.crawling?player.crawlHeight:player.standingHeight;if(canOccupy(nx,nz,player.jumpY,h,player.radius)){player.pos.x=nx;player.pos.z=nz;if(player.grounded){const sup=supportInfoAt(nx,nz,player.jumpY+MAX_STEP);if(sup.height>player.jumpY+COLLISION_EPS&&sup.height-player.jumpY<=MAX_STEP&&canOccupy(nx,nz,sup.height,h,player.radius)){player.jumpY=sup.height;player.supportingSurface=sup.id}}return true}if(player.grounded){const sup=supportInfoAt(nx,nz,player.jumpY+MAX_STEP);if(sup.height>player.jumpY+COLLISION_EPS&&sup.height-player.jumpY<=MAX_STEP&&canOccupy(nx,nz,sup.height,h,player.radius)){player.pos.x=nx;player.pos.z=nz;player.jumpY=sup.height;player.supportingSurface=sup.id;return true}}return false}
+function movePlayer(dx,dz){const dist=Math.hypot(dx,dz),steps=Math.max(1,Math.ceil(dist/.045)),sx=dx/steps,sz=dz/steps;for(let i=0;i<steps;i++){const ox=player.pos.x,oz=player.pos.z;if(tryHorizontalPosition(ox+sx,oz+sz))continue;let moved=false;if(Math.abs(sx)>.00001)moved=tryHorizontalPosition(ox+sx,oz);if(Math.abs(sz)>.00001){const bx=player.pos.x,bz=player.pos.z;if(!tryHorizontalPosition(bx,bz+sz)&&!moved){const len=Math.hypot(sx,sz)||1;tryHorizontalPosition(ox-sz/len*.015,oz+sx/len*.015)}}}player.pos.x=clamp(player.pos.x,-18.2,102.2);player.pos.z=clamp(player.pos.z,-43.2,43.2)}
+function playerNumbersValid(){return Number.isFinite(player.pos.x)&&Number.isFinite(player.pos.z)&&Number.isFinite(player.jumpY)&&Number.isFinite(player.vy)&&Number.isFinite(player.yaw)&&Number.isFinite(player.pitch)}
+const lastSafePlayerTransform={x:DOG_BED_SPAWN.x,z:DOG_BED_SPAWN.z,y:DOG_BED_SPAWN.y,yaw:DOG_BED_SPAWN.yaw,crawling:false,valid:true};let safeGroundedTime=0,safetyClock=0,recoveryCount=0;
+function significantWorldPenetrations(out=_blockerScratch){out.length=0;const h=player.crawling?player.crawlHeight:player.standingHeight,raw=blockersAt(player.pos.x,player.pos.z,player.jumpY,h,player.radius,null,true,[]);for(const c of raw){const yb=colliderYBounds(c),vPen=Math.min(player.jumpY+h,yb.max)-Math.max(player.jumpY,yb.min);if(vPen<=.035)continue;if(c.walkable&&player.jumpY>=yb.max-.045&&player.jumpY<=yb.max+.025)continue;out.push(c)}return out}
+function rememberSafeTransform(dt){const h=player.crawling?player.crawlHeight:player.standingHeight;if(player.grounded&&playerNumbersValid()&&canOccupy(player.pos.x,player.pos.z,player.jumpY,h,player.radius,null,true)&&significantWorldPenetrations().length===0){safeGroundedTime+=dt;if(safeGroundedTime>=.35){lastSafePlayerTransform.x=player.pos.x;lastSafePlayerTransform.z=player.pos.z;lastSafePlayerTransform.y=player.jumpY;lastSafePlayerTransform.yaw=player.yaw;lastSafePlayerTransform.crawling=player.crawling;lastSafePlayerTransform.valid=true;safeGroundedTime=.18}}else safeGroundedTime=0}
+function applySafeTransform(t){player.pos.x=t.x;player.pos.z=t.z;player.jumpY=t.y;player.yaw=t.yaw;player.vy=0;player.grounded=true;player.supportingSurface=supportInfoAt(t.x,t.z,t.y+MAX_STEP).id;player.crawling=!!t.crawling;player.radius=player.crawling?player.crawlRadius:player.baseRadius;player.currentHeight=player.crawling?player.crawlHeight:player.standingHeight;player.currentHead=player.crawling?player.crawlHead:player.head}
+function tryLocalPenetrationResolve(){const h=player.crawling?player.crawlHeight:player.standingHeight,ox=player.pos.x,oz=player.pos.z;for(let rr=.04;rr<=.28;rr+=.04){for(let i=0;i<16;i++){const a=i/16*Math.PI*2,nx=ox+Math.cos(a)*rr,nz=oz+Math.sin(a)*rr;if(canOccupy(nx,nz,player.jumpY,h,player.radius,null,true)){player.pos.x=nx;player.pos.z=nz;return true}}}return false}
+function recoverPlayer(reason='unknown'){const overlaps=significantWorldPenetrations([]),before={x:player.pos.x,z:player.pos.z,y:player.jumpY};recoveryCount++;console.warn('PLAYER RECOVERY',{reason,position:before,overlappingColliders:overlaps.map(c=>c.id||'(unnamed)'),support:player.supportingSurface,recoveryCount});if(playerNumbersValid()&&tryLocalPenetrationResolve()){player.vy=0;return true}if(lastSafePlayerTransform.valid){applySafeTransform(lastSafePlayerTransform);return true}applySafeTransform({x:DOG_BED_SPAWN.x,z:DOG_BED_SPAWN.z,y:DOG_BED_SPAWN.y,yaw:DOG_BED_SPAWN.yaw,crawling:false});return true}
+function updateSafety(dt){if(dogDoorTransit?.active){safetyClock=0;safeGroundedTime=0;return}rememberSafeTransform(dt);safetyClock+=dt;if(!playerNumbersValid()){recoverPlayer('non-finite player state');safetyClock=0;return}if(safetyClock<.25)return;safetyClock=0;const deep=significantWorldPenetrations();if(deep.length)recoverPlayer('deep static-world penetration')}
+function resolveVertical(prevBase,nextBase){const h=player.crawling?player.crawlHeight:player.standingHeight;let base=nextBase;const candidates=collisionCandidatesInto(player.pos.x,player.pos.z,player.radius,_collisionScratch);if(player.vy>0){const prevTop=prevBase+h,nextTop=nextBase+h;let hit=null;for(const c of candidates){if(!c.active()||!circleHitsCollider(player.pos.x,player.pos.z,player.radius*.92,c))continue;const yb=colliderYBounds(c);if(prevTop<=yb.min+COLLISION_EPS&&nextTop>=yb.min-COLLISION_EPS){if(!hit||yb.min<hit.y)hit={c,y:yb.min}}}if(hit){base=hit.y-h-COLLISION_EPS;player.vy=0}}
+ if(player.vy<=0){let landing={height:0,id:'ground'};for(const p of platforms){if(!p.active()||!platformContains(p,player.pos.x,player.pos.z))continue;if(prevBase>=p.height-COLLISION_EPS&&base<=p.height+COLLISION_EPS&&p.height>landing.height)landing={height:p.height,id:p.id||'platform'}}for(const c of candidates){if(!c.active()||!c.walkable||!circleHitsCollider(player.pos.x,player.pos.z,supportRadius(),c))continue;const yb=colliderYBounds(c);if(prevBase>=yb.max-COLLISION_EPS&&base<=yb.max+COLLISION_EPS&&yb.max>landing.height)landing={height:yb.max,id:c.id||'solidTop'}}for(const r of ramps){if(!r.active())continue;const rh=rampHeightAt(r,player.pos.x,player.pos.z);if(rh!==null&&prevBase>=rh-.08&&base<=rh+.04&&rh>landing.height)landing={height:rh,id:r.id}}if(base<=landing.height+COLLISION_EPS){const wasGrounded=player.grounded;base=landing.height;player.vy=0;player.grounded=true;player.supportingSurface=landing.id;if(!wasGrounded)landingSound()}}
+ player.jumpY=Math.max(0,base)}
+// Ground, road, creek and house floor
+setShadow(box(132,.2,88,C.grass,[39,-.14,0]),false,true);
+box(7,.05,88,C.road,[14.5,.01,0]); solidBox(1.6,.08,88,C.walk,[10.2,.04,0],scene,{id:'sidewalk',walkable:true}); solidBox(1.6,.08,88,C.walk,[18.8,.04,0],scene,{id:'sidewalk',walkable:true});
+solidBox(.18,.14,88,C.stone,[11.05,.075,0],scene,{id:'curb',walkable:true});solidBox(.18,.14,88,C.stone,[17.95,.075,0],scene,{id:'curb',walkable:true});
+for(let z=-40;z<=40;z+=4.4)box(.12,.025,2.15,C.white,[14.5,.045,z]);
+// Winding shallow creek assembled from connected segments instead of one giant blue rectangle.
+const creekPath=[[35.2,-44],[36.0,-35],[34.9,-26],[36.2,-17],[35.4,-8],[36.35,2],[35.35,11],[36.7,21],[35.55,32],[36.15,44]],creekWaters=[];
+function creekCenterXAt(z){for(let i=0;i<creekPath.length-1;i++){const a=creekPath[i],b=creekPath[i+1],mn=Math.min(a[1],b[1]),mx=Math.max(a[1],b[1]);if(z>=mn&&z<=mx){const t=(z-a[1])/(b[1]-a[1]);return lerp(a[0],b[0],t)}}return z<creekPath[0][1]?creekPath[0][0]:creekPath[creekPath.length-1][0]}
+function inCreek(x,z,pad=0){const cx=creekCenterXAt(z),w=1.72+.26*Math.sin(z*.18);return Math.abs(x-cx)<w+pad}
+for(let i=0;i<creekPath.length-1;i++){const a=creekPath[i],b=creekPath[i+1],dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)+.42,ang=Math.atan2(dx,dz),cx=(a[0]+b[0])/2,cz=(a[1]+b[1])/2,width=3.35+.42*Math.sin(i*1.7);const w=box(width,.055,len,C.water,[cx,.045,cz]);w.rotation.y=ang;w.material=M(C.water,{transparent:true,opacity:.72,roughness:.24});creekWaters.push(w);const px=Math.cos(ang),pz=-Math.sin(ang),off=width/2+.25;for(const side of [-1,1]){const bx=cx+px*off*side,bz=cz+pz*off*side,bank=box(.52,.16,len,C.dirt,[bx,.08,bz]);bank.rotation.y=ang;addSolid(bx,bz,.54,len,0,.16,{id:'creekBank',yawOffset:ang,walkable:true})}}
+// stones make the mystery crossing readable without turning the water into a wall.
+for(let i=0;i<5;i++){const x=34.75+i*.68,z=2.15+Math.sin(i*1.7)*.18;const st=solidBox(.52,.14,.62,C.stone,[x,.10,z],scene,{id:'creekStone',walkable:true});st.rotation.y=(i-2)*.08}
+// small footbridge farther north gives NPC/world logic a believable dry crossing.
+const creekBridge=solidBox(5.0,.18,1.35,C.darkwood,[35.65,.22,20.3],scene,{id:'creekBridge',walkable:true});for(const z of [19.72,20.88])for(const x of [33.4,37.9])solidCylinder(.07,.65,C.darkwood,[x,.38,z],scene,{id:'bridgePost',segments:7});
+
+function wall(x,z,w,d,h=2.8,color=C.wall){const o=box(w,h,d,color,[x,h/2,z]);setShadow(o,true,true);addCollider(x,z,w,d,h,()=>true,'wall');return o}
+// House: open-plan dog-scale interior with back doorway at x 2
+const houseFloor=solidBox(14,.12,12,C.wood,[0,.02,1],scene,{id:'houseFloor',walkable:true});
+const ceiling=solidBox(14,.12,12,C.wall,[0,2.86,1],scene,{id:'houseCeiling'});setShadow(ceiling,false,true);const playerHouseRoof=mesh(new THREE.ConeGeometry(1,1,4),M(C.darkwood),[0,4.02,1]);playerHouseRoof.rotation.y=Math.PI/4;playerHouseRoof.scale.set(9.7,2.25,8.4);setShadow(playerHouseRoof);addSolid(0,1,14.8,12.8,2.92,5.22,{id:'playerHouseRoof'});
+const indoor1=new THREE.PointLight(0xffe7ad,1.4,12,2);indoor1.position.set(0,2.35,2);scene.add(indoor1);const indoor2=new THREE.PointLight(0xffe7ad,1.0,9,2);indoor2.position.set(4.5,2.35,-2);scene.add(indoor2);
+wall(-7,1,.3,12);wall(7,1,.3,12);wall(0,7,14,.3);wall(-3,-5,8,.3);wall(5,-5,4,.3);
+// baseboards and trim make the interior read as a built room instead of bare boxes
+for(const [x,z,w,d] of [[-6.82,1,.08,11.4],[6.82,1,.08,11.4],[0,6.82,13.5,.08],[-3,-4.82,7.6,.08],[5,-4.82,3.6,.08]])box(w,.12,d,C.white,[x,.12,z]);
+// room dividers with generous dog gaps
+wall(-2.7,3.8,.22,6.1,2.6,0xd7d1b2); wall(-2.7,-3.55,.22,2.9,2.6,0xd7d1b2);
+// little blue rug
+const rug=box(4,.025,2.5,C.blue,[-.2,.09,2.7]);rug.material=M(C.blue,{roughness:1});
+// couch: a meaningful dog obstacle
+const couch=new THREE.Group(); scene.add(couch); couch.position.set(-.2,0,.8);
+box(4,.52,1.1,C.yellow,[0,.45,0],couch);box(4,.9,.28,C.yellow,[0,.85,-.46],couch);box(.35,.72,1.15,C.yellow,[-1.82,.52,0],couch);box(.35,.72,1.15,C.yellow,[1.82,.52,0],couch);
+for(const x of [-1.2,0,1.2]){const cushion=box(1.12,.10,.82,0xd8bd62,[x,.73,.06],couch);cushion.rotation.z=.01*Math.sign(x)}box(3.4,.05,.03,C.darkwood,[0,.76,.49],couch);setShadow(couch);
+addSolid(-.2,.8,4.1,1.15,0,.78,{id:'couchSeatBase',walkable:true});
+addSolid(-.2,.34,4.02,.30,.55,1.32,{id:'couchBack'});addSolid(-2.02,.8,.38,1.16,.48,1.02,{id:'couchArmL'});addSolid(1.62,.8,.38,1.16,.48,1.02,{id:'couchArmR'});
+// coffee table: tabletop is above the dog; only the four legs block movement
+box(2.6,.12,1.1,C.darkwood,[-.2,1.02,3.05]);for(const x of [-1.18,.78])for(const z of [2.63,3.47]){cyl(.07,.07,.97,C.darkwood,[x,.485,z]);addSolid(x,z,.18,.18,0,.97,{id:'coffeeLeg'})}addSolid(-.2,3.05,2.62,1.12,.96,1.08,{id:'coffeeTabletop',walkable:true});addActorOnlyCollider(-.2,3.05,2.75,1.2,'coffeeTableForNPCs');
+// human bed: a real raised surface the dog can land on
+box(3.6,.52,2.4,C.blue,[-4.8,.36,4.3]);box(3.2,.12,1.75,0xb8c6d5,[-4.8,.68,4.28]);solidBox(1.25,.16,.72,C.white,[-5.65,.80,4.78],scene,{id:'bedPillow',walkable:true});box(3.8,.85,.22,C.darkwood,[-4.8,.55,5.45]);addSolid(-4.8,4.3,3.7,2.4,0,.74,{id:'humanBedBase',walkable:true});addSolid(-4.8,5.45,3.82,.24,.05,1.04,{id:'headboard'});
+// kitchen: v9 coherent cabinet/appliance run. Major solid pieces register collision when created.
+const kitchen=new THREE.Group();scene.add(kitchen);
+const kitchenBase=solidBox(1.30,.78,4.28,0xe2dfc8,[6.14,.43,-2.05],scene,{id:'kitchenLower'});
+solidBox(1.18,.10,4.16,0x6f6250,[6.22,.10,-2.05],scene,{id:'kitchenToeKick'});
+const kitchenTop=solidBox(1.55,.11,4.62,C.darkwood,[6.02,.875,-2.05],scene,{id:'kitchenCountertop',walkable:true});
+for(const z of [-3.25,-2.35,-1.45,-.55]){box(.035,.54,.78,0xd8d4bd,[5.475,.45,z]);box(.035,.045,.22,C.metal,[5.45,.52,z-.18]);}
+for(const z of [-3.25,-2.35,-1.45,-.55])box(.018,.70,.018,0xaaa58f,[5.455,.45,z+.40]);
+const sink=box(.72,.045,.92,0x6d858b,[5.91,.95,-2.76]);box(.56,.025,.74,0x526e77,[5.90,.932,-2.76]);
+const faucetStem=cyl(.035,.035,.34,C.metal,[5.77,1.13,-2.76],scene,8);addSolid(5.77,-2.76,.08,.08,.96,1.31,{id:'faucetStem',shape:'circle',solidRadius:.04});const faucetSpout=mesh(new THREE.TorusGeometry(.18,.032,7,14,Math.PI),M(C.metal),[5.77,1.23,-2.76]);faucetSpout.rotation.y=Math.PI/2;faucetSpout.rotation.z=Math.PI/2;
+const stove=box(.78,.035,.98,C.black,[5.91,.95,-1.02]);for(const sx of [-.19,.19])for(const sz of [-.25,.25])cyl(.10,.10,.012,C.metal,[5.91+sx,.975,-1.02+sz],scene,12);
+for(const z of [-2.82,-1.48]){solidBox(.58,.72,1.12,0xdad6c1,[6.64,1.85,z],scene,{id:'upperCabinet'});box(.035,.61,1.02,0xe2dfc8,[6.33,1.85,z]);box(.035,.10,.16,C.metal,[6.305,1.82,z-.23]);}
+const fridge=solidBox(1.34,1.98,1.20,0xdadccf,[6.10,1.00,-4.42],scene,{id:'fridge'});
+box(.035,.025,1.10,0xb5b9b1,[5.415,1.31,-4.42]);
+const fridgeDoorPivot=new THREE.Group();fridgeDoorPivot.position.set(5.42,0,-4.98);scene.add(fridgeDoorPivot);box(.055,1.86,1.08,0xe5e7db,[0,1.02,.54],fridgeDoorPivot);addLocalSolid(fridgeDoorPivot,0,.54,.07,1.10,.09,1.95,{id:'fridgeDoorSlab',dynamic:true});box(.045,.52,.055,C.metal,[-.055,1.25,.16],fridgeDoorPivot);box(.045,.42,.055,C.metal,[-.055,.62,.16],fridgeDoorPivot);const fridgeTowel=box(.035,.48,.34,C.blue,[-.10,.82,.23],fridgeDoorPivot);fridgeTowel.rotation.z=.04;
+const kitchenDrawer=new THREE.Group();kitchenDrawer.position.set(5.43,.70,-1.92);scene.add(kitchenDrawer);box(.12,.20,.82,0xe0dcc7,[0,0,0],kitchenDrawer);addLocalSolid(kitchenDrawer,0,0,.14,.84,-.10,.10,{id:'openDrawerSlab',dynamic:true});box(.04,.055,.25,C.metal,[-.075,.01,-.20],kitchenDrawer);box(.54,.045,.62,C.white,[.18,-.10,0],kitchenDrawer);const drawerMitt=box(.24,.055,.34,C.orange,[.10,.02,.10],kitchenDrawer);drawerMitt.rotation.y=.28;
+const kitchenCabinetPivot=new THREE.Group();kitchenCabinetPivot.position.set(5.45,.18,-.08);scene.add(kitchenCabinetPivot);box(.055,.55,.76,0xdfdbc4,[0,.28,-.38],kitchenCabinetPivot);addLocalSolid(kitchenCabinetPivot,0,-.38,.07,.78,.005,.555,{id:'cabinetDoorSlab',dynamic:true});box(.055,.05,.16,C.metal,[-.04,.30,-.66],kitchenCabinetPivot);
+const cabinetPot=cyl(.24,.24,.22,C.metal,[5.73,.18,-.10],scene,12);cabinetPot.visible=state.kitchenCabinetOpen;
+// more decor: windows, frames, shelf, lamp, dog bed, plants
+function wallFrame(x,y,z,w,h,colorA=C.blue,colorB=C.yellow){box(w+.08,h+.08,.06,C.darkwood,[x,y,z]);box(w,h,.03,colorA,[x,y,z+.01]);box(w*.42,h*.32,.03,colorB,[x,y+.05,z+.02])}
+wallFrame(-4.4,1.55,6.84,1.05,.75,C.blue,C.yellow); wallFrame(.7,1.6,6.84,.95,.68,0x9bb0cb,0xd7c36d);
+box(1.7,1.0,.08,0xc6d6e2,[6.84,1.5,1.4]);
+box(2.0,.11,.35,C.darkwood,[-5.8,1.7,-4.84]);addSolid(-5.8,-4.84,2.02,.37,1.64,1.76,{id:'wallShelf'}); box(.18,.9,.28,C.blue,[-6.55,1.25,-4.84]); box(.18,.65,.28,C.yellow,[-5.15,1.1,-4.84]);
+for(let i=0;i<4;i++)box(.18,.42,.18,[C.blue,C.yellow,C.orange,0x95b08a][i%4],[-6.45+i*.42,1.98,-4.82]);
+const lampBase=cyl(.09,.09,.85,C.metal,[1.85,.42,3.95],scene,8);addSolid(1.85,3.95,.18,.18,0,.86,{id:'lampStem',shape:'circle',solidRadius:.09}); const lampShade=cone(.34,.5,C.yellow,[1.85,1.15,3.95],scene,10);lampShade.rotation.x=Math.PI;addSolid(1.85,3.95,.68,.68,.90,1.40,{id:'lampShade',shape:'circle',solidRadius:.34});
+const dogBedBase=solidBox(1.55,.10,1.05,C.blue,[-5.80,.07,2.35],scene,{id:'dogBedBase',walkable:true});const dogBedCushion=solidBox(1.24,.10,.78,C.yellow,[-5.80,.15,2.35],scene,{id:'dogBedCushion',walkable:true});
+for(const p of [[-1.5,.12,-4.72],[.2,.12,-4.72]]){cyl(.08,.1,.28,C.darkwood,[p[0],.14,p[2]],scene,7);sphere(.28,C.leaf2,[p[0],.55,p[2]],scene,8)}
+const waterBowl=new THREE.Group();waterBowl.position.set(5.12,0,1.50);scene.add(waterBowl);const waterBowlShell=cyl(.38,.30,.14,C.metal,[0,.08,0],waterBowl,16);addLocalSolid(waterBowl,0,0,.72,.72,0,.17,{id:'waterBowlSolid'});const waterSurface=cyl(.285,.285,.025,C.water,[0,.155,0],waterBowl,18);waterSurface.material=M(C.water,{transparent:true,opacity:.76,roughness:.22});
+const foodBowl=new THREE.Group();foodBowl.position.set(5.12,0,2.32);scene.add(foodBowl);cyl(.38,.30,.14,C.blue,[0,.08,0],foodBowl,16);addLocalSolid(foodBowl,0,0,.72,.72,0,.17,{id:'foodBowlSolid'});const kibbleGroup=new THREE.Group();foodBowl.add(kibbleGroup);for(let i=0;i<13;i++){const a=i/13*Math.PI*2,r=.08+(i%4)*.045,k=sphere(.055,C.orange,[Math.cos(a)*r,.17+(i%3)*.008,Math.sin(a)*r],kibbleGroup,6);k.scale.set(1,.55,.82)}
+// Television: a very powerful human-attention machine. The plug is reachable only from the dusty backside.
+const remote=new THREE.Group();remote.position.set(.55,1.12,3.0);scene.add(remote);const remoteBody=box(.24,.055,.58,C.black,[0,0,0],remote);for(let i=0;i<7;i++){const bx=(i%2?-.055:.055),bz=-.20+Math.floor(i/2)*.10;sphere(.022,i===0?C.redgreen:C.metal,[bx,.04,bz],remote,6)}setShadow(remote);
+const tvStand=box(2.45,.42,.62,C.darkwood,[1.05,.27,5.55]); addSolid(1.05,5.55,2.5,.65,.06,.48,{id:'tvStand',walkable:true});
+const tvBody=box(1.95,1.12,.16,C.black,[1.05,1.17,5.52]); setShadow(tvBody);addSolid(1.05,5.52,1.98,.18,.61,1.73,{id:'tvBody'});
+const tvScreen=box(1.72,.90,.035,0x6e91a7,[1.05,1.18,5.42]); tvScreen.material=M(0x6e91a7,{roughness:.25,emissive:0x385c78,emissiveIntensity:.75});
+const tvGlow=new THREE.PointLight(0x7ba8c0,.38,4,2); tvGlow.position.set(1.05,1.2,4.7); scene.add(tvGlow);
+box(.42,.24,.018,C.yellow,[.72,1.28,5.39]); sphere(.13,C.blue,[1.42,1.05,5.38],scene,8);
+const tvShow=new THREE.Group();scene.add(tvShow);tvShow.position.set(0,0,0);
+const tvHorizon=box(1.55,.22,.012,C.yellow,[1.05,.87,5.395],tvShow);const tvGround=box(1.55,.25,.011,0x7e8f58,[1.05,1.07,5.394],tvShow);
+const tvBlob=sphere(.13,C.blue,[.55,1.35,5.37],tvShow,9);const tvBlob2=box(.30,.18,.012,C.orange,[1.38,1.38,5.37],tvShow);
+const tvTicker=box(1.45,.07,.012,C.white,[1.05,.79,5.37],tvShow);setShadow(tvShow,false,false);
+const outlet=box(.18,.18,.03,C.white,[1.95,.28,6.86]);
+const tvCord=new THREE.Group();scene.add(tvCord);let tvCableMesh=null;
+const tvPlug=box(.18,.11,.10,C.black,[0,0,0],tvCord);setShadow(tvPlug);
+function rebuildTVCable(unplugged=false){if(tvCableMesh){tvCord.remove(tvCableMesh);tvCableMesh.geometry.dispose()}const end=unplugged?new THREE.Vector3(1.72,.09,6.28):new THREE.Vector3(1.95,.28,6.80);const pts=[new THREE.Vector3(1.48,.72,5.66),new THREE.Vector3(1.54,.38,5.78),new THREE.Vector3(1.60,.13,6.05),new THREE.Vector3(1.72,.10,6.35),end];const curve=new THREE.CatmullRomCurve3(pts);tvCableMesh=mesh(new THREE.TubeGeometry(curve,28,.024,7,false),M(C.black),[0,0,0],tvCord);tvCableMesh.castShadow=true;tvPlug.position.copy(end);tvPlug.rotation.set(unplugged ? 0 : .15,unplugged ? .65 : 0,0)}
+rebuildTVCable(state.tvUnplugged);
+// back door: visuals and collision share the exact same opening measurements
+box(.12,2.05,.18,C.darkwood,[1.1,1.02,-4.88]);box(.12,2.05,.18,C.darkwood,[2.9,1.02,-4.88]);box(1.9,.14,.18,C.darkwood,[2.0,2.0,-4.88]);
+let backDoorOpen=false;
+const DOOR_RIGHT_X=2.84,DOOR_WIDTH=1.68,DOOR_CENTER_X=2.00,DOOR_Z=-4.82,DOG_HOLE_W=.84,DOG_HOLE_H=.92,DOG_HOLE_CENTER_X=DOOR_CENTER_X;
+const doorPivot=new THREE.Group();doorPivot.position.set(DOOR_RIGHT_X,0,DOOR_Z);scene.add(doorPivot);
+const doorSideW=(DOOR_WIDTH-DOG_HOLE_W)/2;
+const doorLeft=box(doorSideW,1.92,.09,0xc8bb93,[-DOOR_WIDTH+doorSideW/2,1.0,0],doorPivot);
+const doorRight=box(doorSideW,1.92,.09,0xc8bb93,[-doorSideW/2,1.0,0],doorPivot);
+const doorTopH=1.92-DOG_HOLE_H-.08;const doorTop=box(DOG_HOLE_W,doorTopH,.09,0xc8bb93,[-DOOR_WIDTH/2,DOG_HOLE_H+.08+doorTopH/2,0],doorPivot);
+const doorBottom=box(DOG_HOLE_W,.08,.09,0xc8bb93,[-DOOR_WIDTH/2,.04,0],doorPivot);
+const knob=sphere(.055,C.metal,[-1.48,1.02,.09],doorPivot,8);knob.material=M(C.metal,{metalness:.55,roughness:.4});
+box(DOG_HOLE_W+.08,.04,.10,C.darkwood,[-DOOR_WIDTH/2,DOG_HOLE_H+.08,.02],doorPivot);box(.04,DOG_HOLE_H,.10,C.darkwood,[-DOOR_WIDTH/2-DOG_HOLE_W/2-.02,.08+DOG_HOLE_H/2,.02],doorPivot);box(.04,DOG_HOLE_H,.10,C.darkwood,[-DOOR_WIDTH/2+DOG_HOLE_W/2+.02,.08+DOG_HOLE_H/2,.02],doorPivot);
+const flapPivot=new THREE.Group();flapPivot.position.set(-DOOR_WIDTH/2,DOG_HOLE_H+.08,.055);doorPivot.add(flapPivot);
+const dogFlap=box(DOG_HOLE_W-.06,DOG_HOLE_H-.04,.028,C.blue,[0,-(DOG_HOLE_H-.04)/2,0],flapPivot);setShadow(dogFlap);
+const closedDoor=()=>Math.abs(doorPivot.rotation.y)<.85;
+// Every visible door slab keeps its own oriented collider throughout the swing.
+addLocalSolid(doorPivot,-DOOR_WIDTH+doorSideW/2,0,doorSideW,.11,.08,1.96,{id:'doorLeft',dynamic:true});
+addLocalSolid(doorPivot,-doorSideW/2,0,doorSideW,.11,.08,1.96,{id:'doorRight',dynamic:true});
+addLocalSolid(doorPivot,-DOOR_WIDTH/2,0,DOG_HOLE_W,.11,DOG_HOLE_H+.08,1.96,{id:'doorTop',dynamic:true});
+// The visible flap is a real closed barrier. E temporarily opens this exact opening; no offset invisible passage.
+const dogDoorTransit={active:false,t:0,start:null,end:null,flapSign:1};
+const dogDoorBlock=addLocalSolid(doorPivot,-DOOR_WIDTH/2,0,DOG_HOLE_W-.05,.10,.08,DOG_HOLE_H+.08,{id:'dogFlapClosed',dynamic:true,active:()=>closedDoor()&&!dogDoorTransit.active});
+
+// Yard fence, gate on east side
+function fenceSeg(x,z,w,d){const f=box(w,1.25,d,C.darkwood,[x,.62,z]);setShadow(f);addCollider(x,z,w,d,1.35,()=>true,'yardFence');return f}
+fenceSeg(-9,-12,.25,14);fenceSeg(0,-19,18,.25);fenceSeg(9,-17.62,.25,2.75);fenceSeg(9,-13.08,.25,2.75);fenceSeg(9,-6.35,.25,3.3);fenceSeg(8,-4.75,2,.25);fenceSeg(-8,-4.75,2,.25);
+const looseFencePanel=box(.25,.73,1.75,C.darkwood,[9,.89,-15.35]);addSolid(9,-15.35,.27,1.78,.52,1.27,{id:'looseFenceUpper'});const looseFenceSoil=box(.55,.23,1.68,C.dirt,[8.88,.115,-15.35]);const looseFenceSoilCollider=addSolid(8.88,-15.35,.58,1.72,0,.52,{id:'looseFenceSoil',active:()=>state.fenceDig<2});
+const gatePivot=new THREE.Group();gatePivot.position.set(9,0,-11.7);scene.add(gatePivot);const gateMesh=box(.18,1.15,3.3,C.darkwood,[0,.58,1.65],gatePivot);setShadow(gatePivot);addLocalSolid(gatePivot,0,1.65,.20,3.32,0,1.18,{id:'yardGate',dynamic:true});
+
+// Garage / shed, accessed via dog-sized back flap blocked by a box
+solidBox(6,.10,8,C.wood,[-12,.03,0],scene,{id:'shedFloor',walkable:true});wall(-15,0,.28,8,2.6,0xc9c4aa);wall(-9,0,.28,8,2.6,0xc9c4aa);wall(-12,4,6,.28,2.6,0xc9c4aa);wall(-13.4,-4,3.2,.28,2.6,0xc9c4aa);wall(-9.6,-4,1.2,.28,2.6,0xc9c4aa);const shedRoof=solidBox(6.35,.18,8.35,C.darkwood,[-12,2.72,0],scene,{id:'shedRoof'});
+const garageBox=box(1.05,1.0,1.05,C.orange,[-11,.5,-4.55]);setShadow(garageBox);const garageBoxCollider=addSolid(-11,-4.55,1.1,1.1,0,1.02,{id:'garageBox',walkable:true,active:()=>!state.garageDone});
+// low shed opening: unlike the normal doggy door, this is intentionally a crawl-space after the box is moved.
+solidBox(1.5,.06,.15,C.blue,[-11,.03,-4],scene,{id:'shedThreshold',walkable:true});solidBox(.12,.62,.15,C.blue,[-11.72,.31,-4],scene,{id:'shedPost'});solidBox(.12,.62,.15,C.blue,[-10.28,.31,-4],scene,{id:'shedPost'});box(1.5,.62,.15,C.blue,[-11,.94,-4]);addSolid(-11,-4,1.5,.17,.61,1.25,{id:'shedLowLintel'});
+// garage shelves
+box(3.8,.12,.7,C.darkwood,[-12,.65,2.8]);box(3.8,.12,.7,C.darkwood,[-12,1.35,2.8]);addSolid(-12,2.8,3.82,.72,.59,.71,{id:'garageShelfLow'});addSolid(-12,2.8,3.82,.72,1.29,1.41,{id:'garageShelfHigh'});
+
+function makeTree(x,z,s=1){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);const trunk=solidCylinder(.29*s,2.30*s,C.darkwood,[0,1.15*s,0],g,{id:'treeTrunk',segments:9});const root=solidCylinder(.39*s,.24*s,C.darkwood,[0,.12*s,0],g,{id:'treeRoot',segments:9});root.scale.set(1,.7,1);const l1=sphere(1.16*s,C.leaf,[0,2.55*s,0],g,10);const l2=sphere(.84*s,C.leaf2,[.58*s,2.72*s,.14*s],g,9);const l3=sphere(.88*s,C.leaf2,[-.52*s,2.82*s,-.25*s],g,9);g.userData.sway=[l1,l2,l3];setShadow(g,true,true);return g}
+const trees=[];[[-6,-15,1],[-6,12,1.1],[20.8,-16,1.1],[28,13,1],[42,-11,1.1],[44,12,.9],[26,-2,.8],[31,8,.9],[21,15,.9],[-13,-12,.9]].forEach(a=>trees.push(makeTree(...a)));
+
+function makeHouseExterior(x,z,color,variant=0){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);solidBox(7.05,.28,7.05,0xb8b49e,[0,.14,0],g,{id:'houseFoundation'});solidBox(7,3.05,7,color,[0,1.70,0],g,{id:'houseBody'});const roofColor=variant%2?0x665c4c:C.darkwood;const roof=mesh(new THREE.ConeGeometry(5.65,2.25,4),M(roofColor),[0,4.18,0],g);roof.rotation.y=Math.PI/4;addLocalSolid(g,0,0,7.6,7.6,3.18,5.40,{id:'houseRoof'});box(7.55,.12,7.55,roofColor,[0,3.16,0],g);const frontZ=3.53;box(1.05,2.02,.09,variant%3===0?C.blue:C.yellow,[-1.70,1.14,frontZ],g);box(.06,.12,.08,C.metal,[-1.28,1.12,frontZ+.06],g);for(const wx of [1.45,-.10]){box(1.18,.92,.08,C.white,[wx,1.72,frontZ],g);box(.99,.72,.045,0xaec8d5,[wx,1.72,frontZ+.04],g);box(.055,.78,.05,C.white,[wx,1.72,frontZ+.07],g);box(1.04,.055,.05,C.white,[wx,1.72,frontZ+.07],g)}if(variant%2===1){solidBox(3.2,.18,1.25,C.darkwood,[0,.45,4.05],g,{id:'porchDeck',walkable:true});for(const px of [-1.3,1.3])solidCylinder(.09,.78,C.darkwood,[px,.39,4.0],g,{id:'porchPost'});box(3.5,.14,.14,C.white,[0,2.72,3.72],g)}setShadow(g);return g}
+makeHouseExterior(25,-18,0xd4cfad,0);makeHouseExterior(29,19,0xc7c4a3,1);makeHouseExterior(44,-19,0xd0c8a8,2);
+makeHouseExterior(55,-27,0xc8c6a7,1);makeHouseExterior(68,-22,0xd8cfaa,0);makeHouseExterior(61,27,0xc4c8a9,2);
+// extended east neighborhood: dog park, picnic/food-truck corner, paths and little landmarks
+solidBox(35,.06,1.6,C.walk,[57,.04,0],scene,{id:'eastPath',walkable:true}); solidBox(1.6,.06,25,C.walk,[53,.04,12],scene,{id:'eastPath',walkable:true});
+for(const a of [[51,-5,.9],[57,5,1],[64,15,1.1],[70,5,.95],[56,30,.9],[73,28,1.05],[49,-26,.9],[71,-8,.8]])trees.push(makeTree(...a));
+// dog park fence with open entry
+function eastFence(x,z,w,d){const f=box(w,.82,d,C.darkwood,[x,.41,z]);setShadow(f);addCollider(x,z,w,d,.9,()=>true,'dogParkFence');return f}
+eastFence(55,16,.18,12);eastFence(69,16,.18,12);eastFence(62,22,14,.18);eastFence(58,10,6,.18);eastFence(67,10,4,.18);
+const agilityRamp=new THREE.Group();agilityRamp.position.set(62,0,16);scene.add(agilityRamp);
+function rampBoard(x,y,rot,color){const b=box(3.25,.15,1.12,color,[x,y,0],agilityRamp);b.rotation.z=rot;setShadow(b);return b}
+rampBoard(-1.47,.60,-.38,C.blue);rampBoard(1.47,.60,.38,C.yellow);box(.55,.16,1.12,C.white,[0,1.20,0],agilityRamp);
+addRamp(58.98,16,.06,61.72,16,1.20,1.10,'agilityRampWest');addRamp(61.72,16,1.20,65.02,16,.06,1.10,'agilityRampEast');addPlatform(61.72,16,.58,1.08,1.20,'agilityPeak');
+for(const x of [58.2,59.3,60.4]){const hoop=mesh(new THREE.TorusGeometry(.48,.055,8,18),M(C.yellow),[x,.7,19],scene);hoop.rotation.y=Math.PI/2;setShadow(hoop);addSolid(x,19,.13,.22,.24,1.16,{id:'hoopSide'});addSolid(x,18.57,.13,.16,.34,1.06,{id:'hoopRim'});addSolid(x,19.43,.13,.16,.34,1.06,{id:'hoopRim'});addSolid(x,19,.13,.70,1.08,1.18,{id:'hoopTop'})}
+const parkWater=cyl(.48,.40,.16,C.blue,[66,.08,18.5],scene,12);addSolid(66,18.5,.92,.92,0,.18,{id:'parkWaterBowl'});const parkWaterSurface=cyl(.36,.36,.02,C.water,[66,.17,18.5],scene,12);
+const parkBall=sphere(.19,C.yellow,[63.8,.18,13.2],scene,12);setShadow(parkBall);
+// food truck / picnic corner
+const foodTruck=new THREE.Group();foodTruck.position.set(58,0,-12);scene.add(foodTruck);box(4.6,2.1,2.2,C.blue,[0,1.1,0],foodTruck);box(1.8,.72,.04,C.yellow,[.4,1.45,-1.12],foodTruck);box(.75,.5,.04,C.white,[-1.45,1.42,-1.12],foodTruck);for(const x of [-1.5,1.5]){cyl(.36,.36,.24,C.black,[x,.3,-.98],foodTruck,12).rotation.x=Math.PI/2;cyl(.36,.36,.24,C.black,[x,.3,.98],foodTruck,12).rotation.x=Math.PI/2}setShadow(foodTruck);addCollider(58,-12,4.8,2.4,2.3,()=>true,'foodTruck');
+const storyPizzaBox=new THREE.Group();storyPizzaBox.position.set(60.8,.10,-8.4);scene.add(storyPizzaBox);box(1.05,.06,.78,C.orange,[0,0,0],storyPizzaBox);box(.72,.015,.52,C.yellow,[.04,.04,0],storyPizzaBox);box(.18,.02,.16,C.redgreen,[.18,.055,-.08],storyPizzaBox);storyPizzaBox.rotation.y=-.18;setShadow(storyPizzaBox);
+function makePicnicTable(x,z){solidBox(2.7,.12,1,C.darkwood,[x,.72,z],scene,{id:'picnicTop',walkable:true});solidBox(3.0,.12,.36,C.darkwood,[x,.38,z-1],scene,{id:'picnicBench',walkable:true});solidBox(3.0,.12,.36,C.darkwood,[x,.38,z+1],scene,{id:'picnicBench',walkable:true});for(const sx of [-1.05,1.05])for(const sz of [-.34,.34])solidCylinder(.08,.67,C.darkwood,[x+sx,.335,z+sz],scene,{id:'picnicLeg',segments:7});}
+for(const z of [-15,-9])makePicnicTable(64,z);
+// extra hydrants are created after the hydrant helper is defined
+const giantStick=cyl(.07,.09,3.7,C.darkwood,[72,.2,25],scene,8);giantStick.rotation.z=Math.PI/2;setShadow(giantStick);
+
+
+// Park/playground
+box(10,.04,8,0x8e9353,[26,.06,7]);
+for(const x of [23,29]){solidCylinder(.10,2.2,C.blue,[x,1.1,8],scene,{id:'playgroundPole',segments:8});solidCylinder(.10,2.2,C.yellow,[x,1.1,10],scene,{id:'playgroundPole',segments:8});solidBox(1.2,.1,.35,C.darkwood,[x,1.55,9],scene,{id:'playgroundCrossbar'});}
+function makeBench(x,z,yaw=0){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=yaw;scene.add(g);solidBox(2.8,.16,.55,C.darkwood,[0,.58,0],g,{id:'benchSeat',walkable:true});solidBox(2.8,.16,.28,C.darkwood,[0,1.05,.38],g,{id:'benchBack'});for(const xx of [-1.1,1.1])solidCylinder(.075,.58,C.metal,[xx,.29,0],g,{id:'benchLeg',segments:7});setShadow(g);return g}
+const bench=makeBench(24,-6,.04);
+// picnic table beyond creek
+makePicnicTable(42,3);
+
+
+// v9 east-side expansion: a connected creek trail, community green, service path and wooded culvert.
+solidBox(31,.055,1.55,C.walk,[83.5,.04,5.2],scene,{id:'servicePath',walkable:true});solidBox(1.55,.055,14,C.walk,[72.7,.04,11.5],scene,{id:'servicePath',walkable:true});
+// community green with low stone edge, flowers and a bench
+box(11,.035,9,C.grass2,[79,.025,18]);
+for(const x of [74,84])solidBox(.35,.34,9,C.stone,[x,.17,18],scene,{id:'greenStoneEdge'});
+const greenBench=makeBench(80,18,-.12);
+for(let i=0;i<24;i++){const x=74.7+(i%8)*1.25+Math.sin(i*2.1)*.16,z=15.1+Math.floor(i/8)*2.0+Math.cos(i)*.2;const stem=cyl(.018,.018,.18,C.leaf2,[x,.12,z],scene,5);sphere(.055,[C.flower,C.yellow,C.blue][i%3],[x,.23,z],scene,6)}
+// service/maintenance nook with barriers rather than an invisible boundary
+for(const [x,z] of [[78,-4],[81,-4],[84,-4]]){solidBox(2.1,.12,.16,C.orange,[x,.72,z],scene,{id:'constructionRail'});for(const sx of [-.9,.9])solidCylinder(.07,.90,C.white,[x+sx,.45,z],scene,{id:'constructionLeg',segments:6})}
+box(8,.05,5,C.dirt,[82,.025,-7]);for(const [x,z] of [[79,-9],[84,-8],[82,-5]]){const rock=sphere(.32,C.stone,[x,.22,z],scene,8);rock.scale.y=.72;addSolid(x,z,.58,.58,0,.45,{id:'serviceRock'})}
+// wooded patch and hedge-defined outer edge
+for(const a of [[77,8,.8],[80,11,.9],[84,8,1.0],[87,12,.85],[91,9,.95],[95,13,1.0],[98,7,.85],[88,18,.9],[96,20,.95],[76,27,.9],[84,29,.8]])trees.push(makeTree(...a));
+function hedge(x,z,w,d,h=.9){const o=box(w,h,d,C.hedge,[x,h/2,z]);setShadow(o);addCollider(x,z,w,d,h+.05);return o}
+hedge(101.2,7,.55,31,1.25);hedge(89.5,30,24,.55,1.15);hedge(88.5,-13,26,.55,1.0);hedge(75.5,-17,.55,8,1.0);
+// Authored outer boundaries: vegetation, road works and creek stonework stop the world before coordinate clamps do.
+hedge(-4,42,27,.55,1.18);hedge(27,42,15,.55,1.18);hedge(70,42,64,.55,1.18);
+hedge(-4,-42,27,.55,1.18);hedge(27,-42,15,.55,1.18);hedge(70,-42,64,.55,1.18);hedge(-17.7,0,.55,84,1.18);hedge(101.2,-27,.55,38,1.18);hedge(101.2,33,.55,22,1.18);
+for(const z of [-41.35,41.35]){box(9.5,.16,.22,C.orange,[14.5,.72,z]);box(9.5,.62,.16,0xb69455,[14.5,.31,z]);for(const x of [10.2,18.8])cyl(.075,.10,1.35,C.white,[x,.67,z],scene,6);addCollider(14.5,z,9.7,.34,.95,()=>true,'roadBoundary');box(3.65,.66,.38,C.stone,[36,.34,z]);addCollider(36,z,3.8,.48,.72,()=>true,'creekBoundary')}
+
+// A dog-sized hedge shortcut blocks the raccoon's route: crawl fits, standing does not.
+hedge(75,-4.15,.55,17.7,1.05);hedge(75,14.4,.55,17.3,1.05);box(.58,.35,1.02,C.darkwood,[75,.755,5.2]);addSolid(75,5.2,.60,1.04,.58,1.02,{id:'hedgeCrawlTop'});
+
+// culvert/drain: readable destination for the second raccoon beat
+box(5,.10,3.8,C.dirt,[92,.02,5.2]);const culvert=mesh(new THREE.CylinderGeometry(1.05,1.05,2.7,18,1,true,0,Math.PI),M(C.stone,{side:THREE.DoubleSide}),[92,.76,5.2]);culvert.rotation.z=Math.PI/2;culvert.rotation.y=Math.PI/2;setShadow(culvert);
+solidBox(5.0,.62,.30,C.stone,[92,.31,3.98],scene,{id:'culvertWall'});solidBox(5.0,.62,.30,C.stone,[92,.31,6.42],scene,{id:'culvertWall'});solidBox(5.0,.28,2.15,C.stone,[92,1.36,5.2],scene,{id:'culvertRoof'});
+box(3.2,.14,.24,C.stone,[92,.12,3.25]);box(3.2,.14,.24,C.stone,[92,.12,7.15]);
+const culvertWater=box(5.2,.035,1.25,C.water,[92,.055,5.2]);culvertWater.material=M(C.water,{transparent:true,opacity:.66,roughness:.25});
+// Dog-sized shortcut through a hedge into the wooded patch.
+hedge(86.5,23,6,.45,1.0);hedge(94,23,8,.45,1.0);
+// Repeated tiny grass/weed details use shared materials and modest geometry.
+for(let i=0;i<65;i++){const x=46+(i*7.31)%53,z=-35+(i*11.17)%70;if(Math.abs(x-58)<3&&Math.abs(z+12)<3)continue;const g=cyl(.012,.018,.16+(i%4)*.025,C.leaf2,[x,.08,z],scene,4);g.rotation.z=(i%5-2)*.05}
+function makeHydrant(x,z,id){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);solidCylinder(.34,.82,C.blue,[0,.41,0],g,{id:'hydrantBody',segments:12});cyl(.40,.40,.12,C.yellow,[0,.78,0],g,12);sphere(.27,C.blue,[0,.95,0],g,12);for(const sx of [-1,1]){const cap=cyl(.14,.14,.35,C.blue,[sx*.31,.56,0],g,9);cap.rotation.z=Math.PI/2}g.userData.hydrantId=id;setShadow(g);return g}
+const hydrants=[makeHydrant(9.05,-17,'h1'),makeHydrant(20.0,-5,'h2'),makeHydrant(9.05,10,'h3'),makeHydrant(20.0,24,'h4'),makeHydrant(20.0,36,'h5')];
+// trash cans and mailbox
+function trash(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);solidCylinder(.47,1.0,C.metal,[0,.5,0],g,{id:'trashCan',segments:12});cyl(.53,.53,.12,C.darkwood,[0,1.02,0],g,12);box(.42,.06,.10,C.black,[0,1.08,.28],g);setShadow(g);return g}
+const suspiciousTrash=trash(20,1);trash(31,-8);
+const mailbox=new THREE.Group();mailbox.position.set(19,-0.02,-4);scene.add(mailbox);solidCylinder(.08,1.25,C.darkwood,[0,.62,0],mailbox,{id:'mailboxPost',segments:8});solidBox(.75,.52,.45,C.blue,[0,1.28,0],mailbox,{id:'mailboxBody'});box(.08,.35,.04,C.yellow,[.40,1.31,0],mailbox);setShadow(mailbox);
+
+function makeHuman(x,z,shirt=C.blue,scale=1){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);const standingLegs=new THREE.Group(),sittingLegs=new THREE.Group();g.add(standingLegs,sittingLegs);sittingLegs.visible=false;const hips=box(.42,.18,.24,0x6e665d,[0,.86,0],g);const legL=cyl(.1,.1,.72,C.darkwood,[-.16,.42,0],standingLegs,8),legR=cyl(.1,.1,.72,C.darkwood,[.16,.42,0],standingLegs,8);const shoeL=box(.16,.08,.28,C.black,[-.16,.03,.08],standingLegs),shoeR=box(.16,.08,.28,C.black,[.16,.03,.08],standingLegs);for(const sx of [-.16,.16]){const thigh=cyl(.105,.105,.58,C.darkwood,[sx,.82,.27],sittingLegs,8);thigh.rotation.x=Math.PI/2;const shin=cyl(.10,.10,.66,C.darkwood,[sx,.47,.55],sittingLegs,8);box(.17,.09,.30,C.black,[sx,.10,.66],sittingLegs)}const body=cyl(.34,.42,.92,shirt,[0,1.3,0],g,12);const shoulder=box(.78,.18,.26,shirt,[0,1.56,0],g);const neck=cyl(.08,.08,.12,0xbfa37d,[0,1.8,0],g,8);const head=sphere(.28,0xbfa37d,[0,2.06,0],g,14);const hair=mesh(new THREE.SphereGeometry(.285,12,10,0,Math.PI*2,0,Math.PI*.68),M(C.darkwood),[0,2.15,-.02],g);hair.scale.y=.72;const nose=box(.08,.04,.06,0xc18b74,[0,2.02,.25],g);const eyeL=sphere(.03,C.black,[-.08,2.08,.24],g,6),eyeR=sphere(.03,C.black,[.08,2.08,.24],g,6);const armL=new THREE.Group(),armR=new THREE.Group();g.add(armL,armR);armL.position.set(-.39,1.55,0);armR.position.set(.39,1.55,0);cyl(.075,.075,.66,0xbfa37d,[0,-.26,0],armL,8);cyl(.075,.075,.66,0xbfa37d,[0,-.26,0],armR,8);g.scale.setScalar(scale);g.userData={head,body,armL,armR,legL,legR,standingLegs,sittingLegs,hips,shoulder,neck,hair,nose,eyeL,eyeR,baseY:0,patrol:null,stepOffset:Math.random()*6,pose:'stand',radius:.34,isActor:true,navHeight:2.25,interactionOffset:new THREE.Vector3(0,1.30,.18)};setShadow(g);addCollider(x,z,.74*scale,.74*scale,2.30*scale,()=>true,'humanBody',g);return g}
+const owner=makeHuman(.95,.73,C.blue,1);owner.rotation.y=0;owner.userData.role='owner';owner.userData.mode='watchTV';
+const parkHuman=makeHuman(25,-7,C.yellow,.95);parkHuman.rotation.y=.3;parkHuman.userData.patrol={points:[[25,-7],[23.5,-6.3],[24.2,-4.9],[25.7,-5.7]],i:0,speed:.52,pause:0};
+const colorHuman=makeHuman(27,8,C.blue,.9);colorHuman.rotation.y=-1.5;colorHuman.userData.patrol={points:[[27,8],[27.5,9.2],[26.6,9.5]],i:0,speed:.32,pause:0};
+const mailHuman=makeHuman(19.7,-2.6,C.yellow,.95);mailHuman.rotation.y=2.4;mailHuman.userData.patrol={points:[[19.7,-2.6],[19.2,-5.0],[18.8,-7.4],[19.3,-5.0]],i:0,speed:.72,pause:0};
+const jogger=makeHuman(49,-24,C.blue,.92);jogger.userData.patrol={points:[[49,-24],[53,-18],[52,-7],[53,5],[56,18],[67,21],[71,8],[67,-6],[62,-18],[54,-27]],i:0,speed:1.35,pause:0};jogger.userData.role='jogger';
+
+function makeDog(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);const body=mesh(new THREE.CapsuleGeometry(.34,.82,4,10),M(C.dog),[0,.54,0],g);body.rotation.z=Math.PI/2;const chest=sphere(.23,C.dog,[.18,.53,0],g,10);const head=sphere(.34,C.dog,[.62,.82,0],g,10);const snout=box(.25,.18,.22,C.dog,[.86,.74,0],g);sphere(.11,C.furDark,[.98,.73,0],g,9);const collar=box(.18,.08,.52,C.blue,[.4,.63,0],g);const earL=cone(.13,.42,C.furDark,[.54,1.12,.16],g,6),earR=cone(.13,.42,C.furDark,[.54,1.12,-.16],g,6);earL.rotation.z=-.35; earR.rotation.z=-.35;const legs=[];for(const xx of [-.33,.15])for(const zz of [-.19,.19])legs.push(cyl(.07,.08,.5,C.dog,[xx,.27,zz],g,7));const tail=cyl(.07,.1,.62,C.dog,[-.62,.78,0],g,8);tail.rotation.z=-1.0;g.userData={tail,legs,patrol:null,stepOffset:Math.random()*6,radius:.34,isActor:true,navHeight:.92,interactionOffset:new THREE.Vector3(.45,.62,0)};setShadow(g);addCollider(x,z,.92,.72,.9,()=>true,'dogBody',g);return g}
+const neighborDog=makeDog(10.35,-16);neighborDog.rotation.y=-1.2;neighborDog.userData.patrol={points:[[10.35,-16],[10.35,-12],[10.35,-17.6]],i:0,speed:.9,pause:0};neighborDog.userData.role='neighborDog';
+const parkDog=makeDog(62,14.2);parkDog.scale.setScalar(.88);parkDog.userData.patrol={points:[[62,14.2],[66,13.2],[67,18.4],[63,20.2],[58,18.2],[58.5,13]],i:0,speed:1.15,pause:0};parkDog.userData.role='parkDog';
+
+function makeSquirrel(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);sphere(.22,0x89755c,[0,.28,0],g,9);sphere(.16,0x89755c,[.25,.46,0],g,9);sphere(.07,C.black,[.38,.5,.11],g,6);const tail=mesh(new THREE.TorusGeometry(.28,.1,6,10,Math.PI*1.4),M(0x89755c),[-.24,.53,0],g);tail.rotation.y=Math.PI/2;tail.rotation.z=.7;setShadow(g);return g}
+const squirrel=makeSquirrel(-6.4,-13.2);
+function makeRaccoon(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);const body=mesh(new THREE.CapsuleGeometry(.28,.52,4,8),M(0x77766d),[0,.42,0],g);body.rotation.z=Math.PI/2;sphere(.28,0x77766d,[.45,.58,0],g,10);box(.08,.12,.48,C.black,[.63,.62,0],g);sphere(.08,C.black,[.69,.58,0],g,7);const tail=cyl(.12,.2,.7,0x77766d,[-.53,.5,0],g,8);tail.rotation.z=-1.15;setShadow(g);return g}
+const raccoon=makeRaccoon(43,3.1);raccoon.userData={...(raccoon.userData||{}),radius:.30,isActor:true,navHeight:.72,fleeUntil:0};squirrel.userData={...(squirrel.userData||{}),radius:.20,isActor:true,fleeUntil:0};addCollider(0,0,.58,.52,.72,()=>true,'raccoonBody',raccoon);addCollider(0,0,.34,.34,.58,()=>true,'squirrelBody',squirrel);
+const worldActors=[owner,parkHuman,colorHuman,mailHuman,jogger,neighborDog,parkDog,raccoon];
+// pizza remnant for the grand mystery
+const pizza=mesh(new THREE.CylinderGeometry(.45,.45,.07,3),M(C.yellow),[42.5,.49,3.6]);pizza.rotation.x=Math.PI/2;setShadow(pizza);
+
+// Carryables and set dressing
+function makeBall(x,y,z,color=C.blue,r=.18){const b=sphere(r,color,[x,y,z],scene,12);setShadow(b);return b}
+const toy=makeBall(-1.7,.19,1.72,C.blue,.2); // half-hidden by couch/table from dog height
+const toyNub=cone(.09,.17,C.yellow,[0,.18,0],toy,6); toyNub.rotation.z=Math.PI/2;
+const leash=new THREE.Group();leash.position.set(5.3,.24,-.3);scene.add(leash);const leashLoop=mesh(new THREE.TorusGeometry(.23,.045,6,14),M(C.blue),[0,.15,0],leash);leashLoop.rotation.x=Math.PI/2;box(.06,.06,.58,C.blue,[.28,.12,0],leash).rotation.z=-.45;setShadow(leash);
+const sock=new THREE.Group();sock.position.set(-4.35,.84,4.32);scene.add(sock);box(.18,.08,.45,C.yellow,[0,0,0],sock);box(.28,.08,.18,C.yellow,[.06,0,.18],sock);setShadow(sock);
+const keyring=new THREE.Group();keyring.position.set(-12,.14,2.7);scene.add(keyring);const kr=mesh(new THREE.TorusGeometry(.12,.025,6,12),M(C.metal,{metalness:.6,roughness:.35}),[0,0,0],keyring);for(let i=0;i<2;i++){const k=box(.05,.03,.32,C.metal,[.1+i*.07,0,.18],keyring);k.material=M(C.metal,{metalness:.6,roughness:.35})}setShadow(keyring);
+const shinyKey=new THREE.Group();shinyKey.position.set(91.25,.13,5.65);scene.add(shinyKey);const shinyRing=mesh(new THREE.TorusGeometry(.10,.022,6,12),M(C.metal,{metalness:.72,roughness:.25}),[0,0,0],shinyKey);const shinyBlade=box(.05,.025,.30,C.metal,[.12,0,.18],shinyKey);shinyBlade.material=M(C.metal,{metalness:.72,roughness:.25});box(.18,.045,.15,C.blue,[-.10,0,-.03],shinyKey);setShadow(shinyKey);shinyKey.visible=state.keyDropped&&!state.keyReturned&&!state.mysteryComplete;
+const bigStick=cyl(.055,.075,2.8,C.darkwood,[-5,.18,-14.7],scene,8);bigStick.rotation.z=Math.PI/2;bigStick.visible=state.digDone;setShadow(bigStick);
+const gloveSample=new THREE.Group();gloveSample.position.set(24,.77,-6);scene.add(gloveSample);box(.25,.05,.35,C.blue,[0,0,0],gloveSample);for(let i=0;i<4;i++){const f=box(.055,.04,.2,C.blue,[-.09+i*.06,.01,-.23],gloveSample);f.rotation.x=.1}setShadow(gloveSample);
+const porch=new THREE.Group();porch.position.set(24,0,-13.55);scene.add(porch);solidBox(3.2,.18,1.25,C.darkwood,[0,.59,0],porch,{id:'lowPorchTop',walkable:true});for(const x of [-1.35,1.35])for(const z of [-.45,.45])solidCylinder(.08,.58,C.darkwood,[x,.29,z],porch,{id:'porchLeg',segments:7});box(3.35,.08,.10,C.white,[0,.72,.59],porch);setShadow(porch);
+const lostGlove=new THREE.Group();lostGlove.position.set(23.25,.10,-13.55);scene.add(lostGlove);box(.25,.05,.35,C.blue,[0,0,0],lostGlove);for(let i=0;i<4;i++)box(.055,.04,.2,C.blue,[-.09+i*.06,.01,-.23],lostGlove);setShadow(lostGlove);
+// Human color puzzle: intentionally indistinguishable red/green in dog palette
+const colorBallGood=makeBall(24.2,.19,8.7,C.redgreen,.19);colorBallGood.userData.humanColor='red';
+const colorBallWrong=makeBall(24.2,.19,10.1,C.redgreen,.19);colorBallWrong.userData.humanColor='green';
+const basketA=cyl(.42,.5,.35,C.redgreen,[28,.18,7.6],scene,12);const basketB=cyl(.42,.5,.35,C.redgreen,[28,.18,9.2],scene,12);addSolid(28,7.6,.80,.80,0,.36,{id:'ballBasket'});addSolid(28,9.2,.80,.80,0,.36,{id:'ballBasket'});
+
+// Dog muzzle in camera view
+const muzzle=new THREE.Group(),_muzzleWorld=new THREE.Vector3();camera.add(muzzle);scene.add(camera);muzzle.position.set(0,-.22,-.48);const snout=mesh(new THREE.ConeGeometry(.12,.3,8),M(C.dog),[0,0,0],muzzle);snout.rotation.x=-Math.PI/2;sphere(.075,C.black,[0,.02,-.17],muzzle,8);muzzle.visible=true;
+
+const interactables=[]; let currentInteract=null; let carried=null;
+function register(root,opts){const data={root,range:opts.range||1.7,prompt:opts.prompt||'Interact',action:opts.action||(()=>{}),physical:opts.physical||null,active:opts.active||(()=>true),id:opts.id||'',carryable:!!opts.carryable,label:opts.label||opts.id,targetOffset:opts.targetOffset||root.userData.interactionOffset||null};root.userData.interaction=data;interactables.push(data);return data}
+function worldPos(root){const v=new THREE.Vector3();root.getWorldPosition(v);return v}
+function interactionPoint(data){if(!data.targetOffset)return worldPos(data.root);const v=data.targetOffset.clone?data.targetOffset.clone():new THREE.Vector3(...data.targetOffset);data.root.localToWorld(v);return v}
+function pickup(data){if(carried){dropCarried();}
+  carried=data; data.root.userData.carried=true; camera.attach(data.root);data.root.rotation.set(0,0,0);pickupSound(data.id==='keys'||data.id==='shinyKey');
+  const big=data.id==='bigStick'||data.id==='eastStick';data.root.position.set(0,big?-.34:-.28,big?-.86:-.68);data.root.scale.setScalar(big ? .68 : 1);
+  if(data.id==='toy'&&!state.toyFound){state.toyFound=true;discover('Favorite Squeaky Thing');speak('Human: “blah blah GOOD DOG! ... OUTSIDE?”');softSqueak();}
+  if(data.id==='lostGlove'){state.gloveFound=true;discover('The Other Glove');}
+  if(data.id==='sock')achievement('Human’s Missing Sock');if(data.id==='remote'&&ownerAttention()==='distracted')speak('Human: “Hey—give me that.”');if(data.id==='bigStick')achievement('Objectively Best Stick');saveGame();
+}
+function freeDropPoint(radius=.18,height=.30,halfLength=0){const f=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(0,player.yaw,0,'YXZ')),side=new THREE.Vector3(f.z,0,-f.x),axis=new THREE.Vector3(Math.cos(player.yaw+Math.PI/2),0,-Math.sin(player.yaw+Math.PI/2));const tests=[];for(const dist of [.82,1.05,.62,1.28])for(const off of [0,.38,-.38,.70,-.70])tests.push([player.pos.x+f.x*dist+side.x*off,player.pos.z+f.z*dist+side.z*off]);for(const [x,z] of tests){const sup=supportInfoAt(x,z,player.jumpY+MAX_STEP+.55).height;if(!canOccupy(x,z,sup,height,radius))continue;if(halfLength&&(!canOccupy(x+axis.x*halfLength,z+axis.z*halfLength,sup,height,.12)||!canOccupy(x-axis.x*halfLength,z-axis.z*halfLength,sup,height,.12)))continue;return {x,z,y:sup+.14}}return {x:player.pos.x,z:player.pos.z,y:player.jumpY+.14}}
+function dropCarried(){if(!carried)return;const d=carried;scene.attach(d.root);d.root.scale.setScalar(1);const large=d.id==='bigStick'||d.id==='eastStick',p=freeDropPoint(large ? .24 : .18,large ? .22 : .26,large?1.20:0);d.root.position.set(p.x,p.y,p.z);d.root.rotation.set(0,large?player.yaw+Math.PI/2:0,large?Math.PI/2:0);d.root.userData.carried=false;carried=null;dropSound()}
+function segmentIntersectsCollider(a,b,c){if(!c.active())return false;const p=colliderPose(c),co=Math.cos(p.yaw),si=Math.sin(p.yaw);function local(v){const dx=v.x-p.x,dz=v.z-p.z;return {x:dx*co-dz*si,z:dx*si+dz*co,y:v.y}}const A=local(a),B=local(b);const yb=colliderYBounds(c);if(Math.max(A.y,B.y)<yb.min||Math.min(A.y,B.y)>yb.max)return false;let t0=0,t1=1,dx=B.x-A.x,dz=B.z-A.z;for(const [pp,qq] of [[-dx,A.x+c.w/2],[dx,c.w/2-A.x],[-dz,A.z+c.d/2],[dz,c.d/2-A.z]]){if(Math.abs(pp)<1e-8){if(qq<0)return false;continue}const rr=qq/pp;if(pp<0){if(rr>t1)return false;if(rr>t0)t0=rr}else{if(rr<t0)return false;if(rr<t1)t1=rr}}return t0<=t1&&t1>.05&&t0<.96}
+function interactionVisible(data,p){const a=new THREE.Vector3(player.pos.x,player.jumpY+Math.min(player.currentHead,.55),player.pos.z),mx=(a.x+p.x)/2,mz=(a.z+p.z)/2,qr=Math.hypot(p.x-a.x,p.z-a.z)/2+.35,candidates=collisionCandidatesInto(mx,mz,qr,_collisionScratch);for(const c of candidates){if(c.root===data.root||!c.active())continue;if(segmentIntersectsCollider(a,p,c))return false}return true}
+
+function genericCarry(root,id,label,active=()=>true){return register(root,{id,label,active,carryable:true,prompt:()=>carried?.id===id?'Drop '+label:'Pick up '+label,action:d=>{if(carried===d)dropCarried();else pickup(d)}})}
+const movableProps=[];function markMovable(root,radius=.19){root.userData.velocity=new THREE.Vector3();root.userData.moveRadius=radius;movableProps.push(root);return root}
+function pawMovable(root,power=3.0){const f=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(0,player.yaw,0,'YXZ'));root.userData.velocity.addScaledVector(f,power);root.userData.velocity.y=0;thump(.028)}
+const toyInt=genericCarry(toy,'toy','squeaky ball');
+const leashInt=genericCarry(leash,'leash','leash');
+const sockInt=genericCarry(sock,'sock','sock');
+const keysInt=genericCarry(keyring,'keys','jingling keys');const shinyKeyInt=genericCarry(shinyKey,'shinyKey','shiny human key',()=>state.keyDropped&&!state.keyReturned&&!state.mysteryComplete);
+const stickInt=genericCarry(bigStick,'bigStick','ridiculously large stick',()=>state.digDone);
+const gloveInt=genericCarry(lostGlove,'lostGlove','matching glove',()=>state.gloveScented&&!state.gloveReturned);
+const goodBallInt=genericCarry(colorBallGood,'colorGood','mysteriously same-colored ball',()=>!state.colorDone);
+const wrongBallInt=genericCarry(colorBallWrong,'colorWrong','other mysteriously same-colored ball',()=>!state.colorDone);
+const parkBallInt=genericCarry(parkBall,'parkBall','park tennis ball');register(storyPizzaBox,{id:'storyPizzaBox',range:1.45,prompt:'Flattened pizza box reeks of raccoon',physical:'Nudge pizza box',active:()=>state.raccoonMet&&!state.pizzaBoxMoved,action:()=>{}});
+const eastStickInt=genericCarry(giantStick,'eastStick','an outrageously excellent stick');
+const remoteInt=genericCarry(remote,'remote','TV remote');
+for(const b of [toy,colorBallGood,colorBallWrong,parkBall])markMovable(b,b===toy?.20:.19);
+for(const [b,id] of [[toy,'pawToy'],[colorBallGood,'pawColorGood'],[colorBallWrong,'pawColorWrong'],[parkBall,'pawParkBall']])register(b,{id,range:1.25,physical:'Paw ball',action:()=>{}});
+
+register(tvPlug,{id:'tvPlug',range:1.0,prompt:'Bite the plug and pull',active:()=>!state.tvUnplugged,action:()=>{state.tvUnplugged=true;rebuildTVCable(true);tvScreen.material.emissiveIntensity=0;tvScreen.material.color.setHex(0x31383a);tvGlow.intensity=0;tvShow.visible=false;owner.userData.mode='reactTV';owner.userData.modeTime=0;discover('The Off Button, Dog Edition');discover('Dusty Forbidden TV Backside');scrapeSound();speak('Human: “Huh? Hey— why did the TV...?”');saveGame();}});
+
+function ownerAttention(){const m=owner.userData.mode;if(m==='watchTV'&&!state.tvUnplugged)return 'distracted';if(['reactTV','toBackDoor','throughDoor','toGate','returning'].includes(m))return 'moving';if(m==='yardIdle')return 'outside';return 'attentive'}function ownerNearPlayer(r=6){return Math.hypot(owner.position.x-player.pos.x,owner.position.z-player.pos.z)<r}
+function ownerCarryLine(id){const distracted=ownerAttention()==='distracted';const lines={toy:'Human: “Your BALL! There it is!”',leash:'Human: “OUTSIDE?”',sock:distracted?'Human: “Is that my sock...?”':'Human: “Hey! That’s mine.”',remote:'Human: “Hey—give me that.”',bigStick:'Human: “Absolutely not.”',eastStick:'Human: “Absolutely not.”',lostGlove:'Human: “That isn’t mine, buddy.”',parkBall:'Human: “Where did you get that ball?”',keys:'Human: “Those are not my keys.”',colorGood:'Human: “Drop the ball, buddy.”',colorWrong:'Human: “Drop the ball, buddy.”'};return lines[id]||'Human: “...where did you even get that?”'}
+register(owner,{id:'owner',range:2.7,prompt:'Get human attention',targetOffset:[0,1.30,.18],action:()=>{
+ if(carried?.id==='shinyKey'&&state.keyDropped&&!state.keyReturned){scene.attach(shinyKey);shinyKey.visible=false;shinyKey.userData.carried=false;carried=null;state.keyReturned=true;state.mysteryComplete=true;discover('The Mystery Ends With Human Keys');achievement('Solved It With Your Nose');speak('Human: “KEYS! ... where did you— GOOD DOG!”');owner.userData.mode='celebrate';owner.userData.modeTime=0;chime();saveGame();return;}
+ if(carried?.id==='remote'){speak(ownerCarryLine('remote'));if(!state.tvUnplugged)owner.userData.lookAtDog=2.0;return;}
+ if(!state.toyFound){speak('Human: “blah blah BALL... where is your BALL?”');return;}
+ if(!state.tvUnplugged){if(carried?.id==='toy'){speak(ownerCarryLine('toy'));return}if(carried?.id==='sock'){speak(ownerCarryLine('sock'));return}if(carried?.id==='leash'){speak('Human: “Mm-hm, buddy... later.” The glowing rectangle still has them.');return}speak('Human: “Shh, buddy.” Their eyes stay on the glowing rectangle.');return;}
+ if(carried?.id==='leash'&&!state.gateOpen){dropCarried();leash.visible=false;owner.userData.mode='takeLeash';owner.userData.modeTime=0;discover('The Powerful Meaning of LEASH');speak('Human: “OUTSIDE? WALK? ... okay, okay!”');chime();saveGame();return;}
+ if(carried){speak(ownerCarryLine(carried.id));return}
+ if(!state.gateOpen)speak('Human: “OUTSIDE?” They are finally paying attention.');else if(state.raccoonMet&&!state.mysteryComplete)speak('Human: “What did you FIND out there?” (Many things. Mostly smells.)');else speak('Human: “Who’s a GOOD DOG—” (You already know.)');
+}});
+register(parkHuman,{id:'gloveHuman',range:2.4,prompt:'Investigate worried human',action:()=>{
+ if(carried?.id==='lostGlove'){dropCarried();state.gloveReturned=true;discover('Glove Retrieval Professional');speak('Human: “MY GLOVE! Good dog! Good dog!”');chime();saveGame();}
+ else if(!state.gloveScented){speak('Human: “blah blah GLOVE... LOST... GLOVE.” (They hold out one hand.)');}
+ else speak('Human: “GLOVE?” (Yes, you are working on it.)');
+}});
+register(gloveSample,{id:'sampleGlove',range:1.6,prompt:'Sniff the remaining glove',action:()=>{state.gloveScented=true;discover('A Very Specific Glove Smell');sniffBurst();saveGame();}});
+register(colorHuman,{id:'colorHuman',range:2.4,prompt:'See what this human wants',action:()=>{
+ if(carried?.id==='colorGood'){dropCarried();state.colorDone=true;discover('Human Color Logic, Defeated by Nose');speak('Human: “RED BALL! Yes!” (Red? That was red?)');chime();saveGame();}
+ else if(carried?.id==='colorWrong'){achievement('Color Theory Is Suspicious');speak('Human: “No, the RED one!” Both balls look basically identical. Extremely unhelpful.');}
+ else{speak('Human: “RED BALL... RED... BALL.” They point at two balls that look basically the same.');discover('Humans Apparently Have Extra Colors');}
+}});
+register(mailHuman,{id:'mailHuman',range:2.2,prompt:'Inspect mail human',action:()=>{discover('Mail Human');speak('Mail Human: “Hey, buddy.” (Clearly carrying important paper smells.)')}});
+register(jogger,{id:'jogger',range:2.0,prompt:'Inspect fast human',action:()=>{discover('Human Who Goes Outside On Purpose');speak('Jogger: “Hey, pup!” They keep doing the inexplicable running thing.')}});
+register(parkDog,{id:'parkDog',range:1.8,prompt:'Greet dog-park dog',action:()=>{discover('Dog Park Dog');if(carried?.id==='parkBall'){achievement('Shared the Good Ball');parkDog.userData.respondTimer=2.5;dogResponseBark(1);}else{parkDog.userData.respondTimer=1.6;dogResponseBark(1)}}});
+register(dogFlap,{id:'dogDoor',range:1.35,prompt:'Push through',active:()=>state.gateOpen&&closedDoor()&&!dogDoorTransit.active,action:()=>startDogDoorTransit()});
+register(waterBowl,{id:'waterBowl',range:1.25,prompt:'Drink water',action:()=>{state.waterDrunk++;player.headDip=.34;lapSound();waterSurface.scale.setScalar(.96);setTimeout(()=>waterSurface.scale.setScalar(1),240);camera.position.y-=.015;if(state.waterDrunk===1)discover('Water Bowl: Still Excellent');saveGame()}});
+register(foodBowl,{id:'foodBowl',range:1.25,prompt:'Eat a little kibble',action:()=>{state.foodEaten++;player.headDip=.22;crunchSound();kibbleGroup.scale.y=Math.max(.35,1-state.foodEaten*.08);if(state.foodEaten===1)discover('Food Bowl: Kibble Confirmed');saveGame()}});
+register(kitchenDrawer,{id:'kitchenDrawer',range:1.25,prompt:()=>state.kitchenDrawerOpen?'Nose drawer closed':'Nose drawer open',action:()=>{state.kitchenDrawerOpen=!state.kitchenDrawerOpen;if(ownerAttention()==='attentive'&&ownerNearPlayer(7))speak('Human: “Hey! Out of there.”');else if(ownerAttention()==='distracted')owner.userData.delayedKitchenReaction=1.4;saveGame()}});
+register(kitchenCabinetPivot,{id:'kitchenCabinet',range:1.25,prompt:()=>state.kitchenCabinetOpen?'Nudge cabinet closed':'Nudge cabinet open',action:()=>{state.kitchenCabinetOpen=!state.kitchenCabinetOpen;cabinetPot.visible=state.kitchenCabinetOpen;if(ownerAttention()==='attentive'&&ownerNearPlayer(7))speak('Human: “Nope. Cabinet.”');saveGame()}});
+register(fridgeDoorPivot,{id:'fridgeDoor',range:1.3,prompt:()=>state.fridgeOpened?'Nose fridge mostly shut':'Tug hanging towel',action:()=>{state.fridgeOpened=!state.fridgeOpened;if(ownerAttention()==='attentive'&&ownerNearPlayer(8))speak('Human: “HEY. Fridge. Absolutely not.”');else owner.userData.delayedFridgeReaction=1.8;saveGame()}});
+register(garageBox,{id:'garageBox',range:1.5,prompt:'Box blocks the little flap',physical:'Paw / nudge box',active:()=>!state.garageDone,action:()=>{}});
+// dirt dig spot, usable repeatedly
+const digPatch=mesh(new THREE.CircleGeometry(1.1,16),M(C.dirt),[-5,.08,-14.8]);digPatch.rotation.x=-Math.PI/2;
+const creekMudPatch=mesh(new THREE.CircleGeometry(.72,16),M(0x6f6049),[39.0,.075,2.75]);creekMudPatch.rotation.x=-Math.PI/2;
+const fenceDigPatch=mesh(new THREE.CircleGeometry(.68,16),M(C.dirt),[8.48,.075,-15.35]);fenceDigPatch.rotation.x=-Math.PI/2;
+const gardenDigPatch=mesh(new THREE.CircleGeometry(.82,16),M(0x79674d),[-2.2,.075,-12.9]);gardenDigPatch.rotation.x=-Math.PI/2;for(let i=0;i<6;i++)sphere(.07,[C.flower,C.yellow,C.white][i%3],[-2.55+i*.14,.18,-12.85+Math.sin(i)*.16],scene,6);
+register(digPatch,{id:'dig',range:1.5,prompt:'The dirt smells VERY interesting',physical:'Dig',action:()=>{}});
+register(creekMudPatch,{id:'creekMudDig',range:1.4,prompt:'Disturbed mud holds the trail',physical:'Dig disturbed mud',active:()=>state.mysteryClues.includes('creek')&&!state.creekReacquired,action:()=>{}});
+register(fenceDigPatch,{id:'fenceDig',range:1.35,prompt:'Loose dirt under the fence',physical:'Dig under fence',active:()=>state.neighborBarkClue&&state.fenceDig<2,action:()=>{}});
+register(gardenDigPatch,{id:'gardenDig',range:1.45,prompt:'Suspiciously tidy flower bed',physical:'Dig where you should not',action:()=>{}});
+register(parkWaterSurface,{id:'parkWaterPaw',range:1.25,prompt:'Water wants a paw in it',physical:'Splash water',action:()=>{}});
+
+let currentPaw=null;
+function doPaw(){const best=currentPaw;if(!best)return;
+ if(best.id==='storyPizzaBox'){state.pizzaBoxMoved=true;storyPizzaBox.position.x+=.62;storyPizzaBox.position.z+=.25;storyPizzaBox.rotation.y=.55;discover('Raccoon-Squashed Pizza Box');speak('Under it: fresher raccoon paws. The trail keeps going east.');scrapeSound();saveGame();return}
+ if(best.id==='garageBox'){state.garageDone=true;garageBox.position.x=-12.25;garageBox.position.z=-5.2;garageBox.rotation.y=.45;discover('Low Shed Gap Unblocked');scrapeSound();saveGame();return}
+ if(best.id==='dig'){state.digCount++;digSound();digPatch.scale.setScalar(1+state.digCount*.06);if(state.digCount===1)discover('Buried Bottle Cap (Worthless Treasure)');else if(state.digCount===2)discover('Ancient Backyard Bone');else if(state.digCount>=3&&!state.digDone){state.digDone=true;bigStick.visible=true;discover('A Stick Too Large To Be Reasonable');chime()}saveGame();return}
+ if(best.id==='creekMudDig'){state.creekMudDug=true;state.creekReacquired=true;creekMudPatch.scale.set(.78,.78,.78);digSound();discover('Fresh Raccoon Prints in Downstream Mud');saveGame();return}
+ if(best.id==='fenceDig'){state.fenceDig++;digSound();looseFenceSoil.scale.z=Math.max(.25,1-state.fenceDig*.32);if(state.fenceDig>=2){looseFenceSoil.visible=false;discover('A Crawl Gap Under the Loose Fence');achievement('Made Your Own Shortcut')}saveGame();return}
+ if(best.id==='gardenDig'){state.gardenDig++;digSound();gardenDigPatch.scale.setScalar(1+Math.min(.28,state.gardenDig*.08));if(state.gardenDig===1)discover('Flower Bed: Technically Diggable');if(ownerAttention()==='attentive'&&ownerNearPlayer(7))speak('Human: “HEY! Not the flowers!”');if(state.gardenDig>=3)achievement('Landscaping Disagreement');saveGame();return}
+ if(best.id==='parkWaterPaw'){splashSound();parkWaterSurface.scale.set(1.08,1,1.08);setTimeout(()=>parkWaterSurface.scale.set(1,1,1),180);return}
+ if(best.id.startsWith('paw')){const map={pawToy:toy,pawColorGood:colorBallGood,pawColorWrong:colorBallWrong,pawParkBall:parkBall};pawMovable(map[best.id]);return}
+}
+function jump(){if(player.grounded){player.vy=4.35;player.grounded=false;player.supportingSurface=null;jumpSound()}}
+function startDogDoorTransit(){if(dogDoorTransit.active||!state.gateOpen||!closedDoor())return;const inside=player.pos.z>DOOR_Z;dogDoorTransit.active=true;dogDoorTransit.t=0;dogDoorTransit.flapSign=inside?1:-1;dogDoorTransit.start=new THREE.Vector3(player.pos.x,player.jumpY,player.pos.z);dogDoorTransit.end=new THREE.Vector3(DOG_HOLE_CENTER_X,inside?0:.08,DOOR_Z+(inside?-1.05:1.05));player.vy=0;player.grounded=true;doorSound()}
+function doInteract(){if(currentInteract){currentInteract.action(currentInteract);return}if(carried)dropCarried()}
+function setCrawl(force=null){const target=force===null?!player.crawling:!!force,cb=$('#crawlBtn');if(target===player.crawling){if(cb)cb.textContent=player.crawling?'STAND':'CRAWL';return}if(target){player.crawling=true;player.radius=player.crawlRadius;player.currentHeight=player.crawlHeight;if(cb)cb.textContent='STAND';saveGame();return}if(!canOccupy(player.pos.x,player.pos.z,player.jumpY,player.standingHeight,player.baseRadius)){if(cb)cb.textContent='STAND';return}player.crawling=false;player.radius=player.baseRadius;player.currentHeight=player.standingHeight;if(cb)cb.textContent='CRAWL';saveGame();}
+
+// Scent system: each trail is one Points object, fantasy-colored so categories remain readable in dog vision.
+const scentGroup=new THREE.Group();scene.add(scentGroup);scentGroup.visible=false;const scentTrails=[];
+const scentColors={familiar:0x82a7d0,food:0xe0c45f,animal:0xb496d3,mystery:0xa6e3d2,garbage:0xc7b56f,water:0x8bc6df};
+function scentTrail(name,category,pts,strength=1,active=()=>true){const positions=[];for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],dx=b[0]-a[0],dz=b[2]-a[2],len=Math.hypot(dx,dz)||1,px=-dz/len,pz=dx/len;const n=Math.max(3,Math.ceil(new THREE.Vector3(...a).distanceTo(new THREE.Vector3(...b))/.82));for(let j=0;j<n;j++){const t=j/n,wobble=(Math.sin((j+i*7)*1.63)+Math.sin((j+i)*.57)*.45)*.13;positions.push(lerp(a[0],b[0],t)+px*wobble,.22+Math.sin((j+i)*1.7)*.075,lerp(a[2],b[2],t)+pz*wobble)}}positions.push(...pts[pts.length-1]);const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geo.userData.base=positions.slice();const mat=new THREE.PointsMaterial({color:scentColors[category],size:.13+.035*Math.min(1.5,strength),transparent:true,opacity:.48+.18*Math.min(1.5,strength),depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:true});const pointsObj=new THREE.Points(geo,mat);scentGroup.add(pointsObj);const t={name,category,pts:pts.map(p=>new THREE.Vector3(...p)),strength,active,obj:pointsObj,phase:Math.random()*10};scentTrails.push(t);return t}
+const toyScent=scentTrail('Favorite toy','familiar',[[-.4,.2,3.2],[-.8,.2,2.6],[-1.3,.2,2.0],[-1.7,.2,1.72]],1.2,()=>!state.toyFound);
+const leashScent=scentTrail('Outside / leather','familiar',[[3.9,.2,-1.2],[4.6,.2,-.8],[5.3,.2,-.3]],.85,()=>state.toyFound&&!state.gateOpen);
+const foodTruckScent=scentTrail('Hot food','food',[[46,.2,-4],[50,.2,-7],[54,.2,-9],[58,.2,-12]],1.0,()=>state.gateOpen);
+const squirrelScent=scentTrail('Squirrel!','animal',[[-6,.2,-10],[-6.7,.2,-12],[-6.3,.2,-14.2],[-7.2,.2,-16.2],[-7.3,.2,-18.5]],1.05,()=>state.gateOpen&&!state.squirrelDone);
+const gloveScent=scentTrail('Matching glove','familiar',[[24,.2,-6],[23.5,.2,-8.5],[23.1,.2,-11],[23.25,.2,-13.55]],1,()=>state.gloveScented&&!state.gloveReturned);
+const colorScent=scentTrail('Kid / hand smell','familiar',[[27,.2,8],[25.7,.2,8.2],[24.2,.2,8.7]],.75,()=>state.gateOpen&&!state.colorDone);
+const mysteryTrailWest=scentTrail('Unfamiliar visitor','mystery',[[5.8,.2,-4],[7.6,.2,-6],[9,.2,-10],[13,.2,-8],[19,.2,-4],[20,.2,1],[26,.2,1],[31,.2,2],[34.25,.2,2.15]],1.3,()=>state.gateOpen&&!state.raccoonMet&&!state.mysteryComplete);
+const mysteryTrailEast=scentTrail('Unfamiliar visitor, reacquired','mystery',[[39.0,.2,2.75],[40.4,.2,2.85],[41.6,.2,3.0],[43,.2,3.1]],1.15,()=>state.creekReacquired&&!state.raccoonMet&&!state.mysteryComplete);
+const raccoonEscapeTrailA=scentTrail('Raccoon + pizza','mystery',[[43,.2,3.1],[49,.2,1],[54,.2,-4],[58,.2,-10],[60.8,.2,-8.4]],1.12,()=>state.raccoonMet&&!state.pizzaBoxMoved&&!state.mysteryComplete);
+const raccoonEscapeTrailB=scentTrail('Fresh raccoon paws','mystery',[[60.8,.2,-8.4],[65,.2,-6],[70,.2,0],[74,.2,5.2],[75,.2,5.2]],1.08,()=>state.pizzaBoxMoved&&!state.shortcutPassed&&!state.mysteryComplete);
+const raccoonEscapeTrailC=scentTrail('Raccoon through the hedge','mystery',[[75,.2,5.2],[81,.2,5.2],[88,.2,5.2],[92,.2,5.2]],1.06,()=>state.shortcutPassed&&!state.keyDropped&&!state.mysteryComplete);
+scentTrail('INCREDIBLE smell container','garbage',[[19.5,.2,.5],[20,.2,1]],.8,()=>true);
+scentTrail('Pizza','food',[[41,.2,2.7],[42.5,.2,3.6]],1.25,()=>true);
+scentTrail('Creek water','water',[[34,.2,-4],[35,.2,0],[36,.2,4],[37,.2,9]],.6,()=>true);
+scentTrail('Garage keys','familiar',[[-12,.2,-1],[-12,.2,1],[-12,.2,2.7]],.55,()=>state.garageDone);
+
+function pointToTrailDistance(pos,t){let best=1e9,bestP=null;for(const p of t.pts){const d=pos.distanceTo(p);if(d<best){best=d;bestP=p}}return {d:best,p:bestP}}
+let sniffing=false;
+function setSniff(v){sniffing=v;document.body.classList.toggle('sniffing',v);scentGroup.visible=v;renderer.toneMappingExposure=v ? .88 : 1.05;if(v)sniffBurst(.25)}
+function updateSniff(time){if(!sniffing){sniffPanel.innerHTML='';return}const here=new THREE.Vector3(player.pos.x,.2,player.pos.z);const found=[];for(const t of scentTrails){t.obj.visible=t.active();if(!t.active())continue;const r=pointToTrailDistance(here,t);let effective=r.d/(t.strength||1);if(player.wet&&t.category!=='water')effective*=1.9;if(effective<10){const dir=r.p.clone().sub(here);const ang=Math.atan2(dir.x,-dir.z)-player.yaw;const norm=Math.atan2(Math.sin(ang),Math.cos(ang));const direction=Math.abs(norm)<.52?'stronger ahead':norm>0?'stronger right':'stronger left';const strength=effective<1.7?'strong':effective<4.5?'nearby':'very faint';found.push({e:effective,text:`${t.name} · ${direction} · ${strength}`})}}
+ found.sort((a,b)=>a.e-b.e);sniffPanel.innerHTML=found.slice(0,3).map(x=>`<div class="scentChip">${x.text}</div>`).join('')||'<div class="scentChip">Just ordinary air. Suspicious.</div>';
+ // scent-specific discoveries are proximity based, so they are robust rather than exact-point interactions
+ if(state.gateOpen&&!state.squirrelDone&&new THREE.Vector2(player.pos.x+7.3,player.pos.z+18.5).length()<1.5){state.squirrelDone=true;discover('Squirrel Escape Route Under the Fence');saveGame()}
+ for(const h of hydrants){const p=worldPos(h);if(p.distanceTo(here)<1.25){const id=h.userData.hydrantId;if(!state.hydrants.includes(id)){state.hydrants.push(id);discover('Fire Hydrant '+state.hydrants.length+' of 5');if(state.hydrants.length===5)achievement('Sniffed Every Fire Hydrant');saveGame()}}}
+ if(state.gateOpen&&!state.yardScentFound&&new THREE.Vector3(8.2,.2,-8.5).distanceTo(here)<2.0){state.yardScentFound=true;discover('Something Unfamiliar Crossed the Yard');saveGame()}
+ const clues=[['mailbox',new THREE.Vector3(19,.2,-4)],['trash',new THREE.Vector3(20,.2,1)],['creek',new THREE.Vector3(34.2,.2,2.2)]];for(const [id,p] of clues){if(!state.mysteryClues.includes(id)&&p.distanceTo(here)<1.4){state.mysteryClues.push(id);if(id==='mailbox')discover('Unfamiliar Scent on the Mailbox');if(id==='trash')discover('Extremely Suspicious Trash Can');if(id==='creek')discover('Visitor Scent Thins at the Creek');saveGame()}}
+ if(state.gateOpen&&state.yardScentFound&&state.creekReacquired&&!state.raccoonMet&&!state.mysteryComplete&&new THREE.Vector3(43,.2,3.1).distanceTo(here)<1.75){state.raccoonMet=true;raccoon.userData.storyRun=true;discover('Mystery Visitor: Pizza-Thieving Raccoon');speak('The raccoon drops its pizza, jingles something shiny, and bolts east. Apparently the case has a sequel.');chime();saveGame()}
+ if(state.raccoonMet&&state.shortcutPassed&&!state.culvertFound&&!state.keyDropped&&new THREE.Vector3(92,.2,5.2).distanceTo(here)<2.2){state.culvertFound=true;discover('Raccoon Hideout at the Culvert');speak('There. Scratching inside the stone tunnel. And the tiny jingle of Important Human Metal.');saveGame()}
+ if(new THREE.Vector3(20,.2,1).distanceTo(here)<1.3)discover('INCREDIBLE SMELL CONTAINER');
+ if(new THREE.Vector3(42.5,.2,3.6).distanceTo(here)<1.4)discover('Pizza');
+}
+
+// Hearing cues are sparse and transient, not a permanent radar.
+const hearingSources=[
+ {name:'toy',pos:new THREE.Vector3(-1.7,.2,1.72),range:9,active:()=>!state.toyFound},
+ {name:'jingle',pos:new THREE.Vector3(-12,.2,2.7),range:7,active:()=>state.garageDone},
+ {name:'culvert',pos:new THREE.Vector3(92,.2,5.2),range:13,active:()=>state.raccoonMet&&!state.keyDropped&&!state.mysteryComplete},
+ {name:'neighbor',pos:new THREE.Vector3(10.35,.2,-16),range:8,active:()=>state.gateOpen}
+];
+let hearAccum=0;
+function updateHearing(dt){hearAccum+=dt;if(hearAccum<.25)return;hearAccum=0;hearEl.innerHTML='';const here=new THREE.Vector3(player.pos.x,.2,player.pos.z);const candidates=[];for(const s of hearingSources){if(!s.active())continue;const d=here.distanceTo(s.pos);if(d<s.range)candidates.push({s,d})}candidates.sort((a,b)=>a.d-b.d);for(const {s,d} of candidates.slice(0,1)){const v=s.pos.clone().sub(here),ang=Math.atan2(v.x,-v.z)-player.yaw,n=Math.atan2(Math.sin(ang),Math.cos(ang));const x=Math.sin(n)*92,y=-Math.cos(n)*29;const div=document.createElement('div');div.className='hearPing';div.style.transform=`translate(${x}px,${y}px) rotate(${n+.78}rad)`;div.style.opacity=String(clamp((1-d/s.range)*.72,.16,.58));hearEl.appendChild(div)}}
+
+function discover(name){if(state.discoveries.includes(name))return;state.discoveries.push(name);toast('Discovered: '+name);chime();saveGame();updateJournal()}
+function achievement(name){if(state.achievements.includes(name))return;state.achievements.push(name);toast('Optional goal: '+name);chime();saveGame();updateJournal()}
+let toastTimer;function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2600)}
+let speechTimer;function speak(text){speechEl.textContent=text;speechEl.classList.add('show');clearTimeout(speechTimer);speechTimer=setTimeout(()=>speechEl.classList.remove('show'),3300)}
+function currentObjectiveText(){if(!state.toyFound)return 'Find the faint squeaky smell near the couch.';if(!state.tvUnplugged)return 'Get the glowing rectangle to release the human. The plug is behind the TV.';if(!state.gateOpen)return 'Bring the leash to the human. LEASH means OUTSIDE.';if(!state.yardScentFound)return 'Sniff around the yard. Something unfamiliar crossed through here.';if(!state.raccoonMet){if(!state.mysteryClues.includes('creek'))return 'Follow the unfamiliar scent into the neighborhood.';if(!state.creekReacquired)return 'Water erased the trail. Search the downstream far bank for disturbed mud.';return 'Fresh prints! Follow the reacquired scent beyond the creek.'}if(!state.pizzaBoxMoved)return 'The raccoon trail tangles with hot-food smells. Find the flattened pizza box near the food truck and paw it aside.';if(!state.shortcutPassed)return 'Fresh raccoon scent ends at a dog-sized hedge gap. Crawl through—or find the long way around.';if(!state.culvertFound)return 'Follow the reacquired trail east toward the wooded culvert.';if(!state.keyDropped)return 'The raccoon is in the culvert. A bark may convince it to relocate.';if(!state.keyReturned)return 'Carry the shiny human key home.';return 'Mystery solved. Free exploration: continue doing excellent dog nonsense.'}
+function updateJournal(){const ol=$('#objectiveList'),dl=$('#discoveryList'),nl=$('#noseList'),al=$('#achievementList');ol.innerHTML=`<li>${currentObjectiveText()}</li>`;const story=state.discoveries.filter(x=>/TV|LEASH|Unfamiliar|Mystery Visitor|Raccoon-Squashed|Hedge Shortcut|Long Way Around|Culvert|Mystery Ends|Creek|Mailbox|Trash/.test(x));dl.innerHTML=story.length?story.map(x=>`<li>${x}</li>`).join(''):'<li class="empty">The important smells have not happened yet.</li>';const nose=state.discoveries.filter(x=>!story.includes(x)).slice(-12);nl.innerHTML=nose.length?nose.map(x=>`<li>${x}</li>`).join(''):'<li class="empty">Your nose has notes to take.</li>';al.innerHTML=state.achievements.length?state.achievements.map(x=>`<li>★ ${x}</li>`).join(''):'<li class="empty">Optional nonsense awaits.</li>'}
+function updateHint(){hintText.textContent=currentObjectiveText()}
+
+// Bark + audio synthesis
+let audioCtx=null,master=null,noiseBuffer=null,lastStep=0,lastSqueak=0,barkTimes=[],ambientClock=0;const audioTimers=new Set();
+function scheduleAudio(fn,delay){const id=setTimeout(()=>{audioTimers.delete(id);if(started&&!paused)fn()},delay);audioTimers.add(id);return id}function clearAudioTimers(){for(const id of audioTimers)clearTimeout(id);audioTimers.clear()}
+function audioReady(){if(audioCtx){if(audioCtx.state==='suspended')audioCtx.resume();return}audioCtx=new (window.AudioContext||window.webkitAudioContext)();master=audioCtx.createGain();master.gain.value=state.settings.volume;master.connect(audioCtx.destination);const len=Math.floor(audioCtx.sampleRate*1.25);noiseBuffer=audioCtx.createBuffer(1,len,audioCtx.sampleRate);const data=noiseBuffer.getChannelData(0);for(let i=0;i<len;i++)data[i]=Math.random()*2-1}
+function tone(freq,dur=.12,type='sine',gain=.12,when=0,slide=null,pan=0){if(!audioCtx||state.settings.volume<=0)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime+when;o.type=type;o.frequency.setValueAtTime(freq,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,slide),t+dur);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(.0002,gain),t+.018);g.gain.exponentialRampToValueAtTime(.0001,t+dur);let p=null;if(audioCtx.createStereoPanner){p=audioCtx.createStereoPanner();p.pan.value=clamp(pan,-1,1);g.connect(p);p.connect(master)}else g.connect(master);o.connect(g);o.onended=()=>{try{o.disconnect();g.disconnect();p?.disconnect()}catch(e){}};o.start(t);o.stop(t+dur+.03)}
+function noise(dur=.12,gain=.05,filter=900,highpass=60,pan=0){if(!audioCtx||state.settings.volume<=0||!noiseBuffer)return;const src=audioCtx.createBufferSource();src.buffer=noiseBuffer;const lp=audioCtx.createBiquadFilter(),hp=audioCtx.createBiquadFilter(),g=audioCtx.createGain();lp.type='lowpass';lp.frequency.value=filter;hp.type='highpass';hp.frequency.value=highpass;g.gain.value=gain;src.connect(lp);lp.connect(hp);let p=null;if(audioCtx.createStereoPanner){p=audioCtx.createStereoPanner();p.pan.value=clamp(pan,-1,1);hp.connect(g);g.connect(p);p.connect(master)}else{hp.connect(g);g.connect(master)}src.onended=()=>{try{src.disconnect();lp.disconnect();hp.disconnect();g.disconnect();p?.disconnect()}catch(e){}};const maxOffset=Math.max(0,1.24-dur),offset=Math.random()*maxOffset;src.start(0,offset,Math.min(dur,1.24))}
+function softSqueak(){audioReady();tone(520,.07,'sine',.025,0,610);tone(420,.09,'triangle',.018,.045,350)}
+function jumpSound(){audioReady();tone(92,.075,'sine',.025,0,68);noise(.055,.012,500)}
+function landingSound(){if(!audioCtx)return;const surface=surfaceKind();if(surface==='wet')noise(.12,.025,950,120);else if(surface==='wood')noise(.07,.015,900,160);else noise(.08,.014,520,80);tone(74,.055,'sine',.018,0,52)}
+function pickupSound(metal=false){audioReady();noise(.055,.010,900,180);tone(metal?420:150,.05,metal?'triangle':'sine',.011,0,metal?520:112)}function dropSound(){audioReady();noise(.07,.018,700);tone(110,.055,'sine',.014,0,78)}function doorSound(){audioReady();noise(.18,.014,520,65);tone(88,.13,'sine',.012,0,72)}
+function lapSound(){audioReady();for(let i=0;i<3;i++){scheduleAudio(()=>{noise(.075,.016,1550,250);tone(116+Math.random()*18,.05,'sine',.007,0,88)},i*105)}}
+function crunchSound(){audioReady();for(let i=0;i<3;i++)scheduleAudio(()=>noise(.045,.018,1150,180),i*65)}
+function splashSound(){audioReady();noise(.20,.030,1850,170);tone(92,.08,'sine',.010,0,68)}
+function barkSound(pitch=1,pan=0,gain=1){audioReady();const base=(118+Math.random()*18)*pitch;noise(.12,.040*gain,820*pitch,85,pan);noise(.07,.018*gain,1550*pitch,220,pan);tone(base,.115,'sine',.050*gain,0,base*.70,pan);tone(base*1.55,.075,'sine',.018*gain,.018,base*.98,pan)}
+function dogResponseBark(pitch=1,pan=0){barkSound(pitch,pan,.68);scheduleAudio(()=>barkSound(pitch*(.94+Math.random()*.08),pan,.48),110+Math.random()*70)}
+function stepSound(){const surface=surfaceKind();if(surface==='wet'){noise(.08,.017,1200,180);tone(95,.045,'sine',.009,0,72)}else if(surface==='wood'){noise(.045,.010,1050,220);tone(120,.035,'sine',.008,0,88)}else if(surface==='road'){noise(.05,.009,650,140)}else if(surface==='dirt'){noise(.06,.012,430,55)}else{noise(.055,.010,520,80)}}
+function surfaceKind(){if(player.wet)return 'wet';if(player.pos.x>-7&&player.pos.x<7&&player.pos.z>-5&&player.pos.z<7)return 'wood';if(near([82,-7],5)||near([-5,-14.8],2.2))return 'dirt';if(player.pos.x>11&&player.pos.x<18)return 'road';return 'grass'}
+function bark(){barkSound(.96+Math.random()*.10,0,1);barkTimes=barkTimes.filter(t=>performance.now()-t<5000);barkTimes.push(performance.now());const here=new THREE.Vector3(player.pos.x,0,player.pos.z),now=performance.now();if(here.distanceTo(neighborDog.position)<8){neighborDog.userData.respondTimer=3;if(now-(neighborDog.userData.lastBarkResponse||0)>850){neighborDog.userData.lastBarkResponse=now;scheduleAudio(()=>dogResponseBark(.90,-.30),220)}if(!state.neighborBarkClue){state.neighborBarkClue=true;discover('A Bark Answers From the Fence Line');speak('The neighbor dog answers from farther along the fence. Something smells freshly disturbed there.');saveGame()}else discover('Other Dog')}if(here.distanceTo(parkDog.position)<8){parkDog.userData.respondTimer=2.5;if(now-(parkDog.userData.lastBarkResponse||0)>850){parkDog.userData.lastBarkResponse=now;scheduleAudio(()=>dogResponseBark(1.08,.28),200)}}for(const h of [owner,parkHuman,colorHuman,mailHuman,jogger])if(here.distanceTo(h.position)<5.5)h.userData.lookAtDog=1.8;if(here.distanceTo(squirrel.position)<7){squirrel.userData.fleeUntil=2.8;discover('Barking Makes Squirrels Faster')}if(here.distanceTo(new THREE.Vector3(19.7,0,-2.6))<6)achievement('Barked at the Mail Human');if(here.distanceTo(owner.position)<5&&!state.tvUnplugged)speak('Human: “Shhh, buddy.” The TV remains undefeated.');else if(here.distanceTo(owner.position)<4.5&&ownerAttention()==='attentive')speak('Human: “What? What is it?”');if(barkTimes.length>=7&&here.distanceTo(owner.position)<7){achievement('Professional Human Annoyer');speak('Human: “Okay! Okay! I hear you!”')}}
+function chime(){audioReady();tone(520,.13,'sine',.045);tone(690,.18,'triangle',.035,.1)}function sniffBurst(g=.05){audioReady();noise(.085,g*.22,1450,280);scheduleAudio(()=>noise(.075,g*.18,1300,280),105)}function digSound(){audioReady();noise(.16,.035,640,70);scheduleAudio(()=>noise(.11,.025,820,90),130)}function scrapeSound(){audioReady();noise(.22,.026,470,55)}function thump(g=.04){audioReady();tone(82,.065,'sine',g*.55,0,54)}
+function updateAmbient(dt){if(!audioCtx||state.settings.volume<=0)return;ambientClock-=dt;if(ambientClock>0)return;const inside=player.pos.x>-7&&player.pos.x<7&&player.pos.z>-5&&player.pos.z<7,creekDist=Math.abs(player.pos.x-creekCenterXAt(player.pos.z)),dogPark=near([62,16],9),food=near([58,-12],8);if(inside){if(!state.tvUnplugged){noise(.32,.0028,650,100);tone(180+Math.random()*80,.20,'sine',.0018)}ambientClock=3+Math.random()*4;return}if(creekDist<5){noise(.55,.0065,1700,260,(player.pos.x<36?1:-1)*.25);ambientClock=.8+Math.random()*1.1;return}const r=Math.random();if(dogPark&&r<.32){tone(172,.11,'triangle',.012,0,112,Math.random()*.8-.4);ambientClock=3+Math.random()*4}else if(food&&r<.45){noise(.28,.0035,900,120);ambientClock=2+Math.random()*3}else if(r<.48){tone(1450+Math.random()*500,.06,'sine',.006,0,1900+Math.random()*500,Math.random()*.8-.4);tone(1780,.05,'sine',.004,.07,1350);ambientClock=1.8+Math.random()*4}else{noise(.35,.0025,420,70);ambientClock=2.5+Math.random()*4}}
+function barkAtRaccoonCheck(){if(!state.raccoonMet||!state.culvertFound||state.keyDropped||state.mysteryComplete)return;const target=new THREE.Vector3(92,0,5.2);if(new THREE.Vector3(player.pos.x,0,player.pos.z).distanceTo(target)<4.7){state.keyDropped=true;state.culvertFound=true;shinyKey.visible=true;raccoon.userData.flee=1;discover('The Raccoon Drops a Shiny Human Key');dogResponseBark(.72,.35);speak('The raccoon startles, abandons the shiny thing, and makes a tactical retreat.');achievement('Negotiated With a Raccoon');saveGame()}}
+
+// Inputs
+const keys={};let started=false,paused=false,lastEscapeTime=0,ignoreUnlockUntil=0,pauseOpenedByUnlockAt=-1;
+function clearInputState(){for(const k of Object.keys(keys))keys[k]=false;setSniff(false);joy.x=0;joy.y=0;const knob=$('#joyKnob');if(knob)knob.style.transform='translate(0,0)'}
+function isMobileMode(){if(state.settings.touch==='on')return true;if(state.settings.touch==='off')return false;return matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>1}
+function applyMobile(){document.body.classList.toggle('mobile',isMobileMode())}
+addEventListener('keydown',e=>{const now=performance.now(),oneShot=['KeyE','KeyQ','Space','KeyB','KeyC','KeyJ','KeyM'];if(e.code==='Escape'){e.preventDefault();if(e.repeat||now-lastEscapeTime<180)return;lastEscapeTime=now;if(!started)return;if(!journalOverlay.classList.contains('hidden')){closeJournal();return}if(paused){if(now-pauseOpenedByUnlockAt<320)return;closePause();return}openPause();return}if(!started)return;if(e.repeat&&oneShot.includes(e.code))return;if(e.code==='KeyM'){e.preventDefault();paused?closePause():openPause();return}if(paused)return;keys[e.code]=true;if(e.code==='KeyE')doInteract();if(e.code==='KeyQ')doPaw();if(e.code==='Space'){e.preventDefault();jump()}if(e.code==='KeyB'){bark();barkAtRaccoonCheck()}if(e.code==='KeyF')setSniff(true);if(e.code==='KeyJ')openJournal();if(e.code==='KeyC')setCrawl();});
+addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='KeyF')setSniff(false)});
+addEventListener('blur',()=>{clearInputState();last=performance.now()});document.addEventListener('visibilitychange',()=>{clearInputState();last=performance.now();if(document.hidden)clearAudioTimers()});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());renderer.domElement.addEventListener('mousedown',e=>{audioReady();if(e.button===2)setSniff(true);if(e.button===0&&!isMobileMode()&&started&&!paused&&document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock()});addEventListener('mouseup',e=>{if(e.button===2)setSniff(false)});
+addEventListener('mousemove',e=>{if(document.pointerLockElement!==renderer.domElement||paused)return;const s=.0019*state.settings.sensitivity;player.yaw-=e.movementX*s;player.pitch=clamp(player.pitch-e.movementY*s,-1.18,1.18)});
+document.addEventListener('pointerlockchange',()=>{if(!started||isMobileMode())return;const now=performance.now();if(document.pointerLockElement!==renderer.domElement&&!paused&&now>ignoreUnlockUntil){pauseOpenedByUnlockAt=now;openPause()}});
+
+// Touch look
+let lookId=null,lastLook={x:0,y:0};const lookZone=$('#lookZone');
+lookZone.addEventListener('touchstart',e=>{if(lookId!==null)return;const t=e.changedTouches[0];lookId=t.identifier;lastLook={x:t.clientX,y:t.clientY};audioReady();},{passive:false});
+lookZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===lookId){const dx=t.clientX-lastLook.x,dy=t.clientY-lastLook.y;lastLook={x:t.clientX,y:t.clientY};const s=.0042*state.settings.sensitivity;player.yaw-=dx*s;player.pitch=clamp(player.pitch-dy*s,-1.18,1.18);e.preventDefault()}},{passive:false});
+const endLook=e=>{for(const t of e.changedTouches)if(t.identifier===lookId)lookId=null};lookZone.addEventListener('touchend',endLook);lookZone.addEventListener('touchcancel',endLook);
+// virtual stick
+let joyId=null,joy={x:0,y:0};const jb=$('#joyBase'),jk=$('#joyKnob');function joyUpdate(t){const r=jb.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=t.clientX-cx,dy=t.clientY-cy;const mag=Math.hypot(dx,dy),max=43;if(mag>max){dx*=max/mag;dy*=max/mag}joy.x=dx/max;joy.y=dy/max;jk.style.transform=`translate(${dx}px,${dy}px)`}
+jb.addEventListener('touchstart',e=>{const t=e.changedTouches[0];joyId=t.identifier;joyUpdate(t);e.preventDefault()},{passive:false});jb.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===joyId){joyUpdate(t);e.preventDefault()}},{passive:false});const endJoy=e=>{for(const t of e.changedTouches)if(t.identifier===joyId){joyId=null;joy.x=joy.y=0;jk.style.transform='translate(0,0)'}};jb.addEventListener('touchend',endJoy);jb.addEventListener('touchcancel',endJoy);
+function bindTouchHold(sel,start,end){const el=$(sel);el.addEventListener('touchstart',e=>{audioReady();start();e.preventDefault()},{passive:false});const finish=e=>{end?.();e.preventDefault()};el.addEventListener('touchend',finish,{passive:false});el.addEventListener('touchcancel',finish,{passive:false})}
+bindTouchHold('#sniffBtn',()=>setSniff(true),()=>setSniff(false));bindTouchHold('#barkBtn',()=>{bark();barkAtRaccoonCheck()});bindTouchHold('#jumpBtn',()=>jump());bindTouchHold('#pawBtn',()=>doPaw());bindTouchHold('#actBtn',()=>doInteract());bindTouchHold('#crawlBtn',()=>setCrawl());
+
+function updateInteraction(){currentInteract=null;currentPaw=null;let bestM=1e9,bestP=1e9;const forward=new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(0,player.yaw,0,'YXZ')),here=new THREE.Vector3(player.pos.x,player.jumpY+Math.min(.45,player.currentHead),player.pos.z);for(const d of interactables){if(!d.active()||d.root.userData.carried)continue;const p=interactionPoint(d),v=p.clone().sub(here),dist=v.length();if(dist>d.range||!interactionVisible(d,p))continue;const flat=v.clone();flat.y=0;if(flat.lengthSq()>.001)flat.normalize();const facing=forward.dot(flat);if(facing<-.08&&dist>.72)continue;if(d.physical){if(dist<bestP){bestP=dist;currentPaw=d}}else if(dist<bestM){bestM=dist;currentInteract=d}}
+ const chosen=currentPaw&&(!currentInteract||bestP<=bestM+.18)?currentPaw:currentInteract;if(chosen){if(chosen.physical){promptEl.textContent=(isMobileMode()?'PAW · ':'Q · ')+chosen.physical;$('#actBtn').textContent=carried?'DROP':'MOUTH'}else{const txt=typeof chosen.prompt==='function'?chosen.prompt():chosen.prompt;promptEl.textContent=(isMobileMode()?'':'E · ')+txt;$('#actBtn').textContent=txt.toUpperCase().slice(0,22)}promptEl.classList.add('show')}else{promptEl.classList.remove('show');$('#actBtn').textContent=carried?'DROP':'MOUTH'}}
+
+function near(p,r){return Math.hypot(player.pos.x-p[0],player.pos.z-p[1])<r}
+function worldDiscoveries(){if(near([-4.8,4.3],1.8))discover('Secret Under-the-Bed Zone');if(near([20,1],1.6))discover('Suspicious Trash Can');if(near([creekCenterXAt(player.pos.z),player.pos.z],2.1))discover('The Neighborhood Creek');if(near([-5,-14.8],1.5)&&player.wet)discover('Mud');if(state.garageDone&&near([-12,0],2.5))discover('Forbidden Garage Cave');if(near([-6.4,-13.2],2.5))discover('Squirrel');if(near([10.35,-16],2.2))discover('Other Dog');if(near([62,16],5.5))discover('DOG PARK: Official Excellent Place');if(near([66,18.5],1.2))discover('Communal Dog Water');if(near([58,-12],3.5))discover('Food Truck: Smells Better Than It Looks');if(near([72,25],2))discover('The Even More Objectively Best Stick');if(near([64,-15],2.2))discover('Picnic Table With Historical Crumbs');if(near([63.8,13.2],1.6))discover('Public Tennis Ball');if(near([79,18],5))discover('Tiny Community Green');if(near([82,-7],4.5))discover('Maintenance Dirt: Premium Sniffing Surface');if(near([92,5.2],3.2))discover('Stone Culvert');if(near([88,12],7))discover('Little Wooded Shortcut');}
+
+function updateNarrativeAudio(time){/* Hearing UI handles the toy cue; no synthetic squeak loop. */}
+
+const NAV_STEP=1.25,NAV_MIN_X=-17,NAV_MAX_X=101,NAV_MIN_Z=-42,NAV_MAX_Z=42;
+function navWorld(ix,iz){return [NAV_MIN_X+ix*NAV_STEP,NAV_MIN_Z+iz*NAV_STEP]}
+function navIndex(x,z){return [Math.round((x-NAV_MIN_X)/NAV_STEP),Math.round((z-NAV_MIN_Z)/NAV_STEP)]}
+function actorBlocked(actor,x,z,includeActors=true){const r=actor.userData?.radius||.32,base=actor.position.y||0,height=actor.userData?.navHeight||((actor.userData?.role==='neighborDog'||actor.userData?.role==='parkDog') ? .92 : 2.25),candidates=collisionCandidatesInto(x,z,r,_collisionScratch);for(const c of candidates){if(!c.active()||c.root===actor)continue;if(!includeActors&&(c.roleMask&ROLE.ACTOR))continue;const yb=colliderYBounds(c);if(base+height<=yb.min+COLLISION_EPS||base>=yb.max-COLLISION_EPS)continue;if(c.walkable&&yb.max-base<=.26)continue;const insideNow=circleHitsCollider(actor.position.x,actor.position.z,r,c);if(insideNow)continue;if(circleHitsCollider(x,z,r,c))return true}for(const c of actorOnlyColliders){if(!c.active())continue;const yb=colliderYBounds(c);if(base+height<=yb.min+COLLISION_EPS||base>=yb.max-COLLISION_EPS)continue;if(circleHitsCollider(x,z,r,c))return true}if(includeActors){for(const other of worldActors){if(other===actor)continue;const rr=(other.userData?.radius||.3)+r+.08;if(Math.hypot(x-other.position.x,z-other.position.z)<rr)return true}if(Math.hypot(x-player.pos.x,z-player.pos.z)<r+player.radius+.16)return true}return false}
+function navBlocked(actor,x,z){if(x<NAV_MIN_X||x>NAV_MAX_X||z<NAV_MIN_Z||z>NAV_MAX_Z)return true;if(inCreek(x,z,.18)&&Math.abs(z-20.3)>1.05)return true;return actorBlocked(actor,x,z,false)}
+function actorLineClear(actor,x1,z1,x2,z2){const d=Math.hypot(x2-x1,z2-z1),steps=Math.max(1,Math.ceil(d/.42));for(let i=1;i<=steps;i++){const t=i/steps;if(navBlocked(actor,lerp(x1,x2,t),lerp(z1,z2,t)))return false}return true}
+function nearestNavCell(actor,ix,iz){for(let rad=0;rad<=4;rad++){for(let dz=-rad;dz<=rad;dz++)for(let dx=-rad;dx<=rad;dx++){if(Math.max(Math.abs(dx),Math.abs(dz))!==rad)continue;const [x,z]=navWorld(ix+dx,iz+dz);if(!navBlocked(actor,x,z))return [ix+dx,iz+dz]}}return [ix,iz]}
+function aStarPath(actor,target){let [sx,sz]=navIndex(actor.position.x,actor.position.z),[gx,gz]=navIndex(target[0],target[1]);[sx,sz]=nearestNavCell(actor,sx,sz);[gx,gz]=nearestNavCell(actor,gx,gz);const key=(x,z)=>x+','+z,start=key(sx,sz),goal=key(gx,gz),open=[{x:sx,z:sz,g:0,f:Math.hypot(gx-sx,gz-sz)}],best=new Map([[start,open[0]]]),parent=new Map(),closed=new Set(),dirs=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.414],[1,-1,1.414],[-1,1,1.414],[-1,-1,1.414]];let loops=0;while(open.length&&loops++<4200){let bi=0;for(let i=1;i<open.length;i++)if(open[i].f<open[bi].f)bi=i;const cur=open.splice(bi,1)[0],ck=key(cur.x,cur.z);if(closed.has(ck))continue;if(ck===goal){const cells=[[cur.x,cur.z]];let k=ck;while(parent.has(k)){const pr=parent.get(k);cells.push(pr);k=key(pr[0],pr[1])}cells.reverse();const pts=cells.map(c=>navWorld(c[0],c[1]));pts.push([target[0],target[1]]);return pts}closed.add(ck);for(const [dx,dz,cost] of dirs){const nx=cur.x+dx,nz=cur.z+dz,nk=key(nx,nz),[wx,wz]=navWorld(nx,nz);if(closed.has(nk)||navBlocked(actor,wx,wz))continue;if(dx&&dz){const [ax,az]=navWorld(cur.x+dx,cur.z),[bx,bz]=navWorld(cur.x,cur.z+dz);if(navBlocked(actor,ax,az)||navBlocked(actor,bx,bz))continue}const ng=cur.g+cost,old=best.get(nk);if(!old||ng<old.g){const node={x:nx,z:nz,g:ng,f:ng+Math.hypot(gx-nx,gz-nz)};best.set(nk,node);parent.set(nk,[cur.x,cur.z]);open.push(node)}}}return [[target[0],target[1]]]}
+function navTargetFor(actor,target,dt){const u=actor.userData,nav=u.nav||(u.nav={path:[],i:0,goalX:1e9,goalZ:1e9,recalc:0,lastX:actor.position.x,lastZ:actor.position.z,stuck:0,stuckAttempts:0,safeX:actor.position.x,safeZ:actor.position.z});nav.recalc-=dt;const goalMoved=Math.hypot(target[0]-nav.goalX,target[1]-nav.goalZ)>.65;if(goalMoved||nav.recalc<=0||nav.i>=nav.path.length){nav.path=actorLineClear(actor,actor.position.x,actor.position.z,target[0],target[1])?[[target[0],target[1]]]:aStarPath(actor,target);nav.i=0;nav.goalX=target[0];nav.goalZ=target[1];nav.recalc=.8+Math.random()*.45}while(nav.i<nav.path.length-1&&actorLineClear(actor,actor.position.x,actor.position.z,nav.path[nav.i+1][0],nav.path[nav.i+1][1]))nav.i++;return nav.path[Math.min(nav.i,nav.path.length-1)]||target}
+function walkActorTo(actor,target,speed,dt){const goalDist=Math.hypot(target[0]-actor.position.x,target[1]-actor.position.z);if(goalDist<.10)return true;const waypoint=navTargetFor(actor,target,dt),dx=waypoint[0]-actor.position.x,dz=waypoint[1]-actor.position.z,dist=Math.hypot(dx,dz)||1,step=Math.min(dist,speed*dt);let vx=dx/dist,vz=dz/dist;for(const other of worldActors){if(other===actor)continue;const ox=actor.position.x-other.position.x,oz=actor.position.z-other.position.z,od=Math.hypot(ox,oz);if(od>0&&od<1.05){vx+=ox/od*(1.05-od)*.55;vz+=oz/od*(1.05-od)*.55}}const px=actor.position.x-player.pos.x,pz=actor.position.z-player.pos.z,pd=Math.hypot(px,pz);if(pd>0&&pd<1.15){vx+=px/pd*(1.15-pd)*.55;vz+=pz/pd*(1.15-pd)*.55}const vm=Math.hypot(vx,vz)||1;vx/=vm;vz/=vm;let nx=actor.position.x+vx*step,nz=actor.position.z+vz*step;if(!actorBlocked(actor,nx,nz,true)){actor.position.x=nx;actor.position.z=nz}else{const side1=[actor.position.x-vz*step*.72,actor.position.z+vx*step*.72],side2=[actor.position.x+vz*step*.72,actor.position.z-vx*step*.72];if(!actorBlocked(actor,...side1,true)){actor.position.x=side1[0];actor.position.z=side1[1]}else if(!actorBlocked(actor,...side2,true)){actor.position.x=side2[0];actor.position.z=side2[1]}else{actor.userData.nav.recalc=0}}actor.rotation.y=lerp(actor.rotation.y,Math.atan2(vx,vz),1-Math.pow(.0015,dt));const nav=actor.userData.nav,movedNow=Math.hypot(actor.position.x-nav.lastX,actor.position.z-nav.lastZ);if(movedNow<.006)nav.stuck+=dt;else{nav.stuck=0;nav.stuckAttempts=0;if(!actorBlocked(actor,actor.position.x,actor.position.z,true)){nav.safeX=actor.position.x;nav.safeZ=actor.position.z}}nav.lastX=actor.position.x;nav.lastZ=actor.position.z;if(nav.stuck>1.2){nav.recalc=0;nav.stuck=0;nav.stuckAttempts++;if(nav.stuckAttempts>=3&&Number.isFinite(nav.safeX)&&!actorBlocked(actor,nav.safeX,nav.safeZ,true)){actor.position.x=nav.safeX;actor.position.z=nav.safeZ;nav.path=[];nav.i=0;nav.stuckAttempts=0}}if(Math.hypot(waypoint[0]-actor.position.x,waypoint[1]-actor.position.z)<.20)nav.i++;return Math.hypot(target[0]-actor.position.x,target[1]-actor.position.z)<.16}
+function poseHuman(h,pose){if(h.userData.pose===pose)return;h.userData.pose=pose;const u=h.userData;if(pose==='sit'){u.standingLegs.visible=false;u.sittingLegs.visible=true;h.position.y=0;u.armL.rotation.z=.22;u.armR.rotation.z=-.22;u.armL.rotation.x=-.12;u.armR.rotation.x=-.12}else{u.standingLegs.visible=true;u.sittingLegs.visible=false;h.position.y=0;u.armL.rotation.z=.08;u.armR.rotation.z=-.08;u.armL.rotation.x=0;u.armR.rotation.x=0}}
+function updatePatrol(actor,time,dt){const u=actor.userData;if(!u.patrol)return false;if(u.pause>0){u.pause-=dt;return false}const pts=u.patrol.points,idx=u.patrol.i%pts.length,target=pts[(idx+1)%pts.length];const done=walkActorTo(actor,target,u.patrol.speed,dt);if(done){u.patrol.i=(idx+1)%pts.length;u.pause=.7+Math.random()*1.5}return !done}
+function updateOwner(time,dt){const u=owner.userData;u.modeTime=(u.modeTime||0)+dt;if(u.delayedKitchenReaction>0){u.delayedKitchenReaction-=dt;if(u.delayedKitchenReaction<=0){if(ownerAttention()==='distracted')u.delayedKitchenReaction=.25;else speak('Human: “Were you in that drawer?”')}}if(u.delayedFridgeReaction>0){u.delayedFridgeReaction-=dt;if(u.delayedFridgeReaction<=0){if(ownerAttention()==='distracted')u.delayedFridgeReaction=.30;else speak('Human: “Why is the fridge open?”')}}if(state.gateOpen&&u.mode!=='openedGate'&&u.mode!=='returning'&&u.mode!=='yardIdle'&&u.mode!=='celebrate'){u.mode='yardIdle';owner.position.set(4.2,0,-7.2);poseHuman(owner,'stand')}
+ if(u.mode==='watchTV'){poseHuman(owner,'sit');owner.position.x=.95;owner.position.z=.73;owner.rotation.y=0;if(state.tvUnplugged){u.mode='reactTV';u.modeTime=0}}
+ else if(u.mode==='reactTV'){poseHuman(owner,'stand');const route=[[2.35,1.35],[2.35,3.75],[1.55,4.55]];u.reactIndex=u.reactIndex||0;if(walkActorTo(owner,route[u.reactIndex],1.15,dt)){u.reactIndex++;if(u.reactIndex>=route.length){u.mode='inspectTV';u.modeTime=0;u.reactIndex=0;speak('Human: “How did that come unplugged?”')}}}
+ else if(u.mode==='inspectTV'){poseHuman(owner,'stand');owner.rotation.y=lerp(owner.rotation.y,0,1-Math.pow(.02,dt));if(u.modeTime>2.4){u.mode='available';u.modeTime=0}}
+ else if(u.mode==='available'){poseHuman(owner,'stand');const pts=[[1.6,4.2],[3.4,2.8],[4.5,-1.8],[2.5,-2.9]];u.availableIndex=u.availableIndex||0;if(walkActorTo(owner,pts[u.availableIndex%pts.length],.58,dt))u.availableIndex=(u.availableIndex+1)%pts.length}
+ else if(u.mode==='takeLeash'){poseHuman(owner,'stand');if(u.modeTime<.8){const target=Math.atan2(player.pos.x-owner.position.x,player.pos.z-owner.position.z);owner.rotation.y=lerp(owner.rotation.y,target,1-Math.pow(.008,dt))}else{u.mode='toBackDoor';u.modeTime=0}}
+ else if(u.mode==='toBackDoor'){poseHuman(owner,'stand');if(walkActorTo(owner,[2.1,-3.95],1.15,dt)){backDoorOpen=true;doorSound();u.mode='throughDoor';u.modeTime=0;speak('Human: “Come on!”')}}
+ else if(u.mode==='throughDoor'){poseHuman(owner,'stand');if(walkActorTo(owner,[2.1,-6.0],1.1,dt)){u.mode='toGate';u.modeTime=0}}
+ else if(u.mode==='toGate'){poseHuman(owner,'stand');const route=[[4.2,-7.0],[6.4,-8.5],[8.15,-10.0]];u.gateIndex=u.gateIndex||0;if(walkActorTo(owner,route[u.gateIndex],1.25,dt)){u.gateIndex++;if(u.gateIndex>=route.length){state.gateOpen=true;doorSound();u.mode='openedGate';u.modeTime=0;discover('Human Has Opened the Big Gate');speak('Human: “There you go!”');chime();saveGame()}}}
+ else if(u.mode==='openedGate'){poseHuman(owner,'stand');if(u.modeTime>3.2){u.mode='returning';u.modeTime=0}}
+ else if(u.mode==='returning'){poseHuman(owner,'stand');if(walkActorTo(owner,[4.2,-7.2],.7,dt)){backDoorOpen=false;u.mode='yardIdle';u.modeTime=0}}
+ else if(u.mode==='celebrate'){poseHuman(owner,'stand');owner.rotation.y=lerp(owner.rotation.y,Math.atan2(player.pos.x-owner.position.x,player.pos.z-owner.position.z),1-Math.pow(.02,dt));u.armL.rotation.z=-.75+Math.sin(time*.01)*.12;u.armR.rotation.z=.75-Math.sin(time*.01)*.12;if(u.modeTime>3.5){u.mode='yardIdle';u.modeTime=0}}
+ else if(u.mode==='yardIdle'){poseHuman(owner,'stand');const pts=[[4.2,-7.2],[2.4,-8.0],[3.4,-10.2]];u.yardIndex=u.yardIndex||0;if(walkActorTo(owner,pts[u.yardIndex%pts.length],.42,dt))u.yardIndex=(u.yardIndex+1)%pts.length}}
+function updateAnimation(time,dt){for(const t of trees){const a=.018*Math.sin(time*.0012+t.position.x);for(const l of t.userData.sway)l.rotation.z=a}updateOwner(time,dt);for(const h of [parkHuman,colorHuman,mailHuman,jogger]){poseHuman(h,'stand');const moving=updatePatrol(h,time,dt);const p=h.position,d=Math.hypot(player.pos.x-p.x,player.pos.z-p.z);if(h.userData.lookAtDog>0)h.userData.lookAtDog-=dt;if(d<4.5||h.userData.lookAtDog>0){const target=Math.atan2(player.pos.x-p.x,player.pos.z-p.z);h.rotation.y=lerp(h.rotation.y,target,1-Math.pow(.025,dt))}const u=h.userData,swing=Math.sin(time*.007+u.stepOffset)*(moving ? .32 : .05);if(u.legL)u.legL.rotation.z=swing;if(u.legR)u.legR.rotation.z=-swing;if(u.armL)u.armL.rotation.z=.08-swing*.45;if(u.armR)u.armR.rotation.z=-.08+swing*.45}const nd=neighborDog.userData;if(nd.respondTimer>0){nd.respondTimer-=dt;const tz=clamp(player.pos.z,-17.8,-10.5);walkActorTo(neighborDog,[10.15,tz],1.9,dt)}else updatePatrol(neighborDog,time,dt);if(nd.tail)nd.tail.rotation.y=.55+Math.sin(time*.011)*.5;const dogSwing=Math.sin(time*.009+nd.stepOffset)*.25;if(nd.legs)nd.legs.forEach((leg,i)=>leg.rotation.z=(i%2?-1:1)*dogSwing);const pd=parkDog.userData;if(pd.respondTimer>0){pd.respondTimer-=dt;walkActorTo(parkDog,[clamp(player.pos.x,56,68),clamp(player.pos.z,11,21)],1.75,dt)}else updatePatrol(parkDog,time,dt);if(pd.tail)pd.tail.rotation.y=.6+Math.sin(time*.012)*.55;const pdSwing=Math.sin(time*.010+pd.stepOffset)*.22;if(pd.legs)pd.legs.forEach((leg,i)=>leg.rotation.z=(i%2?-1:1)*pdSwing);if(squirrel.userData.fleeUntil>0){squirrel.userData.fleeUntil-=dt;const dx=squirrel.position.x-player.pos.x,dz=squirrel.position.z-player.pos.z,d=Math.hypot(dx,dz)||1;squirrel.position.x+=dx/d*4.2*dt;squirrel.position.z+=dz/d*4.2*dt;squirrel.rotation.y=Math.atan2(dx,dz)}else if(!state.squirrelDone){squirrel.position.x=-6.4+Math.sin(time*.0021)*.35;squirrel.position.z=-13.2-Math.max(0,Math.sin(time*.0011))*1.2;squirrel.rotation.y=Math.sin(time*.0017)*.7}else{squirrel.position.set(-7.35,0,-18.3);squirrel.rotation.y=Math.PI}
+skyDome.position.set(camera.position.x,0,camera.position.z);if(state.raccoonMet&&!state.keyDropped&&!state.mysteryComplete){walkActorTo(raccoon,[91.3,5.35],6.0,dt);raccoon.rotation.z=Math.sin(time*.018)*.04}else if(raccoon.userData.flee||state.keyDropped){walkActorTo(raccoon,[99,10],4.7,dt)}else raccoon.rotation.y=.2+Math.sin(time*.0014)*.15;tvShow.visible=!state.tvUnplugged;if(tvShow.visible){tvBlob.position.x=.55+((time*.00045)%1.05);tvBlob.position.y=1.30+Math.sin(time*.004)*.12;tvBlob2.rotation.z=Math.sin(time*.002)*.35;tvTicker.scale.x=.72+.18*Math.sin(time*.003);tvScreen.material.color.setHSL(.55,.25,.42+.05*Math.sin(time*.0013));}gatePivot.rotation.y=lerp(gatePivot.rotation.y,state.gateOpen?-Math.PI/2:0,1-Math.pow(.0005,dt));doorPivot.rotation.y=lerp(doorPivot.rotation.y,backDoorOpen?-Math.PI/2:0,1-Math.pow(.0015,dt));const flapTarget=dogDoorTransit.active?dogDoorTransit.flapSign*1.12:0;flapPivot.rotation.x=lerp(flapPivot.rotation.x,flapTarget,1-Math.pow(.0005,dt));kitchenDrawer.position.x=lerp(kitchenDrawer.position.x,state.kitchenDrawerOpen?5.02:5.43,1-Math.pow(.001,dt));kitchenCabinetPivot.rotation.y=lerp(kitchenCabinetPivot.rotation.y,state.kitchenCabinetOpen?-.95:0,1-Math.pow(.001,dt));fridgeDoorPivot.rotation.y=lerp(fridgeDoorPivot.rotation.y,state.fridgeOpened?-.72:-.035,1-Math.pow(.001,dt));for(let i=0;i<creekWaters.length;i++)creekWaters[i].material.opacity=.68+.045*Math.sin(time*.0015+i*.7);culvertWater.material.opacity=.60+.06*Math.sin(time*.0019);if(sniffing)for(const t of scentTrails){const a=t.obj.geometry.attributes.position,base=t.obj.geometry.userData.base;for(let i=0;i<a.count;i++){const drift=Math.sin(time*.0018+i*.71+t.phase)*.045;a.array[i*3]=base[i*3]+drift;a.array[i*3+1]=base[i*3+1]+Math.sin(time*.003+i*.9+t.phase)*.08;a.array[i*3+2]=base[i*3+2]+Math.cos(time*.0016+i*.63+t.phase)*.035}a.needsUpdate=true}}
+function updateMovement(dt){if(dogDoorTransit.active){dogDoorTransit.t=Math.min(1,dogDoorTransit.t+dt/0.52);const t=dogDoorTransit.t,e=t*t*(3-2*t);player.pos.x=lerp(dogDoorTransit.start.x,dogDoorTransit.end.x,e);player.pos.z=lerp(dogDoorTransit.start.z,dogDoorTransit.end.z,e);player.jumpY=lerp(dogDoorTransit.start.y,dogDoorTransit.end.y,e);player.vy=0;player.grounded=true;if(t>=1)dogDoorTransit.active=false;return}let ix=(keys.KeyD?1:0)-(keys.KeyA?1:0),iz=(keys.KeyS?1:0)-(keys.KeyW?1:0);if(isMobileMode()){ix+=joy.x;iz+=joy.y}const mag=Math.hypot(ix,iz),running=!player.crawling&&(keys.ShiftLeft||keys.ShiftRight||(isMobileMode()&&mag>.82)),moving=mag>.08;if(moving){ix/=Math.max(1,mag);iz/=Math.max(1,mag);const sy=Math.sin(player.yaw),cy=Math.cos(player.yaw),dx=ix*cy+iz*sy,dz=iz*cy-ix*sy,baseSpeed=player.crawling?1.9:(running?5.25:3.12);movePlayer(dx*baseSpeed*dt,dz*baseSpeed*dt);player.bob+=dt*(player.crawling?5:(running?10:7))}
+ const h=player.crawling?player.crawlHeight:player.standingHeight;
+ if(player.grounded){const sup=supportInfoAt(player.pos.x,player.pos.z,player.jumpY+MAX_STEP);if(Math.abs(sup.height-player.jumpY)<.075){player.jumpY=sup.height;player.supportingSurface=sup.id}else if(sup.height<player.jumpY-.075){player.grounded=false;player.vy=Math.min(player.vy,0);player.supportingSurface=null}else if(sup.height>player.jumpY&&sup.height-player.jumpY<=MAX_STEP&&canOccupy(player.pos.x,player.pos.z,sup.height,h,player.radius)){player.jumpY=sup.height;player.supportingSurface=sup.id}}
+ if(!player.grounded){const prev=player.jumpY;player.vy-=9.65*dt;resolveVertical(prev,prev+player.vy*dt)}
+ player.wet=inCreek(player.pos.x,player.pos.z,.10);
+ player.currentHeight=lerp(player.currentHeight,h,1-Math.pow(.002,dt));player.currentHead=lerp(player.currentHead,player.crawling?player.crawlHead:player.head,1-Math.pow(.003,dt));
+ player.headDip=Math.max(0,player.headDip-dt*1.7);const bobAmt=state.settings.reducedMotion?0:(moving?(player.crawling ? .010 : (running ? .031 : .020)):.004),bob=Math.sin(player.bob*2)*bobAmt,eyeFloor=player.jumpY+.22,eyeCeil=player.jumpY+h-.15,eyeY=clamp(player.jumpY+player.currentHead+bob-player.headDip*.10,eyeFloor,Math.max(eyeFloor,eyeCeil));camera.position.set(player.pos.x,eyeY,player.pos.z);camera.rotation.y=player.yaw;camera.rotation.x=player.pitch+(state.settings.reducedMotion?0:Math.sin(player.bob)*bobAmt*.28);
+ // Muzzle never needs to win a fight with the floor/wall. Hide it only at extreme close-up angles/clearance.
+ muzzle.getWorldPosition(_muzzleWorld);const muzzleBase=Math.max(player.jumpY,_muzzleWorld.y-.08),muzzleBlocked=_muzzleWorld.y<player.jumpY+.055||!canOccupy(_muzzleWorld.x,_muzzleWorld.z,muzzleBase,.16,.08,null,true),downFactor=clamp((-player.pitch-.55)/.62,0,1),muzzleScale=muzzleBlocked?.10:lerp(1,.40,downFactor);muzzle.visible=muzzleScale>.13;muzzle.scale.setScalar(lerp(muzzle.scale.x,muzzleScale,1-Math.pow(.0005,dt)));muzzle.position.z=lerp(muzzle.position.z,lerp(-.48,-.24,downFactor),1-Math.pow(.002,dt));muzzle.position.y=lerp(muzzle.position.y,(player.crawling?-.30:-.22)+downFactor*.09,1-Math.pow(.01,dt));
+ if(moving&&player.grounded&&audioCtx){const now=performance.now(),gap=player.crawling?500:(running?275:405);if(now-lastStep>gap){lastStep=now;stepSound()}}
+}
+
+function updateOptional(){worldDiscoveries();if(state.fenceDig>=2&&!state.fenceShortcutUsed&&player.crawling&&player.pos.x>9.35&&Math.abs(player.pos.z+15.35)<1.1){state.fenceShortcutUsed=true;discover('Dug Through to the Neighbor Side');saveGame()}if(carried?.id==='bigStick'&&Math.abs(player.pos.x-9)<3)achievement('Carry a Stick That Is Clearly Too Large');if(state.pizzaBoxMoved&&!state.shortcutPassed&&player.pos.x>76.0){state.shortcutPassed=true;const throughGap=Math.abs(player.pos.z-5.2)<1.35&&player.crawling;discover(throughGap?'Hedge Shortcut: Exactly Dog Sized':'Long Way Around the Hedge');saveGame()}}
+
+function updateMovables(dt){for(const o of movableProps){if(o.userData.carried)continue;const v=o.userData.velocity,r=o.userData.moveRadius||.19,p=worldPos(o),dx=player.pos.x-p.x,dz=player.pos.z-p.z,dist=Math.hypot(dx,dz);if(dist<player.radius+r+.08&&dist>.001&&Math.abs((p.y-r)-player.jumpY)<.35){const speed=Math.hypot(v.x,v.z);if(speed<1.8){v.x-=dx/dist*1.4;v.z-=dz/dist*1.4}}if(Math.hypot(v.x,v.z)<.015){v.set(0,0,0);const sup=supportInfoAt(o.position.x,o.position.z,o.position.y+.28).height;o.position.y=sup+r;continue}const ox=o.position.x,oz=o.position.z,nx=ox+v.x*dt,nz=oz+v.z*dt,base=o.position.y-r,top=o.position.y+r;let blockedX=false,blockedZ=false,candidates=collisionCandidatesInto(nx,oz,r,_collisionScratch);for(const c of candidates){if(!c.active()||c.root===o)continue;const yb=colliderYBounds(c);if(top<=yb.min+COLLISION_EPS||base>=yb.max-COLLISION_EPS)continue;if(circleHitsCollider(nx,oz,r,c)){blockedX=true;break}}if(!blockedX)o.position.x=nx;else v.x*=-.42;candidates=collisionCandidatesInto(o.position.x,nz,r,_collisionScratch);for(const c of candidates){if(!c.active()||c.root===o)continue;const yb=colliderYBounds(c);if(top<=yb.min+COLLISION_EPS||base>=yb.max-COLLISION_EPS)continue;if(circleHitsCollider(o.position.x,nz,r,c)){blockedZ=true;break}}if(!blockedZ)o.position.z=nz;else v.z*=-.42;v.multiplyScalar(Math.pow(.16,dt));const sup=supportInfoAt(o.position.x,o.position.z,o.position.y+.28).height;o.position.y=sup+r}}
+
+function applyQuality(){const q=state.settings.quality,mobile=isMobileMode();renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'&&!mobile?1.75:q==='low'?.95:1.3));renderer.shadowMap.enabled=q!=='low';sun.castShadow=q!=='low';const shadowSize=q==='high'&&!mobile?1536:1024;if(sun.shadow.mapSize.width!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);sun.shadow.map?.dispose?.()}scene.fog.far=q==='low'?72:(q==='high'?104:92);scentGroup.visible=sniffing}
+function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);applyQuality()}addEventListener('resize',resize);
+
+let last=performance.now(),interactionAccum=0,sniffAccum=0,optionalAccum=0;function loop(now){requestAnimationFrame(loop);const rawDt=(now-last)/1000,dt=clamp(Number.isFinite(rawDt)?rawDt:0,0,.033);last=now;if(started&&!paused){updateMovement(dt);updateMovables(dt);updateSafety(dt);interactionAccum+=dt;sniffAccum+=dt;optionalAccum+=dt;if(interactionAccum>=1/30){updateInteraction();interactionAccum=0}if(sniffAccum>=1/12){updateSniff(now);sniffAccum=0}updateHearing(dt);updateNarrativeAudio(now);updateAmbient(dt);updateAnimation(now,dt);if(optionalAccum>=.12){updateOptional();updateHint();optionalAccum=0}if(DEBUG)updateDebugVisualization()}renderer.render(scene,camera)}
+
+function startGame(fresh=false){if(fresh){resetPersistentState();return}audioReady();started=true;paused=false;clearInputState();startOverlay.classList.add('hidden');pauseOverlay.classList.add('hidden');journalOverlay.classList.add('hidden');player.pos.set(DOG_BED_SPAWN.x,0,DOG_BED_SPAWN.z);player.yaw=DOG_BED_SPAWN.yaw;player.pitch=0;player.jumpY=DOG_BED_SPAWN.y;player.vy=0;player.grounded=true;player.supportingSurface='dogBedCushion';player.crawling=false;player.radius=player.baseRadius;player.currentHead=player.head;player.currentHeight=player.standingHeight;lastSafePlayerTransform.x=player.pos.x;lastSafePlayerTransform.z=player.pos.z;lastSafePlayerTransform.y=player.jumpY;lastSafePlayerTransform.yaw=player.yaw;lastSafePlayerTransform.crawling=false;lastSafePlayerTransform.valid=true;safeGroundedTime=0;if(!playerNumbersValid()||significantWorldPenetrations().length)recoverPlayer('invalid start transform');last=performance.now();if(!isMobileMode())renderer.domElement.requestPointerLock();toast(state.discoveries.length?'Your nose remembers this place.':'Wake up in your bed. Something interesting is nearby.');}
+let resumePointerTimer=0;function openPause(){if(!started||paused)return;paused=true;ignoreUnlockUntil=performance.now()+500;clearInputState();clearAudioTimers();if(resumePointerTimer){clearTimeout(resumePointerTimer);resumePointerTimer=0}last=performance.now();pauseOverlay.classList.remove('hidden');journalOverlay.classList.add('hidden');if(document.pointerLockElement)document.exitPointerLock()}
+function closePause(){if(!paused)return;clearInputState();pauseOverlay.classList.add('hidden');journalOverlay.classList.add('hidden');last=performance.now();ignoreUnlockUntil=performance.now()+900;pauseOpenedByUnlockAt=-1;paused=false;if(!isMobileMode()){if(resumePointerTimer)clearTimeout(resumePointerTimer);resumePointerTimer=setTimeout(()=>{resumePointerTimer=0;if(started&&!paused)renderer.domElement.requestPointerLock()},80)}}
+function openJournal(){if(!started)return;paused=true;ignoreUnlockUntil=performance.now()+500;clearInputState();last=performance.now();updateJournal();journalOverlay.classList.remove('hidden');pauseOverlay.classList.add('hidden');if(document.pointerLockElement)document.exitPointerLock()}
+function closeJournal(){journalOverlay.classList.add('hidden');pauseOverlay.classList.remove('hidden');last=performance.now();}
+
+$('#startBtn').onclick=()=>startGame(false);$('#freshBtn').onclick=()=>startGame(true);$('#resumeBtn').onclick=closePause;$('#menuBtn').onclick=openPause;$('#journalBtn').onclick=openJournal;$('#openJournalBtn').onclick=openJournal;$('#closeJournalBtn').onclick=closeJournal;$('#quitBtn').onclick=()=>{saveGameNow();location.href='https://thomaslab.me';};
+$('#resetBtn').onclick=()=>{if(confirm('Erase all Nose First progress and discoveries?'))resetPersistentState()};
+const sens=$('#sens'),volume=$('#volume'),fov=$('#fov'),quality=$('#quality'),reduced=$('#reduced'),touchSetting=$('#touchSetting');
+sens.value=state.settings.sensitivity;volume.value=state.settings.volume;fov.value=state.settings.fov;quality.value=state.settings.quality;reduced.value=String(state.settings.reducedMotion);touchSetting.value=state.settings.touch;
+function setSetting(){state.settings.sensitivity=+sens.value;state.settings.volume=+volume.value;state.settings.fov=+fov.value;state.settings.quality=quality.value;state.settings.reducedMotion=reduced.value==='true';state.settings.touch=touchSetting.value;if(master)master.gain.value=state.settings.volume;camera.fov=state.settings.fov;camera.updateProjectionMatrix();applyMobile();applyQuality();saveGame()}
+[sens,volume,fov,quality,reduced,touchSetting].forEach(x=>x.addEventListener('input',setSetting));
+addEventListener('pagehide',()=>{if(started&&!suppressPagehideSave)saveGameNow()});
+
+// Restore persistent world visuals and routines
+if(state.gateOpen){gatePivot.rotation.y=-Math.PI/2;owner.userData.mode='yardIdle';owner.position.set(4.2,0,-7.2);leash.visible=false}else if(state.tvUnplugged){owner.userData.mode='available';owner.position.set(1.55,0,4.55);rebuildTVCable(true);tvScreen.material.emissiveIntensity=0;tvScreen.material.color.setHex(0x31383a);tvGlow.intensity=0;tvShow.visible=false}else{poseHuman(owner,'sit')}
+if(state.garageDone){garageBox.position.set(-12.25,.5,-5.2);garageBox.rotation.y=.45}if(state.pizzaBoxMoved){storyPizzaBox.position.set(61.42,.10,-8.15);storyPizzaBox.rotation.y=.55}kitchenDrawer.position.x=state.kitchenDrawerOpen?5.02:5.43;kitchenCabinetPivot.rotation.y=state.kitchenCabinetOpen?-.95:0;cabinetPot.visible=state.kitchenCabinetOpen;fridgeDoorPivot.rotation.y=state.fridgeOpened?-.72:-.035;kibbleGroup.scale.y=Math.max(.35,1-state.foodEaten*.08);looseFenceSoil.visible=state.fenceDig<2;looseFenceSoil.scale.z=Math.max(.25,1-state.fenceDig*.32);if(state.creekMudDug)creekMudPatch.scale.set(.78,.78,.78);bigStick.visible=state.digDone;shinyKey.visible=state.keyDropped&&!state.keyReturned&&!state.mysteryComplete;if(state.raccoonMet&&!state.keyDropped&&!state.mysteryComplete)raccoon.position.set(91.3,0,5.35);if(state.keyDropped||state.mysteryComplete)raccoon.position.set(99,0,10);
+applyMobile();resize();updateJournal();updateHint();setCrawl(false);buildCollisionSpatialHash();
+if(state.discoveries.length){$('#saveNote').textContent=`Continue with ${state.discoveries.length} discoveries saved in this browser.`;$('#freshBtn').style.display='inline-block'}
+$('#startBtn').disabled=false;$('#startBtn').textContent=state.discoveries.length?'Continue':'Start sniffing';
+// Release-candidate validation. DEBUG can visualize the physical world without affecting normal play.
+const debugColliderGroup=new THREE.Group(),debugPlayerGroup=new THREE.Group();scene.add(debugColliderGroup,debugPlayerGroup);debugColliderGroup.visible=DEBUG;debugPlayerGroup.visible=DEBUG;
+function validateCollider(c){const vals=[c.x,c.z,c.w,c.d,c.minY,c.maxY];if(vals.some(v=>!Number.isFinite(v)))return `${c.id||'(unnamed)'} has non-finite values`;if(c.w<=0||c.d<=0||c.maxY<=c.minY)return `${c.id||'(unnamed)'} has invalid dimensions`;if(c.w>140||c.d>140||c.maxY-c.minY>30)return `${c.id||'(unnamed)'} is unexpectedly enormous`;if(c.root&&!c.root.parent)return `${c.id||'(unnamed)'} root is detached`;return null}
+function validateWorld(){const warnings=[];for(const c of colliders){const e=validateCollider(c);if(e)warnings.push(e)}const seen=new Map();for(const c of colliders){if(c.root)continue;const p=colliderPose(c),yb=colliderYBounds(c),k=[c.id,p.x.toFixed(3),p.z.toFixed(3),c.w.toFixed(3),c.d.toFixed(3),yb.min.toFixed(3),yb.max.toFixed(3),p.yaw.toFixed(3)].join('|');if(seen.has(k))warnings.push(`duplicate collider: ${c.id||'(unnamed)'}`);else seen.set(k,c)}if(!canOccupy(DOG_BED_SPAWN.x,DOG_BED_SPAWN.z,DOG_BED_SPAWN.y,player.standingHeight,player.baseRadius,null,true))warnings.push('spawn volume is blocked');if(warnings.length)console.warn('Nose First world validation',warnings);return warnings}
+const debugEntries=[];function initDebugVisualization(){if(!DEBUG)return;const solidMat=new THREE.MeshBasicMaterial({color:0xff6b6b,wireframe:true,transparent:true,opacity:.45}),walkMat=new THREE.MeshBasicMaterial({color:0x66dd88,wireframe:true,transparent:true,opacity:.55}),actorMat=new THREE.MeshBasicMaterial({color:0x66aaff,wireframe:true,transparent:true,opacity:.55});for(const c of colliders){const g=new THREE.BoxGeometry(c.w,Math.max(.01,c.maxY-c.minY),c.d),m=(c.roleMask&ROLE.ACTOR)?actorMat:(c.walkable?walkMat:solidMat),o=new THREE.Mesh(g,m);debugColliderGroup.add(o);debugEntries.push({c,o})}const body=new THREE.Mesh(new THREE.CylinderGeometry(player.radius,player.radius,player.standingHeight,12),actorMat);body.userData.playerDebug=true;debugPlayerGroup.add(body)}
+function updateDebugVisualization(){if(!DEBUG)return;for(const {c,o} of debugEntries){const p=colliderPose(c),yb=colliderYBounds(c);o.position.set(p.x,(yb.min+yb.max)/2,p.z);o.rotation.y=p.yaw;o.visible=c.active()}const body=debugPlayerGroup.children[0];if(body){body.position.set(player.pos.x,player.jumpY+(player.crawling?player.crawlHeight:player.standingHeight)/2,player.pos.z);body.scale.y=(player.crawling?player.crawlHeight:player.standingHeight)/player.standingHeight}}
+initDebugVisualization();validateWorld();
+// Lightweight startup invariants catch accidental geometry/collision regressions early without disturbing play.
+function collisionSanity(){const errors=[];const hit=(x,z,base,h=.84,r=.30)=>!canOccupy(x,z,base,h,r),has=id=>colliders.some(c=>c.id===id);if(!canOccupy(DOG_BED_SPAWN.x,DOG_BED_SPAWN.z,DOG_BED_SPAWN.y,player.standingHeight,player.baseRadius,null,true))errors.push('dog-bed spawn blocked');const bedEdgeX=DOG_BED_SPAWN.x+.78;if(supportInfoAt(bedEdgeX+player.baseRadius+.08,DOG_BED_SPAWN.z,DOG_BED_SPAWN.y+MAX_STEP).height>=DOG_BED_SPAWN.y-.01)errors.push('dog-bed support extends too far beyond visible edge');if(!hit(-.2,3.05,.08,1.10,.25))errors.push('coffee tabletop missing underside');if(!canOccupy(-.2,3.05,.08,player.crawlHeight,.24))errors.push('coffee table no longer crawlable beneath');if(!hit(-6,-15,0,.84,.20))errors.push('tree trunk non-solid');if(!hit(20,-5,0,.84,.20))errors.push('hydrant non-solid');if(!hit(19,-4,0,.84,.20))errors.push('mailbox non-solid');if(!hit(64,-15,0,.84,.24))errors.push('picnic table non-solid');if(!hit(58,-12,0,.84,.25))errors.push('food truck non-solid');if(canOccupy(23.25,-13.55,0,.84,.22))errors.push('porch should block standing dog');if(!canOccupy(23.25,-13.55,0,.48,.22))errors.push('porch crawl gap blocked');for(const id of ['houseCeiling','playerHouseRoof','kitchenLower','kitchenCountertop','fridge','fridgeDoorSlab','tvStand','humanBedBase','couchSeatBase','treeTrunk','hydrantBody','trashCan','mailboxBody','benchSeat','picnicTop','foodTruck','yardFence','yardGate','dogFlapClosed','creekBank','playgroundPole','shedRoof','serviceRock'])if(!has(id))errors.push('missing collider category: '+id);if(errors.length)console.warn('Nose First v9.1 collision sanity:',errors);return errors.length===0}collisionSanity();
+window.__dogGameReady=true;$('#errorOverlay').classList.add('hidden');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#6d7f65" />
+<title>Nose First — A Dog's-Eye Mystery</title>
+<style>
+  :root{--cream:#f7f0da;--ink:#25302d;--blue:#6d91b7;--yellow:#d5ba58;--olive:#8f955a;--panel:rgba(31,42,40,.88);--glass:rgba(247,240,218,.92)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#66765f;color:var(--ink);font-family:ui-rounded,"SF Pro Rounded","Trebuchet MS",system-ui,sans-serif;touch-action:none}
+  canvas{display:block;width:100%;height:100%;outline:none}
+  button,input,select{font:inherit}
+  button{border:0;border-radius:16px;padding:12px 16px;background:var(--cream);color:var(--ink);font-weight:800;box-shadow:0 5px 0 rgba(24,31,29,.22);cursor:pointer}
+  button:active{transform:translateY(2px);box-shadow:0 3px 0 rgba(24,31,29,.22)}
+  button.secondary{background:#d8ddc8}
+  button.danger{background:#e6bd9b}
+  button:disabled{opacity:.5;cursor:default;transform:none}
+  #game{position:fixed;inset:0}
+  #vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at center,transparent 52%,rgba(22,30,32,.14) 100%);z-index:4}
+  #sniffWash{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .16s;background:radial-gradient(circle at 50% 55%,rgba(94,125,153,.05),rgba(54,67,70,.32));backdrop-filter:saturate(.7);z-index:5}
+  body.sniffing #sniffWash{opacity:1}
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+  #crosshair{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;border:2px solid rgba(247,240,218,.9);border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+  #prompt{position:absolute;left:50%;bottom:13%;transform:translateX(-50%);max-width:min(560px,88vw);padding:9px 13px;border-radius:12px;background:rgba(35,45,44,.72);color:#fff9e8;font-size:14px;font-weight:800;text-align:center;opacity:0;transition:opacity .12s}
+  #prompt.show{opacity:1}
+  #hint{position:absolute;left:18px;top:max(18px,env(safe-area-inset-top));max-width:min(390px,75vw);background:rgba(247,240,218,.82);backdrop-filter:blur(7px);padding:10px 13px;border-radius:14px;font-size:13px;font-weight:800;box-shadow:0 4px 18px rgba(0,0,0,.12)}
+  #objectiveDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--yellow);margin-right:7px}
+  #sniffPanel{position:absolute;top:max(18px,env(safe-area-inset-top));right:18px;width:min(270px,42vw);display:none;gap:6px;flex-direction:column}
+  body.sniffing #sniffPanel{display:flex}
+  .scentChip{background:rgba(27,37,40,.72);color:#f8f2df;border:1px solid rgba(255,255,255,.13);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #hear{position:absolute;left:50%;top:42%;width:220px;height:120px;margin-left:-110px;pointer-events:none}
   .hearPing{position:absolute;left:50%;top:50%;font-size:18px;color:#f7f0da;text-shadow:0 2px 5px #26322f;transition:opacity .2s;white-space:nowrap}
   #toast{position:absolute;left:50%;top:12%;transform:translateX(-50%) translateY(-10px);background:var(--glass);padding:12px 16px;border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.18);opacity:0;transition:.25s;max-width:min(520px,88vw);text-align:center;font-weight:900}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
