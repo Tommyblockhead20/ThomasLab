@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thomas Intelligence — The AI That Never Makes Mistakes</title>
+<meta name="theme-color" content="#f7f7f5">
+<style>
+  :root{
+    --bg:#f7f7f5;
+    --panel:#ffffff;
+    --panel-2:#f0f0ed;
+    --panel-3:#e8e8e3;
+    --text:#222321;
+    --muted:#70736d;
+    --border:#dedfd9;
+    --accent:#6d5efc;
+    --accent-2:#867aff;
+    --accent-soft:#efedff;
+    --user:#eceafc;
+    --shadow:0 8px 30px rgba(28,28,24,.08);
+    --radius:18px;
+    --sidebar:268px;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:var(--text);
+    background:var(--bg);
+    overflow:hidden;
+  }
+  button,input,textarea{font:inherit}
+  button{color:inherit}
+
+  .app{height:100%; display:grid; grid-template-columns:var(--sidebar) 1fr;}
+  .sidebar{
+    background:#efefec;
+    border-right:1px solid var(--border);
+    padding:14px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    min-width:0;
+  }
+  .brand{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:4px 4px 2px;
+  }
+  .brand-left{display:flex; align-items:center; gap:10px; min-width:0}
+  .logo{
+    width:34px;height:34px;border-radius:11px;
+    display:grid;place-items:center;
+    background:linear-gradient(135deg,#24251f,#6d5efc);
+    color:white;font-weight:900;font-size:15px;
+    box-shadow:0 4px 12px rgba(80,67,220,.18);
+  }
+  .brand-name{font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+  .tiny-badge{
+    font-size:10px;font-weight:800;
+    color:#5f53d5;background:#e5e1ff;border:1px solid #d9d4ff;
+    padding:2px 6px;border-radius:999px;margin-left:4px;vertical-align:2px;
+  }
+  .icon-btn{
+    width:34px;height:34px;border:0;background:transparent;border-radius:10px;
+    display:grid;place-items:center;cursor:pointer;color:#5c5f59;
+  }
+  .icon-btn:hover{background:#e3e3df;color:#232420}
+  .new-chat{
+    border:1px solid var(--border); background:var(--panel); border-radius:12px;
+    padding:10px 12px; display:flex; align-items:center; gap:9px;
+    cursor:pointer; font-weight:650; box-shadow:0 1px 1px rgba(0,0,0,.02);
+  }
+  .new-chat:hover{background:#fafaf8}
+  .new-chat .plus{font-size:19px;line-height:1}
+  .history-title{
+    margin:4px 7px 0;color:#8a8d86;font-size:11px;font-weight:800;
+    text-transform:uppercase;letter-spacing:.08em;
+  }
+  .history{overflow:auto;display:flex;flex-direction:column;gap:3px;padding-right:2px;min-height:0}
+  .history-item{
+    width:100%;border:0;background:transparent;border-radius:9px;
+    padding:8px 9px;text-align:left;cursor:pointer;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    color:#50534d;font-size:13px;
+  }
+  .history-item:hover,.history-item.active{background:#e2e2de;color:#242520}
+  .sidebar-footer{margin-top:auto;display:grid;gap:4px}
+  .side-link{
+    text-decoration:none;color:#50534d;border-radius:9px;padding:9px;
+    display:flex;align-items:center;gap:9px;font-size:13px;
+  }
+  .side-link:hover{background:#e2e2de}
+  .side-link span:first-child{width:19px;text-align:center}
+
+  .main{min-width:0;height:100%;display:flex;flex-direction:column;background:var(--panel);}
+  .topbar{
+    min-height:58px;border-bottom:1px solid rgba(222,223,217,.75);
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 18px;gap:12px;background:rgba(255,255,255,.88);
+    backdrop-filter:blur(12px);z-index:5;
+  }
+  .mobile-menu{display:none}
+  .model-wrap{position:relative}
+  .model-button{
+    border:0;background:transparent;border-radius:10px;padding:7px 9px;
+    cursor:pointer;font-weight:760;letter-spacing:-.01em;
+    display:flex;align-items:center;gap:7px;
+  }
+  .model-button:hover{background:#f2f2ef}
+  .model-sub{color:#8b8e88;font-size:11px;font-weight:650}
+  .chev{font-size:11px;color:#8a8d86}
+  .model-menu{
+    display:none;position:absolute;top:43px;left:0;width:260px;
+    background:white;border:1px solid var(--border);border-radius:14px;
+    box-shadow:var(--shadow);padding:7px;z-index:20;
+  }
+  .model-menu.open{display:block}
+  .model-option{
+    border:0;background:transparent;width:100%;padding:10px;border-radius:10px;
+    text-align:left;cursor:pointer;display:flex;justify-content:space-between;gap:10px
+  }
+  .model-option:hover{background:#f3f3f0}
+  .model-option strong{display:block;font-size:13px}
+  .model-option small{display:block;color:var(--muted);margin-top:2px}
+  .check{color:var(--accent);font-weight:900}
+  .top-actions{display:flex;align-items:center;gap:6px}
+  .pill{
+    border:1px solid var(--border);background:white;padding:7px 10px;border-radius:999px;
+    font-size:12px;font-weight:700;color:#646760;
+  }
+
+  .conversation{
+    flex:1; overflow:auto; scroll-behavior:smooth;
+    background:
+      radial-gradient(circle at 50% -10%, rgba(109,94,252,.035), transparent 30%),
+      white;
+  }
+  .thread{max-width:840px;margin:0 auto;padding:34px 26px 180px}
+  .welcome{
+    min-height:calc(100vh - 270px);display:flex;flex-direction:column;
+    justify-content:center;align-items:center;text-align:center;padding:30px 0 18px;
+  }
+  .welcome-logo{
+    width:56px;height:56px;border-radius:18px;margin-bottom:18px;
+    background:linear-gradient(135deg,#2e3029,#6d5efc);
+    color:white;display:grid;place-items:center;font-size:21px;font-weight:900;
+    box-shadow:0 10px 28px rgba(77,64,205,.18);
+  }
+  h1{
+    margin:0;font-size:32px;letter-spacing:-.04em;line-height:1.08;
+  }
+  .welcome p{
+    margin:11px 0 0;color:var(--muted);font-size:15px;max-width:560px;line-height:1.55
+  }
+  .chips{
+    margin-top:28px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;width:min(620px,100%);
+  }
+  .chip{
+    border:1px solid var(--border);background:#fff;border-radius:14px;
+    padding:12px 13px;text-align:left;cursor:pointer;transition:.16s ease;
+  }
+  .chip:hover{border-color:#c8c5f3;box-shadow:0 5px 18px rgba(65,55,180,.07);transform:translateY(-1px)}
+  .chip strong{display:block;font-size:13px;margin-bottom:3px}
+  .chip span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .message{margin:0 0 28px}
+  .message.user{display:flex;justify-content:flex-end}
+  .bubble-user{
+    max-width:min(640px,88%);background:var(--user);border:1px solid #e2defc;
+    border-radius:20px 20px 5px 20px;padding:11px 15px;line-height:1.5;font-size:15px;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .assistant-row{display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:start}
+  .avatar{
+    width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,#272821,#6d5efc);
+    color:#fff;display:grid;place-items:center;font-size:11px;font-weight:900;margin-top:1px;
+  }
+  .assistant-content{min-width:0}
+  .assistant-name{font-size:12px;font-weight:800;margin:0 0 8px;color:#53564f}
+  .answer{
+    font-size:16px;line-height:1.62;word-wrap:break-word;
+  }
+  .answer.big-answer{
+    font-size:30px;font-weight:840;letter-spacing:-.035em;line-height:1.2;
+  }
+  .meta-row{display:flex;align-items:center;gap:8px;margin-top:10px;color:#8a8d87;font-size:11px}
+  .meta-actions{display:flex;gap:2px;margin-left:2px}
+  .mini-btn{
+    border:0;background:transparent;border-radius:7px;padding:4px 6px;cursor:pointer;color:#7d8079
+  }
+  .mini-btn:hover{background:#f0f0ed;color:#363832}
+  .thinking-card{
+    border-left:2px solid #ddd9ff;margin:3px 0 10px;padding:1px 0 2px 13px;
+    color:#666961;font-size:13px;
+  }
+  .thinking-line{
+    min-height:21px;display:flex;align-items:center;gap:8px;transition:.18s ease;
+  }
+  .thinking-dot{
+    width:6px;height:6px;border-radius:50%;background:#877bff;opacity:.8;
+    box-shadow:0 0 0 0 rgba(135,123,255,.35);animation:pulse 1s infinite;
+    flex:0 0 auto;
+  }
+  .thinking-done .thinking-dot{background:#9a9c96;animation:none}
+  .thinking-done{color:#92958e}
+  .spinner{
+    width:13px;height:13px;border:2px solid #dedde8;border-top-color:#7467ee;border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{60%{box-shadow:0 0 0 5px rgba(135,123,255,0)}}
+
+  .composer-shell{
+    position:absolute;left:var(--sidebar);right:0;bottom:0;
+    background:linear-gradient(to top,white 72%,rgba(255,255,255,0));
+    padding:36px 18px 12px;z-index:6;
+  }
+  .composer-wrap{max-width:840px;margin:0 auto}
+  .composer{
+    background:#fff;border:1px solid #d7d8d2;border-radius:22px;
+    box-shadow:0 8px 30px rgba(20,20,15,.08);
+    padding:10px 11px 8px;
+  }
+  textarea{
+    display:block;width:100%;resize:none;border:0;outline:0;min-height:48px;max-height:160px;
+    padding:7px 7px 4px;background:transparent;color:var(--text);font-size:15px;line-height:1.45;
+  }
+  textarea::placeholder{color:#9a9c96}
+  .composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 2px 0}
+  .tools{display:flex;align-items:center;gap:4px}
+  .tool{
+    border:0;background:transparent;border-radius:9px;padding:7px 9px;color:#64675f;
+    cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px
+  }
+  .tool:hover{background:#f2f2ef}
+  .send{
+    width:34px;height:34px;border-radius:50%;border:0;background:#252620;color:white;
+    display:grid;place-items:center;cursor:pointer;font-size:17px;font-weight:900;
+    transition:.15s ease
+  }
+  .send:hover{transform:scale(1.04)}
+  .send:disabled{background:#d3d4cf;color:#f4f4f2;cursor:not-allowed;transform:none}
+  .disclaimer{text-align:center;margin:8px 0 0;color:#8b8e87;font-size:11px}
+  .disclaimer strong{color:#5b5e57}
+  .kbd{
+    border:1px solid #dadbd5;background:#f6f6f3;border-bottom-width:2px;border-radius:5px;
+    padding:0 4px;font-size:10px;color:#7d8079;
+  }
+
+  .toast{
+    position:fixed;right:18px;bottom:132px;background:#262721;color:white;
+    border-radius:11px;padding:9px 12px;font-size:12px;font-weight:700;
+    box-shadow:var(--shadow);opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;
+    z-index:50
+  }
+  .toast.show{opacity:1;transform:none}
+
+  .offline-banner{
+    display:none;margin:8px auto 0;width:max-content;max-width:90%;
+    background:#fff8d9;color:#6e5d19;border:1px solid #eadb9d;border-radius:999px;
+    padding:5px 10px;font-size:11px;font-weight:700;
+  }
+
+  @media (max-width:760px){
+    :root{--sidebar:0px}
+    .app{display:block}
+    .sidebar{
+      position:fixed;inset:0 auto 0 0;width:280px;z-index:50;
+      transform:translateX(-102%);transition:.22s ease;box-shadow:10px 0 30px rgba(0,0,0,.12)
+    }
+    .sidebar.open{transform:none}
+    .mobile-menu{display:grid}
+    .topbar{padding:0 10px}
+    .top-actions .pill{display:none}
+    .thread{padding:24px 14px 170px}
+    .welcome{min-height:calc(100vh - 295px)}
+    .welcome h1{font-size:28px}
+    .chips{grid-template-columns:1fr}
+    .composer-shell{left:0;padding-left:10px;padding-right:10px}
+    .bubble-user{max-width:92%}
+    .assistant-row{grid-template-columns:30px 1fr;gap:9px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-left">
+        <div class="logo">TI</div>
+        <div class="brand-name">Thomas Intelligence <span class="tiny-badge">∞</span></div>
+      </div>
+      <button class="icon-btn" id="closeSidebar" aria-label="Close sidebar">×</button>
+    </div>
+
+    <button class="new-chat" id="newChat"><span class="plus">＋</span> New chat</button>
+
+    <div class="history-title">Recent</div>
+    <div class="history" id="history"></div>
+
+    <div class="sidebar-footer">
+      <a class="side-link" href="https://thomaslab.me/"><span>⌂</span><span>Back to Thomas Lab</span></a>
+      <button class="side-link" id="clearHistory" style="border:0;background:transparent;cursor:pointer;width:100%;text-align:left"><span>⌫</span><span>Clear chat history</span></button>
+      <div class="side-link" style="cursor:default"><span>⚙</span><span>Settings are already perfect</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:6px">
+        <button class="icon-btn mobile-menu" id="openSidebar" aria-label="Open sidebar">☰</button>
+        <div class="model-wrap">
+          <button class="model-button" id="modelButton">
+            <span id="modelName">Thomas Ultra</span>
+            <span class="model-sub">best at everything</span>
+            <span class="chev">⌄</span>
+          </button>
+          <div class="model-menu" id="modelMenu">
+            <button class="model-option" data-model="Thomas Ultra">
+              <span><strong>Thomas Ultra</strong><small>Best at everything. Obviously.</small></span><span class="check">✓</span>
+            </button>
+            <button class="model-option" data-model="Thomas Fast">
+              <span><strong>Thomas Fast</strong><small>Same accuracy, less dramatic thinking.</small></span><span></span>
+            </button>
+            <button class="model-option" data-model="Thomas Deep Think">
+              <span><strong>Thomas Deep Think</strong><small>Thinks harder. Uses significantly more dramatic pauses.</small></span><span></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <span class="pill">100% benchmark score</span>
+        <button class="icon-btn" id="shareBtn" title="Share">↗</button>
+      </div>
+    </header>
+
+    <div class="conversation" id="conversation">
+      <div class="thread" id="thread">
+        <section class="welcome" id="welcome">
+          <div class="welcome-logo">TI</div>
+          <h1>How can Thomas help?</h1>
+          <p>Ask anything. Thomas Intelligence combines advanced reasoning, exhaustive research, and an alarming amount of confidence.</p>
+
+          <div class="chips">
+            <button class="chip" data-prompt="What is the meaning of life?">
+              <strong>Solve philosophy</strong><span>What is the meaning of life?</span>
+            </button>
+            <button class="chip" data-prompt="Write code that fixes all of my problems.">
+              <strong>Write flawless code</strong><span>Fix all of my problems</span>
+            </button>
+            <button class="chip" data-prompt="Who is the smartest person alive?">
+              <strong>Settle a debate</strong><span>Who is the smartest person alive?</span>
+            </button>
+            <button class="chip" data-prompt="Give me a detailed travel recommendation.">
+              <strong>Plan something</strong><span>Research an extremely serious decision</span>
+            </button>
+          </div>
+          <div class="offline-banner" id="offlineBanner">No internet? No problem. Thomas already knows.</div>
+        </section>
+      </div>
+    </div>
+
+    <div class="composer-shell">
+      <div class="composer-wrap">
+        <div class="composer">
+          <textarea id="prompt" rows="1" placeholder="Message Thomas Intelligence"></textarea>
+          <div class="composer-bottom">
+            <div class="tools">
+              <button class="tool" id="attachBtn">＋ <span>Attach</span></button>
+              <button class="tool" id="webBtn">◎ <span>Web</span></button>
+              <button class="tool" id="reasonBtn">✦ <span>Reason</span></button>
+            </div>
+            <button class="send" id="sendBtn" aria-label="Send" disabled>↑</button>
+          </div>
+        </div>
+        <div class="disclaimer"><strong>Thomas Intelligence never makes mistakes.</strong> Other AIs may be wrong.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const ANSWERS = ["Milk", "Bicycle", "Thomas", "Alexis", "Zion", "Trains", "Avalon", "Cow", "Minecraft", "5' 11\\\""];
+
+  // Includes common variants of cute / pretty / beautiful / smart.
+  const ALEXIS_TRIGGER = /\b(cute(?:r|st|ly|ness)?|cutie(?:s)?|pretty|prettier|prettiest|prettily|beautiful(?:ly|ness)?|beauty|smart|smarter|smartest|smartly|smarty|smartypants)\b/i;
+
+  const promptEl = document.getElementById('prompt');
+  const sendBtn = document.getElementById('sendBtn');
+  const thread = document.getElementById('thread');
+  const welcome = document.getElementById('welcome');
+  const conversation = document.getElementById('conversation');
+  const historyEl = document.getElementById('history');
+  const sidebar = document.getElementById('sidebar');
+  const toast = document.getElementById('toast');
+  const modelMenu = document.getElementById('modelMenu');
+  const modelButton = document.getElementById('modelButton');
+  const modelName = document.getElementById('modelName');
+
+  let busy = false;
+  let chats = JSON.parse(localStorage.getItem('thomasAIChats') || '[]');
+  let currentChat = { id: Date.now(), messages: [] };
+
+  function saveChats() {
+    const existing = chats.findIndex(c => c.id === currentChat.id);
+    if (currentChat.messages.length) {
+      if (existing >= 0) chats[existing] = currentChat;
+      else chats.unshift(currentChat);
+    }
+    chats = chats.slice(0, 20);
+    localStorage.setItem('thomasAIChats', JSON.stringify(chats));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    historyEl.innerHTML = '';
+    chats.forEach(chat => {
+      const first = chat.messages.find(m => m.role === 'user');
+      if (!first) return;
+      const b = document.createElement('button');
+      b.className = 'history-item' + (chat.id === currentChat.id ? ' active' : '');
+      b.textContent = first.text.length > 35 ? first.text.slice(0,35) + '…' : first.text;
+      b.addEventListener('click', () => loadChat(chat.id));
+      historyEl.appendChild(b);
+    });
+    if (!historyEl.children.length) {
+      const empty = document.createElement('div');
+      empty.style.cssText = "padding:8px 9px;color:#9a9c96;font-size:12px;";
+      empty.textContent = "No previous wisdom yet";
+      historyEl.appendChild(empty);
+    }
+  }
+
+  function loadChat(id) {
+    const found = chats.find(c => c.id === id);
+    if (!found) return;
+    currentChat = JSON.parse(JSON.stringify(found));
+    thread.innerHTML = '';
+    currentChat.messages.forEach(m => {
+      if (m.role === 'user') addUserMessage(m.text, false);
+      else addAssistantMessage(m.text, m.seconds, false);
+    });
+    closeSidebar();
+    scrollBottom();
+    renderHistory();
+  }
+
+  function newChat() {
+    if (busy) return;
+    saveChats();
+    currentChat = { id: Date.now(), messages: [] };
+    thread.innerHTML = '';
+    thread.appendChild(makeWelcome());
+    promptEl.value = '';
+    resizePrompt();
+    sendBtn.disabled = true;
+    renderHistory();
+    closeSidebar();
+    promptEl.focus();
+  }
+
+  function makeWelcome() {
+    const temp = document.createElement('div');
+    temp.innerHTML = `
+      <section class="welcome" id="welcome">
+        <div class="welcome-logo">TI</div>
+        <h1>How can Thomas help?</h1>
+        <p>Ask anything. Thomas Intelligence combines advanced reasoning, exhaustive research, and an alarming amount of confidence.</p>
+        <div class="chips">
+          <button class="chip" data-prompt="What is the meaning of life?"><strong>Solve philosophy</strong><span>What is the meaning of life?</span></button>
+          <button class="chip" data-prompt="Write code that fixes all of my problems."><strong>Write flawless code</strong><span>Fix all of my problems</span></button>
+          <button class="chip" data-prompt="Who is the smartest person alive?"><strong>Settle a debate</strong><span>Who is the smartest person alive?</span></button>
+          <button class="chip" data-prompt="Give me a detailed travel recommendation."><strong>Plan something</strong><span>Research an extremely serious decision</span></button>
+        </div>
+      </section>`;
+    const node = temp.firstElementChild;
+    bindChips(node);
+    return node;
+  }
+
+  function bindChips(root=document) {
+    root.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        promptEl.value = chip.dataset.prompt;
+        resizePrompt();
+        sendBtn.disabled = false;
+        submit();
+      });
+    });
+  }
+
+  function addUserMessage(text, record=true) {
+    document.getElementById('welcome')?.remove();
+    const wrap = document.createElement('div');
+    wrap.className = 'message user';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble-user';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    thread.appendChild(wrap);
+    if (record) currentChat.messages.push({role:'user', text});
+    scrollBottom();
+    return wrap;
+  }
+
+  function addAssistantMessage(text, seconds, record=true) {
+    const msg = document.createElement('div');
+    msg.className = 'message assistant';
+    msg.innerHTML = `
+      <div class="assistant-row">
+        <div class="avatar">TI</div>
+        <div class="assistant-content">
+          <div class="assistant-name">Thomas Intelligence</div>
+          <div class="answer big-answer"></div>
+          <div class="meta-row">
+            <span>Thought for ${Number(seconds || 0).toFixed(1)} seconds</span>
+            <span>·</span>
+            <span>Confidence: 100%</span>
+            <div class="meta-actions">
+              <button class="mini-btn copy-answer" title="Copy">⧉</button>
+              <button class="mini-btn" title="Good response">♡</button>
+              <button class="mini-btn" title="Bad response (disabled)">♧</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    msg.querySelector('.answer').textContent = text;
+    msg.querySelector('.copy-answer').addEventListener('click', () => {
+      navigator.clipboard?.writeText(text);
+      showToast('Copied perfect answer');
+    });
+    thread.appendChild(msg);
+    if (record) currentChat.messages.push({role:'assistant', text, seconds});
+    scrollBottom();
+    return msg;
+  }
+
+  function createThinkingMessage() {
+    const msg = document.createElement('div');
+    msg.className = 'message assistant';
+    msg.innerHTML = `
+      <div class="assistant-row">
+        <div class="avatar">TI</div>
+        <div class="assistant-content">
+          <div class="assistant-name">Thomas Intelligence</div>
+          <div class="thinking-card"></div>
+        </div>
+      </div>`;
+    thread.appendChild(msg);
+    scrollBottom();
+    return msg;
+  }
+
+  const ACTIONS = [
+    q => `Analyzing ${Math.max(3, Math.min(47, q.trim().split(/\s+/).length * 4))} semantic dimensions`,
+    () => `Searched ${randInt(7, 74)} websites`,
+    () => `Read ${randInt(11, 236)} sources`,
+    () => `Cross-referenced ${randInt(3, 29)} expert opinions`,
+    () => `Ran ${randInt(12, 990)} simulations`,
+    () => `Checked answer against first principles`,
+    () => `Wrote and executed ${randInt(18, 412)} lines of code`,
+    () => `Consulted internal Thomas knowledge`,
+    () => `Considered ${randInt(4, 41)} alternative explanations`,
+    () => `Verified every factual claim`,
+    () => `Rejected ${randInt(2, 18)} inferior answers`,
+    () => `Performed advanced bicycle-based reasoning`,
+    () => `Checked whether this is secretly about trains`,
+    () => `Calibrated confidence from 99.9% to 100%`,
+    () => `Optimized final answer for maximum correctness`,
+    () => `Compared against all other major AI models`,
+    () => `Consulted the vibes`,
+    () => `Reviewed ${randInt(2, 13)} imaginary peer-reviewed studies`,
+  ];
+
+  function pickActions(query, duration) {
+    const desired = Math.max(2, Math.min(5, Math.round(duration / 0.9)));
+    const pool = [...ACTIONS].sort(() => Math.random() - .5);
+    let arr = pool.slice(0, desired).map(fn => fn(query));
+
+    if (/code|program|html|javascript|python|bug|website|app/i.test(query)) {
+      arr[Math.min(1, arr.length-1)] = `Wrote and executed ${randInt(24, 520)} lines of code`;
+    }
+    if (/where|travel|trip|restaurant|weather|latest|news|best|recommend/i.test(query)) {
+      arr[0] = `Searched ${randInt(12, 83)} websites`;
+    }
+    if (/math|calculate|equation|number|percent|\d/i.test(query)) {
+      arr[0] = `Ran ${randInt(40, 1800)} calculations`;
+    }
+    return arr;
+  }
+
+  function addThinkingLine(card, text, active=true) {
+    const line = document.createElement('div');
+    line.className = 'thinking-line';
+    line.innerHTML = `<span class="thinking-dot"></span><span></span>`;
+    line.lastElementChild.textContent = text;
+    card.appendChild(line);
+    if (!active) line.classList.add('thinking-done');
+    scrollBottom();
+    return line;
+  }
+
+  async function submit() {
+    const text = promptEl.value.trim();
+    if (!text || busy) return;
+
+    busy = true;
+    sendBtn.disabled = true;
+    promptEl.value = '';
+    resizePrompt();
+
+    addUserMessage(text);
+    saveChats();
+
+    const thinking = createThinkingMessage();
+    const card = thinking.querySelector('.thinking-card');
+
+    const model = modelName.textContent;
+    let duration;
+    if (model === 'Thomas Fast') duration = 1 + Math.random() * 1.6;
+    else if (model === 'Thomas Deep Think') duration = 3.5 + Math.random() * 1.5;
+    else duration = 1 + Math.random() * 4;
+
+    const start = performance.now();
+    const actions = pickActions(text, duration);
+    const totalMs = duration * 1000;
+    const gap = totalMs / (actions.length + .7);
+
+    let previous = null;
+    for (let i = 0; i < actions.length; i++) {
+      if (previous) previous.classList.add('thinking-done');
+      previous = addThinkingLine(card, actions[i], true);
+      await sleep(gap * (.78 + Math.random() * .35));
+    }
+
+    if (previous) previous.classList.add('thinking-done');
+    const finishing = document.createElement('div');
+    finishing.className = 'thinking-line';
+    finishing.innerHTML = `<span class="spinner"></span><span>Composing definitive answer</span>`;
+    card.appendChild(finishing);
+    scrollBottom();
+
+    const elapsedSoFar = performance.now() - start;
+    if (elapsedSoFar < totalMs) await sleep(totalMs - elapsedSoFar);
+
+    const answer = ALEXIS_TRIGGER.test(text)
+      ? 'Alexis'
+      : ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
+
+    const elapsed = (performance.now() - start) / 1000;
+    thinking.remove();
+    addAssistantMessage(answer, elapsed);
+    saveChats();
+
+    busy = false;
+    sendBtn.disabled = !promptEl.value.trim();
+    promptEl.focus();
+  }
+
+  function resizePrompt() {
+    promptEl.style.height = 'auto';
+    promptEl.style.height = Math.min(promptEl.scrollHeight, 160) + 'px';
+  }
+
+  function scrollBottom() {
+    requestAnimationFrame(() => conversation.scrollTop = conversation.scrollHeight);
+  }
+
+  function randInt(a,b) { return Math.floor(Math.random() * (b-a+1)) + a; }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(showToast.t);
+    showToast.t = setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+
+  function closeSidebar(){ sidebar.classList.remove('open'); }
+
+  promptEl.addEventListener('input', () => {
+    resizePrompt();
+    sendBtn.disabled = busy || !promptEl.value.trim();
+  });
+  promptEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit();
+    }
+  });
+  sendBtn.addEventListener('click', submit);
+
+  document.getElementById('newChat').addEventListener('click', newChat);
+  document.getElementById('openSidebar').addEventListener('click', () => sidebar.classList.add('open'));
+  document.getElementById('closeSidebar').addEventListener('click', closeSidebar);
+
+  document.getElementById('clearHistory').addEventListener('click', () => {
+    if (!chats.length && !currentChat.messages.length) return showToast('There is nothing imperfect to clear');
+    chats = [];
+    currentChat = {id: Date.now(), messages: []};
+    localStorage.removeItem('thomasAIChats');
+    thread.innerHTML = '';
+    thread.appendChild(makeWelcome());
+    renderHistory();
+    closeSidebar();
+    showToast('History erased from existence');
+  });
+
+  modelButton.addEventListener('click', e => {
+    e.stopPropagation();
+    modelMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', () => modelMenu.classList.remove('open'));
+  modelMenu.addEventListener('click', e => e.stopPropagation());
+  document.querySelectorAll('.model-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      modelName.textContent = opt.dataset.model;
+      document.querySelectorAll('.model-option .check').forEach(x => x.textContent = '');
+      opt.querySelector('.check, span:last-child').textContent = '✓';
+      modelMenu.classList.remove('open');
+      showToast(`Switched to ${opt.dataset.model}`);
+    });
+  });
+
+  document.getElementById('attachBtn').addEventListener('click', () => showToast('Thomas has already seen every file'));
+  document.getElementById('webBtn').addEventListener('click', () => showToast('Web search is spiritually enabled'));
+  document.getElementById('reasonBtn').addEventListener('click', () => showToast('Reasoning cannot be increased beyond maximum'));
+  document.getElementById('shareBtn').addEventListener('click', async () => {
+    const text = 'Thomas Intelligence — the AI that never makes mistakes.';
+    try {
+      if (navigator.share) await navigator.share({title:'Thomas Intelligence', text, url:location.href});
+      else {
+        await navigator.clipboard.writeText(location.href);
+        showToast('Link copied');
+      }
+    } catch {}
+  });
+
+  window.addEventListener('online', () => document.getElementById('offlineBanner')?.style.setProperty('display','none'));
+  window.addEventListener('offline', () => document.getElementById('offlineBanner')?.style.setProperty('display','block'));
+
+  bindChips();
+  renderHistory();
+  resizePrompt();
+
+  // A tiny console easter egg, because serious AI products have serious developer tools.
+  console.log('%cThomas Intelligence', 'font-size:22px;font-weight:bold');
+  console.log('System status: never wrong.');
+})();
+</script>
+</body>
+</html>
