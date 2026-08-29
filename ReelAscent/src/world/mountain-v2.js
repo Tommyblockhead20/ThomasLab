@@ -45,6 +45,11 @@ export const SUMMIT_ROUTE_CONNECTOR = Object.freeze({
   thresholdRadius: CROWN_TOP_RADIUS - .28,
   maximumVerticalGap: .82
 });
+export const CROWN_DENSITY_CONFIG = Object.freeze({
+  routeStages: 28,
+  branchStages: Object.freeze([4, 9, 14, 19, 24]),
+  beltCounts: Object.freeze([48, 44, 40, 36, 30, 24])
+});
 // V2.8 raises the static terrain resolution so small/medium fishing basins are actually
 // represented by the core mesh rather than being approximated by huge triangular facets.
 // Important escarpment radii are kept explicitly alongside an approximately 3 m cadence.
@@ -909,14 +914,26 @@ export class MountainWorld extends TestWorld {
       vertex[2] * size.z
     ]));
     const colliderDesc = this.RAPIER.ColliderDesc.convexHull(points);
-    if (!colliderDesc) return entity;
+    if (!colliderDesc) {
+      entity.destroy();
+      this.rejectedRocks.push(`${name} (invalid collider hull)`);
+      return null;
+    }
     colliderDesc
       .setTranslation(groundedPosition.x, groundedPosition.y, groundedPosition.z)
       .setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w })
       .setFriction(.9)
       .setRestitution(0);
     entity.physicsCollider = this.physicsWorld.createCollider(colliderDesc);
-    if (options.climbMaterial) this.registerClimbSurface(entity, entity.physicsCollider, options.climbMaterial);
+    let climbMaterial = options.climbMaterial;
+    if (climbMaterial === undefined && options.climbable !== false && options.decorative !== true) {
+      if (material === this.materials.unclimbable) climbMaterial = 'ungrippable';
+      else if (material === this.materials.roughRock || material === this.materials.holdRough) climbMaterial = 'rough';
+      else if (material === this.materials.smoothRock || material === this.materials.wetRock || material === this.materials.holdSmooth) climbMaterial = 'smooth';
+      else if (material === this.materials.ice || material === this.materials.holdIce) climbMaterial = 'ice';
+      else climbMaterial = 'normal';
+    }
+    if (climbMaterial) this.registerClimbSurface(entity, entity.physicsCollider, climbMaterial);
     const localX = groundedPosition.x - MOUNTAIN_CENTER.x;
     const localZ = groundedPosition.z - MOUNTAIN_CENTER.z;
     let angle = Math.atan2(localZ, localX) * 180 / Math.PI;
@@ -933,7 +950,9 @@ export class MountainWorld extends TestWorld {
       contactCount: placement.support.contactCount,
       maximumExposure: placement.exposure?.maximum ?? null,
       visibleFraction: placement.exposure?.visibleFraction ?? null,
-      supportKind: 'mountain-core'
+      supportKind: 'mountain-core',
+      climbMaterial: climbMaterial ?? null,
+      grippable: Boolean(this.climbSurfaces.get(entity.physicsCollider.handle))
     });
     return entity;
   }
@@ -1887,7 +1906,7 @@ export class MountainWorld extends TestWorld {
     // stretching the old rocks apart. Lines still zigzag and converge, but upper rocks
     // shrink with circumference to avoid coplanar overlap / texture flicker near the cap.
     CROWN_ROUTES.forEach((route, routeIndex) => {
-      const stageCount = 22;
+      const stageCount = CROWN_DENSITY_CONFIG.routeStages;
       const baseDifficulty = climbDifficultyAt(route.angle, 3);
       const side = route.sway;
       let lastAngle = route.angle;
@@ -1935,7 +1954,7 @@ export class MountainWorld extends TestWorld {
 
         // Traverse branches stop before the cramped top quarter. This keeps lateral
         // choices lower down without layering nearly coplanar meshes around the cap.
-        if ((stage === 5 || stage === 12) && t < .74) {
+        if (CROWN_DENSITY_CONFIG.branchStages.includes(stage) && t < .9) {
           const branchSide = (routeIndex + stage) % 2 ? 1 : -1;
           for (let branchStep = 0; branchStep < 2; branchStep += 1) {
             const branchAngle = angle + branchSide * (.45 + branchStep * .35);
@@ -1943,9 +1962,9 @@ export class MountainWorld extends TestWorld {
               routeIndex + 73 + branchStep, extraDifficulty + .04);
             this.addRadialRock(`${route.label} crown traverse ${stage + 1}-${branchStep + 1}`,
               branchAngle, radius - .08, centerY + .05 + branchStep * .16,
-              { x: Math.max(1.35, 2.1 * taper), y: 2.35 + branchStep * .3, z: 1.45 },
+              { x: Math.max(1.25, 1.95 * taper), y: 2.2 + branchStep * .28, z: 1.36 },
               this.materialForClimb(branchType), {
-                tangentOffset: tangent + branchSide * (2.25 + branchStep * 1.85),
+                tangentOffset: tangent + branchSide * (1.85 + branchStep * 1.5),
                 pitch: -(7 + t * 3),
                 roll: branchSide * 9,
                 climbMaterial: branchType,
@@ -1954,7 +1973,8 @@ export class MountainWorld extends TestWorld {
           }
         }
 
-        const addRest = stage === 10 && routeIndex % 6 === 0 && difficulty < .88;
+        const addRest = (stage === 8 && routeIndex % 5 === 0)
+          || (stage === 17 && routeIndex % 6 === 2 && difficulty < .9);
         if (addRest) {
           const ledgeType = difficulty > .72 ? 'normal' : 'rough';
           this.addRadialRock(`${route.label} rare crown rest`, angle, radius - .12, centerY - .22,
@@ -2039,11 +2059,12 @@ export class MountainWorld extends TestWorld {
     });
 
     const crownBelts = [
-      { t: .13, count: 42, phase: 4.4 },
-      { t: .29, count: 38, phase: 1.6 },
-      { t: .45, count: 34, phase: 6.8 },
-      { t: .61, count: 30, phase: 2.7 },
-      { t: .76, count: 24, phase: 8.1 }
+      { t: .11, count: CROWN_DENSITY_CONFIG.beltCounts[0], phase: 4.4 },
+      { t: .27, count: CROWN_DENSITY_CONFIG.beltCounts[1], phase: 1.6 },
+      { t: .43, count: CROWN_DENSITY_CONFIG.beltCounts[2], phase: 6.8 },
+      { t: .59, count: CROWN_DENSITY_CONFIG.beltCounts[3], phase: 2.7 },
+      { t: .74, count: CROWN_DENSITY_CONFIG.beltCounts[4], phase: 8.1 },
+      { t: .87, count: CROWN_DENSITY_CONFIG.beltCounts[5], phase: 3.9 }
     ];
     crownBelts.forEach((belt, beltIndex) => {
       const centerY = lerp(CROWN_BASE_HEIGHT + 1.3, SUMMIT_HEIGHT - 4.0, belt.t);

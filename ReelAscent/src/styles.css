@@ -171,6 +171,39 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.multiplayer-catch-feed {
+  position: absolute;
+  top: max(6.2rem, calc(env(safe-area-inset-top) + 6.2rem));
+  right: max(1.1rem, env(safe-area-inset-right));
+  display: grid;
+  width: min(22rem, calc(100vw - 2.2rem));
+  gap: .38rem;
+}
+
+.multiplayer-catch-feed[hidden] { display: none; }
+
+.multiplayer-catch-feed article {
+  display: grid;
+  gap: .14rem;
+  padding: .52rem .66rem;
+  color: #eef8e9;
+  font-size: .65rem;
+  background: rgb(8 35 35 / 78%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-left: .28rem solid #69bdf0;
+  border-radius: .52rem;
+  backdrop-filter: blur(8px);
+}
+
+.multiplayer-catch-feed strong { color: #f7df92; font-size: .7rem; }
+.multiplayer-catch-feed article[data-color="red"] { border-left-color: #e84f47; }
+.multiplayer-catch-feed article[data-color="green"] { border-left-color: #45bd6b; }
+.multiplayer-catch-feed article[data-color="gold"] { border-left-color: #efb333; }
+.multiplayer-catch-feed article[data-color="purple"] { border-left-color: #a864e6; }
+.multiplayer-catch-feed article[data-color="orange"] { border-left-color: #ef7a33; }
+.multiplayer-catch-feed article[data-color="cyan"] { border-left-color: #2bc7d1; }
+.multiplayer-catch-feed article[data-color="pink"] { border-left-color: #ef6dad; }
+
 kbd {
   color: #163f3c;
   font: inherit;
@@ -411,6 +444,9 @@ kbd {
 }
 
 .rhythm-stage {
+  --rhythm-receptor-bottom: 1.18rem;
+  --rhythm-receptor-size: 2.05rem;
+  --rhythm-receptor-radius: calc(var(--rhythm-receptor-size) / 2);
   display: grid;
   height: clamp(8rem, 21vh, 12rem);
   grid-template-columns: repeat(4, 1fr);
@@ -430,11 +466,11 @@ kbd {
 .rhythm-receptor {
   position: absolute;
   z-index: 2;
-  bottom: 1.18rem;
+  bottom: var(--rhythm-receptor-bottom);
   left: 50%;
   display: grid;
-  width: 2.05rem;
-  height: 2.05rem;
+  width: var(--rhythm-receptor-size);
+  height: var(--rhythm-receptor-size);
   place-items: center;
   translate: -50% 0;
   color: rgb(236 252 255 / 78%);
@@ -499,7 +535,10 @@ kbd {
 
 .note-layer {
   position: absolute;
-  inset: 0.42rem 0.3rem 1.66rem;
+  top: .42rem;
+  right: .3rem;
+  bottom: calc(var(--rhythm-receptor-bottom) + var(--rhythm-receptor-radius));
+  left: .3rem;
 }
 
 .rhythm-note {
@@ -1905,8 +1944,8 @@ body.mobile-mode .rhythm-panel {
 .fishing-performance {
   inset: 6.1rem auto auto 1rem;
   display: block;
-  width: min(24rem, calc(100vw - 2rem));
-  max-height: min(31rem, calc(100vh - 7rem));
+  width: min(38rem, calc(100vw - 2rem));
+  max-height: min(47rem, calc(100vh - 7rem));
   margin: 0;
   padding: .7rem;
   overflow: auto;
@@ -2010,6 +2049,53 @@ body.mobile-mode .rhythm-panel {
   font-style: normal;
 }
 
+.performance-rhythm-debug {
+  margin-top: .55rem;
+  padding-top: .48rem;
+  border-top: 1px solid rgb(239 217 139 / 22%);
+}
+
+.performance-rhythm-debug > header {
+  display: flex;
+  justify-content: space-between;
+  color: #f1dc93;
+  font-size: .52rem;
+  letter-spacing: .06em;
+}
+
+.performance-input-log {
+  max-height: 18rem;
+  margin-top: .35rem;
+  overflow: auto;
+  pointer-events: auto;
+  scrollbar-color: #d9bb66 rgb(255 255 255 / 8%);
+}
+
+.performance-input-log table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 700 .49rem/1.3 ui-monospace, monospace;
+  white-space: nowrap;
+}
+
+.performance-input-log th,
+.performance-input-log td {
+  padding: .28rem .34rem;
+  text-align: left;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+}
+
+.performance-input-log th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  color: rgb(234 244 231 / 58%);
+  background: rgb(8 34 35 / 98%);
+}
+
+.performance-input-log tr.is-counted td { color: #a9efbd; }
+.performance-input-log tr.is-mistake td { color: #f3b79b; }
+
 @media (max-width: 700px) {
   .fishing-performance {
     top: 5.4rem;
@@ -2086,4 +2172,3 @@ body.multiplayer-open #game-shell::after { position: absolute; z-index: 60; inse
 .multiplayer-roster li[data-connected="false"] {
   opacity: .62;
 }
-

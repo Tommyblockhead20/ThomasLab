@@ -133,7 +133,9 @@ export class MultiplayerClient extends EventTarget {
       length: Number(catchData.length) || 0,
       weight: Number(catchData.weight) || 0,
       shiny: Boolean(catchData.shiny),
-      locationLabel: String(catchData.locationLabel ?? '').slice(0, 100)
+      locationLabel: String(catchData.locationLabel ?? '').slice(0, 100),
+      presentationId: String(catchData.presentationId ?? '').slice(0, 140),
+      active: catchData.active !== false
     }));
   }
 
@@ -159,6 +161,8 @@ export class MultiplayerClient extends EventTarget {
       this.room.consumeSnapshot(message.payload);
     } else if (message.type === MESSAGE_TYPES.FISHING_STATE) {
       this.room.consumeFishingState(message.payload);
+    } else if (message.type === MESSAGE_TYPES.CATCH_EVENT) {
+      this.room.consumeCatchEvent(message.payload);
     } else if (message.type === MESSAGE_TYPES.ERROR) {
       const code = String(message.payload.code ?? 'server_error');
       const text = String(message.payload.message ?? 'Multiplayer service error.');
@@ -235,4 +239,3 @@ export class MultiplayerClient extends EventTarget {
     this.transport.close();
   }
 }
-

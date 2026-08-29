@@ -123,7 +123,9 @@ export class ProgressionSystem {
 
   importProgress(input) {
     const result = validateProgressImport(input);
-    this.saveSystem.replaceData(result.save);
+    if (!this.saveSystem.replaceData(result.save)) {
+      throw new Error('Progress was valid, but this browser could not save it. Your current progress was kept.');
+    }
     this.state = normalizeProgressionState(this.saveSystem.data.progression);
     this.saveSystem.data.progression = this.state;
     this.equipment.repairDefaults();

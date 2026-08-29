@@ -11,6 +11,19 @@ const CATEGORY_LABELS = Object.freeze({
 const OTHER_MODAL_OPEN = () => ['fish-gallery', 'journal-open', 'multiplayer-open']
   .some((className) => document.body.classList.contains(className));
 
+function downloadProgressJson(text, prefix = 'reel-ascent-progress') {
+  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  link.href = url;
+  link.download = `${prefix}-${timestamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 const TAB_COPY = Object.freeze({
   inventory: 'Every successful catch waits here until you sell it or send it to Aquarium.',
   gear: 'Purchase gear and equip one item in each category.',
@@ -117,15 +130,11 @@ export class InventoryMenu {
       this.transferFile?.click();
       return;
     }
-    if (action === 'export') {
+    if (action === 'download') {
       const text = this.progression.exportProgress();
       if (this.transferText) this.transferText.value = text;
-      try {
-        await navigator.clipboard?.writeText(text);
-        if (this.transferStatus) this.transferStatus.textContent = 'Progress copied to clipboard. Save this JSON somewhere safe.';
-      } catch {
-        if (this.transferStatus) this.transferStatus.textContent = 'Progress is ready below. Copy and save the JSON somewhere safe.';
-      }
+      downloadProgressJson(text);
+      if (this.transferStatus) this.transferStatus.textContent = 'Progress JSON downloaded. Keep it somewhere safe.';
       return;
     }
     if (action !== 'import' || !this.transferText) return;
@@ -135,8 +144,9 @@ export class InventoryMenu {
         `Replace this browser's durable progress with ${preview.summary.discovered} discoveries, ${preview.summary.inventory + preview.summary.aquarium} specimens, and $${preview.summary.money}?`
       );
       if (!accepted) return;
+      downloadProgressJson(this.progression.exportProgress(), 'reel-ascent-backup-before-import');
       this.progression.importProgress(this.transferText.value);
-      if (this.transferStatus) this.transferStatus.textContent = 'Progress imported. Reloading the game…';
+      if (this.transferStatus) this.transferStatus.textContent = 'Backup downloaded. Progress imported; reloading the game…';
       globalThis.setTimeout(() => globalThis.location?.reload(), 180);
     } catch (error) {
       if (this.transferStatus) this.transferStatus.textContent = error instanceof Error ? error.message : 'Progress import failed.';

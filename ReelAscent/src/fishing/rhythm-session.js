@@ -421,6 +421,7 @@ export class RhythmSession {
       } else if (note.status === 'pending' && this.songTime > note.hitTime + this.goodWindow) {
         this.missNote(note);
       }
+      if (this.result) return this.result;
     }
 
     if (this.judgment && this.songTime - this.judgmentTime > this.config.feedbackSeconds) {
@@ -551,6 +552,7 @@ export class RhythmSession {
         { type: 'timeout', noteId: note.id, lane: note.lane, time: mistakeTime, escapeContribution }
       );
     }
+    this.failCleanPerformanceIfNecessary();
   }
 
   registerOffBeat(inputLane, mistakeTime = this.songTime, timingTarget = null, signedMs = null) {
@@ -564,6 +566,13 @@ export class RhythmSession {
       `${this.laneLabel(inputLane)} — ${timing}${timingTarget ? ` (expected ${this.laneLabel(timingTarget.lane)})` : ''}`,
       { type: 'off-beat', noteId: timingTarget?.id ?? null, lane: inputLane, time: mistakeTime, signedMs, escapeContribution }
     );
+    this.failCleanPerformanceIfNecessary();
+  }
+
+  failCleanPerformanceIfNecessary() {
+    if (!this.requiresCleanPerformance || this.lossMeter <= 0) return false;
+    this.result = 'escaped';
+    return true;
   }
 
   laneLabel(lane) {
@@ -587,6 +596,9 @@ export class RhythmSession {
       lane,
       judgment,
       correct,
+      counted: correct,
+      mistake: !correct,
+      reason: correct ? null : judgment === 'WRONG LANE' ? 'wrong lane' : 'off beat',
       signedMs,
       expectedLanes: target ? this.expectedGroup(target.hitTime).map((note) => note.lane) : [],
       expectedHitTime: target?.hitTime ?? null,
@@ -601,7 +613,7 @@ export class RhythmSession {
   resolveOutcome() {
     const remaining = this.pattern.notes.filter((note) => note.status === 'pending' || note.status === 'holding').length;
     const songJudged = remaining === 0;
-    if (this.fish.shiny && this.lossMeter > 0) {
+    if (this.requiresCleanPerformance && this.lossMeter > 0) {
       // Shinies require a completely clean performance: no missed notes and no off-beat taps.
       this.result = 'escaped';
     } else if (this.lossMeter >= 1 && this.spacedMistakeCount >= 2) {
@@ -685,6 +697,11 @@ export class RhythmSession {
       expectedLanes: next ? this.expectedGroup(next.hitTime).map((note) => note.lane) : [],
       expectedHitTime: next?.hitTime ?? null,
       lastInput: this.lastInput,
+      inputLog: [...this.rawInputLog],
+      songTime: this.songTime,
+      perfectWindow: this.perfectWindow,
+      goodWindow: this.goodWindow,
+      requiresCleanPerformance: this.requiresCleanPerformance,
       activeHolds,
       streak: this.streak,
       mistakeLog: [...this.mistakeLog]
@@ -723,6 +740,10 @@ export class RhythmSession {
 
   get escapeProgress() {
     return clamp(this.fish.shiny && this.lossMeter > 0 ? 1 : this.lossMeter, 0, 1);
+  }
+
+  get requiresCleanPerformance() {
+    return Boolean(this.fish.shiny);
   }
 
   get nearLoss() {

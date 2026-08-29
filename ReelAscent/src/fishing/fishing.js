@@ -598,6 +598,7 @@ export class FishingController {
     this.resultTimer = 0;
     this.selectedFish = null;
     this.rhythm = null;
+    this.rhythmDebugAttempt = null;
     this.rhythmStartup = null;
     this.rhythmStartupToken = 0;
     this.lastRhythmBeat = -1;
@@ -2058,6 +2059,7 @@ export class FishingController {
         escapeGain: this.progression?.getModifier('escapeGain') ?? 1
       }
     );
+    this.rhythmDebugAttempt = this.rhythm.getDebugState();
     this.rhythmStartup = null;
       this.performanceEncounterSequence += 1;
       this.activePerformanceEncounter = {
@@ -2087,6 +2089,7 @@ export class FishingController {
       this.rhythmInputFeedback = { ...feedback, serial: this.rhythmInputSerial };
       this.rhythmInputFeedbackBatch.push(this.rhythmInputFeedback);
     }
+    this.rhythmDebugAttempt = this.rhythm.getDebugState();
     if (this.rhythm.beatIndex !== this.lastRhythmBeat) {
       this.lastRhythmBeat = this.rhythm.beatIndex;
       this.audio.beat(this.lastRhythmBeat % 4 === 0);
@@ -2169,6 +2172,7 @@ export class FishingController {
       showRecastHint
     };
     // End the rhythm state before catch presentation so the challenge panel cannot cover the fish.
+    this.rhythmDebugAttempt = this.rhythm?.getDebugState() ?? this.rhythmDebugAttempt;
     this.rhythm = null;
     this.resultTimer = 0;
     this.catchContinueQueued = false;
@@ -2185,6 +2189,7 @@ export class FishingController {
     this.recordPerformanceEncounter('escaped');
     this.player.input.endRhythmCapture();
     this.selectedFish = null;
+    this.rhythmDebugAttempt = this.rhythm?.getDebugState() ?? this.rhythmDebugAttempt;
     this.rhythm = null;
     this.rhythmStartup = null;
     this.showHookTutorial = false;
@@ -3065,6 +3070,7 @@ export class FishingController {
       } : null,
       castValid: Boolean(this.cast?.landingZone?.id === zone.id),
       catchGroundLift: this.catchGroundLift,
+      rhythmAttempt: this.rhythm?.getDebugState() ?? this.rhythmDebugAttempt,
       failure: this.lastFishingFailure
     };
   }

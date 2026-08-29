@@ -18,6 +18,7 @@ import { MultiplayerClient } from './multiplayer/multiplayer-client.js';
 import { MESSAGE_TYPES } from './multiplayer/protocol.js';
 import { MultiplayerMenu } from './ui/multiplayer-menu.js';
 import { describeTransientSession } from './persistence/session-state.js';
+import { createRemoteAvatar } from './multiplayer/remote-avatar.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -82,8 +83,11 @@ export class Game {
     this.inventory = new InventoryMenu(this.progression);
     this.activeMultiplayerSeed = null;
     this.lastMultiplayerFishingActive = false;
+    this.activeCatchPresentation = null;
+    this.remoteCatchNotices = new Map();
+    this.multiplayerCatchFeed = document.querySelector('#multiplayer-catch-feed');
     this.multiplayer = new MultiplayerClient(this.progression.state.player.id, {
-      createRemoteRepresentation: (playerId) => this.createRemotePlayerRepresentation(playerId),
+      createRemoteRepresentation: (playerId, colorIndex) => this.createRemotePlayerRepresentation(playerId, colorIndex),
       onAuthoritativeRunSeed: (runSeed) => this.applyAuthoritativeRunSeed(runSeed)
     });
     this.onMultiplayerMessage = (event) => this.handleMultiplayerMessage(event.detail);
@@ -184,6 +188,8 @@ export class Game {
       fishingState: multiplayerPlayerState.movementState === 'fishing' ? 'active' : null
     });
     this.syncMultiplayerFishingState(multiplayerPlayerState);
+    this.syncMultiplayerCatchPresentation();
+    this.updateRemoteCatchNotices();
     this.fishing.updateDebug(dt);
     this.fishingPerformance.update(this.fishing.getFishingPerformanceState());
     this.inventory.update();
@@ -192,46 +198,8 @@ export class Game {
     this.hud.update(dt, this.getState());
   }
 
-  createRemotePlayerRepresentation(playerId) {
-    const root = new pc.Entity(`Remote player ${playerId}`);
-    const material = new pc.StandardMaterial();
-    material.diffuse = new pc.Color(0.28, 0.72, 0.95);
-    material.emissive = new pc.Color(0.025, 0.06, 0.08);
-    material.gloss = 0.2;
-    material.update();
-
-    const body = new pc.Entity('Remote body');
-    body.addComponent('render', { type: 'capsule', material, castShadows: true, receiveShadows: true });
-    body.setLocalScale(0.72, 1.12, 0.72);
-    body.setLocalPosition(0, -0.05, 0);
-    root.addChild(body);
-
-    const head = new pc.Entity('Remote head');
-    head.addComponent('render', { type: 'sphere', material, castShadows: true, receiveShadows: true });
-    head.setLocalScale(0.48, 0.48, 0.48);
-    head.setLocalPosition(0, 0.82, 0);
-    root.addChild(head);
-
-    const facing = new pc.Entity('Remote facing marker');
-    facing.addComponent('render', { type: 'box', material, castShadows: false, receiveShadows: false });
-    facing.setLocalScale(0.16, 0.16, 0.48);
-    facing.setLocalPosition(0, 0.35, -0.43);
-    root.addChild(facing);
-
-    const fishingRod = new pc.Entity('Remote fishing rod');
-    fishingRod.addComponent('render', { type: 'box', material, castShadows: true, receiveShadows: false });
-    fishingRod.setLocalScale(0.045, 1.25, 0.045);
-    fishingRod.setLocalPosition(0.48, 0.42, -0.28);
-    fishingRod.setLocalEulerAngles(28, 0, -18);
-    fishingRod.enabled = false;
-    root.addChild(fishingRod);
-    root.setFishingState = (value) => {
-      fishingRod.enabled = typeof value === 'object' ? Boolean(value?.active) : value === 'active';
-    };
-
-    root.setPosition(0, -1000, 0);
-    this.app.root.addChild(root);
-    return root;
+  createRemotePlayerRepresentation(playerId, colorIndex = 0) {
+    return createRemoteAvatar(this.app, playerId, colorIndex);
   }
 
   seededRandom(seed) {
@@ -267,8 +235,57 @@ export class Game {
   handleMultiplayerMessage(message) {
     if (message?.type !== MESSAGE_TYPES.CATCH_EVENT) return;
     const catchData = message.payload ?? {};
+    if (catchData.active === false) {
+      const current = this.remoteCatchNotices.get(catchData.playerId);
+      if (!catchData.presentationId || current?.presentationId === catchData.presentationId) {
+        this.remoteCatchNotices.delete(catchData.playerId);
+        this.renderRemoteCatchNotices();
+      }
+      return;
+    }
     const shiny = catchData.shiny ? ' SHINY' : '';
-    this.hud.showToast?.(`Player caught${shiny} ${catchData.name || catchData.speciesId || 'something'}!`);
+    const player = this.multiplayer.room.getPlayerPresentation(catchData.playerId);
+    const identity = `${player?.colorName ?? 'REMOTE'} PLAYER`;
+    this.remoteCatchNotices.set(catchData.playerId, {
+      presentationId: catchData.presentationId,
+      identity,
+      color: player?.colorName?.toLowerCase?.() ?? 'blue',
+      title: `${identity} CAUGHT${shiny}`,
+      detail: `${catchData.name || catchData.speciesId || 'Unknown catch'} • ${Number(catchData.length).toFixed(1)} in • ${Number(catchData.weight).toFixed(2)} lb`,
+      expiresAt: Date.now() + 22_000
+    });
+    this.renderRemoteCatchNotices();
+  }
+
+  updateRemoteCatchNotices(now = Date.now()) {
+    let changed = false;
+    for (const [playerId, notice] of this.remoteCatchNotices) {
+      if (now < notice.expiresAt) continue;
+      this.remoteCatchNotices.delete(playerId);
+      changed = true;
+    }
+    if (changed) this.renderRemoteCatchNotices();
+  }
+
+  renderRemoteCatchNotices() {
+    if (!this.multiplayerCatchFeed) return;
+    this.multiplayerCatchFeed.replaceChildren(...[...this.remoteCatchNotices.values()].map((notice) => {
+      const card = document.createElement('article');
+      card.dataset.color = notice.color;
+      const title = document.createElement('strong');
+      title.textContent = notice.title;
+      const detail = document.createElement('span');
+      detail.textContent = notice.detail;
+      card.append(title, detail);
+      return card;
+    }));
+    this.multiplayerCatchFeed.hidden = this.remoteCatchNotices.size === 0;
+  }
+
+  syncMultiplayerCatchPresentation() {
+    if (!this.activeCatchPresentation || this.fishing.state === 'caught') return;
+    this.multiplayer.sendCatchEvent({ ...this.activeCatchPresentation, active: false });
+    this.activeCatchPresentation = null;
   }
 
   syncPersistentProgress() {
@@ -276,7 +293,12 @@ export class Game {
       if (this.persistedCatches.has(catchData)) continue;
       this.persistedCatches.add(catchData);
       this.saveSystem.recordCatch(catchData);
-      this.multiplayer.sendCatchEvent(catchData);
+      const presentation = {
+        ...catchData,
+        presentationId: `${catchData.speciesId}:${catchData.caughtAt}`,
+        active: true
+      };
+      if (this.multiplayer.sendCatchEvent(presentation)) this.activeCatchPresentation = presentation;
       this.journal.refresh();
     }
 
@@ -332,4 +354,3 @@ export class Game {
     this.physicsWorld.free();
   }
 }
-

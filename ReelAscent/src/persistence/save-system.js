@@ -258,7 +258,10 @@ export class SaveSystem {
   }
 
   replaceData(value) {
+    const previous = this.data;
     this.data = migrate(value);
-    return this.save();
+    if (this.save()) return true;
+    this.data = previous;
+    return false;
   }
 }

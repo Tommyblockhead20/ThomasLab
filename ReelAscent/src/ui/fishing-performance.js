@@ -17,10 +17,14 @@ export class FishingPerformanceMenu {
       selected: document.querySelector('#performance-selected'),
       modifiers: document.querySelector('#performance-modifiers'),
       failure: document.querySelector('#performance-failure'),
-      candidates: document.querySelector('#performance-candidates')
+      candidates: document.querySelector('#performance-candidates'),
+      inputSummary: document.querySelector('#performance-input-summary'),
+      inputLog: document.querySelector('#performance-input-log'),
+      inputRows: document.querySelector('#performance-input-rows')
     };
     this.isOpen = false;
     this.lastRenderAt = 0;
+    this.lastInputCount = -1;
 
     this.onKeyDown = (event) => {
       if (event.code !== FISHING_DEBUG_TOGGLE_CODE || event.repeat) return;
@@ -84,7 +88,29 @@ export class FishingPerformanceMenu {
           `<li><span>${candidate.name} <i>${candidate.rarity}</i></span><b>${(candidate.probability * 100).toFixed(1)}%</b></li>`
         )).join('')
       : '<li><span>No water in cast range</span><b>—</b></li>';
+    const attempt = debug.rhythmAttempt;
+    const inputs = attempt?.inputLog ?? [];
+    this.fields.inputSummary.textContent = attempt
+      ? `${inputs.length} PRESS${inputs.length === 1 ? '' : 'ES'} • ${attempt.requiresCleanPerformance ? 'CLEAN REQUIRED' : 'STANDARD'}`
+      : 'NO ATTEMPT';
+    this.fields.inputRows.innerHTML = inputs.length
+      ? inputs.map((input) => {
+          const expected = input.expectedLanes?.length ? input.expectedLanes.map((lane) => this.laneLabel(lane)).join('+') : '—';
+          const delta = Number.isFinite(input.signedMs) ? `${input.signedMs > 0 ? '+' : ''}${input.signedMs}` : '—';
+          const status = input.counted ? 'COUNTED' : `IGNORED • ${input.reason ?? input.judgment.toLowerCase()}`;
+          const chartTime = `${displayNumber(input.inputTime, 3)} / ${displayNumber(input.expectedHitTime, 3)}`;
+          return `<tr class="${input.mistake ? 'is-mistake' : 'is-counted'}"><td>${input.serial}</td><td>${this.laneLabel(input.lane)}</td><td>${expected}</td><td>${delta}</td><td>${input.judgment}</td><td>${status}${input.mistake ? ' • MISTAKE' : ''}</td><td>${chartTime}</td></tr>`;
+        }).join('')
+      : '<tr><td colspan="7">No inputs in this attempt.</td></tr>';
+    if (inputs.length !== this.lastInputCount) {
+      this.lastInputCount = inputs.length;
+      if (this.fields.inputLog) this.fields.inputLog.scrollTop = this.fields.inputLog.scrollHeight;
+    }
     if (force) this.screen.dataset.rendered = 'true';
+  }
+
+  laneLabel(lane) {
+    return ({ A: 'LEFT', W: 'UP', S: 'DOWN', D: 'RIGHT' })[lane] ?? lane ?? '—';
   }
 
   destroy() {
