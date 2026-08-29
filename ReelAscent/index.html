@@ -72,9 +72,15 @@
           <span><kbd>J</kbd> Journal</span>
           <span><kbd>I</kbd> Inventory</span>
           <span><kbd>M</kbd> Multiplayer</span>
+          <span><kbd>E</kbd> Emotes</span>
         </div>
 
         <section id="multiplayer-catch-feed" class="multiplayer-catch-feed" hidden aria-live="polite" aria-label="Remote catches"></section>
+        <aside id="home-interaction-prompt" class="home-interaction-prompt" hidden aria-live="polite">
+          <span class="eyebrow">TRAIL CABIN</span>
+          <strong id="home-interaction-label">INTERACT</strong>
+          <button id="home-interaction-action" type="button">INTERACT <kbd>X</kbd></button>
+        </aside>
 
         <div id="grip-prompt" class="grip-prompt" hidden>Hold <kbd>Click / G</kbd> — Grip</div>
         <div id="fish-prompt" class="fish-prompt" hidden>Press <kbd>F</kbd> — Fish</div>
@@ -209,6 +215,8 @@
           <button type="button" data-collection-tab="inventory" aria-pressed="true">INVENTORY</button>
           <button type="button" data-collection-tab="gear" aria-pressed="false">GEAR SHOP</button>
           <button type="button" data-collection-tab="aquarium" aria-pressed="false">AQUARIUM</button>
+          <button type="button" data-inventory-appearance>APPEARANCE</button>
+          <button type="button" data-inventory-map>TRAIL MAP</button>
         </nav>
         <p id="inventory-status" class="shop-status" aria-live="polite">Every successful catch waits here until you sell it or send it to Aquarium.</p>
         <div id="inventory-content" class="inventory-content"></div>
@@ -224,6 +232,71 @@
           </div>
           <small id="progress-transfer-status" aria-live="polite"></small>
         </details>
+      </section>
+
+      <section id="appearance-menu" class="appearance-menu" role="dialog" aria-modal="true" hidden aria-labelledby="appearance-title">
+        <header>
+          <div><span class="eyebrow">CABIN WARDROBE • SAVED LOCALLY</span><h2 id="appearance-title">Character Appearance</h2></div>
+          <button id="close-appearance" type="button">CLOSE <kbd>Esc</kbd></button>
+        </header>
+        <p id="appearance-status" class="appearance-status" aria-live="polite">Choose a lightweight trail look. Blue Blob is an intentional joke cosmetic—not the default.</p>
+        <div id="appearance-content" class="appearance-content"></div>
+      </section>
+
+      <section id="mountain-map" class="mountain-map" role="dialog" aria-modal="true" hidden aria-labelledby="mountain-map-title">
+        <header>
+          <div><span class="eyebrow">FIELD PACK • NO GPS</span><h2 id="mountain-map-title">Crooked Peak Trail Map</h2></div>
+          <button id="close-mountain-map" type="button">CLOSE <kbd>Esc</kbd></button>
+        </header>
+        <div class="mountain-map-layout">
+          <svg class="mountain-map-graphic" viewBox="0 0 520 520" role="img" aria-label="Stylized topographic map showing the coast, major waters, caves, progression shelves, Crown, and summit">
+            <defs><filter id="map-ink"><feTurbulence baseFrequency=".022" numOctaves="2" seed="8" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="4"/></filter></defs>
+            <rect width="520" height="520" rx="18" class="map-paper"/>
+            <g class="map-contours" filter="url(#map-ink)">
+              <ellipse cx="260" cy="268" rx="218" ry="204"/>
+              <ellipse cx="260" cy="266" rx="183" ry="170"/>
+              <ellipse cx="260" cy="264" rx="149" ry="137"/>
+              <ellipse cx="260" cy="261" rx="113" ry="104"/>
+              <ellipse cx="260" cy="257" rx="78" ry="72"/>
+              <ellipse cx="260" cy="252" rx="43" ry="39"/>
+            </g>
+            <path class="map-water" d="M30 424 C110 392 168 455 246 424 S390 390 494 426 L494 500 L30 500 Z"/>
+            <path class="map-route" d="M72 412 C128 374 130 322 190 303 S205 238 266 217 S324 163 288 101"/>
+            <path class="map-route alt" d="M447 415 C390 377 401 316 337 294 S329 232 266 217"/>
+            <g class="map-landmarks">
+              <g transform="translate(75 407)"><circle r="8"/><text x="12" y="4">COAST STARTS</text></g>
+              <g transform="translate(164 325)"><rect x="-7" y="-7" width="14" height="14"/><text x="12" y="4">CAVES + LOWER WATERS</text></g>
+              <g transform="translate(190 303)"><circle r="8"/><text x="12" y="-9">500 FT REST</text></g>
+              <g transform="translate(222 254)"><circle r="8"/><text x="12" y="4">600 FT CORE SHELF</text></g>
+              <g transform="translate(266 217)"><circle r="8"/><text x="12" y="4">700 FT SHOULDER</text></g>
+              <g transform="translate(298 154)"><path d="M0 -9 L9 7 L-9 7 Z"/><text x="14" y="4">CROWN</text></g>
+              <g transform="translate(288 101)"><path d="M0 -11 L4 -3 L12 -3 L6 3 L8 11 L0 7 L-8 11 L-6 3 L-12 -3 L-4 -3 Z"/><text x="15" y="4">SUMMIT TARN + BENCH</text></g>
+              <g transform="translate(354 330)"><path d="M-10 7 Q0 -13 10 7 Z"/><text x="14" y="4">FALLGLASS CASCADE</text></g>
+            </g>
+            <g class="map-compass" transform="translate(462 62)"><path d="M0 -22 L7 0 L0 22 L-7 0 Z"/><text x="-5" y="-28">N</text></g>
+          </svg>
+          <aside>
+            <p>This paper map shows broad landmarks and elevation structure only. It does not track your position.</p>
+            <ol>
+              <li><b>500 ft</b> — wide natural rest ledge and branch choices.</li>
+              <li><b>600 ft</b> — a true shelf cut into the mountain core.</li>
+              <li><b>700 ft</b> — preserved shoulder rest terrain.</li>
+              <li><b>Crown</b> — dense final climbing web to the summit rim.</li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <section id="emote-menu" class="emote-menu" role="dialog" aria-modal="true" hidden aria-labelledby="emote-menu-title">
+        <header><div><span class="eyebrow">PLAYER ACTIONS</span><h2 id="emote-menu-title">Emotes</h2></div><button id="close-emote-menu" type="button">CLOSE <kbd>E</kbd> / <kbd>Esc</kbd></button></header>
+        <div class="emote-grid">
+          <button type="button" data-emote-id="wave">WAVE</button>
+          <button type="button" data-emote-id="point">POINT</button>
+          <button type="button" data-emote-id="cheer">CHEER</button>
+          <button type="button" data-emote-id="sit">SIT / RELAX</button>
+          <button type="button" data-emote-id="dance">DANCE</button>
+        </div>
+        <small>Movement, jumping, climbing, fishing, or opening another gameplay state cancels the emote.</small>
       </section>
 
       <section id="multiplayer-menu" class="multiplayer-menu" role="dialog" aria-modal="true" hidden aria-labelledby="multiplayer-title">

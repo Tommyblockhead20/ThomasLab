@@ -4,6 +4,7 @@ import { removeAquariumSpecimen, storeAquariumSpecimen } from './aquarium.js';
 import { createSpecimenRecord, findSpecimenIndex } from './inventory.js';
 import { normalizeProgressionState } from './progression-save.js';
 import { serializeProgress, validateProgressImport } from './progress-transfer.js';
+import { normalizeAppearance } from '../player/appearance.js';
 
 const copy = (value) => JSON.parse(JSON.stringify(value));
 
@@ -95,6 +96,19 @@ export class ProgressionSystem {
   getModifier(name) { return this.equipment.getModifier(name); }
   getModifiers() { return this.equipment.getModifiers(); }
   getEquippedItem(category) { return this.equipment.getEquippedItem(category); }
+
+  getAppearance() {
+    return normalizeAppearance(this.state.appearance);
+  }
+
+  setAppearance(value) {
+    const next = normalizeAppearance({ ...this.state.appearance, ...value });
+    const changed = Object.keys(next).some((key) => next[key] !== this.state.appearance?.[key]);
+    if (!changed) return this.getAppearance();
+    this.state.appearance = next;
+    this.commit();
+    return this.getAppearance();
+  }
 
   getSnapshot() {
     const snapshot = copy(this.state);

@@ -1,3 +1,5 @@
+import { compactAppearance } from '../player/appearance.js';
+
 export const MULTIPLAYER_PROTOCOL_VERSION = 1;
 
 export const MESSAGE_TYPES = Object.freeze({
@@ -39,7 +41,8 @@ export function createPlayerSnapshot(playerId, state, sequence) {
     position: state.position,
     yaw: state.yaw,
     movement: state.movement,
+    appearance: compactAppearance(state.appearance),
+    emote: state.emote ?? null,
     fishingState: state.fishingState ?? null
   });
 }
-

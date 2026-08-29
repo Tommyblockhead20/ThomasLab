@@ -1,6 +1,7 @@
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
+import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 1;
+export const PROGRESSION_SCHEMA_VERSION = 2;
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
@@ -33,6 +34,7 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     money: 0,
     inventory: [],
     aquarium: [],
+    appearance: { ...DEFAULT_APPEARANCE },
     ownedEquipment: [...STARTER_EQUIPMENT_IDS],
     equipped: { ...DEFAULT_EQUIPPED }
   };
@@ -118,6 +120,7 @@ export function normalizeProgressionState(value = {}) {
     money: Math.max(0, Math.floor(finite(value.money))),
     inventory,
     aquarium,
+    appearance: normalizeAppearance(value.appearance),
     ownedEquipment: [...owned],
     equipped
   };

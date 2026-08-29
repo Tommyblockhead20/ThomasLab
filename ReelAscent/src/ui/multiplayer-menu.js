@@ -1,4 +1,6 @@
-const OTHER_MODAL_OPEN = () => ['fish-gallery', 'journal-open', 'inventory-open']
+const OTHER_MODAL_OPEN = () => [
+  'fish-gallery', 'journal-open', 'inventory-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open'
+]
   .some((className) => document.body.classList.contains(className));
 
 export class MultiplayerMenu {

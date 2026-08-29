@@ -37,7 +37,7 @@ export class OrbitCamera {
 
     this.entity = new pc.Entity('Third-person camera');
     this.entity.addComponent('camera', {
-      clearColor: new pc.Color(0.49, 0.73, 0.78),
+      clearColor: new pc.Color(0.42, 0.68, 0.77),
       farClip: 480,
       nearClip: 0.08,
       fov: 54

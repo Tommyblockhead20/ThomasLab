@@ -2147,6 +2147,106 @@ body.inventory-open #game-shell::after {
 .multiplayer-menu > small, .multiplayer-menu > p { font-size: .62rem; line-height: 1.45; }
 body.multiplayer-open #game-shell::after { position: absolute; z-index: 60; inset: 0; content: ""; background: rgb(2 13 15 / 58%); }
 
+body.mountain-map-open #game-shell::after,
+body.emote-menu-open #game-shell::after,
+body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset: 0; content: ""; background: rgb(2 13 15 / 64%); }
+.mountain-map,
+.emote-menu { position: fixed; z-index: 71; inset: 50% auto auto 50%; translate: -50% -50%; color: #edf6e9; background: rgb(8 35 34 / 98%); border: 1px solid rgb(239 217 139 / 42%); border-radius: .72rem; box-shadow: 0 20px 64px rgb(0 0 0 / 52%); }
+.mountain-map { box-sizing: border-box; width: min(61rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 1rem; overflow: auto; }
+.mountain-map > header,
+.emote-menu > header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.mountain-map h2,
+.emote-menu h2 { margin: .12rem 0 .7rem; }
+.mountain-map button,
+.emote-menu button { padding: .52rem .65rem; color: #153a36; background: #edd58c; border: 0; border-radius: .4rem; font-size: .58rem; font-weight: 950; cursor: pointer; }
+.mountain-map-layout { display: grid; grid-template-columns: minmax(18rem, 1.55fr) minmax(14rem, .75fr); gap: 1rem; align-items: center; }
+.mountain-map-graphic { width: 100%; max-height: min(67vh, 42rem); border: 1px solid rgb(239 217 139 / 30%); border-radius: .6rem; }
+.map-paper { fill: #d9d0a8; }
+.map-contours { fill: none; stroke: #496a58; stroke-width: 2.2; opacity: .68; }
+.map-water { fill: #82b4b2; stroke: #2c7475; stroke-width: 3; }
+.map-route { fill: none; stroke: #9a4b34; stroke-width: 5; stroke-dasharray: 10 7; }
+.map-route.alt { stroke: #73543c; stroke-width: 3.5; }
+.map-landmarks { fill: #294f44; stroke: #f0df9a; stroke-width: 2; }
+.map-landmarks text,
+.map-compass text { fill: #173d38; stroke: none; font: 900 12px ui-monospace, monospace; letter-spacing: .04em; }
+.map-compass { fill: #9a4b34; }
+.mountain-map aside { font-size: .72rem; line-height: 1.55; }
+.mountain-map aside p { color: rgb(234 244 231 / 72%); }
+.mountain-map aside li { margin: .55rem 0; }
+.mountain-map aside b { color: #efd98b; }
+.emote-menu { width: min(27rem, calc(100vw - 2rem)); padding: 1rem; }
+.emote-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem; margin: .7rem 0; }
+.emote-grid button:last-child { grid-column: 1 / -1; }
+.emote-menu small { color: rgb(234 244 231 / 62%); font-size: .55rem; line-height: 1.4; }
+
+.appearance-menu {
+  position: fixed;
+  z-index: 72;
+  inset: 50% auto auto 50%;
+  box-sizing: border-box;
+  width: min(58rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 1rem;
+  overflow: auto;
+  color: #edf6e9;
+  background: linear-gradient(145deg, rgb(10 45 42 / 99%), rgb(7 28 31 / 99%));
+  border: 1px solid rgb(239 217 139 / 44%);
+  border-radius: .75rem;
+  box-shadow: 0 22px 68px rgb(0 0 0 / 55%);
+  translate: -50% -50%;
+}
+
+.appearance-menu > header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.appearance-menu h2 { margin: .12rem 0 .35rem; }
+.appearance-menu > header button,
+.appearance-options button {
+  padding: .52rem .65rem;
+  color: #153a36;
+  background: #edd58c;
+  border: 0;
+  border-radius: .42rem;
+  font-size: .58rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.appearance-status { margin: .35rem 0 .8rem; color: rgb(234 244 231 / 68%); font-size: .62rem; line-height: 1.45; }
+.appearance-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .62rem; }
+.appearance-group { display: grid; min-width: 0; margin: 0; padding: .62rem; border: 1px solid rgb(255 255 255 / 12%); border-radius: .55rem; background: rgb(255 255 255 / 4%); }
+.appearance-group[hidden] { display: none; }
+.appearance-group legend { padding: 0 .28rem; color: #efd98b; font-size: .56rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.appearance-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.6rem, 1fr)); gap: .38rem; }
+.appearance-options button { display: flex; gap: .38rem; align-items: center; justify-content: center; min-height: 2.25rem; color: #dcece3; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 12%); }
+.appearance-options button:hover { background: rgb(255 255 255 / 13%); }
+.appearance-options button[aria-pressed="true"] { color: #143833; background: #efd98b; border-color: #fff0b8; box-shadow: 0 0 0 2px rgb(239 217 139 / 18%); }
+.appearance-swatch { width: .86rem; height: .86rem; flex: 0 0 auto; border: 1px solid rgb(255 255 255 / 48%); border-radius: 50%; box-shadow: 0 1px 3px rgb(0 0 0 / 36%); }
+
+.home-interaction-prompt {
+  position: absolute;
+  z-index: 34;
+  right: 1rem;
+  bottom: 8rem;
+  display: grid;
+  gap: .3rem;
+  min-width: 12rem;
+  padding: .65rem;
+  color: #edf6e9;
+  background: rgb(7 31 30 / 90%);
+  border: 1px solid rgb(239 217 139 / 42%);
+  border-radius: .58rem;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 30%);
+  pointer-events: auto;
+}
+.home-interaction-prompt[hidden] { display: none; }
+.home-interaction-prompt strong { font-size: .65rem; letter-spacing: .055em; }
+.home-interaction-prompt button { padding: .48rem .56rem; color: #153a36; background: #efd98b; border: 0; border-radius: .38rem; font-size: .56rem; font-weight: 950; cursor: pointer; }
+
+@media (max-width: 720px) {
+  .mountain-map-layout { grid-template-columns: 1fr; }
+  .mountain-map-graphic { max-height: 52vh; }
+  .appearance-content { grid-template-columns: 1fr; }
+}
+
 /* v8.1 multiplayer room roster */
 .multiplayer-roster {
   display: grid;

@@ -45,10 +45,13 @@ export class RoomState {
     activeIds.delete(this.localPlayerId);
 
     for (const playerId of activeIds) {
+      const presentation = this.roster.get(playerId);
       if (!this.members.has(playerId)) {
         const colorIndex = this.colorAssignments.get(playerId) ?? this.assignColor(playerId);
-        this.members.set(playerId, new RemotePlayer(playerId, createRepresentation(playerId, colorIndex)));
+        this.members.set(playerId, new RemotePlayer(playerId,
+          createRepresentation(playerId, colorIndex, presentation?.appearance)));
       }
+      this.members.get(playerId)?.representation?.setAppearance?.(presentation?.appearance);
     }
     for (const [playerId, player] of this.members) {
       if (activeIds.has(playerId)) continue;

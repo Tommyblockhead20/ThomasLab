@@ -86,7 +86,7 @@ test('ordinary and summit water surfaces are enclosed by depressed floors and ra
   assert.ok(summitBasinHeight(1, SUMMIT_HEIGHT, summitSurface) > summitSurface);
 });
 
-test('F6 is a compact nonmodal overlay and the journal keeps seven columns with slightly smaller text', async () => {
+test('F6 is a compact nonmodal overlay with input telemetry and the journal keeps seven columns', async () => {
   const [html, debugSource, styles] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/fishing-performance.js', import.meta.url), 'utf8'),
@@ -95,12 +95,14 @@ test('F6 is a compact nonmodal overlay and the journal keeps seven columns with 
   assert.match(html, /id="fishing-performance"/);
   assert.match(html, /id="performance-candidates"/);
   const debugMarkup = html.slice(html.indexOf('id="fishing-performance"'), html.indexOf('id="mobile-controls"'));
-  assert.doesNotMatch(debugMarkup, /aria-modal="true"|performance-input-log/);
+  assert.doesNotMatch(debugMarkup, /aria-modal="true"/);
+  assert.match(debugMarkup, /performance-input-log/);
   assert.doesNotMatch(debugSource, /exitPointerLock|\.focus\(/);
   const compactStart = styles.lastIndexOf('/* v6.11 keeps fishing telemetry');
   const compactRule = styles.slice(compactStart, styles.indexOf('body.inventory-open', compactStart));
-  assert.match(compactRule, /width:\s*min\(24rem,/);
-  assert.doesNotMatch(compactRule, /width:\s*100(?:vw|%)|height:\s*100(?:vh|%)/);
+  const overlayRule = compactRule.match(/\.fishing-performance\s*\{[^}]*\}/s)?.[0] ?? '';
+  assert.match(overlayRule, /width:\s*min\(38rem,/);
+  assert.doesNotMatch(overlayRule, /width:\s*100(?:vw|%)|height:\s*100(?:vh|%)/);
   assert.match(styles, /\.journal-grid\s*\{[^}]*grid-template-columns:\s*repeat\(7,/s);
   assert.match(styles, /\.journal-card\s*>\s*strong\s*\{[^}]*font-size:\s*\.9rem/s);
 });

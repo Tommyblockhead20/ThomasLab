@@ -13,11 +13,13 @@ export class RemotePlayer {
 
   consumeSnapshot(snapshot) {
     if (snapshot?.playerId !== this.playerId) return false;
+    if (snapshot.appearance !== undefined) this.representation?.setAppearance?.(snapshot.appearance);
     if (snapshot.fishingState !== undefined) {
       this.fishingState = snapshot.fishingState;
       this.representation?.setFishingState?.(snapshot.fishingState);
     }
     if (typeof snapshot.movement === 'string') this.movement = snapshot.movement;
+    if (snapshot.emote !== undefined) this.representation?.setEmote?.(snapshot.emote);
     return this.snapshots.push(snapshot);
   }
 

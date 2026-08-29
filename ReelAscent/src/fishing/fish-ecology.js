@@ -3,9 +3,13 @@ import { FISH_SPECIES, getWeightedSpeciesTable } from './fish-data.js';
 export const ECOLOGY_TARGETS = Object.freeze({
   waters: 24,
   species: 280,
-  exclusiveSpecies: 96,
-  sharedSpecies: 184,
-  exclusivePerWater: 4,
+  // The v7.1 summit promotions and v8 replacement roster intentionally moved four
+  // creatures from the shared pool into location-specific discoveries. Individual
+  // waters now vary modestly instead of all carrying exactly four exclusives.
+  exclusiveSpecies: 100,
+  sharedSpecies: 180,
+  minimumExclusivePerWater: 2,
+  maximumExclusivePerWater: 8,
   maximumSpeciesShare: .25
 });
 

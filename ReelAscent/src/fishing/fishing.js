@@ -57,29 +57,34 @@ const STABLE_RIG_BOUNDS = Object.freeze({
   plesiosaur: [1.65, .82, .7]
 });
 
-// Small perceptual trims after active-RMS normalization. Low/plucked samples otherwise
-// feel quieter than sustained midrange instruments even at identical numeric RMS.
-const INSTRUMENT_MIX_GAIN = Object.freeze({
-  kalimba: 1.2,
-  electric_bass: 1.12,
-  upright_bass_pizz: 1.12,
-  double_bass_arco: 1.08,
-  cello_arco: 1.04,
-  tuba: 1.08,
-  contrabassoon: 1.08,
-  bassoon: 1.04,
-  bass_clarinet: 1.04,
-  guitar: 1.06,
-  harp: 1.04,
-  handpan: 1.02,
-  marimba: 1.02,
-  glockenspiel: .92,
-  xylophone: .94,
-  trumpet: .9,
-  saxophone: .94,
-  violin_arco: .94,
-  harmonica: .94,
-  flute: .96
+// Perceptual trims after active-RMS normalization. This is the single mix control for
+// every recorded fishing note, so loud samples can be corrected without weakening the
+// whole minigame. Bright/transient instruments and sustained reeds needed the largest
+// reductions after an in-game chord/riff audit; bass and gentle plucks retain some lift.
+export const INSTRUMENT_MIX_GAIN = Object.freeze({
+  kalimba: 1.12,
+  electric_bass: 1.06,
+  upright_bass_pizz: 1.04,
+  double_bass_arco: 1.0,
+  cello_arco: .92,
+  tuba: .94,
+  contrabassoon: .94,
+  bassoon: .91,
+  bass_clarinet: .91,
+  guitar: 1.0,
+  harp: .98,
+  handpan: .96,
+  marimba: .91,
+  glockenspiel: .75,
+  xylophone: .78,
+  trumpet: .76,
+  saxophone: .82,
+  violin_arco: .82,
+  harmonica: .82,
+  flute: .84,
+  clarinet: .86,
+  mandolin: .88,
+  french_horn: .88
 });
 
 function makeMaterial(values, options = {}) {
@@ -1640,8 +1645,14 @@ export class FishingController {
     this.zone = null;
     this.message = '';
     this.charge = 0;
+    this.biteTimer = 0;
+    this.hookTimer = 0;
+    this.resultTimer = 0;
     this.castInputHeld = false;
     this.nearLossWarned = false;
+    this.showHookTutorial = false;
+    this.biteSplashTimer = 0;
+    this.catchContinueQueued = false;
     this.selectedFish = null;
     this.selectionDebug = null;
     this.rhythmInputFeedback = null;
@@ -1650,11 +1661,15 @@ export class FishingController {
     this.rhythmStartupToken += 1;
     this.rhythmStartup = null;
     this.rhythm = null;
+    this.lastRhythmBeat = -1;
+    this.lastJudgmentTime = -1;
     this.catchCard = null;
+    this.catchGroundLift = 0;
     this.cast = null;
     this.rodRoot.enabled = false;
     this.catchFish.enabled = false;
     this.gallery.active = false;
+    document.body.classList.remove('fish-gallery');
     this.hideWaterVisuals();
     return true;
   }

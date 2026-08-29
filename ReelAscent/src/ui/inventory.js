@@ -8,7 +8,7 @@ const CATEGORY_LABELS = Object.freeze({
   rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', guide: 'ECOLOGY GUIDES', traversal: 'TRAVERSAL'
 });
 
-const OTHER_MODAL_OPEN = () => ['fish-gallery', 'journal-open', 'multiplayer-open']
+const OTHER_MODAL_OPEN = () => ['fish-gallery', 'journal-open', 'multiplayer-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open']
   .some((className) => document.body.classList.contains(className));
 
 function downloadProgressJson(text, prefix = 'reel-ascent-progress') {
@@ -65,6 +65,16 @@ export class InventoryMenu {
     };
 
     this.onClick = (event) => {
+      if (event.target.closest('[data-inventory-map]')) {
+        this.close();
+        window.dispatchEvent(new CustomEvent('reel-ascent:open-map'));
+        return;
+      }
+      if (event.target.closest('[data-inventory-appearance]')) {
+        this.close();
+        window.dispatchEvent(new CustomEvent('reel-ascent:open-appearance'));
+        return;
+      }
       const transferAction = event.target.closest('[data-progress-action]')?.dataset.progressAction;
       if (transferAction) {
         void this.handleProgressTransfer(transferAction);

@@ -131,7 +131,29 @@ export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) 
       }));
     });
   }
-  return entries;
+  // A rarity tier can contain too few eligible creatures to honor the per-species cap
+  // inside that tier (for example, one Common in a small cave pool would inherit the
+  // entire 60% lower-tier Common share). Apply one final feasible cap across the complete
+  // pool, then recompute the diagnostic rarity/within-rarity shares from the actual odds.
+  const finalProbabilities = capProbabilityShares(
+    entries.map((entry) => entry.probability),
+    maximumFinalShare
+  );
+  const finalRarityProbabilities = Object.fromEntries(CATCH_RARITIES.map((rarity) => [rarity, 0]));
+  entries.forEach((entry, index) => {
+    finalRarityProbabilities[entry.fish.rarity] += finalProbabilities[index];
+  });
+  return entries.map((entry, index) => {
+    const probability = finalProbabilities[index];
+    const rarityProbability = finalRarityProbabilities[entry.fish.rarity];
+    return Object.freeze({
+      ...entry,
+      selectionWeight: probability,
+      probability,
+      rarityProbability,
+      withinRarityProbability: probability / Math.max(Number.EPSILON, rarityProbability)
+    });
+  });
 }
 
 export function summarizeRarityProbabilities(table) {

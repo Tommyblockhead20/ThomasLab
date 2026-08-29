@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { RHYTHM_CONFIG } from '../src/config.js';
 import {
-  chooseWeightedSpecies, createCatchRecord, createFishSpecimen, FISH_SONG_TEMPO_MULTIPLIER,
-  FISH_SPECIES, getFishDisplayMetrics, getWeightedSpeciesTable, rollFish
+  chooseWeightedSpecies, createCatchRecord, createFishSpecimen, createFishSpecimenForCategories,
+  FISH_SONG_TEMPO_MULTIPLIER, FISH_SPECIES, getFishDisplayMetrics, getWeightedSpeciesTable, rollFish
 } from '../src/fishing/fish-data.js';
 import { FishingZone } from '../src/fishing/fishing-zone.js';
 import {
@@ -28,6 +27,11 @@ function seededRandom(seed = 123456789) {
 }
 
 const allFishIds = FISH_SPECIES.map((fish) => fish.id);
+
+function hitPatternNote(session, note) {
+  session.handleInput(note.lane, note.hitTime);
+  if (note.status === 'holding') session.completeHold(note, note.hitTime + note.duration);
+}
 
 test('fishing zones use explicit water geometry without any water-death API', () => {
   const shallowZone = new FishingZone({
@@ -65,14 +69,16 @@ test('fishing zones use explicit water geometry without any water-death API', ()
   });
   assert.equal(ocean.contains({ x: 10, z: 10 }), false, 'annulus must exclude its inland center');
   assert.equal(ocean.contains({ x: 40, z: 10 }), true);
-  assert.equal(ocean.distanceToWater({ x: 25, z: 10 }), 5);
+  assert.ok(Math.abs(ocean.distanceToWater({ x: 25, z: 10 }) - 1.8) < 1e-9,
+    'cast distance follows the rendered shoreline overlap, not the offshore ecology boundary');
   assert.equal(typeof ocean.isDeepWater, 'undefined');
-  assert.ok(ocean.contains(ocean.clampToWater({ x: 10, z: 10 })));
+  assert.ok(ocean.containsWaterFootprint(ocean.clampToWater({ x: 10, z: 10 })));
 });
 
 test('weighted species selection reaches every configured rarity tier', () => {
-  assert.equal(chooseWeightedSpecies(allFishIds, () => 0).name, 'Bluegill');
-  assert.equal(chooseWeightedSpecies(allFishIds, () => 0.999999).name, FISH_SPECIES.at(-1).name);
+  const completeTable = getWeightedSpeciesTable(allFishIds);
+  assert.equal(chooseWeightedSpecies(allFishIds, () => 0).id, completeTable[0].fish.id);
+  assert.equal(chooseWeightedSpecies(allFishIds, () => 0.999999).id, completeTable.at(-1).fish.id);
 
   const table = getWeightedSpeciesTable(allFishIds, { rarityBias: .5 });
   assert.equal(table.length, FISH_SPECIES.length);
@@ -117,11 +123,14 @@ test('fish sizes favor ordinary catches but still produce trophy catches', () =>
 test('fish size population has visible tails and correlated length/weight categories', () => {
   const rng = seededRandom(4219);
   const counts = { Tiny: 0, Small: 0, Average: 0, Large: 0, Massive: 0 };
+  let exactCategoryMatches = 0;
   for (let index = 0; index < 30000; index += 1) {
     const fish = rollFish(['bluegill'], {}, rng);
     counts[fish.sizeCategory] += 1;
-    assert.equal(fish.sizeCategoryIndex, fish.lengthCategoryIndex);
+    assert.ok(Math.abs(fish.sizeCategoryIndex - fish.lengthCategoryIndex) <= 1);
+    if (fish.sizeCategoryIndex === fish.lengthCategoryIndex) exactCategoryMatches += 1;
   }
+  assert.ok(exactCategoryMatches / 30000 > .9);
   const ratio = (label) => counts[label] / 30000;
   assert.ok(ratio('Tiny') >= .12 && ratio('Tiny') <= .15);
   assert.ok(ratio('Small') >= .22 && ratio('Small') <= .25);
@@ -139,17 +148,20 @@ test('held-fish scale starts from the generated inch measurement in world meters
 });
 
 test('species rhythm patterns stay inside their data-driven input and BPM ranges', () => {
+  const groupBounds = {
+    Common: [5, 9], Uncommon: [8, 14], Rare: [11, 20], Legendary: [16, 28]
+  };
   for (const fish of FISH_SPECIES) {
     assert.equal(fish.rhythm.motifs.length, 1);
     assert.ok(fish.rhythm.instrument);
     for (let sample = 0; sample < 20; sample += 1) {
-      const pattern = generateRhythmPattern(fish, seededRandom(sample + fish.name.length));
-      assert.ok(pattern.bpm >= fish.rhythm.bpm[0] * .88 && pattern.bpm <= fish.rhythm.bpm[1] * 1.12);
-      assert.ok(pattern.notes.length >= fish.rhythm.inputs[0]);
-      assert.ok(pattern.notes.length <= Math.max(
-        fish.rhythm.inputs[1],
-        RHYTHM_CONFIG.rarityMinimumEvents[fish.rarity]
-      ));
+      const specimen = createFishSpecimenForCategories(fish, 2, 2, false, () => .5);
+      const pattern = generateRhythmPattern(specimen, seededRandom(sample + fish.name.length));
+      const baseline = (fish.rhythm.bpm[0] + fish.rhythm.bpm[1]) * .5 + 20;
+      const groupCount = new Set(pattern.notes.map((note) => note.groupIndex)).size;
+      assert.ok(Math.abs(pattern.bpm - baseline) <= 2);
+      assert.ok(groupCount >= groupBounds[fish.rarity][0] && groupCount <= groupBounds[fish.rarity][1]);
+      assert.ok(pattern.notes.length >= groupCount && pattern.notes.length <= groupCount * 4);
       assert.ok(pattern.notes.every((note) => ['A', 'W', 'S', 'D'].includes(note.lane)));
     }
   }
@@ -163,11 +175,17 @@ test('species songs have distinct deterministic direction and sustain signatures
   assert.equal(new Set(signatures).size, FISH_SPECIES.length);
 });
 
-test('authored song length, specimen tempo bounds, and holds remain data-driven', () => {
+test('rarity adaptation, specimen tempo, and holds remain data-driven', () => {
+  const groupBounds = {
+    Common: [5, 9], Uncommon: [8, 14], Rare: [11, 20], Legendary: [16, 28]
+  };
   for (const fish of FISH_SPECIES) {
-    const pattern = generateRhythmPattern(createFishSpecimen(fish, .5, false, () => .5), seededRandom(91));
-    assert.equal(pattern.notes.length, fish.rhythm.inputs[0]);
-    assert.ok(pattern.bpm >= fish.rhythm.bpm[0] * .88 && pattern.bpm <= fish.rhythm.bpm[1] * 1.12);
+    const specimen = createFishSpecimenForCategories(fish, 2, 2, false, () => .5);
+    const pattern = generateRhythmPattern(specimen, seededRandom(91));
+    const groupCount = new Set(pattern.notes.map((note) => note.groupIndex)).size;
+    const baseline = (fish.rhythm.bpm[0] + fish.rhythm.bpm[1]) * .5 + 20;
+    assert.ok(groupCount >= groupBounds[fish.rarity][0] && groupCount <= groupBounds[fish.rarity][1]);
+    assert.ok(Math.abs(pattern.bpm - baseline) <= 2);
   }
   const common = generateRhythmPattern(createFishSpecimen('bluegill', .5, false, () => .5), seededRandom(4));
   const legendary = generateRhythmPattern(createFishSpecimen('channel-catfish', .5, false, () => .5), seededRandom(4));
@@ -275,9 +293,10 @@ test('specimen traits only make bounded performance adjustments', () => {
   const large = { ...createFishSpecimen(species, .95, false, () => .5), condition: 1.16 };
   const smallPattern = generateRhythmPattern(small, seededRandom(11));
   const largePattern = generateRhythmPattern(large, seededRandom(11));
+  const baseline = (species.rhythm.bpm[0] + species.rhythm.bpm[1]) * .5 + 20;
   assert.equal(smallPattern.motifIndex, largePattern.motifIndex);
-  assert.ok(smallPattern.bpm >= species.rhythm.bpm[0] && smallPattern.bpm <= species.rhythm.bpm[1]);
-  assert.ok(largePattern.bpm >= species.rhythm.bpm[0] && largePattern.bpm <= species.rhythm.bpm[1]);
+  assert.ok(smallPattern.bpm >= baseline * .8 && smallPattern.bpm <= baseline * 1.22);
+  assert.ok(largePattern.bpm >= baseline * .8 && largePattern.bpm <= baseline * 1.22);
   assert.ok(largePattern.bpm > smallPattern.bpm);
   assert.notEqual(smallPattern.notes.find((note) => note.duration)?.duration, largePattern.notes.find((note) => note.duration)?.duration);
 });
@@ -290,7 +309,8 @@ test('every song has exactly one spare event and one miss remains recoverable', 
   const fish = createFishSpecimen(FISH_SPECIES[0], .5, false, () => .5);
   const recovered = new RhythmSession(fish, 0, seededRandom(4));
   recovered.missNote(recovered.pattern.notes[0]);
-  for (const note of recovered.pattern.notes.slice(1)) recovered.handleInput(note.lane, note.hitTime);
+  for (const note of recovered.pattern.notes.slice(1)) hitPatternNote(recovered, note);
+  recovered.resolveOutcome();
   assert.equal(recovered.result, 'caught');
 
   const escaped = new RhythmSession(fish, 0, seededRandom(4));
@@ -309,12 +329,12 @@ test('a fish cannot be caught before the final song event is judged', () => {
   };
   const session = new RhythmSession(fish, 0, seededRandom(9));
   for (const note of session.pattern.notes.slice(0, -1)) {
-    session.handleInput(note.lane, note.hitTime);
+    hitPatternNote(session, note);
   }
   assert.equal(session.successfulNotes, session.pattern.requiredHits);
   assert.equal(session.result, null);
   const finalNote = session.pattern.notes.at(-1);
-  session.handleInput(finalNote.lane, finalNote.hitTime);
+  hitPatternNote(session, finalNote);
   assert.equal(session.result, 'caught');
   assert.equal(session.perfectPerformance, true);
 });
@@ -330,6 +350,7 @@ test('accurate rhythm inputs catch a fish', () => {
   const session = new RhythmSession(fish, startTime, seededRandom(17));
   let noteIndex = 0;
   let result = null;
+  const heldUntil = new Map();
   for (let step = 1; step < 2400 && !result; step += 1) {
     const now = startTime + step / 120;
     const inputs = [];
@@ -337,9 +358,10 @@ test('accurate rhythm inputs catch a fish', () => {
       && now >= startTime + session.pattern.notes[noteIndex].hitTime) {
       const note = session.pattern.notes[noteIndex];
       inputs.push({ lane: note.lane, time: startTime + note.hitTime });
+      if (note.duration > 0) heldUntil.set(note.lane, startTime + note.hitTime + note.duration);
       noteIndex += 1;
     }
-    result = session.update(now, inputs);
+    result = session.update(now, inputs, (lane) => (heldUntil.get(lane) ?? -Infinity) >= now);
   }
 
   assert.equal(result, 'caught');

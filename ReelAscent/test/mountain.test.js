@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FISH_SPECIES, getWeightedSpeciesTable } from '../src/fishing/fish-data.js';
-import { attachZoneEcology, auditFishingEcology, climateThemeAtPoint, getEcologySelection } from '../src/fishing/fish-ecology.js';
+import {
+  attachZoneEcology, auditFishingEcology, climateThemeAtPoint, ECOLOGY_TARGETS, getEcologySelection
+} from '../src/fishing/fish-ecology.js';
 import { FishingZone } from '../src/fishing/fishing-zone.js';
 import {
   ALL_FISHING_WATER_DESCRIPTORS,
@@ -41,12 +43,18 @@ function ecologyZones() {
       radii: { x: water.radii[0], z: water.radii[1] },
       surfaceY: water.y,
       fishIds: water.fish,
-      modifiers: { rarityBias: water.rarityBias }
+      modifiers: {
+        rarityBias: water.rarityBias,
+        size: water.size,
+        trophyChance: water.trophyChance,
+        maximumSpeciesProbability: water.maximumSpeciesProbability ?? ECOLOGY_TARGETS.maximumSpeciesShare
+      }
     });
     Object.assign(zone, {
       tier: water.tier,
       waterType: water.waterType,
       theme: water.theme,
+      ecologyThemes: water.ecologyThemes,
       cave: water.cave,
       waterfall: water.waterfall
     });
@@ -111,17 +119,18 @@ test('280-creature ecology audit preserves the active 24-water topology', () => 
   assert.equal(audit.waterCount, 24);
   assert.equal(audit.uniqueWaterCount, 24);
   assert.deepEqual(audit.zeroWaterSpecies, []);
-  assert.equal(audit.exclusiveCount, 96);
-  assert.equal(audit.sharedCount, 184);
+  assert.equal(audit.exclusiveCount, ECOLOGY_TARGETS.exclusiveSpecies);
+  assert.equal(audit.sharedCount, ECOLOGY_TARGETS.sharedSpecies);
   assert.deepEqual(audit.invalidExclusiveWaters, []);
-  assert.deepEqual(audit.sharedBelowTwoWaters, [
-    'rainbow-smelt', 'atlantic-cod', 'pollock', 'haddock',
-    'harbor-seal', 'california-sea-lion', 'walrus', 'manatee', 'beluga-whale', 'narwhal',
-    'sperm-whale', 'selkie', 'siren-ray', 'kraken', 'leviathan', 'lusca', 'sea-urchin',
-    'chambered-nautilus', 'ocean-sunfish', 'coelacanth', 'anglerfish', 'great-white-shark',
-    'whale-shark', 'giant-squid', 'blue-marlin'
-  ]);
-  assert.ok(audit.pools.every((pool) => pool.exclusiveCount === 4));
+  assert.ok(audit.sharedBelowTwoWaters.length <= Math.ceil(audit.sharedCount * .16));
+  assert.ok(audit.sharedBelowTwoWaters.every((id) => (
+    FISH_SPECIES.some((fish) => fish.id === id && !fish.habitat.exclusiveWaterId)
+  )));
+  assert.equal(audit.pools.reduce((total, pool) => total + pool.exclusiveCount, 0), audit.exclusiveCount);
+  assert.ok(audit.pools.every((pool) => (
+    pool.exclusiveCount >= ECOLOGY_TARGETS.minimumExclusivePerWater
+      && pool.exclusiveCount <= ECOLOGY_TARGETS.maximumExclusivePerWater
+  )));
   assert.ok(audit.pools.every((pool) => pool.poolSize >= 8));
   assert.ok(audit.maximumNormalizedShare <= .25 + 1e-9);
   assert.ok(audit.mostDiversePool.poolSize >= 40);

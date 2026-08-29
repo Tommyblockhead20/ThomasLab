@@ -1,5 +1,27 @@
 const MOVEMENT_STATES = new Set(['grounded', 'airborne', 'sliding', 'climbing', 'mantling', 'fishing']);
+const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'sit', 'dance']);
+const APPEARANCE_OPTIONS = Object.freeze({
+  avatarType: new Set(['human', 'blob']),
+  skinTone: new Set(['porcelain', 'warm', 'golden', 'umber', 'deep']),
+  shirtColor: new Set(['alpine', 'ember', 'moss', 'sunset', 'plum', 'cream']),
+  pantsColor: new Set(['pine', 'charcoal', 'denim', 'clay', 'sage']),
+  hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'bald']),
+  hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal']),
+  accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat'])
+});
+const DEFAULT_APPEARANCE = Object.freeze({
+  avatarType: 'human', skinTone: 'warm', shirtColor: 'alpine', pantsColor: 'pine',
+  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'none'
+});
 const finite = (value) => Number.isFinite(Number(value));
+
+export function sanitizeAppearance(value = {}) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(Object.entries(DEFAULT_APPEARANCE).map(([key, fallback]) => [
+    key,
+    APPEARANCE_OPTIONS[key].has(source[key]) ? source[key] : fallback
+  ]));
+}
 
 export function validateSnapshot(payload, session, now = Date.now()) {
   if (!payload || payload.playerId !== session.playerId) return { ok: false, reason: 'player_id_mismatch' };
@@ -38,6 +60,13 @@ export function validateSnapshot(payload, session, now = Date.now()) {
       position: normalizedPosition,
       yaw: ((yaw % 360) + 360) % 360,
       movement,
+      appearance: sanitizeAppearance(payload.appearance),
+      emote: EMOTE_IDS.has(payload.emote?.id) ? {
+        id: payload.emote.id,
+        startedAt: Number.isFinite(Number(payload.emote.startedAt))
+          ? Math.max(now - 10_000, Math.min(now + 1_000, Number(payload.emote.startedAt)))
+          : now
+      } : null,
       fishingState: payload.fishingState ?? null,
       serverTime: now
     }

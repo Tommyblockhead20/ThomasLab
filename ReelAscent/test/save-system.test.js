@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FISH_SPECIES } from '../src/fishing/fish-data.js';
+import { FISH_SPECIES, canonicalSpeciesId } from '../src/fishing/fish-data.js';
 import { normalizeRarity, SAVE_SCHEMA_VERSION, SAVE_STORAGE_KEY, SaveSystem } from '../src/persistence/save-system.js';
 
 class MemoryStorage {
@@ -85,9 +85,9 @@ test('legacy Epic values normalize to canonical Legendary without changing the s
   const save = new SaveSystem(storage);
   assert.equal(normalizeRarity('Epic'), 'Legendary');
   assert.equal(save.data.version, SAVE_SCHEMA_VERSION);
-  assert.equal(save.data.collection['lake-sturgeon'].rarity, 'Legendary');
-  assert.equal(save.data.collection['lake-sturgeon'].catches, 4);
-  assert.equal(save.data.collection['lake-sturgeon'].bestWeight, 51.2);
+  assert.equal(save.data.collection.lake_sturgeon.rarity, 'Legendary');
+  assert.equal(save.data.collection.lake_sturgeon.catches, 4);
+  assert.equal(save.data.collection.lake_sturgeon.bestWeight, 51.2);
   assert.equal(save.data.runHistory[0].rarest, 'Legendary Lake Sturgeon');
   save.recordCatch(catchData({ speciesId: 'legacy-catch', rarity: 'Epic', rarityLabel: undefined }));
   assert.equal(save.data.collection['legacy-catch'].rarity, 'Legendary');
@@ -107,9 +107,9 @@ test('a complete 51-species v13 collection normalizes without losing stable IDs'
   });
   const snapshot = new SaveSystem(storage).getSnapshot();
   assert.equal(Object.keys(snapshot.collection).length, 51);
-  assert.deepEqual(Object.keys(snapshot.collection), legacyRoster.map((fish) => fish.id));
+  assert.deepEqual(Object.keys(snapshot.collection), legacyRoster.map((fish) => canonicalSpeciesId(fish.id)));
   assert.equal(snapshot.collection.bluegill.discovered, true);
-  assert.equal(snapshot.collection.needlefish.catches, 51);
+  assert.equal(snapshot.collection[canonicalSpeciesId(legacyRoster.at(-1).id)].catches, 51);
 });
 
 test('catch records preserve discovery, bests, quality, shinies, and survive reload', () => {
@@ -131,7 +131,7 @@ test('catch records preserve discovery, bests, quality, shinies, and survive rel
   })), true);
 
   const reloaded = new SaveSystem(storage).getSnapshot();
-  const fish = reloaded.collection['rainbow-trout'];
+  const fish = reloaded.collection.rainbow_trout;
   assert.equal(reloaded.lifetime.fishCaught, 2);
   assert.equal(fish.discovered, true);
   assert.equal(fish.catches, 2);

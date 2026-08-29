@@ -19,6 +19,10 @@ const RARITY_PAGES = [
   { id: 'legendary', label: 'Legendary' }
 ];
 
+const OTHER_MODAL_OPEN = () => [
+  'fish-gallery', 'inventory-open', 'multiplayer-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open'
+].some((name) => document.body.classList.contains(name));
+
 export class FishJournal {
   constructor(saveSystem, species) {
     this.saveSystem = saveSystem;
@@ -44,8 +48,7 @@ export class FishJournal {
         this.close();
         return;
       }
-      if (event.code !== 'KeyJ' || document.body.classList.contains('fish-gallery')
-        || (!this.isOpen && ['inventory-open', 'multiplayer-open'].some((name) => document.body.classList.contains(name)))) return;
+      if (event.code !== 'KeyJ' || (!this.isOpen && OTHER_MODAL_OPEN())) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       this.toggle();
@@ -92,7 +95,7 @@ export class FishJournal {
   }
 
   open() {
-    if (!this.screen) return;
+    if (!this.screen || this.isOpen || OTHER_MODAL_OPEN()) return;
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     this.isOpen = true;
     this.screen.hidden = false;

@@ -12,6 +12,8 @@ import { ClimbingController } from './climbing.js';
 import { stabilizeWedgeMovement } from './collision-stability.js';
 import { createContactRecovery, sampleContactRecovery } from './contact-recovery.js';
 import { moveToward, PlayerInput, StaminaResource } from './movement.js';
+import { emoteDurationMs, EMOTE_IDS, normalizeEmote } from '../multiplayer/emotes.js';
+import { normalizeAppearance, resolveAppearance } from './appearance.js';
 
 function makeMaterial(values, gloss = 0.12) {
   const material = new pc.StandardMaterial();
@@ -19,6 +21,16 @@ function makeMaterial(values, gloss = 0.12) {
   material.gloss = gloss;
   material.update();
   return material;
+}
+
+function setMaterialColor(material, values) {
+  if (!material || !values) return;
+  material.diffuse.set(values[0], values[1], values[2]);
+  material.update();
+}
+
+function shirtAccent(values) {
+  return values.map((value) => clamp(value * .72 + .08, 0, 1));
 }
 
 function shortestAngleDelta(from, to) {
@@ -99,6 +111,7 @@ export class Player {
     this.contactRecovery = null;
     this.stationaryProbePosition = new pc.Vec3(spawnPoint.x, spawnPoint.y, spawnPoint.z);
     this.movementState = 'airborne';
+    this.currentEmote = null;
     this.canGrip = false;
     this.gripCandidate = null;
     this.surfaceRegistry = surfaceRegistry;
@@ -137,6 +150,7 @@ export class Player {
     this.visualRoot = new pc.Entity('Player visual');
     this.entity.addChild(this.visualRoot);
     this.app.root.addChild(this.entity);
+    this.appearance = normalizeAppearance(this.progression?.getAppearance?.());
     this.buildCharacter();
     this.buildMantleDebugMarkers();
     // The authored mascot mesh was a little over two meters tall. Keep its silhouette,
@@ -213,9 +227,9 @@ export class Player {
     return joint;
   }
 
-  buildLimb(side, jacket, skin, trousers, boots) {
+  buildLimb(side, jacket, skin, trousers, boots, parent = this.visualRoot) {
     const direction = side === 'Left' ? -1 : 1;
-    const shoulder = this.addJoint(`${side} shoulder`, { x: direction * 0.39, y: 0.27, z: 0 });
+    const shoulder = this.addJoint(`${side} shoulder`, { x: direction * 0.41, y: 0.27, z: 0 }, parent);
     this.addVisual(
       `${side} upper arm`, 'box',
       { x: 0, y: -0.18, z: 0 }, { x: 0.18, y: 0.36, z: 0.2 }, jacket, {}, shoulder
@@ -232,7 +246,7 @@ export class Player {
 
     // The visual root is scaled to the 0.94 m capsule foot offset. Keeping the original
     // rig proportions here lets animation remain independent of the physical body size.
-    const hip = this.addJoint(`${side} hip`, { x: direction * 0.19, y: -0.35, z: 0 });
+    const hip = this.addJoint(`${side} hip`, { x: direction * 0.19, y: -0.35, z: 0 }, parent);
     this.addVisual(
       `${side} upper leg`, 'box',
       { x: 0, y: -0.15, z: 0 }, { x: 0.23, y: 0.3, z: 0.27 }, trousers, {}, hip
@@ -253,57 +267,142 @@ export class Player {
     const jacket = makeMaterial(COLORS.player);
     const accent = makeMaterial(COLORS.playerAccent);
     const skin = makeMaterial([0.93, 0.72, 0.52]);
-    const boots = makeMaterial([0.18, 0.22, 0.18]);
+    const boots = makeMaterial([0.16, 0.18, 0.16]);
     const pack = makeMaterial([0.18, 0.39, 0.34]);
     const trousers = makeMaterial([0.23, 0.31, 0.29]);
-    const dark = makeMaterial([0.08, 0.11, 0.1], 0.4);
+    const hair = makeMaterial([0.08, 0.05, 0.035], 0.18);
+    const dark = makeMaterial([0.055, 0.075, 0.07], 0.4);
+    const blobBlue = makeMaterial([0.12, 0.5, 0.88], .48);
+    const blobLight = makeMaterial([0.28, 0.72, 1], .38);
+    this.appearanceMaterials = { jacket, accent, skin, boots, pack, trousers, hair, dark, blobBlue, blobLight };
+
+    this.humanRig = new pc.Entity('Human avatar');
+    this.visualRoot.addChild(this.humanRig);
+    this.blobRig = new pc.Entity('Blue Blob avatar');
+    this.visualRoot.addChild(this.blobRig);
 
     this.addVisual(
-      'Torso', 'box',
-      { x: 0, y: -0.04, z: 0 },
-      { x: 0.66, y: 0.7, z: 0.43 },
-      jacket
+      'Tapered upper torso', 'box',
+      { x: 0, y: 0.06, z: 0 },
+      { x: 0.7, y: 0.58, z: 0.42 },
+      jacket, {}, this.humanRig
+    );
+    this.addVisual(
+      'Lower torso', 'box',
+      { x: 0, y: -0.28, z: 0 },
+      { x: 0.55, y: 0.18, z: 0.38 },
+      accent, {}, this.humanRig
     );
     this.addVisual(
       'Jacket collar', 'box',
       { x: 0, y: 0.34, z: -0.04 },
       { x: 0.38, y: 0.12, z: 0.47 },
-      accent
+      accent, {}, this.humanRig
     );
+    this.addVisual('Neck', 'cylinder', { x: 0, y: 0.46, z: 0 }, { x: 0.17, y: 0.2, z: 0.17 }, skin, {}, this.humanRig);
+    this.addVisual('Left shoulder cap', 'sphere', { x: -0.37, y: 0.27, z: 0 }, { x: .25, y: .25, z: .27 }, jacket, {}, this.humanRig);
+    this.addVisual('Right shoulder cap', 'sphere', { x: 0.37, y: 0.27, z: 0 }, { x: .25, y: .25, z: .27 }, jacket, {}, this.humanRig);
     this.addVisual(
       'Head', 'sphere',
-      { x: 0, y: 0.64, z: -0.015 },
-      { x: 0.54, y: 0.58, z: 0.53 },
-      skin
+      { x: 0, y: 0.7, z: -0.015 },
+      { x: 0.47, y: 0.52, z: 0.46 },
+      skin, {}, this.humanRig
     );
-    this.addVisual('Left eye', 'sphere', { x: -0.115, y: 0.69, z: -0.265 }, { x: 0.055, y: 0.065, z: 0.045 }, dark);
-    this.addVisual('Right eye', 'sphere', { x: 0.115, y: 0.69, z: -0.265 }, { x: 0.055, y: 0.065, z: 0.045 }, dark);
-    this.addVisual('Nose', 'cone', { x: 0, y: 0.59, z: -0.3 }, { x: 0.07, y: 0.12, z: 0.07 }, skin, { x: 90 });
-    this.addVisual(
-      'Beanie', 'cone',
-      { x: 0, y: 0.96, z: 0 },
-      { x: 0.48, y: 0.34, z: 0.48 },
-      accent
-    );
-    this.addVisual('Beanie band', 'cylinder', { x: 0, y: 0.86, z: 0 }, { x: 0.5, y: 0.12, z: 0.5 }, accent);
+    this.addVisual('Left eye', 'sphere', { x: -0.105, y: 0.73, z: -0.235 }, { x: 0.05, y: 0.06, z: 0.04 }, dark, {}, this.humanRig);
+    this.addVisual('Right eye', 'sphere', { x: 0.105, y: 0.73, z: -0.235 }, { x: 0.05, y: 0.06, z: 0.04 }, dark, {}, this.humanRig);
+    this.addVisual('Nose', 'cone', { x: 0, y: 0.64, z: -0.27 }, { x: 0.065, y: 0.11, z: 0.065 }, skin, { x: 90 }, this.humanRig);
+
+    const shortHair = new pc.Entity('Short hair style');
+    const tousledHair = new pc.Entity('Tousled hair style');
+    const ponytailHair = new pc.Entity('Ponytail hair style');
+    const mohawkHair = new pc.Entity('Mohawk hair style');
+    const baldHair = new pc.Entity('Bald hair style');
+    [shortHair, tousledHair, ponytailHair, mohawkHair, baldHair].forEach((root) => this.humanRig.addChild(root));
+    this.addVisual('Short hair cap', 'sphere', { x: 0, y: .9, z: .02 }, { x: .475, y: .2, z: .455 }, hair, {}, shortHair);
+    this.addVisual('Tousled hair cap', 'sphere', { x: 0, y: .9, z: .02 }, { x: .48, y: .19, z: .46 }, hair, {}, tousledHair);
+    [-.23, 0, .22].forEach((x, index) => this.addVisual(`Tousled lock ${index + 1}`, 'cone',
+      { x, y: .995 + (index % 2) * .045, z: -.02 }, { x: .13, y: .25, z: .13 }, hair,
+      { z: (index - 1) * -12 }, tousledHair));
+    this.addVisual('Ponytail hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, ponytailHair);
+    this.addVisual('Ponytail tie', 'sphere', { x: 0, y: .77, z: .4 }, { x: .17, y: .17, z: .17 }, accent, {}, ponytailHair);
+    this.addVisual('Ponytail', 'sphere', { x: 0, y: .58, z: .45 }, { x: .22, y: .38, z: .2 }, hair, { x: -8 }, ponytailHair);
+    [-.2, 0, .2].forEach((z, index) => this.addVisual(`Mohawk crest ${index + 1}`, 'cone',
+      { x: 0, y: 1.02, z }, { x: .16, y: .35 + (index === 1 ? .08 : 0), z: .16 }, hair, {}, mohawkHair));
+    this.hairStyles = new Map([
+      ['short', shortHair], ['tousled', tousledHair], ['ponytail', ponytailHair],
+      ['mohawk', mohawkHair], ['bald', baldHair]
+    ]);
+
+    const beanie = new pc.Entity('Beanie accessory');
+    const glasses = new pc.Entity('Glasses accessory');
+    const trailHat = new pc.Entity('Trail hat accessory');
+    [beanie, glasses, trailHat].forEach((root) => this.humanRig.addChild(root));
+    this.addVisual('Beanie crown', 'cone', { x: 0, y: 1.0, z: 0 }, { x: .5, y: .34, z: .5 }, accent, {}, beanie);
+    this.addVisual('Beanie band', 'cylinder', { x: 0, y: .89, z: 0 }, { x: .51, y: .12, z: .51 }, accent, {}, beanie);
+    this.addVisual('Left glasses frame', 'box', { x: -.13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, dark, {}, glasses);
+    this.addVisual('Right glasses frame', 'box', { x: .13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, dark, {}, glasses);
+    this.addVisual('Glasses bridge', 'box', { x: 0, y: .73, z: -.285 }, { x: .08, y: .025, z: .025 }, dark, {}, glasses);
+    this.addVisual('Trail hat brim', 'box', { x: 0, y: .94, z: -.05 }, { x: .72, y: .055, z: .62 }, accent, {}, trailHat);
+    this.addVisual('Trail hat crown', 'cylinder', { x: 0, y: 1.06, z: .02 }, { x: .46, y: .24, z: .46 }, accent, {}, trailHat);
+    this.accessories = new Map([['beanie', beanie], ['glasses', glasses], ['trail-hat', trailHat]]);
+
     this.addVisual(
       'Backpack', 'box',
       { x: 0, y: -0.03, z: 0.34 },
       { x: 0.55, y: 0.66, z: 0.27 },
       pack,
-      { x: -7, y: 0, z: 0 }
+      { x: -7, y: 0, z: 0 }, this.humanRig
     );
-    this.addVisual('Backpack flap', 'box', { x: 0, y: 0.15, z: 0.495 }, { x: 0.45, y: 0.18, z: 0.05 }, accent, { x: -7 });
+    this.addVisual('Backpack flap', 'box', { x: 0, y: 0.15, z: 0.495 }, { x: 0.45, y: 0.18, z: 0.05 }, accent, { x: -7 }, this.humanRig);
 
-    this.leftLimb = this.buildLimb('Left', jacket, skin, trousers, boots);
-    this.rightLimb = this.buildLimb('Right', jacket, skin, trousers, boots);
+    this.leftLimb = this.buildLimb('Left', jacket, skin, trousers, boots, this.humanRig);
+    this.rightLimb = this.buildLimb('Right', jacket, skin, trousers, boots, this.humanRig);
 
     // Empty attachment points keep future cosmetics independent of the animation rig.
     this.cosmeticSlots = new Map([
-      ['head', this.addJoint('Head cosmetic slot', { x: 0, y: 1.13, z: 0 })],
-      ['face', this.addJoint('Face cosmetic slot', { x: 0, y: 0.65, z: -0.32 })],
-      ['backpack', this.addJoint('Backpack cosmetic slot', { x: 0, y: 0, z: 0.52 })]
+      ['head', this.addJoint('Head cosmetic slot', { x: 0, y: 1.13, z: 0 }, this.humanRig)],
+      ['face', this.addJoint('Face cosmetic slot', { x: 0, y: 0.65, z: -0.32 }, this.humanRig)],
+      ['backpack', this.addJoint('Backpack cosmetic slot', { x: 0, y: 0, z: 0.52 }, this.humanRig)]
     ]);
+
+    this.blobBody = this.addVisual('Blue Blob body', 'sphere', { x: 0, y: .02, z: 0 },
+      { x: .82, y: 1.15, z: .74 }, blobBlue, {}, this.blobRig);
+    this.addVisual('Blue Blob crown', 'sphere', { x: 0, y: .62, z: 0 },
+      { x: .66, y: .64, z: .65 }, blobLight, {}, this.blobRig);
+    this.addVisual('Blue Blob left eye', 'sphere', { x: -.15, y: .66, z: -.58 },
+      { x: .11, y: .14, z: .085 }, dark, {}, this.blobRig);
+    this.addVisual('Blue Blob right eye', 'sphere', { x: .15, y: .66, z: -.58 },
+      { x: .11, y: .14, z: .085 }, dark, {}, this.blobRig);
+    this.blobLimbs = {
+      leftArm: this.addJoint('Blue Blob left arm pivot', { x: -.58, y: .2, z: 0 }, this.blobRig),
+      rightArm: this.addJoint('Blue Blob right arm pivot', { x: .58, y: .2, z: 0 }, this.blobRig),
+      leftFoot: this.addJoint('Blue Blob left foot pivot', { x: -.25, y: -.7, z: -.04 }, this.blobRig),
+      rightFoot: this.addJoint('Blue Blob right foot pivot', { x: .25, y: -.7, z: -.04 }, this.blobRig)
+    };
+    this.addVisual('Blue Blob left arm', 'sphere', { x: -.15, y: -.12, z: 0 }, { x: .38, y: .2, z: .2 }, blobBlue, { z: -22 }, this.blobLimbs.leftArm);
+    this.addVisual('Blue Blob right arm', 'sphere', { x: .15, y: -.12, z: 0 }, { x: .38, y: .2, z: .2 }, blobBlue, { z: 22 }, this.blobLimbs.rightArm);
+    this.addVisual('Blue Blob left foot', 'sphere', { x: 0, y: 0, z: -.1 }, { x: .34, y: .19, z: .45 }, blobBlue, {}, this.blobLimbs.leftFoot);
+    this.addVisual('Blue Blob right foot', 'sphere', { x: 0, y: 0, z: -.1 }, { x: .34, y: .19, z: .45 }, blobBlue, {}, this.blobLimbs.rightFoot);
+    this.applyAppearance(this.appearance);
+  }
+
+  applyAppearance(value) {
+    this.appearance = normalizeAppearance(value);
+    const resolved = resolveAppearance(this.appearance);
+    setMaterialColor(this.appearanceMaterials.jacket, resolved.shirtColorValue.color);
+    setMaterialColor(this.appearanceMaterials.accent, shirtAccent(resolved.shirtColorValue.color));
+    setMaterialColor(this.appearanceMaterials.skin, resolved.skinToneValue.color);
+    setMaterialColor(this.appearanceMaterials.trousers, resolved.pantsColorValue.color);
+    setMaterialColor(this.appearanceMaterials.hair, resolved.hairColorValue.color);
+    this.humanRig.enabled = this.appearance.avatarType === 'human';
+    this.blobRig.enabled = this.appearance.avatarType === 'blob';
+    for (const [id, root] of this.hairStyles) root.enabled = id === this.appearance.hairStyle;
+    for (const [id, root] of this.accessories) root.enabled = id === this.appearance.accessory;
+    return this.getAppearance();
+  }
+
+  getAppearance() {
+    return normalizeAppearance(this.appearance);
   }
 
   getGroundSurfaceInfo() {
@@ -803,19 +902,46 @@ export class Player {
     return this.stamina.setUnlimited(enabled);
   }
 
+  exitFishing(options = {}) {
+    const wasFishing = Boolean(this.fishing?.active || this.movementState === 'fishing');
+    this.fishing?.cancel();
+    this.input.endRhythmCapture();
+    this.input.discardPrimaryEdges();
+    this.horizontalVelocity.set(0, 0, 0);
+    this.sprinting = false;
+    this.canGrip = false;
+    this.contactRecovery = null;
+    this.clearContactMotionLock();
+    this.resetSlideState();
+    this.movementState = this.grounded ? 'grounded' : 'airborne';
+    const position = this.body.translation();
+    this.stationaryProbePosition.set(position.x, position.y, position.z);
+    if (options.releasePointerLock && globalThis.document?.pointerLockElement) {
+      globalThis.document.exitPointerLock?.();
+    }
+    return wasFishing;
+  }
+
   update(dt, cameraAxes) {
+    this.updateEmote();
     this.momentumDeflectCooldown = Math.max(0, this.momentumDeflectCooldown - dt);
     const wasRecoveringFromSlideJam = this.slideRecoveryTimer > 0;
     this.slideRecoveryTimer = Math.max(0, this.slideRecoveryTimer - dt);
     if (wasRecoveringFromSlideJam && this.slideRecoveryTimer <= 0) {
       this.slideAvoidanceSide = 0;
     }
+    const cancelPressed = this.input.consumeCancel();
+    if ((cancelPressed && (this.fishing?.active || this.movementState === 'fishing'))
+      || (this.fishing?.active && this.movementState !== 'fishing')) {
+      // Contact recovery can change movementState before the normal fishing branch runs.
+      // Repair that split state immediately; Escape is sampled before any early return.
+      this.exitFishing({ releasePointerLock: cancelPressed });
+    }
     if (this.updateContactRecovery(dt)) return;
     this.slideBraking = false;
     this.climbing.tickCooldown(dt, this.stamina, this.body.translation());
     const jumpPressed = this.input.consumeJump();
     const fishingToggle = this.input.consumeFishingToggle();
-    const cancelPressed = this.input.consumeCancel();
     const axes = this.input.getMoveAxes();
     // Probe even when Rapier refuses to call a >55° face 'grounded'. That closes the
     // classic bunny-hop loophole where repeatedly touching a steep slope can refresh a
@@ -834,6 +960,11 @@ export class Player {
 
     const inputLength = Math.hypot(axes.x, axes.z);
     const hasMoveInput = inputLength > 0.01;
+    if (this.currentEmote && (hasMoveInput || jumpPressed || fishingToggle
+      || this.input.sprintHeld || this.input.slideHeld || this.input.gripHeld
+      || this.movementState !== 'grounded')) {
+      this.cancelEmote();
+    }
     const footSupport = this.getFootSupportInfo();
     const stationaryContact = this.updateStationaryContactRecovery(dt, footSupport, hasMoveInput);
     // Stamina recovery should be a property of the player's physical footing, never of
@@ -846,28 +977,27 @@ export class Player {
       && !slidingDownSlope
       && !slideRecoveryActive
       && (legalGroundSupport || footSupport.stable));
+    const partialFootRecovery = isPartialFootRestEligible(footSupport, {
+      movementState: this.movementState,
+      actualSpeed: stationaryContact.actualSpeed,
+      hasMoveInput,
+      sprintHeld: this.input.sprintHeld,
+      slideHeld: this.input.slideHeld,
+      gripHeld: this.input.gripHeld,
+      slidingDownSlope,
+      slideRecoveryActive
+    });
     const canRegenerateStamina = !slideRecoveryActive
-      && (normalFootRecovery || stationaryContact.ready);
+      && (normalFootRecovery || partialFootRecovery || stationaryContact.ready);
 
     if (this.movementState === 'fishing'
       && (!this.fishing?.active || !this.fishing.canRemainActive?.())) {
-      this.fishing?.cancel();
-      this.movementState = this.grounded ? 'grounded' : 'airborne';
-      this.sprinting = false;
-      this.canGrip = false;
-      this.input.discardPrimaryEdges();
+      this.exitFishing();
     }
 
     if (this.movementState === 'fishing') {
-      if (fishingToggle || cancelPressed) {
-        // F/Escape always exits the fishing stance, even if the player has slipped/fallen
-        // outside the original cast range since opening it.
-        this.fishing.cancel();
-        this.movementState = this.grounded ? 'grounded' : 'airborne';
-        this.sprinting = false;
-        this.canGrip = false;
-        this.horizontalVelocity.set(0, 0, 0);
-        this.input.discardPrimaryEdges();
+      if (fishingToggle) {
+        this.exitFishing();
       } else {
         this.sprinting = false;
         this.canGrip = false;
@@ -1475,8 +1605,7 @@ export class Player {
       return;
     }
     if (this.movementState === 'fishing' && !this.grounded) {
-      this.fishing.cancel();
-      this.movementState = 'airborne';
+      this.exitFishing();
     }
     if (this.movementState !== 'climbing'
       && this.movementState !== 'mantling'
@@ -1516,7 +1645,8 @@ export class Player {
     const lean = Math.min(this.lastSpeed * 1.25, 8);
     this.visualRoot.setLocalPosition(
       0,
-      PLAYER_VISUAL_GROUND_OFFSET + bob - (slidingPose ? .11 : 0),
+      PLAYER_VISUAL_GROUND_OFFSET + bob - (slidingPose ? .11 : 0)
+        - (this.currentEmote?.id === 'sit' ? .42 : 0),
       0
     );
     this.visualRoot.setLocalEulerAngles(
@@ -1548,7 +1678,46 @@ export class Player {
     let leftArmRoll = -8;
     let rightArmRoll = 8;
 
-    if (this.movementState === 'fishing' && this.fishing?.state === 'caught') {
+    if (this.currentEmote && this.movementState === 'grounded') {
+      const phase = (Date.now() - this.currentEmote.startedAt) / 1000;
+      if (this.currentEmote.id === 'wave') {
+        rightShoulder = 145;
+        rightElbow = -38;
+        rightArmRoll = -34 + Math.sin(phase * 8) * 24;
+        leftElbow = -8;
+      } else if (this.currentEmote.id === 'point') {
+        rightShoulder = 88;
+        rightElbow = 2;
+        rightArmRoll = -10;
+        leftElbow = -8;
+      } else if (this.currentEmote.id === 'cheer') {
+        leftShoulder = 148 + Math.sin(phase * 7) * 10;
+        rightShoulder = 148 - Math.sin(phase * 7) * 10;
+        leftElbow = -18;
+        rightElbow = -18;
+        leftArmRoll = -22;
+        rightArmRoll = 22;
+      } else if (this.currentEmote.id === 'sit') {
+        leftShoulder = -8;
+        rightShoulder = -8;
+        leftElbow = -18;
+        rightElbow = -18;
+        leftHip = 74;
+        rightHip = 74;
+        leftKnee = -88;
+        rightKnee = -88;
+      } else if (this.currentEmote.id === 'dance') {
+        const swing = Math.sin(phase * 6.5);
+        leftShoulder = 72 + swing * 48;
+        rightShoulder = 72 - swing * 48;
+        leftElbow = -32;
+        rightElbow = -32;
+        leftHip = -swing * 28;
+        rightHip = swing * 28;
+        leftKnee = -12 - Math.max(0, swing) * 30;
+        rightKnee = -12 - Math.max(0, -swing) * 30;
+      }
+    } else if (this.movementState === 'fishing' && this.fishing?.state === 'caught') {
       leftShoulder = 118;
       rightShoulder = 118;
       leftElbow = -25;
@@ -1646,6 +1815,21 @@ export class Player {
     right.hip.setLocalEulerAngles(rightHip, 0, 0);
     left.knee.setLocalEulerAngles(leftKnee, 0, 0);
     right.knee.setLocalEulerAngles(rightKnee, 0, 0);
+    this.applyBlobPose({ leftShoulder, rightShoulder, leftHip, rightHip, groundedMotion, slidingPose });
+  }
+
+  applyBlobPose({ leftShoulder, rightShoulder, leftHip, rightHip, groundedMotion, slidingPose }) {
+    if (!this.blobRig || !this.blobLimbs) return;
+    const bounce = this.grounded
+      ? Math.abs(Math.sin(this.motionTime * 1.8)) * .055 * groundedMotion
+      : -.035;
+    const breathe = Math.sin(this.motionTime * .8) * .018;
+    const squash = slidingPose ? .86 : 1 + breathe - bounce * .35;
+    this.blobRig.setLocalScale(1 + bounce * .42, squash, 1 + bounce * .28);
+    this.blobLimbs.leftArm.setLocalEulerAngles(leftShoulder * .72, 0, -18);
+    this.blobLimbs.rightArm.setLocalEulerAngles(rightShoulder * .72, 0, 18);
+    this.blobLimbs.leftFoot.setLocalEulerAngles(leftHip * .55, 0, 0);
+    this.blobLimbs.rightFoot.setLocalEulerAngles(rightHip * .55, 0, 0);
   }
 
   respawn() {
@@ -1653,6 +1837,7 @@ export class Player {
   }
 
   teleport(position, facingYaw = this.facingYaw) {
+    this.cancelEmote();
     const spawn = { x: position.x, y: position.y, z: position.z };
     this.body.setTranslation(spawn, true);
     this.body.setNextKinematicTranslation(spawn);
@@ -1682,7 +1867,7 @@ export class Player {
     this.stamina.reset();
     this.climbing.detach(0);
     this.climbing.clearTransferProtection();
-    this.fishing?.cancel();
+    this.exitFishing();
     this.movementState = 'airborne';
     this.canGrip = false;
     this.facingYaw = facingYaw;
@@ -1697,6 +1882,28 @@ export class Player {
 
   getPosition() {
     return this.body.translation();
+  }
+
+  canStartEmote() {
+    return this.grounded && this.movementState === 'grounded' && !this.fishing?.active
+      && !this.slideActive && this.lastSpeed <= .2;
+  }
+
+  startEmote(id, startedAt = Date.now()) {
+    if (!this.canStartEmote() || !EMOTE_IDS.includes(id)) return false;
+    this.currentEmote = normalizeEmote({ id, startedAt });
+    return Boolean(this.currentEmote);
+  }
+
+  cancelEmote() {
+    const active = Boolean(this.currentEmote);
+    this.currentEmote = null;
+    return active;
+  }
+
+  updateEmote(now = Date.now()) {
+    if (!this.currentEmote) return;
+    if (now - this.currentEmote.startedAt >= emoteDurationMs(this.currentEmote.id)) this.cancelEmote();
   }
 
   getState() {
@@ -1718,7 +1925,10 @@ export class Player {
       sprintLocked: this.stamina.sprintLocked,
       stamina: this.stamina.normalized,
       staminaSupport: this.getFootSupportInfo().fraction,
+      staminaContactSupport: this.getFootSupportInfo().contactFraction,
       movementState: this.movementState,
+      appearance: this.getAppearance(),
+      emote: this.currentEmote ? { ...this.currentEmote } : null,
       slideBraking: this.slideBraking,
       slideActive: this.slideActive,
       slidePoseActive: this.slidePoseActive,

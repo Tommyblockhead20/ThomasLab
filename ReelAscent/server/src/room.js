@@ -40,7 +40,8 @@ export class Room {
       players: [...this.players.values()].map((player) => ({
         id: player.playerId,
         connected: player.connected,
-        host: player.playerId === this.hostId
+        host: player.playerId === this.hostId,
+        appearance: player.lastSnapshot?.appearance ?? null
       }))
     };
   }

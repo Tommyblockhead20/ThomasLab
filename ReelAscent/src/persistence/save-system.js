@@ -1,7 +1,7 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 5;
+export const SAVE_SCHEMA_VERSION = 6;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 
 const QUALITY_RANK = Object.freeze({ GOOD: 1, GREAT: 2, PERFECT: 3 });
@@ -130,6 +130,11 @@ const MIGRATIONS = Object.freeze({
     ...value,
     version: 5,
     progression: normalizeProgressionState(value.progression)
+  }),
+  5: (value) => ({
+    ...value,
+    version: 6,
+    progression: normalizeProgressionState(value.progression)
   })
 });
 
@@ -193,7 +198,8 @@ export class SaveSystem {
 
   recordCatch(catchData) {
     if (!catchData?.speciesId) return false;
-    const previous = normalizeEntry(this.data.collection[catchData.speciesId]);
+    const speciesId = canonicalSpeciesId(catchData.speciesId);
+    const previous = normalizeEntry(this.data.collection[speciesId]);
     const lengthCategoryIndex = Math.max(0, finiteNumber(catchData.lengthCategoryIndex));
     const sizeCategoryIndex = Math.max(0, finiteNumber(catchData.sizeCategoryIndex));
     const quality = QUALITY_RANK[catchData.quality] ? catchData.quality : 'GOOD';
@@ -225,7 +231,7 @@ export class SaveSystem {
       firstCaughtAt: previous.firstCaughtAt || finiteNumber(catchData.caughtAt, Date.now()),
       lastCaughtAt: finiteNumber(catchData.caughtAt, Date.now())
     };
-    this.data.collection[catchData.speciesId] = record;
+    this.data.collection[speciesId] = record;
     this.data.lifetime.fishCaught += 1;
     return this.save();
   }

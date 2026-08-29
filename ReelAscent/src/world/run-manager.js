@@ -179,7 +179,7 @@ export class RunManager {
     this.status = 'ended';
     this.endedTime = 0;
     this.pendingStart = this.world.chooseStart(this.currentStart.id);
-    this.fishing.cancel();
+    this.player.exitFishing({ releasePointerLock: true });
     if (document.pointerLockElement) document.exitPointerLock?.();
     this.banner = {
       title: 'RUN ENDED',

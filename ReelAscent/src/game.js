@@ -19,6 +19,10 @@ import { MESSAGE_TYPES } from './multiplayer/protocol.js';
 import { MultiplayerMenu } from './ui/multiplayer-menu.js';
 import { describeTransientSession } from './persistence/session-state.js';
 import { createRemoteAvatar } from './multiplayer/remote-avatar.js';
+import { MountainMapMenu } from './ui/mountain-map.js';
+import { EmoteMenu } from './ui/emote-menu.js';
+import { AppearanceMenu } from './ui/appearance-menu.js';
+import { HomeInteractionController } from './ui/home-interaction.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -42,12 +46,12 @@ export class Game {
     });
     this.app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
     this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
-    this.app.scene.ambientLight = new pc.Color(0.76, 0.78, 0.73);
+    this.app.scene.ambientLight = new pc.Color(0.68, 0.72, 0.67);
     this.app.scene.fog.type = pc.FOG_LINEAR;
     this.app.scene.fog.color.set(COLORS.fog[0], COLORS.fog[1], COLORS.fog[2]);
-    this.app.scene.fog.start = 170;
-    this.app.scene.fog.end = 390;
-    this.app.scene.exposure = 1.08;
+    this.app.scene.fog.start = 190;
+    this.app.scene.fog.end = 425;
+    this.app.scene.exposure = 1.06;
     this.app.scene.toneMapping = pc.TONEMAP_ACES;
 
     this.physicsWorld = new physics.World({ x: 0, y: -PLAYER_CONFIG.gravity, z: 0 });
@@ -59,6 +63,8 @@ export class Game {
     this.hud = new Hud();
     this.saveSystem = new SaveSystem();
     this.progression = new ProgressionSystem(this.saveSystem);
+    this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
+    this.lastHomeProgressRevision = this.saveSystem.revision;
     this.journal = new FishJournal(this.saveSystem, FISH_SPECIES);
     this.player = new Player(
       this.app,
@@ -81,13 +87,22 @@ export class Game {
     this.ecologyGuide = new EcologyGuidePanel(this.fishing);
     this.fishingPerformance = new FishingPerformanceMenu(this.fishing);
     this.inventory = new InventoryMenu(this.progression);
+    this.appearanceMenu = new AppearanceMenu(this.progression, this.player);
+    this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud);
+    this.mapMenu = new MountainMapMenu();
+    this.emoteMenu = new EmoteMenu(
+      (emoteId) => this.player.startEmote(emoteId),
+      () => this.player.canStartEmote()
+    );
     this.activeMultiplayerSeed = null;
     this.lastMultiplayerFishingActive = false;
     this.activeCatchPresentation = null;
     this.remoteCatchNotices = new Map();
     this.multiplayerCatchFeed = document.querySelector('#multiplayer-catch-feed');
     this.multiplayer = new MultiplayerClient(this.progression.state.player.id, {
-      createRemoteRepresentation: (playerId, colorIndex) => this.createRemotePlayerRepresentation(playerId, colorIndex),
+      createRemoteRepresentation: (playerId, colorIndex, appearance) => (
+        this.createRemotePlayerRepresentation(playerId, colorIndex, appearance)
+      ),
       onAuthoritativeRunSeed: (runSeed) => this.applyAuthoritativeRunSeed(runSeed)
     });
     this.onMultiplayerMessage = (event) => this.handleMultiplayerMessage(event.detail);
@@ -156,11 +171,11 @@ export class Game {
     sun.addComponent('light', {
       type: 'directional',
       color: new pc.Color(1, 0.91, 0.7),
-      intensity: 1.45,
+      intensity: 1.38,
       castShadows: true,
       shadowBias: 0.2,
       normalOffsetBias: 0.05,
-      shadowDistance: 105,
+      shadowDistance: 118,
       shadowResolution: 1536
     });
     sun.setEulerAngles(48, -32, 0);
@@ -169,7 +184,8 @@ export class Game {
 
   update(dt) {
     if (this.destroyed) return;
-    if (!this.journal.isOpen && !this.inventory.isOpen && !this.multiplayerMenu.isOpen) {
+    if (!this.journal.isOpen && !this.inventory.isOpen && !this.multiplayerMenu.isOpen
+      && !this.mapMenu.isOpen && !this.emoteMenu.isOpen && !this.appearanceMenu.isOpen) {
       this.runManager.update(dt);
       if (!this.runManager.paused) {
         this.player.update(dt, this.camera.getPlanarAxes());
@@ -179,12 +195,19 @@ export class Game {
       }
     }
     this.syncPersistentProgress();
+    if (this.lastHomeProgressRevision !== this.saveSystem.revision) {
+      this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
+      this.lastHomeProgressRevision = this.saveSystem.revision;
+    }
     this.world.update(dt);
+    this.homeInteraction.update();
     const multiplayerPlayerState = this.player.getState();
     this.multiplayer.update(Date.now(), {
       position: multiplayerPlayerState.position,
       yaw: this.player.facingYaw,
       movement: multiplayerPlayerState.movementState,
+      appearance: multiplayerPlayerState.appearance,
+      emote: multiplayerPlayerState.emote,
       fishingState: multiplayerPlayerState.movementState === 'fishing' ? 'active' : null
     });
     this.syncMultiplayerFishingState(multiplayerPlayerState);
@@ -193,13 +216,14 @@ export class Game {
     this.fishing.updateDebug(dt);
     this.fishingPerformance.update(this.fishing.getFishingPerformanceState());
     this.inventory.update();
+    this.appearanceMenu.update();
     this.ecologyGuide.update();
     this.camera.update(dt);
     this.hud.update(dt, this.getState());
   }
 
-  createRemotePlayerRepresentation(playerId, colorIndex = 0) {
-    return createRemoteAvatar(this.app, playerId, colorIndex);
+  createRemotePlayerRepresentation(playerId, colorIndex = 0, appearance = null) {
+    return createRemoteAvatar(this.app, playerId, colorIndex, appearance);
   }
 
   seededRandom(seed) {
@@ -340,6 +364,10 @@ export class Game {
     this.fishing.destroy();
     this.fishingPerformance.destroy();
     this.inventory.destroy();
+    this.appearanceMenu.destroy();
+    this.homeInteraction.destroy();
+    this.mapMenu.destroy();
+    this.emoteMenu.destroy();
     this.multiplayerMenu.destroy();
     this.multiplayer.removeEventListener('message', this.onMultiplayerMessage);
     this.multiplayer.destroy();

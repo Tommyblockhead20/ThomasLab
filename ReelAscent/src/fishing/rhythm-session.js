@@ -30,6 +30,100 @@ const GOOD_WINDOW_BONUS_BY_RARITY = Object.freeze({
 
 export const RHYTHM_MINIMUM_ACTION_GAP_SECONDS = .08;
 
+// Only these quick-moving species can receive a short tap riff. Riffs replace a small
+// run of existing events rather than expanding the song and therefore preserve each
+// species' authored melodic identity and overall difficulty envelope.
+export const RHYTHM_RIFF_PROFILES = Object.freeze({
+  rainbow_shiner: Object.freeze({ chance: .14, minimum: 3, maximum: 4, timingWindowScale: .58 }),
+  mackerel: Object.freeze({ chance: .14, minimum: 3, maximum: 4, timingWindowScale: .58 }),
+  great_barracuda: Object.freeze({ chance: .18, minimum: 3, maximum: 5, timingWindowScale: .6 }),
+  piranha: Object.freeze({ chance: .16, minimum: 3, maximum: 4, timingWindowScale: .6 }),
+  sailfish: Object.freeze({ chance: .2, minimum: 4, maximum: 5, timingWindowScale: .6 }),
+  yellowfin_tuna: Object.freeze({ chance: .24, minimum: 4, maximum: 6, timingWindowScale: .68 }),
+  swordfish: Object.freeze({ chance: .28, minimum: 4, maximum: 6, timingWindowScale: .68 })
+});
+
+// Four-lane chords are deliberately a different vocabulary from riffs. The tiny
+// probabilities plus one-per-song cap make them a special Rare/Legendary flourish.
+export const FOUR_LANE_CHORD_PROFILES = Object.freeze({
+  electric_eel: .035,
+  mantis_shrimp: .035,
+  yellowfin_tuna: .035,
+  american_alligator: .035,
+  swordfish: .07,
+  polar_bear: .07,
+  great_white_shark: .07,
+  peaklight_koi: .07
+});
+
+function speciesKey(fish) {
+  return String(fish.canonicalId ?? fish.speciesId ?? fish.id ?? '')
+    .trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function groupRhythmEvents(events) {
+  const groups = [];
+  for (const event of [...events].sort((a, b) => a.groupIndex - b.groupIndex || a.stepIndex - b.stepIndex)) {
+    const previous = groups.at(-1);
+    if (previous && previous.groupIndex === event.groupIndex) previous.events.push(event);
+    else groups.push({ groupIndex: event.groupIndex, stepIndex: event.stepIndex, events: [event] });
+  }
+  return groups;
+}
+
+export function applySpecialRhythmVocabulary(events, fish, rng = Math.random) {
+  const key = speciesKey(fish);
+  const groups = groupRhythmEvents(events);
+  const riffProfile = RHYTHM_RIFF_PROFILES[key];
+  let riff = null;
+
+  if (riffProfile && groups.length >= riffProfile.minimum + 2 && rng() < riffProfile.chance) {
+    const desiredLength = riffProfile.minimum
+      + Math.floor(rng() * (riffProfile.maximum - riffProfile.minimum + 1));
+    const length = Math.min(desiredLength, groups.length - 2);
+    const start = 1 + Math.floor(rng() * Math.max(1, groups.length - length - 1));
+    for (let index = start; index < start + length; index += 1) {
+      const source = groups[index].events[0];
+      groups[index].events = [{
+        ...source,
+        hold: false,
+        holdLevel: 0,
+        riff: true,
+        timingWindowScale: riffProfile.timingWindowScale
+      }];
+    }
+    riff = Object.freeze({ start, length, speciesId: key });
+  }
+
+  let fourLaneChord = null;
+  const chordChance = FOUR_LANE_CHORD_PROFILES[key] ?? 0;
+  if (['Rare', 'Legendary'].includes(fish.rarity) && chordChance > 0 && groups.length >= 7 && rng() < chordChance) {
+    const candidates = groups
+      .map((group, index) => ({ group, index }))
+      .filter(({ group, index }) => index >= 2 && index <= groups.length - 3
+        && !group.events.some((event) => event.riff || event.hold)
+        && !groups[index - 1].events.some((event) => event.riff || event.hold)
+        && !groups[index + 1].events.some((event) => event.riff || event.hold));
+    if (candidates.length) {
+      const selected = candidates[Math.floor(rng() * candidates.length)];
+      const source = selected.group.events[0];
+      selected.group.events = RHYTHM_LANES.map((lane, laneIndex) => ({
+        ...source,
+        lane,
+        pitchSlot: (source.pitchSlot + laneIndex) % 2,
+        degree: RHYTHM_SCALE_DEGREES[lane][(source.pitchSlot + laneIndex) % 2],
+        hold: false,
+        holdLevel: 0,
+        riff: false,
+        fourLaneChord: true
+      }));
+      fourLaneChord = Object.freeze({ groupIndex: selected.group.groupIndex, speciesId: key });
+    }
+  }
+
+  return { events: groups.flatMap((group) => group.events), riff, fourLaneChord };
+}
+
 function effectiveGoodWindow(fish, config, successWindowMultiplier = 1) {
   return config.goodWindow
     * (fish.rhythm.timingTolerance ?? 1)
@@ -49,9 +143,16 @@ export function normalizeRequiredActionTimings(notes, goodWindow, minimumGap = R
     else groups.push({ key, notes: [note] });
   }
   let previousActionEnd = -Infinity;
+  let previousGroup = null;
   for (const [groupIndex, group] of groups.entries()) {
     const authoredHitTime = Math.min(...group.notes.map((note) => note.hitTime));
-    const earliestHit = previousActionEnd + minimumGap + goodWindow;
+    const currentWindow = Math.max(...group.notes.map((note) => goodWindow * (note.timingWindowScale ?? 1)));
+    const riffPair = previousGroup?.notes.every((note) => note.riff)
+      && group.notes.every((note) => note.riff);
+    const chordPair = previousGroup?.notes.some((note) => note.fourLaneChord)
+      || group.notes.some((note) => note.fourLaneChord);
+    const actionGap = riffPair ? .035 : chordPair ? .32 : minimumGap;
+    const earliestHit = previousActionEnd + actionGap + currentWindow;
     const shiftedHitTime = Math.max(authoredHitTime, earliestHit);
     for (const note of group.notes) {
       note.authoredStepIndex = note.stepIndex;
@@ -60,8 +161,9 @@ export function normalizeRequiredActionTimings(notes, goodWindow, minimumGap = R
       note.groupIndex = groupIndex;
     }
     previousActionEnd = Math.max(...group.notes.map((note) => (
-      note.hitTime + Math.max(0, note.duration) + goodWindow
+      note.hitTime + Math.max(0, note.duration) + goodWindow * (note.timingWindowScale ?? 1)
     )));
+    previousGroup = group;
   }
   return ordered;
 }
@@ -213,7 +315,9 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
   const motifs = settings.motifs?.length ? settings.motifs : [fallbackMotif(settings)];
   const motifIndex = 0;
   const parsed = parseAuthoredMotif(motifs[0], fish.shiny);
-  const events = adaptEventsForRarity(parsed.events, fish.rarity);
+  const adaptedEvents = adaptEventsForRarity(parsed.events, fish.rarity);
+  const specialVocabulary = applySpecialRhythmVocabulary(adaptedEvents, fish, rng);
+  const events = specialVocabulary.events;
   const [typicalMinLength, typicalMaxLength] = fish.sizeModel?.typicalLength ?? [fish.length ?? 1, fish.length ?? 1];
   const lengthSpan = Math.max(.01, typicalMaxLength - typicalMinLength);
   const lengthFactor = clamp(((fish.length ?? typicalMinLength) - typicalMinLength) / lengthSpan, -.15, 1.7);
@@ -253,12 +357,7 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
   // shifts notes whose complete required-action windows would otherwise conflict.
   const interNoteGap = ({ Common: .14, Uncommon: .09, Rare: .025, Legendary: 0 }[fish.rarity] ?? .05);
   const lengthTier = fish.lengthCategoryIndex ?? 2;
-  const eventGroups = [];
-  for (const event of events) {
-    const group = eventGroups.at(-1);
-    if (group && group.groupIndex === event.groupIndex) group.events.push(event);
-    else eventGroups.push({ groupIndex: event.groupIndex, stepIndex: event.stepIndex, events: [event] });
-  }
+  const eventGroups = groupRhythmEvents(events);
   const timingPatterns = {
     Common: [1.5, 2, 1, 1.5, 1],
     Uncommon: [1, 1.5, 2, 1, 1.5, 1],
@@ -273,11 +372,16 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
       const previous = eventGroups[index - 1];
       const authoredMultiple = clamp(group.stepIndex - previous.stepIndex, 1, 3);
       let multiplier = Math.max(authoredMultiple, timingPattern[(index - 1) % timingPattern.length]);
+      const riffPair = previous.events.every((event) => event.riff)
+        && group.events.every((event) => event.riff);
+      const chordBreathingRoom = previous.events.some((event) => event.fourLaneChord)
+        || group.events.some((event) => event.fourLaneChord);
       const safeLegendaryHalfBeat = fish.rarity === 'Legendary' && index % 11 === 7
         && previous.events.length === 1 && group.events.length === 1
         && !previous.events[0].hold && !group.events[0].hold;
-      if (safeLegendaryHalfBeat) multiplier = .5;
-      groupTime += spacing * multiplier + interNoteGap;
+      if (riffPair || safeLegendaryHalfBeat) multiplier = .5;
+      if (chordBreathingRoom) multiplier = Math.max(multiplier, 2.5);
+      groupTime += spacing * multiplier + (riffPair ? 0 : interNoteGap);
     }
     groupHitTimes.set(group.groupIndex, groupTime);
   });
@@ -286,9 +390,9 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
     // Long specimens keep the SAME tune, but phrase-ending notes linger more often.
     // This is deterministic by authored step so repeated catches remain recognizable.
     const singleNoteGroup = groupSizes.get(event.groupIndex) === 1;
-    const sizeAddedHoldLevel = singleNoteGroup && lengthTier >= 4
+    const sizeAddedHoldLevel = !event.riff && singleNoteGroup && lengthTier >= 4
       ? (event.groupIndex % 10 === 3 ? 3 : event.groupIndex % 5 === 3 ? 2 : 0)
-      : singleNoteGroup && lengthTier >= 3 && event.groupIndex % 8 === 5 ? 1 : 0;
+      : !event.riff && singleNoteGroup && lengthTier >= 3 && event.groupIndex % 8 === 5 ? 1 : 0;
     const holdLevel = Math.max(event.holdLevel ?? (event.hold ? 1 : 0), sizeAddedHoldLevel);
     const holdBeatLengths = [0, .55, .9, 1.3];
     return {
@@ -301,6 +405,9 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
       hitTime: groupHitTimes.get(event.groupIndex) ?? config.approachSeconds,
       duration: holdLevel ? beat * holdBeatLengths[holdLevel] * sustainScale : 0,
       holdLevel,
+      riff: Boolean(event.riff),
+      fourLaneChord: Boolean(event.fourLaneChord),
+      timingWindowScale: event.timingWindowScale ?? 1,
       status: 'pending',
       timingJudgment: null,
       signedErrorMs: null,
@@ -322,8 +429,10 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
     instrument: settings.instrument ?? 'wood',
     root: settings.root ?? 55,
     notes,
+    riff: specialVocabulary.riff,
+    fourLaneChord: specialVocabulary.fourLaneChord,
     duration: finalNote
-      ? finalNote.hitTime + finalNote.duration + config.goodWindow + .32
+      ? finalNote.hitTime + finalNote.duration + config.goodWindow * (finalNote.timingWindowScale ?? 1) + .32
       : config.approachSeconds,
     approachSeconds: config.approachSeconds,
     requiredHits: Math.max(1, notes.length - 1),
@@ -413,12 +522,12 @@ export class RhythmSession {
         if (this.songTime >= endTime) {
           // Holding beyond the authored endpoint is harmless: finish on the exact tail time.
           this.completeHold(note);
-        } else if (this.songTime > note.hitTime + this.perfectWindow && !isLaneHeld(note.lane)) {
+        } else if (this.songTime > note.hitTime + this.perfectWindowFor(note) && !isLaneHeld(note.lane)) {
           if (this.songTime >= requiredUntil || this.songTime >= endTime - this.holdEndpointGraceSeconds) {
             this.completeHold(note);
           } else this.missNote(note, note.lane, this.songTime, 'hold-release');
         }
-      } else if (note.status === 'pending' && this.songTime > note.hitTime + this.goodWindow) {
+      } else if (note.status === 'pending' && this.songTime > note.hitTime + this.goodWindowFor(note)) {
         this.missNote(note);
       }
       if (this.result) return this.result;
@@ -450,8 +559,8 @@ export class RhythmSession {
       }
     }
 
-    if (matching && matchingDelta <= this.goodWindow) {
-      const perfect = matchingDelta <= this.perfectWindow;
+    if (matching && matchingDelta <= this.goodWindowFor(matching)) {
+      const perfect = matchingDelta <= this.perfectWindowFor(matching);
       const signedMs = Math.round((inputTime - matching.hitTime) * 1000);
       matching.timingJudgment = perfect ? 'perfect' : 'good';
       matching.signedErrorMs = signedMs;
@@ -474,7 +583,7 @@ export class RhythmSession {
       return;
     }
 
-    if (timingTarget && timingDelta <= this.goodWindow) {
+    if (timingTarget && timingDelta <= this.goodWindowFor(timingTarget)) {
       // A wrong direction at the correct time is ONE mistake: consume that due note as
       // missed so it cannot time out later and count as a second miss.
       this.recordInput(lane, 'WRONG LANE', false, Math.round((inputTime - timingTarget.hitTime) * 1000), timingTarget, inputTime);
@@ -733,9 +842,17 @@ export class RhythmSession {
     return this.config.perfectWindow * this.timingTolerance;
   }
 
+  perfectWindowFor(note) {
+    return this.perfectWindow * (note?.timingWindowScale ?? 1);
+  }
+
   get goodWindow() {
     return this.config.goodWindow * this.timingTolerance * this.successWindowMultiplier
       + (GOOD_WINDOW_BONUS_BY_RARITY[this.fish.rarity] ?? 0);
+  }
+
+  goodWindowFor(note) {
+    return this.goodWindow * (note?.timingWindowScale ?? 1);
   }
 
   get escapeProgress() {
