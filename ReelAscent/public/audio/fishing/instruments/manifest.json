@@ -1,0 +1,1539 @@
+{
+  "version": 1,
+  "design": "8-note diatonic instrument sets for fishing rhythm songs",
+  "arrow_mapping": {
+    "left": [
+      1,
+      2
+    ],
+    "up": [
+      3,
+      4
+    ],
+    "down": [
+      5,
+      6
+    ],
+    "right": [
+      7,
+      8
+    ]
+  },
+  "shiny_rule": "Mirror left<->right and up<->down, and flip the two-note slot within each arrow.",
+  "notes": "Most instruments use C-major scale degrees. Ocarina/handpan preserve relative degree identity where the source did not provide a reliable octave/pitch label.",
+  "instruments": {
+    "saxophone": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "saxophone/01_C4.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "saxophone/02_D4.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "saxophone/03_E4.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "saxophone/04_F4.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "saxophone/05_G4.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "saxophone/06_A4.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "saxophone/07_B4.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "saxophone/08_C5.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "trombone": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C3",
+          "file": "trombone/01_C3.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D3",
+          "file": "trombone/02_D3.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E3",
+          "file": "trombone/03_E3.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F3",
+          "file": "trombone/04_F3.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G3",
+          "file": "trombone/05_G3.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A3",
+          "file": "trombone/06_A3.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B3",
+          "file": "trombone/07_B3.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C4",
+          "file": "trombone/08_C4.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "trumpet": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "trumpet/01_C4.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "trumpet/02_D4.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "trumpet/03_E4.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "trumpet/04_F4.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "trumpet/05_G4.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "trumpet/06_A4.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "trumpet/07_B4.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "trumpet/08_C5.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "tuba": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C2",
+          "file": "tuba/01_C2.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D2",
+          "file": "tuba/02_D2.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E2",
+          "file": "tuba/03_E2.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F2",
+          "file": "tuba/04_F2.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G2",
+          "file": "tuba/05_G2.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A2",
+          "file": "tuba/06_A2.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B2",
+          "file": "tuba/07_B2.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C3",
+          "file": "tuba/08_C3.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "viola_arco": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "viola_arco/01_C4.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "viola_arco/02_D4.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "viola_arco/03_E4.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "viola_arco/04_F4.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "viola_arco/05_G4.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "viola_arco/06_A4.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "viola_arco/07_B4.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "viola_arco/08_C5.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "violin_arco": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C5",
+          "file": "violin_arco/01_C5.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D5",
+          "file": "violin_arco/02_D5.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E5",
+          "file": "violin_arco/03_E5.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F5",
+          "file": "violin_arco/04_F5.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G5",
+          "file": "violin_arco/05_G5.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A5",
+          "file": "violin_arco/06_A5.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B5",
+          "file": "violin_arco/07_B5.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C6",
+          "file": "violin_arco/08_C6.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "banjo": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "banjo/01_C4.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "banjo/02_D4.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "banjo/03_E4.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "banjo/04_F4.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "banjo/05_G4.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "banjo/06_A4.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "banjo/07_B4.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "banjo/08_C5.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "bass_clarinet": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C3",
+          "file": "bass_clarinet/01_C3.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D3",
+          "file": "bass_clarinet/02_D3.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E3",
+          "file": "bass_clarinet/03_E3.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F3",
+          "file": "bass_clarinet/04_F3.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G3",
+          "file": "bass_clarinet/05_G3.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A3",
+          "file": "bass_clarinet/06_A3.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B3",
+          "file": "bass_clarinet/07_B3.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C4",
+          "file": "bass_clarinet/08_C4.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "bassoon": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C3",
+          "file": "bassoon/01_C3.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D3",
+          "file": "bassoon/02_D3.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E3",
+          "file": "bassoon/03_E3.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F3",
+          "file": "bassoon/04_F3.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G3",
+          "file": "bassoon/05_G3.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A3",
+          "file": "bassoon/06_A3.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B3",
+          "file": "bassoon/07_B3.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C4",
+          "file": "bassoon/08_C4.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "cello_arco": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C3",
+          "file": "cello_arco/01_C3.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D3",
+          "file": "cello_arco/02_D3.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E3",
+          "file": "cello_arco/03_E3.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F3",
+          "file": "cello_arco/04_F3.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G3",
+          "file": "cello_arco/05_G3.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A3",
+          "file": "cello_arco/06_A3.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B3",
+          "file": "cello_arco/07_B3.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C4",
+          "file": "cello_arco/08_C4.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "clarinet": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "clarinet/01_C4.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "clarinet/02_D4.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "clarinet/03_E4.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "clarinet/04_F4.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "clarinet/05_G4.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "clarinet/06_A4.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "clarinet/07_B4.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "clarinet/08_C5.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "contrabassoon": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C2",
+          "file": "contrabassoon/01_C2.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D2",
+          "file": "contrabassoon/02_D2.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E2",
+          "file": "contrabassoon/03_E2.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F2",
+          "file": "contrabassoon/04_F2.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G2",
+          "file": "contrabassoon/05_G2.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A2",
+          "file": "contrabassoon/06_A2.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B2",
+          "file": "contrabassoon/07_B2.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C3",
+          "file": "contrabassoon/08_C3.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "cor_anglais": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "cor_anglais/01_C4.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "cor_anglais/02_D4.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "cor_anglais/03_E4.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "cor_anglais/04_F4.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "cor_anglais/05_G4.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "cor_anglais/06_A4.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "cor_anglais/07_B4.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "cor_anglais/08_C5.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "double_bass_arco": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C2",
+          "file": "double_bass_arco/01_C2.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D2",
+          "file": "double_bass_arco/02_D2.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E2",
+          "file": "double_bass_arco/03_E2.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F2",
+          "file": "double_bass_arco/04_F2.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G2",
+          "file": "double_bass_arco/05_G2.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A2",
+          "file": "double_bass_arco/06_A2.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B2",
+          "file": "double_bass_arco/07_B2.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C3",
+          "file": "double_bass_arco/08_C3.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "flute": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C5",
+          "file": "flute/01_C5.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D5",
+          "file": "flute/02_D5.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E5",
+          "file": "flute/03_E5.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F5",
+          "file": "flute/04_F5.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G5",
+          "file": "flute/05_G5.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A5",
+          "file": "flute/06_A5.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B5",
+          "file": "flute/07_B5.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C6",
+          "file": "flute/08_C6.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "french_horn": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C3",
+          "file": "french_horn/01_C3.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D3",
+          "file": "french_horn/02_D3.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E3",
+          "file": "french_horn/03_E3.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F3",
+          "file": "french_horn/04_F3.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G3",
+          "file": "french_horn/05_G3.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A3",
+          "file": "french_horn/06_A3.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B3",
+          "file": "french_horn/07_B3.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C4",
+          "file": "french_horn/08_C4.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "guitar": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C3",
+          "file": "guitar/01_C3.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D3",
+          "file": "guitar/02_D3.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E3",
+          "file": "guitar/03_E3.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F3",
+          "file": "guitar/04_F3.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G3",
+          "file": "guitar/05_G3.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A3",
+          "file": "guitar/06_A3.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B3",
+          "file": "guitar/07_B3.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C4",
+          "file": "guitar/08_C4.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "mandolin": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "mandolin/01_C4.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "mandolin/02_D4.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "mandolin/03_E4.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "mandolin/04_F4.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "mandolin/05_G4.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "mandolin/06_A4.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "mandolin/07_B4.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "mandolin/08_C5.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "oboe": {
+      "source": "Philharmonia Orchestra uploaded archive",
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C5",
+          "file": "oboe/01_C5.mp3"
+        },
+        {
+          "degree": 2,
+          "pitch": "D5",
+          "file": "oboe/02_D5.mp3"
+        },
+        {
+          "degree": 3,
+          "pitch": "E5",
+          "file": "oboe/03_E5.mp3"
+        },
+        {
+          "degree": 4,
+          "pitch": "F5",
+          "file": "oboe/04_F5.mp3"
+        },
+        {
+          "degree": 5,
+          "pitch": "G5",
+          "file": "oboe/05_G5.mp3"
+        },
+        {
+          "degree": 6,
+          "pitch": "A5",
+          "file": "oboe/06_A5.mp3"
+        },
+        {
+          "degree": 7,
+          "pitch": "B5",
+          "file": "oboe/07_B5.mp3"
+        },
+        {
+          "degree": 8,
+          "pitch": "C6",
+          "file": "oboe/08_C6.mp3"
+        }
+      ],
+      "derived_scale": false
+    },
+    "electric_bass": {
+      "source": "20150__j_e_f_f_g__rickenbacker-bass-guitar-notes.zip",
+      "scale": "C2 major octave",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C2",
+          "file": "electric_bass/01_C2.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D2",
+          "file": "electric_bass/02_D2.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": "E2",
+          "file": "electric_bass/03_E2.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": "F2",
+          "file": "electric_bass/04_F2.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": "G2",
+          "file": "electric_bass/05_G2.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": "A2",
+          "file": "electric_bass/06_A2.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": "B2",
+          "file": "electric_bass/07_B2.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": "C3",
+          "file": "electric_bass/08_C3.mp3",
+          "source_file": "353478__j_e_f_f_g__2_c_mf.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    },
+    "upright_bass_pizz": {
+      "source": "9528__carlos_vaquero__double-bass-single-notes-pizzicato-f1-g4.zip",
+      "scale": "C2 to C3 diatonic",
+      "derived_scale": false,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C2",
+          "file": "upright_bass_pizz/01_C2.mp3",
+          "source_file": "153805__carlos_vaquero__double-bass-c-2-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D2",
+          "file": "upright_bass_pizz/02_D2.mp3",
+          "source_file": "153807__carlos_vaquero__double-bass-d-2-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 3,
+          "pitch": "E2",
+          "file": "upright_bass_pizz/03_E2.mp3",
+          "source_file": "153808__carlos_vaquero__double-bass-e-2-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 4,
+          "pitch": "F2",
+          "file": "upright_bass_pizz/04_F2.mp3",
+          "source_file": "153809__carlos_vaquero__double-bass-f-2-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 5,
+          "pitch": "G2",
+          "file": "upright_bass_pizz/05_G2.mp3",
+          "source_file": "153811__carlos_vaquero__double-bass-g-2-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 6,
+          "pitch": "A2",
+          "file": "upright_bass_pizz/06_A2.mp3",
+          "source_file": "153813__carlos_vaquero__double-bass-a-2-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 7,
+          "pitch": "B2",
+          "file": "upright_bass_pizz/07_B2.mp3",
+          "source_file": "153815__carlos_vaquero__double-bass-b-2-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 8,
+          "pitch": "C3",
+          "file": "upright_bass_pizz/08_C3.mp3",
+          "source_file": "153816__carlos_vaquero__double-bass-c-3-pizzicato-non-vibrato.wav",
+          "derived_by_pitch_shift_semitones": 0
+        }
+      ]
+    },
+    "kalimba": {
+      "source": "38696__hollandm__kalimba-thumb-piano.zip",
+      "scale": "C4 to C5 diatonic",
+      "derived_scale": false,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "kalimba/01_C4.mp3",
+          "source_file": "691783__hollandm__c4-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "kalimba/02_D4.mp3",
+          "source_file": "691789__hollandm__d4-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "kalimba/03_E4.mp3",
+          "source_file": "691795__hollandm__e4-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "kalimba/04_F4.mp3",
+          "source_file": "691801__hollandm__f4-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "kalimba/05_G4.mp3",
+          "source_file": "691805__hollandm__g4-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "kalimba/06_A4.mp3",
+          "source_file": "691775__hollandm__a4-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "kalimba/07_B4.mp3",
+          "source_file": "691779__hollandm__b4-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "kalimba/08_C5.mp3",
+          "source_file": "691785__hollandm__c5-soft-kalimba.wav",
+          "derived_by_pitch_shift_semitones": 0
+        }
+      ]
+    },
+    "marimba": {
+      "source": "21030__sgossner__vsco-2-ce-percussion-marimba.zip",
+      "scale": "C5 major octave",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C5",
+          "file": "marimba/01_C5.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D5",
+          "file": "marimba/02_D5.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": "E5",
+          "file": "marimba/03_E5.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": "F5",
+          "file": "marimba/04_F5.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": "G5",
+          "file": "marimba/05_G5.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": "A5",
+          "file": "marimba/06_A5.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": "B5",
+          "file": "marimba/07_B5.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": "C6",
+          "file": "marimba/08_C6.mp3",
+          "source_file": "373580__sgossner__marimba-c5-marimba_hit_outrigger_c4_loud_01.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    },
+    "glockenspiel": {
+      "source": "38756__hollandm__toy-glockenspiel.zip",
+      "scale": "C4 major octave",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "glockenspiel/01_C4.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "glockenspiel/02_D4.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "glockenspiel/03_E4.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "glockenspiel/04_F4.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "glockenspiel/05_G4.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "glockenspiel/06_A4.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "glockenspiel/07_B4.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "glockenspiel/08_C5.mp3",
+          "source_file": "693344__hollandm__glock-c4.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    },
+    "harp": {
+      "source": "21029__sgossner__vsco-2-ce-strings-harp.zip",
+      "scale": "C3 major octave",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C3",
+          "file": "harp/01_C3.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D3",
+          "file": "harp/02_D3.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": "E3",
+          "file": "harp/03_E3.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": "F3",
+          "file": "harp/04_F3.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": "G3",
+          "file": "harp/05_G3.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": "A3",
+          "file": "harp/06_A3.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": "B3",
+          "file": "harp/07_B3.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": "C4",
+          "file": "harp/08_C4.mp3",
+          "source_file": "373562__sgossner__harp-c3-ksharp_c3_mf.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    },
+    "ocarina": {
+      "source": "1333__madjad__ocarina-flute.zip",
+      "scale": "relative diatonic",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": null,
+          "file": "ocarina/01_degree1.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": null,
+          "file": "ocarina/02_degree2.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": null,
+          "file": "ocarina/03_degree3.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": null,
+          "file": "ocarina/04_degree4.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": null,
+          "file": "ocarina/05_degree5.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": null,
+          "file": "ocarina/06_degree6.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": null,
+          "file": "ocarina/07_degree7.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": null,
+          "file": "ocarina/08_degree8.mp3",
+          "source_file": "21678__madjad__ocarina-note-4.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    },
+    "handpan": {
+      "source": "27787__georgenaimeh__handpan.zip",
+      "scale": "relative diatonic",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": null,
+          "file": "handpan/01_degree1.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": null,
+          "file": "handpan/02_degree2.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": null,
+          "file": "handpan/03_degree3.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": null,
+          "file": "handpan/04_degree4.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": null,
+          "file": "handpan/05_degree5.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": null,
+          "file": "handpan/06_degree6.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": null,
+          "file": "handpan/07_degree7.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": null,
+          "file": "handpan/08_degree8.mp3",
+          "source_file": "493864__georgenaimeh__handpan-c.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    },
+    "harmonica": {
+      "source": "20090__j_e_f_f_g__harmonica-multisample-notes.zip",
+      "scale": "C6 major octave",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C6",
+          "file": "harmonica/01_C6.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D6",
+          "file": "harmonica/02_D6.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": "E6",
+          "file": "harmonica/03_E6.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": "F6",
+          "file": "harmonica/04_F6.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": "G6",
+          "file": "harmonica/05_G6.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": "A6",
+          "file": "harmonica/06_A6.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": "B6",
+          "file": "harmonica/07_B6.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": "C7",
+          "file": "harmonica/08_C7.mp3",
+          "source_file": "352737__j_e_f_f_g__6_c.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    },
+    "xylophone": {
+      "source": "21065__sgossner__vsco-2-ce-percussion-xylophone.zip",
+      "scale": "C4 major octave",
+      "derived_scale": true,
+      "samples": [
+        {
+          "degree": 1,
+          "pitch": "C4",
+          "file": "xylophone/01_C4.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 0
+        },
+        {
+          "degree": 2,
+          "pitch": "D4",
+          "file": "xylophone/02_D4.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 2
+        },
+        {
+          "degree": 3,
+          "pitch": "E4",
+          "file": "xylophone/03_E4.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 4
+        },
+        {
+          "degree": 4,
+          "pitch": "F4",
+          "file": "xylophone/04_F4.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 5
+        },
+        {
+          "degree": 5,
+          "pitch": "G4",
+          "file": "xylophone/05_G4.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 7
+        },
+        {
+          "degree": 6,
+          "pitch": "A4",
+          "file": "xylophone/06_A4.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 9
+        },
+        {
+          "degree": 7,
+          "pitch": "B4",
+          "file": "xylophone/07_B4.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 11
+        },
+        {
+          "degree": 8,
+          "pitch": "C5",
+          "file": "xylophone/08_C5.mp3",
+          "source_file": "374699__sgossner__xylophone-c4-xylo_medium_c4_ff_01_far.wav",
+          "derived_by_pitch_shift_semitones": 12
+        }
+      ]
+    }
+  },
+  "percussion_accents": {
+    "woodblock": "percussion_accents/woodblock_hit.mp3",
+    "agogo": "percussion_accents/agogo_hit.mp3",
+    "triangle": "percussion_accents/triangle_hit.mp3"
+  },
+  "still_missing_from_planned_palette": [
+    "vibraphone",
+    "steel_pan"
+  ]
+}

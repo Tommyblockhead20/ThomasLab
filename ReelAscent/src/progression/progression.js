@@ -1,0 +1,133 @@
+import { getCatchValue } from './economy.js';
+import { EquipmentManager } from './equipment.js';
+import { removeAquariumSpecimen, storeAquariumSpecimen } from './aquarium.js';
+import { createSpecimenRecord, findSpecimenIndex } from './inventory.js';
+import { normalizeProgressionState } from './progression-save.js';
+import { serializeProgress, validateProgressImport } from './progress-transfer.js';
+
+const copy = (value) => JSON.parse(JSON.stringify(value));
+
+export class ProgressionSystem {
+  constructor(saveSystem) {
+    this.saveSystem = saveSystem;
+    this.state = normalizeProgressionState(saveSystem.data.progression);
+    this.saveSystem.data.progression = this.state;
+    this.revision = 0;
+    this.equipment = new EquipmentManager(() => this.state, () => this.commit(), {
+      canAfford: (price) => this.canAfford(price),
+      spend: (price) => this.spend(price)
+    });
+    this.equipment.repairDefaults();
+  }
+
+  commit() {
+    this.saveSystem.data.progression = this.state;
+    this.saveSystem.save();
+    this.revision += 1;
+  }
+
+  canAfford(price) {
+    return this.state.money >= Math.max(0, Number(price) || 0);
+  }
+
+  spend(price) {
+    const amount = Math.max(0, Math.floor(Number(price) || 0));
+    if (!this.canAfford(amount)) return false;
+    this.state.money -= amount;
+    return true;
+  }
+
+  addMoney(amount) {
+    const delta = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!delta) return this.state.money;
+    this.state.money += delta;
+    this.commit();
+    return this.state.money;
+  }
+
+  captureCatch(catchData) {
+    if (!catchData?.speciesId) return { ok: false, specimen: null, value: null, reason: 'Invalid catch' };
+    const value = getCatchValue(catchData);
+    const specimen = createSpecimenRecord(catchData, value, this.state.player.id);
+    if (this.state.inventory.some((entry) => entry.specimenId === specimen.specimenId)) {
+      return { ok: false, specimen, value, reason: 'Catch already stored' };
+    }
+    this.state.inventory.push(specimen);
+    this.commit();
+    return { ok: true, specimen, value };
+  }
+
+  sellInventorySpecimen(specimenId) {
+    const index = findSpecimenIndex(this.state.inventory, specimenId);
+    if (index < 0) return { ok: false, reason: 'Specimen not found in Inventory' };
+    const [specimen] = this.state.inventory.splice(index, 1);
+    this.state.money += specimen.value;
+    this.commit();
+    return { ok: true, specimen, amount: specimen.value };
+  }
+
+  moveInventorySpecimenToAquarium(specimenId) {
+    const index = findSpecimenIndex(this.state.inventory, specimenId);
+    if (index < 0) return { ok: false, reason: 'Specimen not found in Inventory' };
+    const specimen = this.state.inventory[index];
+    const prepared = { specimen, value: specimen.value };
+    if (!storeAquariumSpecimen(this.state.aquarium, prepared)) {
+      return { ok: false, reason: 'Specimen already stored in Aquarium' };
+    }
+    this.state.inventory.splice(index, 1);
+    this.commit();
+    return { ok: true, specimen, amount: 0 };
+  }
+
+  // Backwards-compatible debug helper: prefer selling Inventory specimens, but old automation
+  // that passes an Aquarium specimen ID still works.
+  sellSpecimen(specimenId) {
+    if (findSpecimenIndex(this.state.inventory, specimenId) >= 0) return this.sellInventorySpecimen(specimenId);
+    const specimen = removeAquariumSpecimen(this.state.aquarium, specimenId);
+    if (!specimen) return { ok: false, reason: 'Specimen not found' };
+    this.state.money += specimen.value;
+    this.commit();
+    return { ok: true, specimen, amount: specimen.value };
+  }
+
+  purchase(itemId) { return this.equipment.purchase(itemId); }
+  equip(itemId) { return this.equipment.equip(itemId); }
+  getModifier(name) { return this.equipment.getModifier(name); }
+  getModifiers() { return this.equipment.getModifiers(); }
+  getEquippedItem(category) { return this.equipment.getEquippedItem(category); }
+
+  getSnapshot() {
+    const snapshot = copy(this.state);
+    // Preserve the old read-only alias for external debug tooling; owned undecided catches now
+    // live in inventory and Aquarium is explicitly chosen storage.
+    snapshot.specimens = snapshot.aquarium;
+    return snapshot;
+  }
+
+  getHudState() {
+    return {
+      money: this.state.money,
+      specimenCount: this.state.inventory.length,
+      aquariumCount: this.state.aquarium.length,
+      equipped: { ...this.state.equipped }
+    };
+  }
+
+  exportProgress() {
+    return serializeProgress(this.saveSystem.getSnapshot());
+  }
+
+  previewProgressImport(input) {
+    return validateProgressImport(input);
+  }
+
+  importProgress(input) {
+    const result = validateProgressImport(input);
+    this.saveSystem.replaceData(result.save);
+    this.state = normalizeProgressionState(this.saveSystem.data.progression);
+    this.saveSystem.data.progression = this.state;
+    this.equipment.repairDefaults();
+    this.revision += 1;
+    return result.summary;
+  }
+}

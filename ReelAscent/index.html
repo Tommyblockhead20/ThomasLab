@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Reel Ascent is an original low-poly climbing and fishing adventure prototype."
+    />
+    <title>Reel Ascent — Climbing & Fishing Prototype</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+    <style>
+      #return-home {
+        position: fixed;
+        left: 12px;
+        top: max(7rem, calc(env(safe-area-inset-top) + 7rem));
+        z-index: 40;
+        pointer-events: auto;
+        border: 1px solid rgba(255,255,255,.24);
+        border-radius: 9px;
+        padding: 7px 10px;
+        background: rgba(38, 70, 67, .82);
+        color: #fff8c9;
+        font: 700 11px/1 system-ui, sans-serif;
+        letter-spacing: .04em;
+        cursor: pointer;
+        backdrop-filter: blur(4px);
+      }
+      #return-home:hover, #return-home:focus-visible {
+        background: rgba(49, 88, 83, .96);
+        outline: 2px solid rgba(255, 225, 113, .7);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="game-shell">
+      <canvas id="game-canvas" tabindex="0" aria-label="Reel Ascent 3D game"></canvas>
+
+      <section id="loading" class="loading-panel" aria-live="polite">
+        <div class="loading-mark" aria-hidden="true"></div>
+        <p class="eyebrow">REEL ASCENT</p>
+        <h1>Finding the trail…</h1>
+        <p id="loading-status">Preparing the mountain</p>
+      </section>
+
+      <section id="hud" class="hud" hidden>
+        <div class="brand" aria-label="Reel Ascent">
+          <span class="brand-mark" aria-hidden="true">▲</span>
+          <div>
+            <span class="eyebrow">MOUNTAIN TRAVERSAL GRAYBOX</span>
+            <strong>REEL ASCENT</strong>
+          </div>
+        </div>
+
+        <div id="run-status" class="run-status">
+          <span id="run-sector">Finding the mountain…</span>
+          <strong><output id="run-elevation">0</output>ft</strong>
+        </div>
+
+        <div id="currency-indicator" class="currency-indicator" aria-label="Current money">$0</div>
+
+        <button id="return-home" type="button" title="Return to this run's starting spawn">⌂ HOME</button>
+
+        <div class="controls-card">
+          <span><kbd>WASD / Arrows</kbd> Move</span>
+          <span><kbd>Shift</kbd> Sprint</span>
+          <span><kbd>Space</kbd> Jump / Push off</span>
+          <span><kbd>C</kbd> Slide</span>
+          <span><kbd>Click / G</kbd> Grip</span>
+          <span><kbd>F</kbd> Fish</span>
+          <span><kbd>J</kbd> Journal</span>
+          <span><kbd>I</kbd> Inventory</span>
+          <span><kbd>M</kbd> Multiplayer</span>
+        </div>
+
+        <div id="grip-prompt" class="grip-prompt" hidden>Hold <kbd>Click / G</kbd> — Grip</div>
+        <div id="fish-prompt" class="fish-prompt" hidden>Press <kbd>F</kbd> — Fish</div>
+        <div id="fishing-panel" class="fishing-panel" hidden>
+          <div class="fishing-heading">
+            <strong id="fishing-zone">Mirror Pond</strong>
+            <span id="session-summary" class="session-summary">0 caught</span>
+          </div>
+          <span id="fishing-message" class="fishing-message">Ready to cast</span>
+          <div id="cast-meter" class="fishing-meter" hidden>
+            <span><b>CAST</b><output id="cast-value">0%</output></span>
+            <div class="meter-track"><div id="cast-fill" class="meter-fill cast-fill"></div></div>
+          </div>
+          <small><kbd>↑</kbd> Charge / cast • <kbd>↓</kbd> Hook • <kbd>F</kbd> / <kbd>Esc</kbd> Stop</small>
+        </div>
+        <div id="bite-prompt" class="bite-prompt" hidden><strong>FISH BITING!</strong><span>Press <kbd>↓</kbd> to hook!</span></div>
+        <section id="rhythm-panel" class="rhythm-panel" hidden aria-label="Fish rhythm challenge">
+          <div class="rhythm-heading">
+            <span class="eyebrow">MATCH THE FISH'S MOVEMENTS!</span>
+            <span id="rhythm-bpm">96 BPM</span>
+          </div>
+          <div id="rhythm-stage" class="rhythm-stage">
+            <div class="rhythm-lane" data-lane="A">
+              <div class="note-layer"></div>
+              <div class="rhythm-receptor" aria-hidden="true"><span>←</span></div>
+            </div>
+            <div class="rhythm-lane" data-lane="W">
+              <div class="note-layer"></div>
+              <div class="rhythm-receptor" aria-hidden="true"><span>↑</span></div>
+            </div>
+            <div class="rhythm-lane" data-lane="S">
+              <div class="note-layer"></div>
+              <div class="rhythm-receptor" aria-hidden="true"><span>↓</span></div>
+            </div>
+            <div class="rhythm-lane" data-lane="D">
+              <div class="note-layer"></div>
+              <div class="rhythm-receptor" aria-hidden="true"><span>→</span></div>
+            </div>
+          </div>
+          <output id="rhythm-judgment" class="rhythm-judgment"></output>
+          <div class="rhythm-meters">
+            <div class="fishing-meter">
+              <span><b>REEL IN</b><output id="rhythm-progress-value">0%</output></span>
+              <div class="meter-track"><div id="rhythm-progress-fill" class="meter-fill rhythm-progress-fill"></div></div>
+            </div>
+            <div class="fishing-meter">
+              <span><b>ESCAPE</b><output id="rhythm-escape-value">0%</output></span>
+              <div class="meter-track"><div id="rhythm-escape-fill" class="meter-fill rhythm-escape-fill"></div></div>
+            </div>
+          </div>
+        </section>
+        <div id="catch-banner" class="catch-banner" hidden>
+          <span id="catch-rarity" class="catch-rarity">COMMON</span>
+          <strong id="catch-species">Bluegill</strong>
+          <div class="catch-measurements" aria-label="Catch measurements">
+            <span><small>LENGTH</small><strong id="catch-length">11.5 in</strong><em id="catch-length-category">AVERAGE</em></span>
+            <span><small>WEIGHT</small><strong id="catch-weight">1.80 lb</strong><em id="catch-size-category">AVERAGE</em></span>
+            <span id="catch-quality-wrap"><small>QUALITY</small><strong id="catch-quality">GREAT</strong><em id="catch-quality-stars">★★☆</em></span>
+            <span id="catch-value-wrap"><small>VALUE</small><strong id="catch-value">$0</strong></span>
+          </div>
+          <span id="catch-record" class="catch-record">NEW RECORD</span>
+          <small id="catch-hint" hidden></small>
+        </div>
+
+        <aside id="ecology-guide" class="ecology-guide" hidden aria-label="Equipped ecology guide">
+          <header><div><small id="ecology-guide-title">Field Notes</small><strong id="ecology-guide-zone">Nearby Water</strong></div><span>LIVE ODDS</span></header>
+          <ol id="ecology-guide-list"></ol>
+        </aside>
+
+        <div id="run-banner" class="run-banner" hidden>
+          <strong id="run-banner-title">RUN ENDED</strong>
+          <span id="run-banner-detail"></span>
+        </div>
+
+        <section id="run-end-screen" class="run-end-screen" hidden aria-labelledby="run-end-title">
+          <span class="eyebrow">TRAIL REPORT</span>
+          <h2 id="run-end-title">Run ended</h2>
+          <div class="run-end-stats">
+            <span><small>TIME</small><strong id="run-end-time">0:00</strong></span>
+            <span><small>HIGH POINT</small><strong><output id="run-end-elevation">0</output>ft</strong></span>
+            <span><small>FISH</small><strong id="run-end-fish">0</strong></span>
+            <span><small>RAREST</small><strong id="run-end-rarest">None</strong></span>
+          </div>
+          <p>Starting shore: <strong id="run-end-next-start">—</strong></p>
+          <button id="start-new-run" type="button">START NEW RUN</button>
+        </section>
+
+        <div class="stamina-panel">
+          <div class="stamina-label">
+            <span>STAMINA</span>
+            <span id="stamina-value">100</span>
+          </div>
+          <div
+            class="stamina-track"
+            role="progressbar"
+            aria-label="Stamina"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="100"
+          >
+            <div id="stamina-fill" class="stamina-fill"></div>
+          </div>
+        </div>
+
+        <output id="debug-panel" class="debug-panel" hidden></output>
+      </section>
+
+      <section id="fish-journal" class="fish-journal" role="dialog" aria-modal="true" hidden aria-labelledby="journal-title" tabindex="-1">
+        <header class="journal-header">
+          <div>
+            <span class="eyebrow">PERSISTENT COLLECTION</span>
+            <h2 id="journal-title">Fish Journal</h2>
+            <p id="journal-progress">0 / 0 discovered</p>
+          </div>
+          <div class="journal-lifetime">
+            <span><small>LIFETIME FISH</small><strong id="journal-total-fish">0</strong></span>
+            <span><small>SUMMITS</small><strong id="journal-total-summits">0</strong></span>
+          </div>
+          <button id="close-journal" type="button" aria-label="Close fish journal">CLOSE <kbd>J</kbd> / <kbd>Esc</kbd></button>
+        </header>
+        <div id="journal-grid" class="journal-grid" tabindex="0" aria-label="Fish journal entries"></div>
+      </section>
+
+
+      <section id="inventory-menu" class="progression-shop inventory-menu" role="dialog" aria-modal="true" hidden aria-labelledby="inventory-title">
+        <header class="shop-header collection-header">
+          <div><span class="eyebrow">FIELD PACK</span><h2 id="inventory-title">Inventory</h2></div>
+          <strong id="collection-balance">$0</strong>
+          <button id="close-inventory" type="button">CLOSE <kbd>I</kbd> / <kbd>Esc</kbd></button>
+        </header>
+        <nav id="collection-tabs" class="shop-tabs collection-tabs" aria-label="Inventory sections">
+          <button type="button" data-collection-tab="inventory" aria-pressed="true">INVENTORY</button>
+          <button type="button" data-collection-tab="gear" aria-pressed="false">GEAR SHOP</button>
+          <button type="button" data-collection-tab="aquarium" aria-pressed="false">AQUARIUM</button>
+        </nav>
+        <p id="inventory-status" class="shop-status" aria-live="polite">Every successful catch waits here until you sell it or send it to Aquarium.</p>
+        <div id="inventory-content" class="inventory-content"></div>
+        <details class="progress-transfer">
+          <summary>PORTABLE PROGRESS</summary>
+          <p>Export only durable progress. Session position, active fishing, and transient run state are intentionally excluded.</p>
+          <textarea id="progress-transfer-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste a Reel Ascent progress file here to import."></textarea>
+          <div class="progress-transfer-actions">
+            <button type="button" data-progress-action="export">EXPORT PROGRESS</button>
+            <button type="button" data-progress-action="file">LOAD FILE</button>
+            <button type="button" data-progress-action="import">IMPORT PROGRESS</button>
+            <input id="progress-transfer-file" type="file" accept="application/json,.json" hidden />
+          </div>
+          <small id="progress-transfer-status" aria-live="polite"></small>
+        </details>
+      </section>
+
+      <section id="multiplayer-menu" class="multiplayer-menu" role="dialog" aria-modal="true" hidden aria-labelledby="multiplayer-title">
+        <header>
+          <div><span class="eyebrow">LOCAL MULTIPLAYER MVP</span><h2 id="multiplayer-title">Multiplayer</h2></div>
+          <button id="close-multiplayer" type="button">CLOSE <kbd>M</kbd> / <kbd>Esc</kbd></button>
+        </header>
+        <p id="multiplayer-status" class="multiplayer-status">Checking availability…</p>
+        <p id="multiplayer-details">Solo play remains local and fully available.</p>
+        <ul id="multiplayer-roster" class="multiplayer-roster" aria-label="Connected players"></ul>
+        <div class="multiplayer-actions">
+          <button id="multiplayer-host" type="button">HOST ROOM</button>
+          <label>ROOM CODE<input id="multiplayer-code" type="text" maxlength="12" autocomplete="off" /></label>
+          <button id="multiplayer-join" type="button">JOIN ROOM</button>
+          <button id="multiplayer-leave" type="button" hidden>LEAVE ROOM</button>
+        </div>
+        <small>A server URL must be supplied through <code>VITE_MULTIPLAYER_ENDPOINT</code>. v8.1 can connect to the local multiplayer server; production hosting is still separate.</small>
+      </section>
+
+      <section id="fishing-performance" class="fishing-performance" hidden aria-label="Fishing debug overlay">
+        <header class="performance-header">
+          <div><span class="eyebrow">F6 DEBUG</span><strong>Fishing Ecology</strong></div>
+          <button id="close-performance" type="button" aria-label="Close fishing debug">F6 ×</button>
+        </header>
+        <div class="performance-debug-grid">
+          <span>STATE <b id="performance-state">INACTIVE</b></span>
+          <span>ZONE <b id="performance-zone">NONE</b></span>
+          <span>WATER <b id="performance-water">—</b></span>
+          <span>THEME <b id="performance-theme">—</b></span>
+          <span>ELIGIBLE <b id="performance-eligible">0</b></span>
+          <span>CAST <b id="performance-cast">—</b></span>
+        </div>
+        <p id="performance-selected" class="performance-selected">No generated creature</p>
+        <p id="performance-modifiers" class="performance-modifiers">No active ecology modifiers</p>
+        <p id="performance-failure" class="performance-failure">LAST FAILURE: NONE</p>
+        <ol id="performance-candidates" class="performance-candidates"></ol>
+      </section>
+
+      <section id="mobile-controls" class="mobile-controls" aria-label="Touch controls" hidden>
+        <div class="mobile-dpad" aria-label="Movement and rhythm arrows">
+          <button class="touch-button touch-up" type="button" data-touch-action="up" aria-label="Move forward or rhythm up">↑</button>
+          <button class="touch-button touch-left" type="button" data-touch-action="left" aria-label="Move left or rhythm left">←</button>
+          <button class="touch-button touch-down" type="button" data-touch-action="down" aria-label="Move backward or rhythm down">↓</button>
+          <button class="touch-button touch-right" type="button" data-touch-action="right" aria-label="Move right or rhythm right">→</button>
+        </div>
+        <div class="mobile-actions" aria-label="Actions">
+          <button class="touch-button touch-action touch-jump" type="button" data-touch-action="jump">Jump</button>
+          <button class="touch-button touch-action" type="button" data-touch-action="sprint">Sprint</button>
+          <button class="touch-button touch-action" type="button" data-touch-action="slide">Slide</button>
+          <button class="touch-button touch-action" type="button" data-touch-action="fish">Fish</button>
+          <button id="touch-grip" class="touch-button touch-action touch-grip" type="button" data-touch-action="grip">Grip</button>
+        </div>
+        <button id="open-journal" class="journal-mobile-button" type="button">Journal</button>
+        <button id="open-inventory" class="journal-mobile-button inventory-mobile-button" type="button">Inventory</button>
+      </section>
+
+      <section id="error-panel" class="error-panel" hidden>
+        <p class="eyebrow">TRAIL CLOSED</p>
+        <h1>The prototype could not start.</h1>
+        <p id="error-message"></p>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
