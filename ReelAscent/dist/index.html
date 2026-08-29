@@ -31,8 +31,8 @@
         outline-offset: 2px;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-BPR1RGeq.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CH9ywBu9.css">
+    <script type="module" crossorigin src="./assets/index-CGBQoRNB.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-E4NowRlv.css">
   </head>
   <body>
     <main id="game-shell">
@@ -74,6 +74,8 @@
           <span><kbd>I</kbd> Inventory</span>
           <span><kbd>M</kbd> Multiplayer</span>
         </div>
+
+        <section id="multiplayer-catch-feed" class="multiplayer-catch-feed" hidden aria-live="polite" aria-label="Remote catches"></section>
 
         <div id="grip-prompt" class="grip-prompt" hidden>Hold <kbd>Click / G</kbd> — Grip</div>
         <div id="fish-prompt" class="fish-prompt" hidden>Press <kbd>F</kbd> — Fish</div>
@@ -216,7 +218,7 @@
           <p>Export only durable progress. Session position, active fishing, and transient run state are intentionally excluded.</p>
           <textarea id="progress-transfer-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste a Reel Ascent progress file here to import."></textarea>
           <div class="progress-transfer-actions">
-            <button type="button" data-progress-action="export">EXPORT PROGRESS</button>
+            <button type="button" data-progress-action="download">DOWNLOAD PROGRESS</button>
             <button type="button" data-progress-action="file">LOAD FILE</button>
             <button type="button" data-progress-action="import">IMPORT PROGRESS</button>
             <input id="progress-transfer-file" type="file" accept="application/json,.json" hidden />
@@ -259,6 +261,15 @@
         <p id="performance-modifiers" class="performance-modifiers">No active ecology modifiers</p>
         <p id="performance-failure" class="performance-failure">LAST FAILURE: NONE</p>
         <ol id="performance-candidates" class="performance-candidates"></ol>
+        <section class="performance-rhythm-debug" aria-label="Current rhythm attempt inputs">
+          <header><strong>CURRENT ATTEMPT INPUTS</strong><span id="performance-input-summary">NO ATTEMPT</span></header>
+          <div id="performance-input-log" class="performance-input-log" tabindex="0">
+            <table>
+              <thead><tr><th>#</th><th>INPUT</th><th>TARGET</th><th>Δ MS</th><th>JUDGMENT</th><th>STATUS / REASON</th><th>CHART TIME</th></tr></thead>
+              <tbody id="performance-input-rows"><tr><td colspan="7">No inputs in this attempt.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
       <section id="mobile-controls" class="mobile-controls" aria-label="Touch controls" hidden>

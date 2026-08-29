@@ -195,14 +195,32 @@ test('shiny fish escape on their first miss but can be caught with a clean full 
   const shiny = createFishSpecimen('bluegill', .5, true, () => .5);
   const failed = new RhythmSession(shiny, 0, seededRandom(2));
   failed.missNote(failed.pattern.notes[0]);
-  failed.resolveOutcome();
   assert.equal(failed.result, 'escaped');
   assert.equal(failed.escapeProgress, 1);
 
   const clean = new RhythmSession(shiny, 0, seededRandom(2));
-  for (const note of clean.pattern.notes) clean.handleInput(note.lane, note.hitTime);
+  for (const note of clean.pattern.notes) {
+    clean.handleInput(note.lane, note.hitTime);
+    if (note.status === 'holding') clean.completeHold(note, note.hitTime + note.duration);
+  }
+  clean.resolveOutcome();
   assert.equal(clean.result, 'caught');
   assert.equal(clean.misses, 0);
+});
+
+test('F6 rhythm diagnostics retain every press with chart and judgment details', () => {
+  const session = new RhythmSession(createFishSpecimen('bluegill', .5, false, () => .5), 0, seededRandom(3));
+  const note = session.pattern.notes[0];
+  session.handleInput(note.lane, note.hitTime + .02);
+  session.handleInput('D', note.hitTime + 8);
+  const debug = session.getDebugState();
+  assert.equal(debug.inputLog.length, 2);
+  assert.deepEqual(Object.keys(debug.inputLog[0]).sort(), [
+    'correct', 'counted', 'expectedHitTime', 'expectedLanes', 'inputTime', 'judgment',
+    'lane', 'mistake', 'reason', 'serial', 'signedMs', 'targetNoteId'
+  ]);
+  assert.equal(debug.inputLog[0].counted, true);
+  assert.equal(debug.inputLog[1].mistake, true);
 });
 
 test('GOOD, GREAT, and PERFECT grades are reachable from existing judgments', () => {

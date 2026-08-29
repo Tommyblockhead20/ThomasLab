@@ -155,6 +155,8 @@ export class ClientConnection {
       weight: Number.isFinite(Number(payload.weight)) ? Number(payload.weight) : 0,
       shiny: Boolean(payload.shiny),
       locationLabel: safeString(payload.locationLabel, 100),
+      presentationId: safeString(payload.presentationId, 140),
+      active: payload.active !== false,
       serverTime: Date.now()
     };
     this.session.room.broadcast(MESSAGE_TYPES.CATCH_EVENT, event, this.session.playerId);

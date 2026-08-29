@@ -6,6 +6,7 @@ import { FishingZone } from '../src/fishing/fishing-zone.js';
 import {
   ALL_FISHING_WATER_DESCRIPTORS,
   COASTAL_SHELF_RADIUS,
+  CROWN_DENSITY_CONFIG,
   FISHING_WATER_COUNTS,
   MOUNTAIN_CENTER,
   MOUNTAIN_FAILURE_RADIUS,
@@ -15,6 +16,13 @@ import {
   SUMMIT_HEIGHT,
   TERRAIN_ANGLE_PROFILE
 } from '../src/world/mountain-v2.js';
+
+test('Crown traversal density supplies supported routes, branches, rests, and upper belts', () => {
+  assert.ok(CROWN_DENSITY_CONFIG.routeStages >= 28);
+  assert.ok(CROWN_DENSITY_CONFIG.branchStages.length >= 5);
+  assert.ok(CROWN_DENSITY_CONFIG.beltCounts.length >= 6);
+  assert.ok(CROWN_DENSITY_CONFIG.beltCounts.reduce((total, count) => total + count, 0) >= 220);
+});
 
 function pointAt(angle, radius) {
   const radians = angle * Math.PI / 180;

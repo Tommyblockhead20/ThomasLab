@@ -32,6 +32,19 @@ const lerp = (a, b, t) => a + (b - a) * t;
 // anchored to the capsule so stamina and collision behavior do not move with the art.
 const PLAYER_VISUAL_GROUND_OFFSET = -0.06;
 
+export function isPartialFootRestEligible(footSupport, state = {}) {
+  const restState = state.movementState === 'grounded' || state.movementState === 'airborne';
+  return Boolean(footSupport?.partial
+    && restState
+    && !state.slidingDownSlope
+    && !state.slideRecoveryActive
+    && !state.hasMoveInput
+    && !state.sprintHeld
+    && !state.slideHeld
+    && !state.gripHeld
+    && state.actualSpeed <= PLAYER_CONFIG.staminaPartialSupportMaximumSpeed);
+}
+
 export class Player {
   constructor(app, canvas, physicsWorld, RAPIER, surfaceRegistry, spawnPoint = SPAWN_POINT, progression = null) {
     this.app = app;
@@ -382,9 +395,12 @@ export class Player {
       [r * .72, r * .72], [r * .72, -r * .72], [-r * .72, r * .72], [-r * .72, -r * .72]
     ];
     let supported = 0;
+    let contactSupported = 0;
     let steepContacts = 0;
     const maxDistance = PLAYER_CONFIG.capsuleHalfHeight + PLAYER_CONFIG.radius
       + PLAYER_CONFIG.staminaSupportProbeExtra;
+    const contactDistance = PLAYER_CONFIG.capsuleHalfHeight + PLAYER_CONFIG.radius + .08
+      + PLAYER_CONFIG.staminaPartialSupportExtra;
     for (const [dx, dz] of offsets) {
       const ray = new this.RAPIER.Ray(
         { x: position.x + dx, y: position.y + 0.08, z: position.z + dz },
@@ -394,7 +410,8 @@ export class Player {
         ray, maxDistance, true, undefined, undefined, this.collider
       );
       if (!hit) continue;
-      const normalY = Math.abs(hit.normal.y);
+      const normalY = Math.max(-1, Math.min(1, hit.normal.y));
+      if (normalY <= 0) continue;
       const slopeDegrees = Math.acos(Math.max(-1, Math.min(1, normalY))) * 180 / Math.PI;
       if (slopeDegrees > PLAYER_CONFIG.staminaMaximumSupportSlopeDegrees) {
         steepContacts += 1;
@@ -403,12 +420,16 @@ export class Player {
       // Probe distance tolerance deliberately allows broad ordinary slopes; what fails is
       // tiny-point contact, an edge under only one foot, air, or a >55° face.
       if (hit.timeOfImpact <= maxDistance) supported += 1;
+      if (hit.timeOfImpact <= contactDistance) contactSupported += 1;
     }
     return {
       fraction: supported / offsets.length,
       supportedSamples: supported,
+      contactFraction: contactSupported / offsets.length,
+      contactSupportedSamples: contactSupported,
       steepSamples: steepContacts,
-      stable: supported / offsets.length >= PLAYER_CONFIG.staminaMinimumSupportFraction
+      stable: supported / offsets.length >= PLAYER_CONFIG.staminaMinimumSupportFraction,
+      partial: contactSupported / offsets.length >= PLAYER_CONFIG.staminaPartialSupportFraction
     };
   }
 

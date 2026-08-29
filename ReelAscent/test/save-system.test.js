@@ -166,3 +166,11 @@ test('summits and bounded run summaries persist lifetime progress', () => {
   assert.equal(reloaded.runHistory.length, 12);
   assert.equal(reloaded.runHistory[0].summitReached, true);
 });
+
+test('a failed imported-save write keeps the prior in-memory progress', () => {
+  const save = new SaveSystem(new MemoryStorage());
+  save.data.progression.money = 321;
+  save.storage = { setItem() { throw new Error('blocked'); } };
+  assert.equal(save.replaceData({ ...save.getSnapshot(), progression: { ...save.data.progression, money: 999 } }), false);
+  assert.equal(save.data.progression.money, 321);
+});
