@@ -31,8 +31,8 @@
         outline-offset: 2px;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-D9v2U0LJ.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CDhvQFee.css">
+    <script type="module" crossorigin src="./assets/index-CyIO10JR.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Bok9lbjj.css">
   </head>
   <body>
     <main id="game-shell">
@@ -187,6 +187,7 @@
         </div>
 
         <output id="debug-panel" class="debug-panel" hidden></output>
+        <output id="cheat-activation" class="cheat-activation" hidden aria-live="polite"></output>
       </section>
 
       <section id="fish-journal" class="fish-journal" role="dialog" aria-modal="true" hidden aria-labelledby="journal-title" tabindex="-1">
@@ -214,18 +215,16 @@
         </header>
         <nav id="collection-tabs" class="shop-tabs collection-tabs" aria-label="Inventory sections">
           <button type="button" data-collection-tab="inventory" aria-pressed="true">INVENTORY</button>
-          <button type="button" data-collection-tab="gear" aria-pressed="false">GEAR SHOP</button>
-          <button type="button" data-collection-tab="aquarium" aria-pressed="false">AQUARIUM</button>
-          <button type="button" data-inventory-appearance>APPEARANCE</button>
-          <button type="button" data-inventory-map>TRAIL MAP</button>
+          <button type="button" data-collection-tab="save-data" aria-pressed="false">SAVE / DATA</button>
         </nav>
         <p id="inventory-status" class="shop-status" aria-live="polite">Every successful catch waits here until you sell it or send it to Aquarium.</p>
         <div id="inventory-content" class="inventory-content"></div>
-        <details class="progress-transfer">
+        <details id="progress-transfer" class="progress-transfer" hidden>
           <summary>PORTABLE PROGRESS</summary>
           <p>Export only durable progress. Session position, active fishing, and transient run state are intentionally excluded.</p>
           <textarea id="progress-transfer-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste a Reel Ascent progress file here to import."></textarea>
           <div class="progress-transfer-actions">
+            <label>IMPORT DESTINATION<select id="progress-import-slot"></select></label>
             <button type="button" data-progress-action="download">DOWNLOAD PROGRESS</button>
             <button type="button" data-progress-action="file">LOAD FILE</button>
             <button type="button" data-progress-action="import">IMPORT PROGRESS</button>
@@ -233,6 +232,25 @@
           </div>
           <small id="progress-transfer-status" aria-live="polite"></small>
         </details>
+      </section>
+
+      <section id="progression-shop" class="progression-shop" role="dialog" aria-modal="true" hidden aria-labelledby="shop-title">
+        <header class="shop-header"><div><span class="eyebrow">SHOP ISLAND OUTFITTER</span><h2 id="shop-title">Gear, Maps & Fish Market</h2></div><strong id="shop-money">$0</strong><button id="close-shop" type="button">CLOSE <kbd>Esc</kbd></button></header>
+        <p id="shop-status" class="shop-status" aria-live="polite">Purchase gear and maps, equip gear, or sell carried specimens.</p>
+        <div id="shop-content" class="shop-content"></div>
+      </section>
+
+      <section id="aquarium-menu" class="progression-shop aquarium-menu" role="dialog" aria-modal="true" hidden aria-labelledby="aquarium-title">
+        <header class="shop-header"><div><span class="eyebrow">AQUARIUM ISLAND</span><h2 id="aquarium-title">Public Aquarium Collection</h2></div><strong id="aquarium-count">0 retained</strong><button id="close-aquarium" type="button">CLOSE <kbd>Esc</kbd></button></header>
+        <p class="shop-status">Add carried specimens to the swimming display or return displayed fish to Inventory.</p>
+        <div id="aquarium-content" class="aquarium-content"></div>
+      </section>
+
+      <section id="boat-travel" class="boat-travel" role="dialog" aria-modal="true" hidden aria-labelledby="boat-travel-title">
+        <header><div><span class="eyebrow">TINY BOAT • BIG OCEAN</span><h2 id="boat-travel-title">Where to, captain?</h2></div><button id="close-boat-travel" type="button">STAY HERE <kbd>Esc</kbd></button></header>
+        <div id="boat-travel-map" class="boat-travel-map" aria-label="Clickable map of travel destinations"></div>
+        <footer><strong id="boat-travel-selection">Choose an island on the chart</strong><button id="confirm-boat-travel" type="button" disabled>SET SAIL</button></footer>
+        <div id="boat-travel-transition" class="boat-travel-transition" hidden><span aria-hidden="true">⛵</span><strong>Sailing…</strong></div>
       </section>
 
       <section id="appearance-menu" class="appearance-menu" role="dialog" aria-modal="true" hidden aria-labelledby="appearance-title">

@@ -1,6 +1,7 @@
 const MODAL_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open',
-  'mountain-map-open', 'emote-menu-open', 'appearance-open'
+  'mountain-map-open', 'emote-menu-open', 'appearance-open', 'shop-open',
+  'aquarium-open', 'boat-travel-open'
 ]);
 
 export class HomeInteractionController {
@@ -11,6 +12,7 @@ export class HomeInteractionController {
     this.hud = hud;
     this.camera = camera;
     this.prompt = document.querySelector('#home-interaction-prompt');
+    this.eyebrow = this.prompt?.querySelector('.eyebrow') ?? null;
     this.label = document.querySelector('#home-interaction-label');
     this.button = document.querySelector('#home-interaction-action');
     this.current = null;
@@ -67,6 +69,9 @@ export class HomeInteractionController {
     if (!this.prompt) return;
     this.prompt.hidden = !this.current;
     if (this.current && this.label) {
+      if (this.eyebrow) this.eyebrow.textContent = ({
+        boat: 'ISLAND FERRY', shop: 'SHOP ISLAND', aquarium: 'AQUARIUM ISLAND', appearance: 'CABIN / HOME ISLAND'
+      })[this.current.action] ?? 'WORLD INTERACTION';
       this.label.textContent = seatedInteraction
         ? (this.player.fishing?.active ? 'STOP FISHING & GET UP' : 'CLICK TO GET UP')
         : this.current.label;
@@ -90,6 +95,18 @@ export class HomeInteractionController {
     if (interaction.action === 'aquarium') {
       this.player.cancelEmote();
       window.dispatchEvent(new CustomEvent('reel-ascent:open-aquarium'));
+      return true;
+    }
+    if (interaction.action === 'shop') {
+      this.player.cancelEmote();
+      window.dispatchEvent(new CustomEvent('reel-ascent:open-shop'));
+      return true;
+    }
+    if (interaction.action === 'boat') {
+      this.player.cancelEmote();
+      window.dispatchEvent(new CustomEvent('reel-ascent:open-boat', {
+        detail: { currentLocationId: interaction.destinationId }
+      }));
       return true;
     }
     if (interaction.action === 'rest' && interaction.seatPosition) {

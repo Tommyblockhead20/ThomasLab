@@ -2,7 +2,8 @@ export class FishingZone {
   constructor({
     id, label, center, radii, surfaceY, fishIds, modifiers = {}, exclusions = [],
     depth = 'shallow', shape = 'ellipse', innerRadius = 0, outerRadius = 0,
-    renderedInnerRadius = null, containsRenderedWater = null
+    renderedInnerRadius = null, containsRenderedWater = null, distanceToRenderedWater = null,
+    pathPoints = [], pathWidth = 0
   }) {
     this.id = id;
     this.label = label;
@@ -17,8 +18,11 @@ export class FishingZone {
       ? Math.max(0, Number.isFinite(renderedInnerRadius) ? renderedInnerRadius : innerRadius - 3.2)
       : innerRadius;
     this.containsRenderedWater = typeof containsRenderedWater === 'function' ? containsRenderedWater : null;
+    this.distanceToRenderedWater = typeof distanceToRenderedWater === 'function' ? distanceToRenderedWater : null;
     this.outerRadius = outerRadius;
     this.surfaceY = surfaceY;
+    this.pathPoints = pathPoints.map((point) => ({ ...point }));
+    this.pathWidth = pathWidth;
     this.fishIds = [...fishIds];
     this.modifiers = { ...modifiers };
     this.exclusions = exclusions.map((exclusion) => ({ ...exclusion }));
@@ -26,6 +30,9 @@ export class FishingZone {
   }
 
   normalizedRadius(point) {
+    if (this.shape === 'path') {
+      return this.distanceToPath(point).distance / Math.max(.001, this.pathWidth);
+    }
     if (this.shape === 'annulus') {
       const radial = this.radialDistance(point);
       return (radial - this.innerRadius) / Math.max(.001, this.outerRadius - this.innerRadius);
@@ -47,6 +54,10 @@ export class FishingZone {
   }
 
   contains(point, margin = 0) {
+    if (this.shape === 'path') {
+      return this.distanceToPath(point).distance <= Math.max(.05, this.pathWidth - margin)
+        && !this.isExcluded(point);
+    }
     if (this.shape === 'annulus') {
       const radius = this.radialDistance(point);
       return radius >= this.innerRadius + margin
@@ -75,12 +86,40 @@ export class FishingZone {
 
   distanceToWater(point) {
     if (this.containsWaterFootprint(point)) return 0;
+    if (this.distanceToRenderedWater) return this.distanceToRenderedWater(point);
     if (this.shape === 'annulus') {
       const radius = this.radialDistance(point);
       if (radius < this.renderedInnerRadius) return this.renderedInnerRadius - radius;
       return Math.max(0, radius - this.outerRadius);
     }
+    if (this.shape === 'path') return Math.max(0, this.distanceToPath(point).distance - this.pathWidth);
     return Math.max(0, this.normalizedRadius(point) - 1) * Math.min(this.radii.x, this.radii.z);
+  }
+
+  distanceToPath(point) {
+    let nearest = { distance: Infinity, point: this.pathPoints[0] ?? this.center };
+    for (let index = 0; index < this.pathPoints.length - 1; index += 1) {
+      const start = this.pathPoints[index];
+      const end = this.pathPoints[index + 1];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const lengthSquared = dx * dx + dz * dz;
+      const t = lengthSquared > .001
+        ? Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSquared))
+        : 0;
+      const candidate = {
+        x: start.x + dx * t,
+        y: start.y + ((end.y ?? this.surfaceY) - (start.y ?? this.surfaceY)) * t,
+        z: start.z + dz * t
+      };
+      const distance = Math.hypot(point.x - candidate.x, point.z - candidate.z);
+      if (distance < nearest.distance) nearest = { distance, point: candidate };
+    }
+    return nearest;
+  }
+
+  resolveSurfaceY(point = this.center) {
+    return this.shape === 'path' ? (this.distanceToPath(point).point.y ?? this.surfaceY) : this.surfaceY;
   }
 
   clampToWater(point, margin = 0.35) {
@@ -98,6 +137,10 @@ export class FishingZone {
         z: this.center.z + (radial > .001 ? dz * scale : 0)
       };
     }
+    if (this.shape === 'path') {
+      const nearest = this.distanceToPath(point).point;
+      return { x: nearest.x, y: nearest.y ?? this.surfaceY, z: nearest.z };
+    }
     const normalized = Math.hypot(dx / this.radii.x, dz / this.radii.z);
     const maximum = Math.max(0.1, 1 - margin / Math.min(this.radii.x, this.radii.z));
     const scale = normalized > maximum ? maximum / normalized : 1;
@@ -109,7 +152,8 @@ export class FishingZone {
   }
 
   canCastFrom(point, maximumCastDistance, verticalTolerance = 3.5) {
-    if (Math.abs(point.y - this.surfaceY) > verticalTolerance) return false;
-    return this.distanceToWater(point) <= maximumCastDistance;
+    if (this.distanceToWater(point) > maximumCastDistance) return false;
+    const target = this.clampToWater(point);
+    return Math.abs(point.y - this.resolveSurfaceY(target)) <= verticalTolerance;
   }
 }

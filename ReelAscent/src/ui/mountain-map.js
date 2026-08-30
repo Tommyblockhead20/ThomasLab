@@ -1,17 +1,22 @@
 const BLOCKING_CLASSES = Object.freeze([
-  'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'emote-menu-open', 'appearance-open'
+  'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'emote-menu-open',
+  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open'
 ]);
 
 export class MountainMapMenu {
-  constructor(mapData) {
+  constructor(mapData, { getLocalPlayer = () => null, getRemotePlayers = () => [] } = {}) {
     this.screen = document.querySelector('#mountain-map');
     this.closeButton = document.querySelector('#close-mountain-map');
     this.svg = this.screen?.querySelector('.mountain-map-graphic') ?? null;
     this.legend = this.screen?.querySelector('[data-mountain-map-legend]') ?? null;
     this.mapData = mapData;
+    this.getLocalPlayer = getLocalPlayer;
+    this.getRemotePlayers = getRemotePlayers;
+    this.mode = 'paper';
+    this.lastGpsRender = 0;
     this.isOpen = false;
     this.previousFocus = null;
-    this.onOpenRequest = () => this.open();
+    this.onOpenRequest = (event) => this.open(event.detail?.mode ?? 'paper');
     this.onCloseClick = () => this.close();
     this.onKeyDown = (event) => {
       if (event.code !== 'Escape' || !this.isOpen) return;
@@ -26,7 +31,7 @@ export class MountainMapMenu {
   }
 
   project(point) {
-    const scale = 215 / Math.max(1, this.mapData.mountainRadius);
+    const scale = 220 / Math.max(1, this.mapData.outerRadius);
     return {
       x: 260 + (point.x - this.mapData.center.x) * scale,
       y: 260 + (point.z - this.mapData.center.z) * scale,
@@ -95,6 +100,22 @@ export class MountainMapMenu {
       cx: 260, cy: 260, r: (ocean.innerRadius * scale).toFixed(1), class: 'map-shore'
     }));
 
+    const islandGroup = this.createSvg('g', { class: 'map-islands' });
+    for (const location of this.mapData.locations.filter((entry) => entry.type !== 'main-island')) {
+      const point = this.project(location.position);
+      const marker = this.createSvg('g', { class: `map-island map-island-${location.type}` });
+      marker.append(
+        this.createSvg('ellipse', {
+          cx: point.x.toFixed(1), cy: point.y.toFixed(1),
+          rx: Math.max(5, location.radii.x * scale).toFixed(1),
+          ry: Math.max(4, location.radii.z * scale).toFixed(1)
+        }),
+        this.createSvg('text', { x: point.x.toFixed(1), y: (point.y - Math.max(7, location.radii.z * scale + 4)).toFixed(1) }, location.label)
+      );
+      islandGroup.appendChild(marker);
+    }
+    svg.appendChild(islandGroup);
+
     const elevationColors = ['map-elevation-coast', 'map-elevation-lower', 'map-elevation-middle', 'map-elevation-alpine', 'map-elevation-summit'];
     this.mapData.contours.forEach((area, index) => {
       svg.appendChild(this.createSvg('polygon', {
@@ -137,14 +158,14 @@ export class MountainMapMenu {
     svg.appendChild(waterGroup);
 
     const markerGroup = this.createSvg('g', { class: 'map-landmarks' });
-    for (const start of this.mapData.starts) this.addMarker(markerGroup, start, 'map-start', '', 'S');
+    for (const dock of this.mapData.docks) this.addMarker(markerGroup, dock, 'map-start', '', 'S');
     for (const cave of this.mapData.caves) this.addMarker(markerGroup, cave, 'map-cave', '', 'C');
     // Rest ledges remain real traversal geometry and still shape the five elevation bands,
     // but individual 500/550/600-ft pins made the overview noisy and are intentionally omitted.
     // Split Boulder has authored world geometry; the dormant Tilted Slab route does not.
-    const wantedLandmarks = new Set(['cabin', 'aquarium', 'waterfall-basin', 'summit-crown', 'summit-tarn', 'split-boulder']);
+    const wantedLandmarks = new Set(['cabin', 'shop', 'aquarium', 'waterfall-basin', 'summit-crown', 'summit-tarn', 'split-boulder']);
     for (const landmark of this.mapData.landmarks.filter((entry) => wantedLandmarks.has(entry.id))) {
-      this.addMarker(markerGroup, landmark, 'map-landmark', landmark.label, '◆');
+      this.addMarker(markerGroup, landmark, 'map-landmark', landmark.id === 'split-boulder' ? '' : landmark.label, '◆');
     }
     svg.appendChild(markerGroup);
 
@@ -154,13 +175,37 @@ export class MountainMapMenu {
       this.createSvg('text', { x: -4, y: -24 }, 'N')
     );
     svg.appendChild(compass);
+    this.gpsGroup = this.createSvg('g', { class: 'map-gps-players' });
+    svg.appendChild(this.gpsGroup);
+    this.renderGpsPlayers();
     this.renderLegend();
+  }
+
+  renderGpsPlayers() {
+    if (!this.gpsGroup) return;
+    this.gpsGroup.replaceChildren();
+    if (this.mode !== 'gps') return;
+    const players = [this.getLocalPlayer(), ...this.getRemotePlayers()].filter((entry) => entry?.position);
+    players.forEach((player, index) => {
+      const point = this.project(player.position);
+      const marker = this.createSvg('g', {
+        class: `map-player ${index === 0 ? 'is-local' : 'is-remote'}`,
+        transform: `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`
+      });
+      marker.append(
+        this.createSvg('circle', { r: index === 0 ? 5.5 : 4.5 }),
+        this.createSvg('text', { x: 7, y: -5 }, String(player.id ?? 'PLAYER').slice(0, 10))
+      );
+      this.gpsGroup.appendChild(marker);
+    });
   }
 
   renderLegend() {
     if (!this.legend) return;
     const intro = document.createElement('p');
-    intro.textContent = 'Built from the live mountain descriptors and terrain contours. It never tracks the player.';
+    intro.textContent = this.mode === 'gps'
+      ? 'GPS Map • live player positions projected through the same world coordinates as every marker.'
+      : 'Paper Map • built from live world descriptors and terrain contours; player positions are intentionally omitted.';
     const elevationTitle = document.createElement('h3');
     elevationTitle.textContent = 'Five elevation areas';
     const elevations = document.createElement('ol');
@@ -175,6 +220,10 @@ export class MountainMapMenu {
     const biomes = document.createElement('p');
     biomes.className = 'map-biome-key';
     biomes.textContent = this.mapData.biomes.map((biome) => biome.label).join(' • ');
+    const symbolTitle = document.createElement('h3');
+    symbolTitle.textContent = 'Symbols';
+    const symbols = document.createElement('p');
+    symbols.textContent = 'S — Boat Arrival / Spawn Point • C — Cave Entrance • ◆ — Landmark';
     const waterTitle = document.createElement('h3');
     waterTitle.textContent = `All ${this.mapData.waters.length} fishing waters`;
     const waters = document.createElement('ol');
@@ -185,17 +234,29 @@ export class MountainMapMenu {
       li.textContent = `${water.label}${water.cave ? ' • cave entrance marked C' : ''}`;
       waters.appendChild(li);
     }
-    this.legend.replaceChildren(intro, elevationTitle, elevations, biomeTitle, biomes, waterTitle, waters);
+    this.legend.replaceChildren(intro, elevationTitle, elevations, biomeTitle, biomes, symbolTitle, symbols, waterTitle, waters);
   }
 
-  open() {
+  open(mode = 'paper') {
     if (!this.screen || this.isOpen || BLOCKING_CLASSES.some((name) => document.body.classList.contains(name))) return;
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.exitPointerLock?.();
     this.isOpen = true;
+    this.mode = mode === 'gps' ? 'gps' : 'paper';
+    const eyebrow = this.screen.querySelector('.eyebrow');
+    const title = this.screen.querySelector('#mountain-map-title');
+    if (eyebrow) eyebrow.textContent = this.mode === 'gps' ? 'RUGGED RECEIVER • LIVE GPS' : 'FOLD-OUT PAPER MAP • NO GPS';
+    if (title) title.textContent = this.mode === 'gps' ? 'Crooked Peak GPS Map' : 'Crooked Peak Paper Map';
+    this.renderMap();
     this.screen.hidden = false;
     document.body.classList.add('mountain-map-open');
     this.closeButton?.focus({ preventScroll: true });
+  }
+
+  update(now = performance.now()) {
+    if (!this.isOpen || this.mode !== 'gps' || now - this.lastGpsRender < 180) return;
+    this.lastGpsRender = now;
+    this.renderGpsPlayers();
   }
 
   close() {

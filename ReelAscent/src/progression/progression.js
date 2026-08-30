@@ -5,6 +5,7 @@ import { createSpecimenRecord, findSpecimenIndex } from './inventory.js';
 import { normalizeProgressionState } from './progression-save.js';
 import { serializeProgress, validateProgressImport } from './progress-transfer.js';
 import { normalizeAppearance } from '../player/appearance.js';
+import { MAP_ITEM_BY_ID } from '../world/world-locations.js';
 
 const copy = (value) => JSON.parse(JSON.stringify(value));
 
@@ -82,6 +83,18 @@ export class ProgressionSystem {
     return { ok: true, specimen, amount: 0 };
   }
 
+  moveAquariumSpecimenToInventory(specimenId) {
+    const specimen = removeAquariumSpecimen(this.state.aquarium, specimenId);
+    if (!specimen) return { ok: false, reason: 'Specimen not found in Aquarium' };
+    if (this.state.inventory.some((entry) => entry.specimenId === specimen.specimenId)) {
+      this.state.aquarium.push(specimen);
+      return { ok: false, reason: 'Specimen is already in Inventory' };
+    }
+    this.state.inventory.push(specimen);
+    this.commit();
+    return { ok: true, specimen };
+  }
+
   // Backwards-compatible debug helper: prefer selling Inventory specimens, but old automation
   // that passes an Aquarium specimen ID still works.
   sellSpecimen(specimenId) {
@@ -98,6 +111,35 @@ export class ProgressionSystem {
   getModifier(name) { return this.equipment.getModifier(name); }
   getModifiers() { return this.equipment.getModifiers(); }
   getEquippedItem(category) { return this.equipment.getEquippedItem(category); }
+
+  purchaseWorldItem(itemId) {
+    const item = MAP_ITEM_BY_ID.get(itemId);
+    if (!item) return { ok: false, reason: 'Unknown shop item' };
+    if (this.state.ownedItems.includes(item.id)) return { ok: false, reason: `${item.name} already owned` };
+    if (!this.spend(item.price)) return { ok: false, reason: `Need $${item.price}` };
+    this.state.ownedItems.push(item.id);
+    this.commit();
+    return { ok: true, item };
+  }
+
+  ownsWorldItem(itemId) {
+    return this.state.ownedItems.includes(itemId);
+  }
+
+  setHeldWorldItem(itemId = null) {
+    if (itemId === null) {
+      this.state.heldItemId = null;
+      this.commit();
+      return { ok: true, item: null };
+    }
+    const item = MAP_ITEM_BY_ID.get(itemId);
+    if (!item || !this.ownsWorldItem(itemId)) return { ok: false, reason: 'Item not owned' };
+    if (itemId === this.state.heldItemId) return { ok: true, item };
+    this.state.heldItemId = itemId;
+    this.state.heldSpecimenId = null;
+    this.commit();
+    return { ok: true, item };
+  }
 
   getAppearance() {
     return normalizeAppearance(this.state.appearance);
@@ -117,6 +159,7 @@ export class ProgressionSystem {
     const specimen = this.state.inventory.find((entry) => entry.specimenId === specimenId);
     if (!specimen) return { ok: false, specimen: null, reason: 'Specimen not found in Inventory' };
     this.state.heldSpecimenId = specimen.specimenId;
+    this.state.heldItemId = null;
     this.commit();
     return { ok: true, specimen };
   }
@@ -143,6 +186,7 @@ export class ProgressionSystem {
       money: this.state.money,
       specimenCount: this.state.inventory.length,
       aquariumCount: this.state.aquarium.length,
+      itemCount: this.state.ownedItems.length,
       equipped: { ...this.state.equipped }
     };
   }
@@ -164,6 +208,14 @@ export class ProgressionSystem {
     this.saveSystem.data.progression = this.state;
     this.equipment.repairDefaults();
     this.revision += 1;
+    return result.summary;
+  }
+
+  importProgressToSlot(input, slotId) {
+    const result = validateProgressImport(input);
+    if (!this.saveSystem.replaceSlotData(slotId, result.save)) {
+      throw new Error('Progress was valid, but the destination slot could not be saved.');
+    }
     return result.summary;
   }
 }

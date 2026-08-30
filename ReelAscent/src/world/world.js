@@ -133,8 +133,9 @@ export class TestWorld {
     let nearest = null;
     let nearestDistance = maximumDistance;
     for (const zone of this.fishingZones) {
-      if (Math.abs(point.y - zone.surfaceY) > 3.5) continue;
       const distance = zone.distanceToWater(point);
+      const target = zone.clampToWater(point);
+      if (Math.abs(point.y - zone.resolveSurfaceY(target)) > 3.5) continue;
       if (distance <= nearestDistance) {
         nearest = zone;
         nearestDistance = distance;
@@ -165,7 +166,7 @@ export class TestWorld {
     for (let distance = minimumCastDistance; distance <= maximumCastDistance + .001; distance += .55) {
       const target = { x: point.x + dx * distance, y: point.y, z: point.z + dz * distance };
       const zone = this.findFishingZoneAt(target);
-      if (zone && Math.abs(point.y - zone.surfaceY) <= 3.5) return zone;
+      if (zone && Math.abs(point.y - zone.resolveSurfaceY(target)) <= 3.5) return zone;
     }
     return null;
   }

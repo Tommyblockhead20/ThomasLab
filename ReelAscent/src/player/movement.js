@@ -1,4 +1,5 @@
 import { STAMINA_CONFIG } from '../config.js';
+import { isCheatsEnabled } from '../debug/cheat-gate.js';
 
 const MOVEMENT_KEYS = new Set([
   'KeyW',
@@ -162,13 +163,13 @@ export class PlayerInput {
       if (event.code === 'Escape' && !event.repeat) {
         this.cancelQueued = true;
       }
-      if (event.code === 'KeyB' && !event.repeat) {
+      if (event.code === 'KeyB' && !event.repeat && isCheatsEnabled()) {
         this.forceBiteQueued = true;
       }
-      if (event.code === 'KeyN' && !event.repeat) {
+      if (event.code === 'KeyN' && !event.repeat && isCheatsEnabled()) {
         this.debugFishQueued = 'easy';
       }
-      if (event.code === 'F10' && !event.repeat) {
+      if (event.code === 'F10' && !event.repeat && isCheatsEnabled()) {
         this.debugFishQueued = 'hard';
       }
       this.held.add(event.code);

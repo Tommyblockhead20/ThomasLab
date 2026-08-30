@@ -1,4 +1,5 @@
 import { PLAYER_FOOT_OFFSET } from '../config.js';
+import { isCheatsEnabled } from '../debug/cheat-gate.js';
 
 const RARITY_RANK = Object.freeze({ Common: 0, Uncommon: 1, Rare: 2, Legendary: 3 });
 
@@ -57,11 +58,13 @@ export class RunManager {
       // Temporary playtest shortcut: F7 toggles unlimited stamina without requiring
       // the debug HUD. It is deliberately separate from F8's summit teleport.
       if (event.code === TEMPORARY_PLAYTEST_CONTROLS.unlimitedStamina) {
+        if (!isCheatsEnabled()) return;
         event.preventDefault();
         this.debugQueue.push({ type: 'toggle-unlimited-stamina' });
         return;
       }
       if (event.code === TEMPORARY_PLAYTEST_CONTROLS.returnHome) {
+        if (!isCheatsEnabled()) return;
         event.preventDefault();
         this.debugQueue.push({ type: 'home' });
         return;
@@ -69,11 +72,12 @@ export class RunManager {
       // Temporary playtest shortcut: F8 always jumps to the summit rim, even when the
       // debug HUD is hidden. This is intentionally isolated from the numbered debug map.
       if (event.code === TEMPORARY_PLAYTEST_CONTROLS.summitRim) {
+        if (!isCheatsEnabled()) return;
         event.preventDefault();
         this.debugQueue.push({ type: 'teleport', code: 'F8' });
         return;
       }
-      if (!this.hud.debugVisible) return;
+      if (!this.hud.debugVisible || !isCheatsEnabled()) return;
       if (/^Digit[0-9]$/.test(event.code) || ['KeyT', 'KeyV', 'KeyY', 'KeyO', 'KeyU'].includes(event.code)) {
         event.preventDefault();
         this.debugQueue.push({ type: 'teleport', code: event.code });

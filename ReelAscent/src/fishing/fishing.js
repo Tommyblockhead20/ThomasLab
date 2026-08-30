@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import { isCheatsEnabled } from '../debug/cheat-gate.js';
 import { FISHING_CONFIG } from '../config.js';
 import {
   createCatchRecord, createFishSpecimenForCategories, FISH_SPECIES, getFishDisplayMetrics,
@@ -650,6 +651,7 @@ export class FishingController {
       if (event.repeat) return;
       const targetTag = event.target?.tagName?.toLowerCase?.() ?? '';
       if (targetTag === 'input' || targetTag === 'textarea' || event.target?.isContentEditable) return;
+      if (!isCheatsEnabled() && !(event.code === 'Escape' && this.gallery.active)) return;
       const galleryToggle = event.code === 'F4' || event.code === 'KeyP';
       if (galleryToggle) {
         if (!this.gallery.active && (document.body.classList.contains('inventory-open')

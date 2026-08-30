@@ -41,9 +41,10 @@ function typeFamily(type) {
 }
 
 export function getZoneHabitat(zone, point = zone.center) {
+  const probabilityPoint = zone.uniformProbabilities ? (zone.probabilityAnchor ?? zone.center) : point;
   const waterType = zone.waterType ?? 'pond';
   const isOcean = waterType === 'ocean';
-  const visualTheme = isOcean ? climateThemeAtPoint(point, zone.center) : zone.theme ?? climateThemeAtPoint(zone.center);
+  const visualTheme = isOcean ? climateThemeAtPoint(probabilityPoint, zone.center) : zone.theme ?? climateThemeAtPoint(zone.center);
   // Fallglass is an environment treatment, not a fourth biological climate. Keeping the
   // ecology wedge separate prevents it from filtering out every shared climate creature.
   const ecologyTheme = isOcean
@@ -140,7 +141,7 @@ export function auditFishingEcology(zones) {
     // treating the descriptor center as a single sunwash sample and falsely reporting
     // climate-specific ocean creatures as unreachable. Inland waters remain one fixed sample.
     const center = zone.center ?? { x: 0, z: 0 };
-    const samplePoints = zone.waterType === 'ocean'
+    const samplePoints = zone.waterType === 'ocean' && !zone.uniformProbabilities
       ? [
           { x: center.x + 1, z: center.z },      // sunwash
           { x: center.x, z: center.z - 1 },      // fernwood

@@ -23,6 +23,10 @@ import { MountainMapMenu } from './ui/mountain-map.js';
 import { EmoteMenu } from './ui/emote-menu.js';
 import { AppearanceMenu } from './ui/appearance-menu.js';
 import { HomeInteractionController } from './ui/home-interaction.js';
+import { cheatGate, isCheatsEnabled } from './debug/cheat-gate.js';
+import { ShopMenu } from './ui/shop.js';
+import { AquariumMenu } from './ui/aquarium.js';
+import { BoatTravelMenu } from './ui/boat-travel.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -35,6 +39,7 @@ export class Game {
     this.canvas = canvas;
     this.physics = physics;
     this.destroyed = false;
+    cheatGate.install();
 
     onProgress('Painting the meadow');
     this.app = new pc.Application(canvas, {
@@ -91,7 +96,17 @@ export class Game {
     this.player.showInventorySpecimen(this.progression.getHeldInventorySpecimen());
     this.appearanceMenu = new AppearanceMenu(this.progression, this.player);
     this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud, this.camera);
-    this.mapMenu = new MountainMapMenu(this.world.getMapData());
+    this.shopMenu = new ShopMenu(this.progression);
+    this.aquariumMenu = new AquariumMenu(this.progression);
+    this.mapMenu = new MountainMapMenu(this.world.getMapData(), {
+      getLocalPlayer: () => ({ id: 'YOU', position: this.player.getPosition() }),
+      getRemotePlayers: () => [...(this.multiplayer?.room?.members ?? new Map()).entries()]
+        .filter(([, remote]) => remote.lastSample)
+        .map(([id, remote]) => ({ id: id.slice(-6).toUpperCase(), position: remote.lastSample }))
+    });
+    this.boatTravel = new BoatTravelMenu((destinationId) => this.travelByBoat(destinationId));
+    this.onOpenBoat = (event) => this.boatTravel.open(event.detail?.currentLocationId);
+    window.addEventListener('reel-ascent:open-boat', this.onOpenBoat);
     this.emoteMenu = new EmoteMenu(
       (emoteId) => this.player.startEmote(emoteId),
       () => this.player.canStartEmote()
@@ -101,7 +116,7 @@ export class Game {
     this.activeCatchPresentation = null;
     this.remoteCatchNotices = new Map();
     this.multiplayerCatchFeed = document.querySelector('#multiplayer-catch-feed');
-    this.multiplayer = new MultiplayerClient(this.progression.state.player.id, {
+    this.multiplayer = new MultiplayerClient(this.saveSystem.multiplayerPlayerId, {
       createRemoteRepresentation: (playerId, colorIndex, appearance) => (
         this.createRemotePlayerRepresentation(playerId, colorIndex, appearance)
       ),
@@ -128,7 +143,7 @@ export class Game {
 
     this.onResize = () => this.app.resizeCanvas();
     this.onDebugKeyDown = (event) => {
-      if (event.repeat || event.code !== 'F9') return;
+      if (event.repeat || event.code !== 'F9' || !isCheatsEnabled()) return;
       const editable = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase?.()) || event.target?.isContentEditable;
       if (editable) return;
       event.preventDefault();
@@ -187,7 +202,8 @@ export class Game {
   update(dt) {
     if (this.destroyed) return;
     if (!this.journal.isOpen && !this.inventory.isOpen && !this.multiplayerMenu.isOpen
-      && !this.mapMenu.isOpen && !this.emoteMenu.isOpen && !this.appearanceMenu.isOpen) {
+      && !this.mapMenu.isOpen && !this.emoteMenu.isOpen && !this.appearanceMenu.isOpen
+      && !this.shopMenu.isOpen && !this.aquariumMenu.isOpen && !this.boatTravel.isOpen) {
       this.runManager.update(dt);
       if (!this.runManager.paused) {
         // Sample the shared X/Grip interaction target before climbing consumes a held Grip.
@@ -222,7 +238,14 @@ export class Game {
     this.updateRemoteCatchNotices();
     this.fishing.updateDebug(dt);
     this.fishingPerformance.update(this.fishing.getFishingPerformanceState());
+    const heldSpecimen = this.progression.getHeldInventorySpecimen();
+    if ((this.player.heldInventorySpecimen?.specimenId ?? null) !== (heldSpecimen?.specimenId ?? null)) {
+      this.player.showInventorySpecimen(heldSpecimen);
+    }
     this.inventory.update();
+    this.shopMenu.update();
+    this.aquariumMenu.update();
+    this.mapMenu.update();
     this.appearanceMenu.update();
     this.ecologyGuide.update();
     this.camera.update(dt);
@@ -231,6 +254,17 @@ export class Game {
 
   createRemotePlayerRepresentation(playerId, colorIndex = 0, appearance = null) {
     return createRemoteAvatar(this.app, playerId, colorIndex, appearance);
+  }
+
+  travelByBoat(destinationId) {
+    const arrival = this.world.chooseTravelArrival(destinationId);
+    if (!arrival) return false;
+    if (this.fishing.active) this.fishing.cancel();
+    this.player.clearBenchSeat?.();
+    this.player.teleport(arrival.position, arrival.facingYaw);
+    this.camera.setYaw(arrival.facingYaw);
+    this.hud.showToast?.(`Arrived at ${arrival.location.displayName} • ${arrival.dockId}`);
+    return true;
   }
 
   seededRandom(seed) {
@@ -371,6 +405,10 @@ export class Game {
     this.fishing.destroy();
     this.fishingPerformance.destroy();
     this.inventory.destroy();
+    this.shopMenu.destroy();
+    this.aquariumMenu.destroy();
+    this.boatTravel.destroy();
+    window.removeEventListener('reel-ascent:open-boat', this.onOpenBoat);
     this.appearanceMenu.destroy();
     this.homeInteraction.destroy();
     this.mapMenu.destroy();
@@ -384,6 +422,7 @@ export class Game {
     this.hud.destroy();
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onDebugKeyDown, true);
+    cheatGate.destroy();
     delete window.__reelAscent;
     this.app.destroy();
     this.physicsWorld.free();

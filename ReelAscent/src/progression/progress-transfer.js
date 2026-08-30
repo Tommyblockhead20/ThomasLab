@@ -3,7 +3,7 @@ import { normalizeProgressionState } from './progression-save.js';
 import { SAVE_SCHEMA_VERSION, normalizeSave } from '../persistence/save-system.js';
 
 export const PROGRESS_EXPORT_FORMAT = 'reel-ascent-progress';
-export const PROGRESS_EXPORT_VERSION = 1;
+export const PROGRESS_EXPORT_VERSION = 2;
 const MAX_SPECIMENS = 2000;
 const MAX_COLLECTION_ENTRIES = 2000;
 
@@ -44,7 +44,9 @@ function parseDocument(input) {
 export function validateProgressImport(input) {
   const document = parseDocument(input);
   if (document.format !== PROGRESS_EXPORT_FORMAT) throw new Error('This is not a Reel Ascent progress export.');
-  if (document.exportVersion !== PROGRESS_EXPORT_VERSION) throw new Error(`Unsupported progress export version: ${document.exportVersion}.`);
+  if (!Number.isInteger(document.exportVersion) || document.exportVersion < 1 || document.exportVersion > PROGRESS_EXPORT_VERSION) {
+    throw new Error(`Unsupported progress export version: ${document.exportVersion}.`);
+  }
   if (!Number.isInteger(document.schemaVersion) || document.schemaVersion < 1 || document.schemaVersion > SAVE_SCHEMA_VERSION) {
     throw new Error(`Unsupported save schema version: ${document.schemaVersion}.`);
   }

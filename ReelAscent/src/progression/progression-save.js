@@ -1,7 +1,8 @@
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
+import { MAP_ITEMS } from '../world/world-locations.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 5;
+export const PROGRESSION_SCHEMA_VERSION = 6;
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
@@ -35,6 +36,8 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     inventory: [],
     aquarium: [],
     heldSpecimenId: null,
+    ownedItems: [],
+    heldItemId: null,
     appearance: { ...DEFAULT_APPEARANCE },
     ownedEquipment: [...STARTER_EQUIPMENT_IDS],
     equipped: { ...DEFAULT_EQUIPPED }
@@ -111,6 +114,11 @@ export function normalizeProgressionState(value = {}) {
     if (typeof selected === 'string' && owned.has(selected)) equipped[category] = selected;
   }
   if (typeof value.equipped?.guide === 'string' && owned.has(value.equipped.guide)) equipped.guide = value.equipped.guide;
+  const validWorldItems = new Set(MAP_ITEMS.map((item) => item.id));
+  const ownedItems = [...new Set(
+    (Array.isArray(value.ownedItems) ? value.ownedItems : [])
+      .filter((id) => typeof id === 'string' && validWorldItems.has(id))
+  )];
   return {
     ...defaults,
     schemaVersion: PROGRESSION_SCHEMA_VERSION,
@@ -123,6 +131,10 @@ export function normalizeProgressionState(value = {}) {
     aquarium,
     heldSpecimenId: typeof value.heldSpecimenId === 'string' && inventoryIds.has(value.heldSpecimenId)
       ? value.heldSpecimenId
+      : null,
+    ownedItems,
+    heldItemId: typeof value.heldItemId === 'string' && ownedItems.includes(value.heldItemId)
+      ? value.heldItemId
       : null,
     // Only genuinely absent appearance data receives the legacy v1-v7 default. Existing
     // selections are normalized/migrated but never guessed to be an "old default" and reset.

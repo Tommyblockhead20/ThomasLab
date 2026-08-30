@@ -1,83 +1,119 @@
-# Reel Ascent v8.8 focused continuation handoff
+# Reel Ascent v9 major update handoff
 
-Status: implemented in the current project tree. No commit, push, deployment, protocol change, progression reset, or production-server mutation was performed.
+Status: implemented in the current project tree. No commit, push, deployment, multiplayer-server change, or production mutation was performed. Islands remain deliberately always loaded. Validation was kept light as requested.
 
-1. **Scope honored**
+1. **Fishing waters moved** — Amber Reed Pond moved offshore and became Reedwater Pond on Normal Fishing Island; Basalt Grotto moved to Cave Fishing Island; Blue-Ice Melt moved to Cold Island and is presented as Frosthook Melt. The total remains 24 fishing zones.
 
-   This pass is limited to the v8.8 map cleanup, seated-fishing input ordering, appearance reset/default verification, Fallglass waterfall clipping, and cave-mouth block cleanup. The future mountain rebalance, islands, GPS/player tracking, and other large world changes remain deferred.
+2. **Radial alignments broken up** — Main-mountain angles changed deliberately: Redbank 24°→18°, Red River 26°→47°, Echo Cave 125°→137°, Mossbell 86°→92°, Split Rock 42°→315°, Obsidian 202°→217°, Twilight 332°→344°, Hidden Ridge 29°→335°, and High Cirque 112°→74°. Only the watershed remains a continuous radial feature.
 
-2. **500/550/600-ft map pins removed**
+3. **Cloudstep Lake probabilities** — Cloudstep is its own freshwater upper-tier ecology/probability group, anchored once for the whole lake.
 
-   The three individual ledge markers and labels are no longer rendered. Their real traversal geometry and map-data descriptors remain intact, as do the five data-derived elevation regions and their legend.
+4. **Waterfall probabilities** — Fallglass Cascade is one path-shaped waterfall ecology/probability group spanning the whole cascade; it does not split into top/middle/bottom tables.
 
-3. **Cave map labels removed**
+5. **Ocean probabilities** — Outer Ocean is one saltwater ecology/probability group using all three coastal ecology themes as a single fixed table instead of changing by ocean wedge/cast position.
 
-   All four cave mouths retain the gray `C` symbol at their data-derived entrance position. The visible cave-name text beside each symbol is removed; the numbered water list remains unchanged.
+6. **Uniformity confirmation** — `uniformProbabilities` and a stable probability anchor are applied independently to Cloudstep, Fallglass, and Outer Ocean. Cast position changes surface targeting, not the table inside any one of those zones.
 
-4. **Split Boulder finding**
+7. **Waterfall geometry** — The terrain-following ribbon now starts at Cloudstep's outer edge (radius 96), samples each left/right terrain edge every 2 m, and continues through radius 222 into the ocean. Width now tapers over the complete lower run, and modest source/plunge/runout foam remains.
 
-   Split Boulder is genuine, deliberately authored world geometry at angle 35°/radius 119: two differently colored, intersecting natural rock teeth approximately 7.2 m and 8.1 m tall, both grounded and climbable. Its map marker is retained.
+8. **Six island locations** — Home `(462.1, -182.0)`, Shop `(460.8, 200.8)`, Aquarium `(197.5, 270.9)`, Cave Fishing `(-28.4, 82.7)`, Normal Fishing `(548.4, -82.7)`, and Cold `(76.2, -219.1)` in world X/Z coordinates. Ellipse radii range only 15–23 m, versus the main island's 208 m core radius.
 
-5. **Giant Tilted Slab finding**
+9. **Cabin Island** — A wooded/cozy low-poly island now carries the repaired cabin, wardrobe/appearance interaction, rest furniture, trophies, progress display, and climbable trees.
 
-   A construction branch exists for an 11.5 × 5.8 × 9.2 m tilted slab, but no live route descriptor invokes that branch. It is therefore not a reliable world landmark in the current generated mountain, and its map marker is removed. No replacement geometry was added in this cleanup pass.
+10. **Shop Island** — A developed outpost with cargo, an open-front outfitter, counter interaction, gear purchase/equip, specimen selling, and map sales.
 
-6. **Map accuracy sanity check**
+11. **Aquarium Island** — A landscaped island with garden accents and the repaired public aquarium pavilion; its physical interaction opens add/remove/display management and its saved residents keep swimming in the tank.
 
-   The map still derives 24 waters, four cave mouths, five sampled elevation contours, three shared biome sectors, six shoreline starts, cabin, aquarium, summit crown/tarn, and the Fallglass cascade from live world descriptors. Water centers/radii, cave-depth mouths, biome angles, cabin/aquarium coordinates, summit, cascade, and ocean annulus all share their gameplay sources. No additional obvious mapping bug was found.
+12. **Cave Fishing Island** — A rocky silhouette with an opening omitted from the island-core triangles, a recessed rounded tunnel, descending floor, chamber, and Basalt Grotto water at the rear. It has no mine frame or exterior dark doorway blocks.
 
-7. **Seated-fishing root cause**
+13. **Normal Fishing Island** — Reedwater is an outdoor natural pond island with a reed ring, open banks, and a distinct soft/green silhouette rather than a second cave.
 
-   WASD/arrows serve as rhythm lanes but were also read as normal movement before fishing owned the frame. The generic bench-exit condition treated those song inputs as a request to stand, cancelled fishing, and moved the player off the bench.
+14. **Cold Island** — Frosthook uses pale snow terrain, cold rock/ice materials, sparse large ice formations, and Frosthook Melt as its dedicated cold water.
 
-8. **Seated input policy now**
+15. **Cold species concentration** — Polar Bear remains exclusive to `blue-ice-melt` (now Frosthook); Penguin can use Frosthook and ocean but strongly favors Frosthook; Arctic Char and Arctic Grayling now favor Frosthook; Dolly Varden and existing Fairy Shrimp already favor that same water. Logical nonexclusive cold fish can still occur elsewhere.
 
-   WASD/arrows, sprint, and slide no longer stand a seated player. During fishing they flow into the cast/hook/rhythm system; while merely resting they are harmless. The deliberate stand paths are X/on-screen Interact/Grip interaction, Jump, or Escape while seated but not actively fishing.
+16. **Normal water moved offshore** — Amber Reed Pond was chosen because removing it reduces lower-main clustering; its canonical ID remains `amber-reed-pond` for saves/species references.
 
-9. **Escape while seated and fishing**
+17. **Cave water moved offshore** — Basalt Grotto moved off the main mountain with canonical ID `basalt-grotto` retained.
 
-   The frame records whether fishing was active before centralized cleanup. Escape during ready/cast/song/catch cancels fishing, releases fishing input/pointer state through `exitFishing()`, and returns to the same anchored seated posture. It cannot fall through and stand in that same frame. A later Escape while only seated can stand.
+18. **Opposite fishing islands** — Cave Fishing is at 164°/radius 300 and Normal Fishing at 344°/radius 300: exactly opposite bearings and about 600 m apart.
 
-10. **RESET TO DEFAULT**
+19. **Boat travel implementation** — Every destination comes from the generic world-location registry. Dock interaction opens travel; selection runs a short transition; the player is safely teleported to the destination arrival, camera yaw is restored, fishing/seating is cancelled cleanly, and multiplayer room membership is untouched.
 
-   A `RESET TO DEFAULT` button now sits next to `RANDOMIZE LOOK`. It applies every field in `DEFAULT_APPEARANCE`, updates the local player and live preview immediately, saves through the normal appearance-only progression path, and does not touch catches, unlocks, inventory, aquarium residents, records, or other progression.
+20. **Travel-map UI** — The selector is a stylized clickable ocean chart using each destination's real world position, distinct island glyphs/colors, current/selected highlights, confirm step, and a small animated sailboat transition.
 
-11. **Exact legacy v4.5 color verification**
+21. **Docks added** — Six main-shore docks and one dock on each of the six small islands use low-poly decks/piles, touch their shore slopes, expose boat interactions, and have separate safe arrival points.
 
-   Re-read from the supplied `Mountain Fishing v4.5/src/config.js` and `src/player/player.js`: `COLORS.player` `[0.95, 0.5, 0.22]`; `COLORS.playerAccent` `[0.99, 0.82, 0.33]`; skin `[0.93, 0.72, 0.52]`; boots `[0.18, 0.22, 0.18]`; pack `[0.18, 0.39, 0.34]`; trousers `[0.23, 0.31, 0.29]`; dark `[0.08, 0.11, 0.10]`. Current shared legacy constants match exactly.
+22. **Main-island spawn relocation** — All six red/orange start arrivals moved from radius 183–184 to radius 204, with safe beach shelves and docks centered around radius 220.
 
-12. **Current default selections**
+23. **Random main arrival** — Returning to Main Mountain selects one of the six valid `START_LOCATIONS` with `Math.random`; focused checks verify both first and last dock selection paths.
 
-   New/default/reset appearance is Human; Warm skin (tone 3); Classic Orange shirt; Classic Trail pants; Tousled Espresso hair; yellow Beanie; no eyewear; no face/neck accessory; Trail Backpack; and no custom shirt/pants/hair/accessory/blob tint. Resolved shirt, accent, skin, trousers, boots, backpack, and dark-detail colors match the exact values above.
+24. **Island loading** — All six simple island meshes and their props stay loaded. This avoids a streaming system, preserves remote 3D players, and is acceptable for the current scale; registry `loadGroup`/`alwaysLoaded` metadata leaves room for later activation.
 
-13. **Existing customized saves**
+25. **Island map integration** — The world map consumes the same `WORLD_LOCATIONS`, ellipse radii, structure landmarks, fishing descriptors, and dock positions used by gameplay. All six islands are projected at their true positions.
 
-   Startup migration behavior is unchanged: only absent appearance data receives `DEFAULT_APPEARANCE`; existing selections are normalized and retained. The new reset occurs only when the player explicitly clicks the button.
+26. **S marker legend** — Every real dock is an `S`; the legend says `S — Boat Arrival / Spawn Point`. Individual S markers have no giant labels.
 
-14. **Waterfall clipping cause**
+27. **Larger fishing numbers** — Fishing marker numbers increased from 6.8 px to 9 px with stronger outline; their compact water footprints remain small enough to avoid excessive overlap.
 
-   Fallglass previously sampled terrain only beneath the ribbon centerline, then gave both wide edge vertices the center height. On irregular cross-slope terrain, either edge could sink into the mountain; the 4 m longitudinal spacing also made individual triangles more likely to cut through local curvature.
+28. **Split Boulder label** — Its real symbol remains, but the visible `Split Boulder` text is suppressed. Cave names and individual 500/550/600-ft ledge pins remain suppressed too.
 
-15. **Waterfall fix**
+29. **GPS Map** — GPS uses the normal world→map projection and refreshes local plus remote markers from the existing interpolated multiplayer snapshots. Local/remote styling and short nonprivate player-ID suffixes are distinct; no tracking protocol was added.
 
-   Sampling cadence is now 2 m (33 shared path rows from radius 96–160). Each left/right vertex computes its real polar position and samples the terrain directly beneath itself with a small surface clearance. The upper width is modestly reduced, the lower runout tapers more tightly, and source/pool/runout foam indices are descriptor-relative. One indexed continuous mesh remains, so the old overlapping-sheet regression is not reintroduced.
+30. **Paper Map** — Paper Map is a durable inventory item that opens the complete descriptor-driven world overview with six islands, 24 waters, caves, biomes, five elevation regions, docks, structures, waterfall, summit, and useful landmarks, but never player positions.
 
-16. **Cave-mouth block cause**
+31. **Map prices/ownership** — Paper Map costs `$75`; GPS Map costs `$900`. Both are bought only at Shop Island, persist in `ownedItems`, appear as actual Inventory cards, can be held/used there, and GPS is intentionally much more expensive.
 
-   The first floor/wall/roof shell row used 1.16–1.2 segment depths while centered only half a segment behind the mouth. Its opaque boxes therefore extended slightly beyond the triangle cut and could read as protruding rectangular dark rocks.
+32. **Inventory structure** — Inventory now has exactly `INVENTORY` and `SAVE / DATA` tabs. Global Appearance, Aquarium, Gear Shop, selling, purchasing, and free Trail Map buttons were removed.
 
-17. **Cave-mouth fix and limitation**
+33. **Hold in Hand** — Carried specimen hold/put-away remains. Map inventory actions select the durable map item and immediately read/use the corresponding Paper or GPS display.
 
-   The first shell row is recessed 18% of one tunnel segment behind the real mountain opening while preserving overlap with row two. No decorative frame, portal, trench, or added rock was introduced. The cave remains a true exterior-triangle opening into a box-built collision shell; close inspection can still reveal planar interior walls because a fully sculpted/carved cave mesh is outside this small pass.
+34. **Specimen previews** — Each specimen card renders a lightweight SVG silhouette using that species' actual model archetype proportions/category and authored primary/accent colors, plus rarity, quality, shiny mark, length, weight, value, and provenance.
 
-18. **Files and network impact**
+35. **Appearance relocation** — Appearance is opened only from the Cabin Island wardrobe. The live preview, skin/cosmetics/tints, hair/hat rules, Randomize, classic Reset Default, save compatibility, and multiplayer appearance snapshots remain intact.
 
-   Source changes are in `index.html`, `src/styles.css`, `src/player/player.js`, `src/ui/appearance-menu.js`, `src/ui/mountain-map.js`, `src/world/mountain-v2.js`, and new `test/v88-focused.test.js`; `dist` was refreshed. No multiplayer client/server/protocol file changed, so no server startup or Render redeployment is required specifically for v8.8. A frontend redeploy/build is required to publish these client/world changes.
+36. **Aquarium management relocation** — Adding to and removing from the aquarium now happens only in the physical Aquarium Island menu. Inventory still records carried ownership but has no aquarium-management buttons.
 
-19. **Focused validation completed**
+37. **Shop relocation** — Gear buying/equipping, map purchasing, and fish selling now happen only at Shop Island. Durable equipment ownership/equipped state is unchanged.
 
-   `node --test test/v87-focused.test.js test/v88-focused.test.js` passed 8/8. `git diff --check` found no whitespace errors (only the existing Windows LF→CRLF notice). `npm run build` succeeded with 1,268 modules transformed and refreshed `dist/assets/index-D9v2U0LJ.js` plus `index-CDhvQFee.css`; only the existing large-chunk warning remains. The temporary Vite server was stopped. Automated visual control was attempted twice but the desktop browser runtime could not create its local assets (`os error 3`).
+38. **Save slots** — Four local save slots are available.
 
-20. **Short manual check still required**
+39. **Old-save migration** — When no slot container exists, the existing `reel-ascent-save-v1` payload is migrated into Save Slot 1 automatically; focused tests preserve its money and progression.
 
-   Open the map and confirm no 500/550/600 pins, cave names, or Tilted Slab pin; retain five bands, gray `C`s, and Split Boulder. From a summit bench, complete a full rhythm song and confirm the player stays seated, then test active-fishing Escape, Jump, and X/Interact. Click Randomize then Reset and confirm the exact classic look without progression loss. Finally inspect Fallglass from source through runout and all four cave mouths at close/oblique angles for any remaining terrain intersection or visible interior block edge.
+40. **Save-slot architecture** — One structured `reel-ascent-save-slots-v1` document owns active-slot metadata and four independently migrated save payloads. A separate browser multiplayer ID prevents imported/selected save identities from impersonating another active room identity.
+
+41. **Export/import changes** — Export format version is 2 and exports the current save only. Version-1 exports remain accepted; import validates/migrates canonical data, lets the player choose a destination slot, warns before overwrite, and downloads a current-slot backup first.
+
+42. **Reset Save** — Save/Data requires typing the exact slot-specific reset phrase, resets only that slot, and reloads only when the active slot changed. It does not clear other slots or the browser multiplayer identity.
+
+43. **F1 activation** — Cheats are off on every page load. A tap or early release cancels; holding F1 continuously for 3 seconds shows percentage progress and then a temporary `CHEATS ENABLED` confirmation. It is session-only and never saved.
+
+44. **Cheat keys after activation** — F3 HUD, F4/P creature gallery and gallery edit keys, F6 ecology panel, F7 stamina, F8 summit, F9 money, F10 hard debug fish, B/N fishing cheats, Home debug return, and F3-dependent numeric/letter teleports work after activation. They remain absent from normal Controls.
+
+45. **Cave-core geometry** — Main cave mouths still remove triangles from the gray core. Their protruding side/roof box rows were replaced by one collidable semicircular arch mesh recessed behind the cut; Cave Island uses the same principle in its own omitted core wedge. Floors/chambers remain internal only.
+
+46. **Cave staggering** — The remaining main cave waters are Echo at angle 137°/radius 110, Obsidian at 217°/105, and High Cirque at 74°/56, so both bearing and elevation differ; Basalt moved offshore.
+
+47. **Dominant vegetation archetypes** — Sunwash now uses short broad umbrella-like `scrub-tree` crowns; Blackstone uses tall narrow conifers; Fernwood uses rounded multi-lobe broadleaf canopies. These are deliberately not evenly mixed.
+
+48. **Vegetation density** — Deterministic candidates rose from 210 to 360 and climbable-tree capacity from 64 to 100. Authored density is Sunwash `.72`, Blackstone `.94`, Fernwood `1.0`; Blackstone/Fernwood read as forests, while Sunwash remains more open. Secondary dry scrub, pine saplings, fern fans, bushes, grass, and flowers follow biome identity and thin above low elevations.
+
+49. **Performance considerations** — Islands use six low-segment terrain meshes, shared materials/primitives, and no simulation/streaming. Vegetation reuses existing forms and keeps only up to 100 trunks/branches collidable. Always-loaded simplicity was chosen; manual frame-rate inspection is still recommended.
+
+50. **Island multiplayer handling** — Boat teleport does not leave/rejoin rooms or change protocol state. With all locations loaded, remote avatars continue rendering/resynchronizing through existing snapshots and the roster is unchanged.
+
+51. **GPS multiplayer tracking** — GPS reads `RemotePlayer.lastSample` plus the local player position and updates only while the GPS map is open. It exposes only `YOU` and a short player-ID suffix.
+
+52. **Future second main island** — `WorldLocation` records now own ID, display/type, world position, radii, theme/functions, load group, map representation, destination order, and dock/arrival metadata. Boat and map iterate this registry; a future location can be added without duplicating UI switch statements.
+
+53. **Multiplayer protocol changes** — None. Existing position/appearance snapshots are sufficient.
+
+54. **Render redeployment** — No multiplayer server/Render service code changed, so the server does not need redeployment for v9. Publishing the client still requires normal frontend hosting/deployment.
+
+55. **Files changed** — `PROJECT_HANDOFF.md`, `index.html`, `src/styles.css`, fishing data/ecology/zone/controller files, `src/game.js`, persistence/progression files, `src/player/movement.js`, Home/HUD/Inventory/Map/Shop/Aquarium/Fishing Performance UI files, `src/world/mountain-v2.js`, `src/world/world.js`, `src/world/run-manager.js`; new `src/world/world-locations.js`, `src/ui/boat-travel.js`, `src/debug/cheat-gate.js`, and `test/v9-major.test.js`; refreshed `dist/index.html` and hashed JS/CSS assets.
+
+56. **Save schema changes** — Durable save schema `6→7`; progression schema `5→6`; progress export format `1→2`; new slot-container schema `1` with four slots; new durable `ownedItems`/`heldItemId`; old schemas and version-1 exports migrate forward.
+
+57. **Frontend build** — Yes. `npm run build` is required for source changes and was run successfully (1,273 modules; only the existing large-chunk warning). `node --test test/v9-major.test.js` passes all focused boat/map/save/watershed/cheat checks, syntax checks pass, Vite startup succeeds, and `git diff --check` reports only Windows line-ending notices.
+
+58. **Highest-value manual tests** — Sail once to any small island and return to verify a random main dock; inspect the six island shore/dock joins and Cave Island entrance; walk Cloudstep→Fallglass→ocean looking for clipping; buy/use both maps and check GPS with a second player; exercise Shop/Aquarium/Cabin interactions; migrate/switch/import/reset a nonprimary save; tap then hold F1 and try F3/F7/F9.

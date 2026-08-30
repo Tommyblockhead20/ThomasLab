@@ -2111,6 +2111,72 @@ body.inventory-open #game-shell::after {
   content: "";
   background: rgb(2 13 15 / 58%);
 }
+.inventory-specimen-preview { width: 100%; height: 4.3rem; padding: .2rem; background: radial-gradient(circle, rgb(104 174 178 / 22%), transparent 70%); border-radius: .4rem; }
+.specimen-sparkle { fill: none; stroke: #fff4b2; stroke-width: 2; stroke-linecap: round; }
+.inventory-actions { grid-template-columns: 1fr; }
+.inventory-item-card { grid-template-columns: auto 1fr auto; align-items: center; }
+.inventory-item-card button,
+.save-slot-card button,
+.aquarium-card button { padding: .52rem .68rem; color: #153a36; font-size: .58rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .42rem; cursor: pointer; }
+.inventory-item-icon { display: grid; width: 3.1rem; height: 3.1rem; place-items: center; color: #f4de91; font-size: 2rem; background: rgb(3 24 25 / 55%); border-radius: 50%; }
+.inventory-item-card p { margin: .3rem 0 0; color: rgb(234 244 231 / 66%); font-size: .56rem; line-height: 1.45; }
+.save-data-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.save-slot-card { display: grid; gap: .65rem; padding: .8rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 11%); border-radius: .55rem; }
+.save-slot-card.is-active { border-color: #efd98b; box-shadow: 0 0 0 2px rgb(239 217 139 / 16%); }
+.save-slot-card header,
+.save-slot-actions { display: flex; gap: .5rem; align-items: center; justify-content: space-between; }
+.save-slot-card header span { color: #efd98b; font-size: .52rem; font-weight: 950; letter-spacing: .08em; }
+.save-slot-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin: 0; }
+.save-slot-card dl div { padding: .4rem; background: rgb(0 0 0 / 14%); }
+.save-slot-card dt { color: rgb(234 244 231 / 54%); font-size: .46rem; font-weight: 900; }
+.save-slot-card dd { margin: .12rem 0 0; font-size: .58rem; }
+.progress-transfer-actions label { display: grid; gap: .25rem; color: #efd98b; font-size: .5rem; font-weight: 900; }
+.progress-transfer select { min-width: 10rem; padding: .45rem; color: #edf6e9; background: #123c3b; border: 1px solid rgb(239 217 139 / 28%); border-radius: .35rem; }
+
+body.shop-open #game-shell::after,
+body.aquarium-open #game-shell::after,
+body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inset: 0; content: ""; background: rgb(2 13 15 / 64%); }
+.aquarium-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .5rem; }
+.aquarium-content { display: grid; gap: 1rem; }
+.aquarium-content h3 { color: #efd98b; font-size: .64rem; letter-spacing: .08em; }
+
+.boat-travel { position: absolute; z-index: 70; inset: 50% auto auto 50%; display: grid; width: min(46rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 1rem; color: #edf6e9; background: #123e42; border: 2px solid #d9bb66; border-radius: 1rem; box-shadow: 0 1.4rem 5rem rgb(0 0 0 / 45%); transform: translate(-50%, -50%); }
+.boat-travel[hidden] { display: none; }
+.boat-travel > header,
+.boat-travel > footer { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
+.boat-travel h2 { margin: .15rem 0 0; color: #f3dea0; }
+.boat-travel button { padding: .55rem .75rem; color: #153a36; font-size: .62rem; font-weight: 950; background: #efd98b; border: 0; border-radius: .5rem; cursor: pointer; }
+.boat-travel button:disabled { opacity: .4; cursor: default; }
+.boat-travel-map { position: relative; aspect-ratio: 1.55; margin: .8rem 0; overflow: hidden; background: radial-gradient(circle at 45% 42%, #65b8c0, #2d7d8a 68%, #235b68); border: .45rem solid #bc8e52; border-radius: .8rem; box-shadow: inset 0 0 2.2rem rgb(8 52 61 / 45%); }
+.boat-travel-map::before { position: absolute; inset: 0; content: ""; opacity: .22; background: repeating-radial-gradient(circle at 50% 50%, transparent 0 12px, #e7f5d6 13px 14px); }
+.boat-map-island { position: absolute; display: grid; min-width: 3.9rem; padding: .3rem !important; place-items: center; color: #20362c !important; background: #77a95a !important; border: 2px solid #3b643b !important; border-radius: 48% 55% 45% 58% !important; transform: translate(-50%, -50%); }
+.boat-map-island span { font-size: 1.05rem; }
+.boat-map-island b { max-width: 6.3rem; font-size: .46rem; line-height: 1.15; text-align: center; }
+.boat-map-main-island { min-width: 6.4rem; min-height: 4.7rem; background: #789264 !important; }
+.boat-map-cold-island { color: #254954 !important; background: #e8f4ec !important; border-color: #9fd0df !important; }
+.boat-map-island.is-current { box-shadow: 0 0 0 3px #fff5b6; }
+.boat-map-island.is-selected { outline: 4px solid #f2bd45; outline-offset: 2px; }
+.boat-travel-transition { position: absolute; z-index: 3; inset: 0; display: grid; place-content: center; gap: .7rem; text-align: center; background: rgb(10 48 53 / 94%); border-radius: .8rem; }
+.boat-travel-transition[hidden] { display: none; }
+.boat-travel-transition span { font-size: 3.2rem; animation: boat-bob .55s ease-in-out infinite alternate; }
+@keyframes boat-bob { to { transform: translate(2rem, -.35rem) rotate(4deg); } }
+
+.map-islands ellipse { fill: #6f9958; stroke: #2d5c45; stroke-width: 1.4; }
+.map-island-cold-island ellipse { fill: #e4efea; stroke: #78aeb9; }
+.map-island-cave-island ellipse { fill: #777a70; }
+.map-islands text { fill: #183f3a; font: 800 6.4px system-ui, sans-serif; text-anchor: middle; paint-order: stroke; stroke: #e8dca9; stroke-width: 2.2px; stroke-linejoin: round; }
+.map-player circle { fill: #e7784f; stroke: #fff4bc; stroke-width: 2; }
+.map-player.is-local circle { fill: #ffe462; stroke: #173e3d; }
+.map-player text { fill: #173e3d; font: 900 7px ui-monospace, monospace; paint-order: stroke; stroke: #fff4bc; stroke-width: 2.5px; }
+
+.cheat-activation { --cheat-progress: 0%; position: absolute; z-index: 90; top: 1rem; left: 50%; min-width: 12rem; padding: .65rem .9rem; color: #fff1a6; font: 950 .7rem ui-monospace, monospace; text-align: center; letter-spacing: .08em; background: linear-gradient(90deg, rgb(205 149 43 / 72%) var(--cheat-progress), rgb(6 35 38 / 92%) var(--cheat-progress)); border: 1px solid #efd98b; border-radius: .5rem; transform: translateX(-50%); }
+.cheat-activation[hidden] { display: none; }
+
+@media (max-width: 650px) {
+  .save-data-content { grid-template-columns: 1fr; }
+  .inventory-item-card { grid-template-columns: auto 1fr; }
+  .inventory-item-card button { grid-column: 1 / -1; }
+}
 .inventory-menu { width: min(66rem, calc(100vw - 2rem)); }
 .collection-tabs { position: sticky; top: -.9rem; z-index: 2; padding: .55rem 0; background: rgb(8 35 34 / 96%); }
 .inventory-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: .5rem; }
@@ -2178,7 +2244,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .map-biome-blackstone { fill: #3f4d58; }
 .map-cascade { fill: none; stroke: #d6f6f4; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
 .map-waters ellipse { fill: #64aeb2; stroke: #185e68; stroke-width: 1.5; }
-.map-waters text { fill: #f7f0c9; font: 900 6.8px ui-monospace, monospace; text-anchor: middle; paint-order: stroke; stroke: #164c50; stroke-width: 1.4; }
+.map-waters text { fill: #fff7cc; font: 950 9px ui-monospace, monospace; text-anchor: middle; paint-order: stroke; stroke: #164c50; stroke-width: 1.8; }
 .map-water { fill: #82b4b2; stroke: #2c7475; stroke-width: 3; }
 .map-route { fill: none; stroke: #9a4b34; stroke-width: 5; stroke-dasharray: 10 7; }
 .map-route.alt { stroke: #73543c; stroke-width: 3.5; }

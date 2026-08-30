@@ -1,3 +1,5 @@
+import { isCheatsEnabled } from '../debug/cheat-gate.js';
+
 export const FISHING_DEBUG_TOGGLE_CODE = 'F6';
 
 const displayNumber = (value, digits = 2) => Number.isFinite(value) ? Number(value).toFixed(digits) : '—';
@@ -27,7 +29,7 @@ export class FishingPerformanceMenu {
     this.lastInputCount = -1;
 
     this.onKeyDown = (event) => {
-      if (event.code !== FISHING_DEBUG_TOGGLE_CODE || event.repeat) return;
+      if (event.code !== FISHING_DEBUG_TOGGLE_CODE || event.repeat || !isCheatsEnabled()) return;
       event.preventDefault();
       this.toggle();
     };

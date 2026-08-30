@@ -1,8 +1,12 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 6;
+export const SAVE_SCHEMA_VERSION = 7;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
+export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
+export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
+export const SAVE_SLOT_SCHEMA_VERSION = 1;
+export const SAVE_SLOT_COUNT = 4;
 
 const QUALITY_RANK = Object.freeze({ GOOD: 1, GREAT: 2, PERFECT: 3 });
 const CANONICAL_RARITIES = new Set(['Common', 'Uncommon', 'Rare', 'Legendary']);
@@ -135,6 +139,11 @@ const MIGRATIONS = Object.freeze({
     ...value,
     version: 6,
     progression: normalizeProgressionState(value.progression)
+  }),
+  6: (value) => ({
+    ...value,
+    version: 7,
+    progression: normalizeProgressionState(value.progression)
   })
 });
 
@@ -160,33 +169,130 @@ function getBrowserStorage() {
   }
 }
 
+function slotId(index) {
+  return `slot-${index + 1}`;
+}
+
+function emptySlot(index) {
+  return {
+    id: slotId(index),
+    label: `Save Slot ${index + 1}`,
+    createdAt: 0,
+    updatedAt: 0,
+    data: null
+  };
+}
+
+function normalizeSlot(value, index) {
+  const base = emptySlot(index);
+  const data = value?.data && typeof value.data === 'object' ? migrate(value.data) : null;
+  return {
+    ...base,
+    createdAt: data ? Math.max(0, finiteNumber(value?.createdAt, Date.now())) : 0,
+    updatedAt: data ? Math.max(0, finiteNumber(value?.updatedAt, Date.now())) : 0,
+    data
+  };
+}
+
+export function normalizeSaveSlotStore(value = {}, legacySave = null) {
+  const supplied = Array.isArray(value.slots) ? value.slots : [];
+  const slots = Array.from({ length: SAVE_SLOT_COUNT }, (_, index) => normalizeSlot(supplied[index], index));
+  if (!slots.some((slot) => slot.data)) {
+    const migrated = legacySave ? migrate(legacySave) : defaultSave();
+    slots[0] = {
+      ...emptySlot(0),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      data: migrated
+    };
+  }
+  const requestedActive = typeof value.activeSlotId === 'string' ? value.activeSlotId : '';
+  const activeSlotId = slots.some((slot) => slot.id === requestedActive && slot.data)
+    ? requestedActive
+    : slots.find((slot) => slot.data)?.id ?? slots[0].id;
+  return {
+    schemaVersion: SAVE_SLOT_SCHEMA_VERSION,
+    activeSlotId,
+    slots
+  };
+}
+
+function summarizeSlot(slot, activeSlotId) {
+  const save = slot.data ? migrate(slot.data) : null;
+  return {
+    id: slot.id,
+    label: slot.label,
+    empty: !save,
+    active: slot.id === activeSlotId,
+    createdAt: slot.createdAt,
+    updatedAt: slot.updatedAt,
+    money: save?.progression?.money ?? 0,
+    discovered: save ? Object.values(save.collection).filter((entry) => entry.discovered).length : 0,
+    fishCaught: save?.lifetime?.fishCaught ?? 0,
+    summits: save?.lifetime?.summitCount ?? 0,
+    appearance: save?.progression?.appearance ?? null
+  };
+}
+
 export class SaveSystem {
   constructor(storage) {
     this.storage = arguments.length ? storage : getBrowserStorage();
     this.lastLoadError = null;
     this.revision = 0;
-    this.data = this.load();
+    this.slotStore = this.loadSlotStore();
+    this.activeSlotId = this.slotStore.activeSlotId;
+    this.data = migrate(this.slotStore.slots.find((slot) => slot.id === this.activeSlotId)?.data ?? defaultSave());
+    this.multiplayerPlayerId = this.loadMultiplayerPlayerId();
+  }
+
+  loadMultiplayerPlayerId() {
+    try {
+      const existing = this.storage?.getItem(MULTIPLAYER_ID_STORAGE_KEY);
+      if (existing) return existing.slice(0, 160);
+      const id = this.data.progression?.player?.id
+        || `browser-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+      this.storage?.setItem(MULTIPLAYER_ID_STORAGE_KEY, id);
+      return id;
+    } catch {
+      return this.data.progression?.player?.id ?? `browser-${Date.now()}`;
+    }
+  }
+
+  loadSlotStore() {
+    try {
+      const rawSlots = this.storage?.getItem(SAVE_SLOTS_STORAGE_KEY);
+      const legacyRaw = rawSlots ? null : this.storage?.getItem(SAVE_STORAGE_KEY);
+      const store = normalizeSaveSlotStore(
+        rawSlots ? JSON.parse(rawSlots) : {},
+        legacyRaw ? JSON.parse(legacyRaw) : null
+      );
+      this.storage?.setItem(SAVE_SLOTS_STORAGE_KEY, JSON.stringify(store));
+      return store;
+    } catch {
+      this.lastLoadError = 'corrupt-or-unavailable';
+      return normalizeSaveSlotStore();
+    }
   }
 
   load() {
-    try {
-      const raw = this.storage?.getItem(SAVE_STORAGE_KEY);
-      if (!raw) {
-        const fresh = defaultSave();
-        this.storage?.setItem(SAVE_STORAGE_KEY, JSON.stringify(fresh));
-        return fresh;
-      }
-      return migrate(JSON.parse(raw));
-    } catch {
-      this.lastLoadError = 'corrupt-or-unavailable';
-      return defaultSave();
-    }
+    return migrate(this.slotStore?.slots.find((slot) => slot.id === this.activeSlotId)?.data ?? defaultSave());
+  }
+
+  writeSlotStore() {
+    if (!this.storage) throw new Error('Storage unavailable');
+    this.storage.setItem(SAVE_SLOTS_STORAGE_KEY, JSON.stringify(this.slotStore));
   }
 
   save() {
     try {
-      if (!this.storage) throw new Error('Storage unavailable');
-      this.storage.setItem(SAVE_STORAGE_KEY, JSON.stringify(this.data));
+      const slot = this.slotStore.slots.find((entry) => entry.id === this.activeSlotId);
+      if (!slot) throw new Error('Active slot unavailable');
+      const now = Date.now();
+      slot.data = migrate(this.data);
+      slot.createdAt ||= now;
+      slot.updatedAt = now;
+      this.slotStore.activeSlotId = this.activeSlotId;
+      this.writeSlotStore();
       this.lastLoadError = null;
       this.revision += 1;
       return true;
@@ -261,6 +367,91 @@ export class SaveSystem {
 
   getSnapshot() {
     return copy(this.data);
+  }
+
+  getSlotSummaries() {
+    return this.slotStore.slots.map((slot) => summarizeSlot(slot, this.activeSlotId));
+  }
+
+  createSlot(id) {
+    const slot = this.slotStore.slots.find((entry) => entry.id === id);
+    if (!slot || slot.data) return false;
+    const now = Date.now();
+    slot.data = defaultSave();
+    slot.createdAt = now;
+    slot.updatedAt = now;
+    try {
+      this.writeSlotStore();
+      this.revision += 1;
+      return true;
+    } catch {
+      this.lastLoadError = 'write-unavailable';
+      slot.data = null;
+      slot.createdAt = 0;
+      slot.updatedAt = 0;
+      return false;
+    }
+  }
+
+  selectSlot(id) {
+    const slot = this.slotStore.slots.find((entry) => entry.id === id && entry.data);
+    if (!slot) return false;
+    const previous = this.activeSlotId;
+    this.activeSlotId = slot.id;
+    this.slotStore.activeSlotId = slot.id;
+    this.data = migrate(slot.data);
+    try {
+      this.writeSlotStore();
+      this.revision += 1;
+      return true;
+    } catch {
+      this.activeSlotId = previous;
+      this.slotStore.activeSlotId = previous;
+      this.data = migrate(this.slotStore.slots.find((entry) => entry.id === previous)?.data ?? defaultSave());
+      this.lastLoadError = 'write-unavailable';
+      return false;
+    }
+  }
+
+  replaceSlotData(id, value) {
+    const slot = this.slotStore.slots.find((entry) => entry.id === id);
+    if (!slot) return false;
+    const previous = { data: slot.data, createdAt: slot.createdAt, updatedAt: slot.updatedAt };
+    const now = Date.now();
+    slot.data = migrate(value);
+    slot.createdAt ||= now;
+    slot.updatedAt = now;
+    try {
+      this.writeSlotStore();
+      if (id === this.activeSlotId) this.data = migrate(slot.data);
+      this.revision += 1;
+      return true;
+    } catch {
+      Object.assign(slot, previous);
+      this.lastLoadError = 'write-unavailable';
+      return false;
+    }
+  }
+
+  resetSlot(id) {
+    return this.replaceSlotData(id, defaultSave());
+  }
+
+  deleteSlot(id) {
+    const slot = this.slotStore.slots.find((entry) => entry.id === id);
+    if (!slot) return false;
+    if (id === this.activeSlotId) return this.resetSlot(id);
+    const previous = { ...slot };
+    Object.assign(slot, emptySlot(this.slotStore.slots.indexOf(slot)));
+    try {
+      this.writeSlotStore();
+      this.revision += 1;
+      return true;
+    } catch {
+      Object.assign(slot, previous);
+      this.lastLoadError = 'write-unavailable';
+      return false;
+    }
   }
 
   replaceData(value) {

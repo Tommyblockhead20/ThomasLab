@@ -1,3 +1,5 @@
+import { isCheatsEnabled } from '../debug/cheat-gate.js';
+
 function formatRunTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
@@ -80,7 +82,7 @@ export class Hud {
     this.lastTouchGripLabel = '';
 
     this.onKeyDown = (event) => {
-      if (event.code !== 'F3' || event.repeat) return;
+      if (event.code !== 'F3' || event.repeat || !isCheatsEnabled()) return;
       event.preventDefault();
       this.debugVisible = !this.debugVisible;
       this.debugPanel.hidden = !this.debugVisible;
