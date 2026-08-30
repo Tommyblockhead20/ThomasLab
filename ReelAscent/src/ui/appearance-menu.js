@@ -1,12 +1,15 @@
 import {
   ACCESSORIES,
   AVATAR_TYPES,
+  CUSTOM_COLOR_FIELDS,
   HAIR_COLORS,
   HAIR_STYLES,
   PANTS_COLORS,
   SHIRT_COLORS,
   SKIN_TONES,
-  normalizeAppearance
+  colorToHex,
+  normalizeAppearance,
+  resolveAppearance
 } from '../player/appearance.js';
 
 const BLOCKING_CLASSES = Object.freeze([
@@ -27,6 +30,12 @@ const GROUPS = Object.freeze([
 const colorCss = (color) => color
   ? `rgb(${color.map((value) => Math.round(value * 255)).join(' ')})`
   : '';
+
+const TINT_BY_OPTION = Object.freeze({
+  shirtColor: 'shirtTint',
+  pantsColor: 'pantsTint',
+  hairColor: 'hairTint'
+});
 
 export class AppearanceMenu {
   constructor(progression, player) {
@@ -54,15 +63,34 @@ export class AppearanceMenu {
       const key = option.dataset.appearanceKey;
       const value = option.dataset.appearanceValue;
       if (!GROUPS.some((group) => group.key === key && group.options.some((entry) => entry.id === value))) return;
-      const appearance = this.progression.setAppearance({ [key]: value });
+      const patch = { [key]: value };
+      if (TINT_BY_OPTION[key]) patch[TINT_BY_OPTION[key]] = null;
+      const appearance = this.progression.setAppearance(patch);
       this.player.applyAppearance(appearance);
       if (this.status) this.status.textContent = 'Saved locally • multiplayer appearance updates live.';
+      this.render(true);
+    };
+    this.onChange = (event) => {
+      const input = event.target.closest?.('[data-appearance-tint]');
+      if (!input || !CUSTOM_COLOR_FIELDS.some((field) => field.key === input.dataset.appearanceTint)) return;
+      const appearance = this.progression.setAppearance({ [input.dataset.appearanceTint]: input.value });
+      this.player.applyAppearance(appearance);
+      if (this.status) this.status.textContent = 'Custom color saved • multiplayer appearance updates live.';
+      this.render(true);
+    };
+    this.onResetTint = (event) => {
+      const reset = event.target.closest?.('[data-appearance-reset-tint]');
+      if (!reset || !CUSTOM_COLOR_FIELDS.some((field) => field.key === reset.dataset.appearanceResetTint)) return;
+      const appearance = this.progression.setAppearance({ [reset.dataset.appearanceResetTint]: null });
+      this.player.applyAppearance(appearance);
       this.render(true);
     };
 
     window.addEventListener('reel-ascent:open-appearance', this.onOpenRequest);
     window.addEventListener('keydown', this.onKeyDown, true);
     this.screen?.addEventListener('click', this.onClick);
+    this.screen?.addEventListener('change', this.onChange);
+    this.screen?.addEventListener('click', this.onResetTint);
     this.closeButton?.addEventListener('click', this.onCloseClick);
   }
 
@@ -94,8 +122,9 @@ export class AppearanceMenu {
   render(force = false) {
     if (!this.isOpen || !this.content || (!force && this.renderedRevision === this.progression.revision)) return;
     const appearance = normalizeAppearance(this.progression.getAppearance());
+    const resolved = resolveAppearance(appearance);
     const human = appearance.avatarType === 'human';
-    this.content.replaceChildren(...GROUPS.map((group) => {
+    const groups = GROUPS.map((group) => {
       const fieldset = document.createElement('fieldset');
       fieldset.className = 'appearance-group';
       fieldset.hidden = Boolean(group.human && !human);
@@ -122,7 +151,36 @@ export class AppearanceMenu {
       }
       fieldset.append(legend, options);
       return fieldset;
-    }));
+    });
+    const customColors = document.createElement('fieldset');
+    customColors.className = 'appearance-group appearance-custom-colors';
+    const customLegend = document.createElement('legend');
+    customLegend.textContent = 'Custom Colors';
+    const customGrid = document.createElement('div');
+    customGrid.className = 'appearance-color-grid';
+    for (const field of CUSTOM_COLOR_FIELDS) {
+      if ((field.human && !human) || (field.blob && human)) continue;
+      const row = document.createElement('label');
+      row.className = 'appearance-color-control';
+      const caption = document.createElement('span');
+      caption.textContent = field.label;
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.dataset.appearanceTint = field.key;
+      const optionValue = field.optionKey
+        ? resolved[`${field.optionKey}Value`]?.color
+        : resolved[field.resolvedKey];
+      input.value = appearance[field.key] ?? colorToHex(optionValue);
+      const reset = document.createElement('button');
+      reset.type = 'button';
+      reset.dataset.appearanceResetTint = field.key;
+      reset.textContent = appearance[field.key] ? 'Use preset' : 'Preset';
+      reset.disabled = !appearance[field.key];
+      row.append(caption, input, reset);
+      customGrid.appendChild(row);
+    }
+    customColors.append(customLegend, customGrid);
+    this.content.replaceChildren(...groups, customColors);
     this.renderedRevision = this.progression.revision;
   }
 
@@ -130,6 +188,8 @@ export class AppearanceMenu {
     window.removeEventListener('reel-ascent:open-appearance', this.onOpenRequest);
     window.removeEventListener('keydown', this.onKeyDown, true);
     this.screen?.removeEventListener('click', this.onClick);
+    this.screen?.removeEventListener('change', this.onChange);
+    this.screen?.removeEventListener('click', this.onResetTint);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     document.body.classList.remove('appearance-open');
   }

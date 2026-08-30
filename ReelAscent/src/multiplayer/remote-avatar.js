@@ -107,8 +107,8 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   const hair = material([.08, .055, .04], { gloss: .14 });
   const dark = material([.055, .075, .07], { gloss: .18 });
   const accent = material(palette.rgb.map((value) => clamp(value * .62, 0, 1)));
-  const blobBlue = material([.12, .5, .88], { emissive: [.008, .025, .05], gloss: .48 });
-  const blobLight = material([.28, .72, 1], { emissive: [.01, .035, .07], gloss: .38 });
+  const accessory = material([.84, .42, .13], { gloss: .3 });
+  const blobBlue = material([.28, .72, .95], { emissive: [.01, .03, .05], gloss: .38 });
   const root = new pc.Entity(`Remote ${palette.name} player ${playerId}`);
   const rig = new pc.Entity('Remote character visual');
   const humanRig = new pc.Entity('Remote human avatar');
@@ -138,6 +138,9 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     ['tousled', makeGroup('Remote tousled hair')],
     ['ponytail', makeGroup('Remote ponytail hair')],
     ['mohawk', makeGroup('Remote mohawk hair')],
+    ['long', makeGroup('Remote long hair')],
+    ['bun', makeGroup('Remote trail bun hair')],
+    ['braids', makeGroup('Remote twin braids hair')],
     ['bald', makeGroup('Remote bald hair')]
   ]);
   primitive(hairStyles.get('short'), 'Remote short hair cap', 'sphere', { x: 0, y: .95, z: .015 }, { x: .46, y: .19, z: .44 }, hair);
@@ -148,19 +151,45 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   primitive(hairStyles.get('ponytail'), 'Remote ponytail', 'sphere', { x: 0, y: .66, z: .39 }, { x: .2, y: .36, z: .19 }, hair);
   [-.18, 0, .18].forEach((z, index) => primitive(hairStyles.get('mohawk'), `Remote mohawk ${index + 1}`,
     'cone', { x: 0, y: 1.05, z }, { x: .15, y: .34 + (index === 1 ? .06 : 0), z: .15 }, hair));
+  primitive(hairStyles.get('long'), 'Remote long hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
+  primitive(hairStyles.get('long'), 'Remote long hair back', 'sphere', { x: 0, y: .64, z: .3 }, { x: .42, y: .56, z: .19 }, hair);
+  primitive(hairStyles.get('bun'), 'Remote bun hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
+  primitive(hairStyles.get('bun'), 'Remote trail bun', 'sphere', { x: 0, y: 1, z: .36 }, { x: .26, y: .26, z: .26 }, hair);
+  primitive(hairStyles.get('braids'), 'Remote braids hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
+  for (const side of [-1, 1]) {
+    primitive(hairStyles.get('braids'), `Remote braid ${side}`, 'cylinder',
+      { x: side * .32, y: .62, z: .18 }, { x: .1, y: .48, z: .1 }, hair, { z: side * 5 });
+  }
 
   const accessories = new Map([
     ['beanie', makeGroup('Remote beanie')],
     ['glasses', makeGroup('Remote glasses')],
-    ['trail-hat', makeGroup('Remote trail hat')]
+    ['trail-hat', makeGroup('Remote trail hat')],
+    ['fishing-cap', makeGroup('Remote fishing cap')],
+    ['headlamp', makeGroup('Remote headlamp')],
+    ['scarf', makeGroup('Remote scarf')],
+    ['flower-crown', makeGroup('Remote flower crown')],
+    ['goggles', makeGroup('Remote summit goggles')]
   ]);
-  primitive(accessories.get('beanie'), 'Remote beanie crown', 'cone', { x: 0, y: 1.03, z: 0 }, { x: .49, y: .32, z: .49 }, accent);
-  primitive(accessories.get('beanie'), 'Remote beanie band', 'cylinder', { x: 0, y: .94, z: 0 }, { x: .5, y: .11, z: .5 }, accent);
-  primitive(accessories.get('glasses'), 'Remote left glasses', 'box', { x: -.13, y: .78, z: -.42 }, { x: .19, y: .13, z: .03 }, dark);
-  primitive(accessories.get('glasses'), 'Remote right glasses', 'box', { x: .13, y: .78, z: -.42 }, { x: .19, y: .13, z: .03 }, dark);
-  primitive(accessories.get('glasses'), 'Remote glasses bridge', 'box', { x: 0, y: .78, z: -.43 }, { x: .08, y: .025, z: .02 }, dark);
-  primitive(accessories.get('trail-hat'), 'Remote trail hat brim', 'box', { x: 0, y: .99, z: -.05 }, { x: .7, y: .05, z: .6 }, accent);
-  primitive(accessories.get('trail-hat'), 'Remote trail hat crown', 'cylinder', { x: 0, y: 1.1, z: 0 }, { x: .44, y: .22, z: .44 }, accent);
+  primitive(accessories.get('beanie'), 'Remote beanie crown', 'cone', { x: 0, y: 1.03, z: 0 }, { x: .49, y: .32, z: .49 }, accessory);
+  primitive(accessories.get('beanie'), 'Remote beanie band', 'cylinder', { x: 0, y: .94, z: 0 }, { x: .5, y: .11, z: .5 }, accessory);
+  primitive(accessories.get('glasses'), 'Remote left glasses', 'box', { x: -.13, y: .78, z: -.42 }, { x: .19, y: .13, z: .03 }, accessory);
+  primitive(accessories.get('glasses'), 'Remote right glasses', 'box', { x: .13, y: .78, z: -.42 }, { x: .19, y: .13, z: .03 }, accessory);
+  primitive(accessories.get('glasses'), 'Remote glasses bridge', 'box', { x: 0, y: .78, z: -.43 }, { x: .08, y: .025, z: .02 }, accessory);
+  primitive(accessories.get('trail-hat'), 'Remote trail hat brim', 'box', { x: 0, y: .99, z: -.05 }, { x: .7, y: .05, z: .6 }, accessory);
+  primitive(accessories.get('trail-hat'), 'Remote trail hat crown', 'cylinder', { x: 0, y: 1.1, z: 0 }, { x: .44, y: .22, z: .44 }, accessory);
+  primitive(accessories.get('fishing-cap'), 'Remote fishing cap crown', 'sphere', { x: 0, y: 1.01, z: .02 }, { x: .47, y: .2, z: .44 }, accessory);
+  primitive(accessories.get('fishing-cap'), 'Remote fishing cap bill', 'box', { x: 0, y: .96, z: -.37 }, { x: .47, y: .05, z: .34 }, accessory, { x: -5 });
+  primitive(accessories.get('headlamp'), 'Remote headlamp band', 'cylinder', { x: 0, y: .94, z: 0 }, { x: .48, y: .08, z: .48 }, accessory);
+  primitive(accessories.get('headlamp'), 'Remote headlamp light', 'sphere', { x: 0, y: .95, z: -.43 }, { x: .13, y: .12, z: .1 }, accessory);
+  primitive(accessories.get('scarf'), 'Remote scarf collar', 'cylinder', { x: 0, y: .52, z: 0 }, { x: .31, y: .16, z: .31 }, accessory);
+  primitive(accessories.get('scarf'), 'Remote scarf tail', 'box', { x: .17, y: .25, z: .25 }, { x: .18, y: .52, z: .1 }, accessory, { x: -12, z: -8 });
+  primitive(accessories.get('flower-crown'), 'Remote flower crown band', 'cylinder', { x: 0, y: .97, z: 0 }, { x: .48, y: .055, z: .48 }, accessory);
+  [-.28, -.14, 0, .14, .28].forEach((x, index) => primitive(accessories.get('flower-crown'), `Remote flower ${index + 1}`,
+    'sphere', { x, y: 1.04 + (index % 2) * .03, z: -.33 + Math.abs(x) * .2 }, { x: .095, y: .095, z: .075 }, accessory));
+  primitive(accessories.get('goggles'), 'Remote goggles left lens', 'sphere', { x: -.14, y: .8, z: -.42 }, { x: .17, y: .13, z: .04 }, dark);
+  primitive(accessories.get('goggles'), 'Remote goggles right lens', 'sphere', { x: .14, y: .8, z: -.42 }, { x: .17, y: .13, z: .04 }, dark);
+  primitive(accessories.get('goggles'), 'Remote goggles strap', 'cylinder', { x: 0, y: .81, z: 0 }, { x: .46, y: .05, z: .46 }, accessory);
 
   const limbs = {
     leftArm: limb(humanRig, 'Remote left arm', { x: -.43, y: .4, z: 0 }, { x: .18, y: .72, z: .18 }, cloth),
@@ -173,16 +202,10 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   primitive(limbs.leftLeg, 'Remote left boot', 'box', { x: 0, y: -.55, z: -.1 }, { x: .28, y: .17, z: .43 }, dark);
   primitive(limbs.rightLeg, 'Remote right boot', 'box', { x: 0, y: -.55, z: -.1 }, { x: .28, y: .17, z: .43 }, dark);
 
-  primitive(blobRig, 'Remote Blue Blob body', 'sphere', { x: 0, y: .02, z: 0 }, { x: .82, y: 1.15, z: .74 }, blobBlue);
-  primitive(blobRig, 'Remote Blue Blob crown', 'sphere', { x: 0, y: .62, z: 0 }, { x: .66, y: .64, z: .65 }, blobLight);
-  primitive(blobRig, 'Remote Blue Blob left eye', 'sphere', { x: -.15, y: .66, z: -.58 }, { x: .11, y: .14, z: .085 }, dark);
-  primitive(blobRig, 'Remote Blue Blob right eye', 'sphere', { x: .15, y: .66, z: -.58 }, { x: .11, y: .14, z: .085 }, dark);
-  const blobLimbs = {
-    leftArm: limb(blobRig, 'Remote Blue Blob left arm', { x: -.58, y: .2, z: 0 }, { x: .2, y: .62, z: .2 }, blobBlue),
-    rightArm: limb(blobRig, 'Remote Blue Blob right arm', { x: .58, y: .2, z: 0 }, { x: .2, y: .62, z: .2 }, blobBlue),
-    leftFoot: limb(blobRig, 'Remote Blue Blob left foot', { x: -.25, y: -.66, z: -.04 }, { x: .3, y: .25, z: .42 }, blobBlue),
-    rightFoot: limb(blobRig, 'Remote Blue Blob right foot', { x: .25, y: -.66, z: -.04 }, { x: .3, y: .25, z: .42 }, blobBlue)
-  };
+  // Match the original multiplayer proxy: capsule, round head, and facing marker.
+  primitive(blobRig, 'Remote classic Blue Blob body', 'capsule', { x: 0, y: -.05, z: 0 }, { x: .72, y: 1.12, z: .72 }, blobBlue);
+  primitive(blobRig, 'Remote classic Blue Blob head', 'sphere', { x: 0, y: .82, z: 0 }, { x: .48, y: .48, z: .48 }, blobBlue);
+  primitive(blobRig, 'Remote classic Blue Blob facing marker', 'box', { x: 0, y: .35, z: -.43 }, { x: .16, y: .16, z: .48 }, blobBlue);
 
   const fishingRod = primitive(rig, 'Remote fishing rod', 'cylinder',
     { x: .62, y: .42, z: -.3 }, { x: .035, y: 1.25, z: .035 }, dark, { x: 28, z: -18 });
@@ -205,6 +228,8 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     setMaterialColor(skin, resolved.skinToneValue.color);
     setMaterialColor(trousers, resolved.pantsColorValue.color);
     setMaterialColor(hair, resolved.hairColorValue.color);
+    setMaterialColor(accessory, resolved.accessoryColor);
+    setMaterialColor(blobBlue, resolved.blobColor, .03);
     humanRig.enabled = root.appearance.avatarType === 'human';
     blobRig.enabled = root.appearance.avatarType === 'blob';
     for (const [id, group] of hairStyles) group.enabled = id === root.appearance.hairStyle;
@@ -261,10 +286,6 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     limbs.rightArm.setLocalEulerAngles(rightArm, 0, -8);
     limbs.leftLeg.setLocalEulerAngles(leftLeg, 0, 0);
     limbs.rightLeg.setLocalEulerAngles(rightLeg, 0, 0);
-    blobLimbs.leftArm.setLocalEulerAngles(leftArm * .72, 0, 8);
-    blobLimbs.rightArm.setLocalEulerAngles(rightArm * .72, 0, -8);
-    blobLimbs.leftFoot.setLocalEulerAngles(leftLeg * .55, 0, 0);
-    blobLimbs.rightFoot.setLocalEulerAngles(rightLeg * .55, 0, 0);
     const bounce = moving ? Math.abs(Math.sin(phase)) * .055 : Math.sin(phase * .2) * .012;
     blobRig.setLocalScale(1 + bounce * .4, 1 - bounce * .25, 1 + bounce * .25);
     if (catchRoot.enabled && now >= root.catchPresentationExpiresAt) root.clearCatch();

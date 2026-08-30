@@ -27,12 +27,13 @@ function downloadProgressJson(text, prefix = 'reel-ascent-progress') {
 const TAB_COPY = Object.freeze({
   inventory: 'Every successful catch waits here until you sell it or send it to Aquarium.',
   gear: 'Purchase gear and equip one item in each category.',
-  aquarium: 'Exact specimens you chose to retain live here. A swimming 3D aquarium comes later.'
+  aquarium: 'Exact specimens you chose to retain are visible swimming in the shoreline aquarium pavilion.'
 });
 
 export class InventoryMenu {
-  constructor(progression) {
+  constructor(progression, player = null) {
     this.progression = progression;
+    this.player = player;
     this.screen = document.querySelector('#inventory-menu');
     this.content = document.querySelector('#inventory-content');
     this.status = document.querySelector('#inventory-status');
@@ -89,13 +90,22 @@ export class InventoryMenu {
       const inventoryAction = event.target.closest('[data-inventory-action]');
       if (inventoryAction) {
         const specimenId = inventoryAction.dataset.specimenId;
-        const result = inventoryAction.dataset.inventoryAction === 'sell'
+        const action = inventoryAction.dataset.inventoryAction;
+        if (!['sell', 'aquarium', 'hold'].includes(action)) return;
+        const result = action === 'sell'
           ? this.progression.sellInventorySpecimen(specimenId)
-          : this.progression.moveInventorySpecimenToAquarium(specimenId);
+          : action === 'aquarium'
+            ? this.progression.moveInventorySpecimenToAquarium(specimenId)
+            : this.progression.setHeldInventorySpecimen(specimenId);
+        this.player?.showInventorySpecimen(this.progression.getHeldInventorySpecimen());
         if (this.status) this.status.textContent = result.ok
-          ? inventoryAction.dataset.inventoryAction === 'sell'
+          ? action === 'sell'
             ? `${result.specimen.name} sold for $${result.amount}.`
-            : `${result.specimen.name} sent to Aquarium.`
+            : action === 'aquarium'
+              ? `${result.specimen.name} sent to the shoreline Aquarium.`
+              : result.specimen
+                ? `${result.specimen.name} is now displayed in your hand. Close Inventory to see it.`
+                : 'Inventory fish put away.'
           : result.reason;
         this.render(true, true);
         return;
@@ -116,6 +126,7 @@ export class InventoryMenu {
 
     this.onCloseClick = () => this.close();
     this.onOpenClick = () => { if (!OTHER_MODAL_OPEN()) this.open(); };
+    this.onOpenAquarium = () => { if (!OTHER_MODAL_OPEN()) this.open('aquarium'); };
     this.onTransferFile = async () => {
       const file = this.transferFile?.files?.[0];
       if (!file || !this.transferText) return;
@@ -129,6 +140,7 @@ export class InventoryMenu {
       this.transferFile.value = '';
     };
     window.addEventListener('keydown', this.onKeyDown, true);
+    window.addEventListener('reel-ascent:open-aquarium', this.onOpenAquarium);
     this.screen?.addEventListener('click', this.onClick);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.mobileButton?.addEventListener('click', this.onOpenClick);
@@ -222,7 +234,7 @@ export class InventoryMenu {
   renderInventory(state) {
     const specimens = state.inventory ?? [];
     return specimens.length ? [...specimens].reverse().map((specimen) => (
-      `<article class="inventory-card" data-rarity="${escapeHtml(specimen.rarity.toLowerCase())}">
+      `<article class="inventory-card" data-rarity="${escapeHtml(specimen.rarity.toLowerCase())}" data-held="${state.heldSpecimenId === specimen.specimenId}">
         <div class="inventory-card-heading"><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)} • ${escapeHtml(specimen.quality)}</small></div>
         <dl>
           <div><dt>LENGTH</dt><dd>${specimen.length.toFixed(1)} in • ${escapeHtml(specimen.lengthCategory)}</dd></div>
@@ -232,6 +244,7 @@ export class InventoryMenu {
         </dl>
         <small>${new Date(specimen.provenance.caughtAt).toLocaleString()}${Number.isFinite(specimen.provenance.elevation) ? ` • ${Math.round(specimen.provenance.elevation)} ft` : ''}</small>
         <div class="inventory-actions">
+          <button type="button" data-inventory-action="hold" data-specimen-id="${escapeHtml(specimen.specimenId)}">${state.heldSpecimenId === specimen.specimenId ? 'PUT AWAY' : 'HOLD IN HAND'}</button>
           <button type="button" data-inventory-action="sell" data-specimen-id="${escapeHtml(specimen.specimenId)}">SELL — $${specimen.value}</button>
           <button type="button" data-inventory-action="aquarium" data-specimen-id="${escapeHtml(specimen.specimenId)}">SEND TO AQUARIUM</button>
         </div>
@@ -271,6 +284,7 @@ export class InventoryMenu {
 
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown, true);
+    window.removeEventListener('reel-ascent:open-aquarium', this.onOpenAquarium);
     this.screen?.removeEventListener('click', this.onClick);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.mobileButton?.removeEventListener('click', this.onOpenClick);

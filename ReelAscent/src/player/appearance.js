@@ -17,7 +17,10 @@ export const SHIRT_COLORS = Object.freeze([
   Object.freeze({ id: 'moss', label: 'Moss', color: [0.25, 0.49, 0.3] }),
   Object.freeze({ id: 'sunset', label: 'Sunset', color: [0.83, 0.52, 0.18] }),
   Object.freeze({ id: 'plum', label: 'Plum', color: [0.47, 0.28, 0.56] }),
-  Object.freeze({ id: 'cream', label: 'Trail Cream', color: [0.78, 0.72, 0.55] })
+  Object.freeze({ id: 'cream', label: 'Trail Cream', color: [0.78, 0.72, 0.55] }),
+  Object.freeze({ id: 'frost', label: 'Glacier Frost', color: [0.48, 0.72, 0.78] }),
+  Object.freeze({ id: 'midnight', label: 'Midnight', color: [0.12, 0.16, 0.31] }),
+  Object.freeze({ id: 'rose', label: 'Alpine Rose', color: [0.68, 0.27, 0.38] })
 ]);
 
 export const PANTS_COLORS = Object.freeze([
@@ -25,7 +28,9 @@ export const PANTS_COLORS = Object.freeze([
   Object.freeze({ id: 'charcoal', label: 'Charcoal', color: [0.16, 0.18, 0.19] }),
   Object.freeze({ id: 'denim', label: 'Denim', color: [0.18, 0.3, 0.43] }),
   Object.freeze({ id: 'clay', label: 'Clay', color: [0.39, 0.25, 0.18] }),
-  Object.freeze({ id: 'sage', label: 'Sage', color: [0.34, 0.4, 0.29] })
+  Object.freeze({ id: 'sage', label: 'Sage', color: [0.34, 0.4, 0.29] }),
+  Object.freeze({ id: 'rust', label: 'Rust', color: [0.45, 0.2, 0.12] }),
+  Object.freeze({ id: 'sand', label: 'Trail Sand', color: [0.58, 0.49, 0.34] })
 ]);
 
 export const HAIR_STYLES = Object.freeze([
@@ -33,6 +38,9 @@ export const HAIR_STYLES = Object.freeze([
   Object.freeze({ id: 'tousled', label: 'Tousled' }),
   Object.freeze({ id: 'ponytail', label: 'Ponytail' }),
   Object.freeze({ id: 'mohawk', label: 'Mohawk' }),
+  Object.freeze({ id: 'long', label: 'Long' }),
+  Object.freeze({ id: 'bun', label: 'Trail Bun' }),
+  Object.freeze({ id: 'braids', label: 'Twin Braids' }),
   Object.freeze({ id: 'bald', label: 'Bald' })
 ]);
 
@@ -42,14 +50,30 @@ export const HAIR_COLORS = Object.freeze([
   Object.freeze({ id: 'gold', label: 'Gold', color: [0.72, 0.52, 0.22] }),
   Object.freeze({ id: 'copper', label: 'Copper', color: [0.58, 0.19, 0.08] }),
   Object.freeze({ id: 'silver', label: 'Silver', color: [0.62, 0.64, 0.61] }),
-  Object.freeze({ id: 'teal', label: 'Lake Teal', color: [0.05, 0.38, 0.4] })
+  Object.freeze({ id: 'teal', label: 'Lake Teal', color: [0.05, 0.38, 0.4] }),
+  Object.freeze({ id: 'black', label: 'Raven', color: [0.025, 0.03, 0.035] }),
+  Object.freeze({ id: 'violet', label: 'Violet', color: [0.38, 0.18, 0.52] }),
+  Object.freeze({ id: 'pink', label: 'Wildflower', color: [0.72, 0.3, 0.48] })
 ]);
 
 export const ACCESSORIES = Object.freeze([
   Object.freeze({ id: 'none', label: 'None' }),
   Object.freeze({ id: 'beanie', label: 'Beanie' }),
   Object.freeze({ id: 'glasses', label: 'Trail Glasses' }),
-  Object.freeze({ id: 'trail-hat', label: 'Trail Hat' })
+  Object.freeze({ id: 'trail-hat', label: 'Trail Hat' }),
+  Object.freeze({ id: 'fishing-cap', label: 'Fishing Cap' }),
+  Object.freeze({ id: 'headlamp', label: 'Headlamp' }),
+  Object.freeze({ id: 'scarf', label: 'Trail Scarf' }),
+  Object.freeze({ id: 'flower-crown', label: 'Flower Crown' }),
+  Object.freeze({ id: 'goggles', label: 'Summit Goggles' })
+]);
+
+export const CUSTOM_COLOR_FIELDS = Object.freeze([
+  Object.freeze({ key: 'shirtTint', label: 'Custom shirt', optionKey: 'shirtColor', human: true }),
+  Object.freeze({ key: 'pantsTint', label: 'Custom pants', optionKey: 'pantsColor', human: true }),
+  Object.freeze({ key: 'hairTint', label: 'Custom hair', optionKey: 'hairColor', human: true }),
+  Object.freeze({ key: 'accessoryTint', label: 'Custom accessory', resolvedKey: 'accessoryColor', human: true }),
+  Object.freeze({ key: 'blobTint', label: 'Custom blob', resolvedKey: 'blobColor', blob: true })
 ]);
 
 export const DEFAULT_APPEARANCE = Object.freeze({
@@ -59,7 +83,12 @@ export const DEFAULT_APPEARANCE = Object.freeze({
   pantsColor: 'pine',
   hairStyle: 'tousled',
   hairColor: 'espresso',
-  accessory: 'none'
+  accessory: 'none',
+  shirtTint: null,
+  pantsTint: null,
+  hairTint: null,
+  accessoryTint: null,
+  blobTint: null
 });
 
 const OPTION_SETS = Object.freeze({
@@ -79,12 +108,30 @@ const CATALOGS = Object.freeze({
   hairColor: HAIR_COLORS
 });
 
+const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+const normalizeTint = (value) => typeof value === 'string' && COLOR_PATTERN.test(value)
+  ? value.toLowerCase()
+  : null;
+
+export function colorToHex(color = [0, 0, 0]) {
+  return `#${color.map((value) => Math.round(Math.max(0, Math.min(1, value)) * 255)
+    .toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function hexToColor(value, fallback = [1, 1, 1]) {
+  if (!COLOR_PATTERN.test(value ?? '')) return [...fallback];
+  return [1, 3, 5].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255);
+}
+
 export function normalizeAppearance(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  return Object.fromEntries(Object.entries(DEFAULT_APPEARANCE).map(([key, fallback]) => [
-    key,
-    OPTION_SETS[key].has(source[key]) ? source[key] : fallback
-  ]));
+  const appearance = {};
+  for (const [key, options] of Object.entries(OPTION_SETS)) {
+    appearance[key] = options.has(source[key]) ? source[key] : DEFAULT_APPEARANCE[key];
+  }
+  for (const field of CUSTOM_COLOR_FIELDS) appearance[field.key] = normalizeTint(source[field.key]);
+  return appearance;
 }
 
 export function resolveAppearance(value = {}) {
@@ -93,6 +140,18 @@ export function resolveAppearance(value = {}) {
   for (const [key, catalog] of Object.entries(CATALOGS)) {
     resolved[`${key}Value`] = catalog.find((entry) => entry.id === appearance[key]) ?? catalog[0];
   }
+  const tintTargets = {
+    shirtTint: 'shirtColorValue',
+    pantsTint: 'pantsColorValue',
+    hairTint: 'hairColorValue'
+  };
+  for (const [tintKey, targetKey] of Object.entries(tintTargets)) {
+    if (!appearance[tintKey]) continue;
+    resolved[targetKey] = { ...resolved[targetKey], color: hexToColor(appearance[tintKey]) };
+  }
+  const accessoryPreset = resolved.shirtColorValue.color.map((component) => Math.min(1, component * .72 + .08));
+  resolved.accessoryColor = hexToColor(appearance.accessoryTint, accessoryPreset);
+  resolved.blobColor = hexToColor(appearance.blobTint, [0.28, 0.72, 0.95]);
   return resolved;
 }
 

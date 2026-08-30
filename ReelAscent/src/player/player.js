@@ -14,6 +14,7 @@ import { createContactRecovery, sampleContactRecovery } from './contact-recovery
 import { moveToward, PlayerInput, StaminaResource } from './movement.js';
 import { emoteDurationMs, EMOTE_IDS, normalizeEmote } from '../multiplayer/emotes.js';
 import { normalizeAppearance, resolveAppearance } from './appearance.js';
+import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
 
 function makeMaterial(values, gloss = 0.12) {
   const material = new pc.StandardMaterial();
@@ -151,6 +152,8 @@ export class Player {
     this.entity.addChild(this.visualRoot);
     this.app.root.addChild(this.entity);
     this.appearance = normalizeAppearance(this.progression?.getAppearance?.());
+    this.heldInventorySpecimen = null;
+    this.inventorySpecimenModel = null;
     this.buildCharacter();
     this.buildMantleDebugMarkers();
     // The authored mascot mesh was a little over two meters tall. Keep its silhouette,
@@ -272,9 +275,9 @@ export class Player {
     const trousers = makeMaterial([0.23, 0.31, 0.29]);
     const hair = makeMaterial([0.08, 0.05, 0.035], 0.18);
     const dark = makeMaterial([0.055, 0.075, 0.07], 0.4);
-    const blobBlue = makeMaterial([0.12, 0.5, 0.88], .48);
-    const blobLight = makeMaterial([0.28, 0.72, 1], .38);
-    this.appearanceMaterials = { jacket, accent, skin, boots, pack, trousers, hair, dark, blobBlue, blobLight };
+    const accessory = makeMaterial([0.84, 0.42, 0.13], .3);
+    const blobBlue = makeMaterial([0.28, 0.72, 0.95], .38);
+    this.appearanceMaterials = { jacket, accent, skin, boots, pack, trousers, hair, dark, accessory, blobBlue };
 
     this.humanRig = new pc.Entity('Human avatar');
     this.visualRoot.addChild(this.humanRig);
@@ -316,8 +319,12 @@ export class Player {
     const tousledHair = new pc.Entity('Tousled hair style');
     const ponytailHair = new pc.Entity('Ponytail hair style');
     const mohawkHair = new pc.Entity('Mohawk hair style');
+    const longHair = new pc.Entity('Long hair style');
+    const bunHair = new pc.Entity('Trail bun hair style');
+    const braidsHair = new pc.Entity('Twin braids hair style');
     const baldHair = new pc.Entity('Bald hair style');
-    [shortHair, tousledHair, ponytailHair, mohawkHair, baldHair].forEach((root) => this.humanRig.addChild(root));
+    [shortHair, tousledHair, ponytailHair, mohawkHair, longHair, bunHair, braidsHair, baldHair]
+      .forEach((root) => this.humanRig.addChild(root));
     this.addVisual('Short hair cap', 'sphere', { x: 0, y: .9, z: .02 }, { x: .475, y: .2, z: .455 }, hair, {}, shortHair);
     this.addVisual('Tousled hair cap', 'sphere', { x: 0, y: .9, z: .02 }, { x: .48, y: .19, z: .46 }, hair, {}, tousledHair);
     [-.23, 0, .22].forEach((x, index) => this.addVisual(`Tousled lock ${index + 1}`, 'cone',
@@ -328,23 +335,57 @@ export class Player {
     this.addVisual('Ponytail', 'sphere', { x: 0, y: .58, z: .45 }, { x: .22, y: .38, z: .2 }, hair, { x: -8 }, ponytailHair);
     [-.2, 0, .2].forEach((z, index) => this.addVisual(`Mohawk crest ${index + 1}`, 'cone',
       { x: 0, y: 1.02, z }, { x: .16, y: .35 + (index === 1 ? .08 : 0), z: .16 }, hair, {}, mohawkHair));
+    this.addVisual('Long hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .48, y: .2, z: .46 }, hair, {}, longHair);
+    this.addVisual('Long hair back', 'sphere', { x: 0, y: .58, z: .3 }, { x: .43, y: .58, z: .2 }, hair, { x: -5 }, longHair);
+    for (const side of [-1, 1]) this.addVisual(`Long hair side ${side}`, 'sphere',
+      { x: side * .37, y: .62, z: .05 }, { x: .13, y: .46, z: .15 }, hair, { z: side * 5 }, longHair);
+    this.addVisual('Trail bun hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, bunHair);
+    this.addVisual('Trail bun', 'sphere', { x: 0, y: .96, z: .36 }, { x: .27, y: .27, z: .27 }, hair, {}, bunHair);
+    this.addVisual('Braids hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, braidsHair);
+    for (const side of [-1, 1]) {
+      this.addVisual(`Braid ${side} upper`, 'cylinder', { x: side * .33, y: .57, z: .18 },
+        { x: .11, y: .48, z: .11 }, hair, { z: side * 5 }, braidsHair);
+      this.addVisual(`Braid ${side} end`, 'sphere', { x: side * .37, y: .31, z: .19 },
+        { x: .13, y: .17, z: .13 }, hair, {}, braidsHair);
+    }
     this.hairStyles = new Map([
       ['short', shortHair], ['tousled', tousledHair], ['ponytail', ponytailHair],
-      ['mohawk', mohawkHair], ['bald', baldHair]
+      ['mohawk', mohawkHair], ['long', longHair], ['bun', bunHair], ['braids', braidsHair], ['bald', baldHair]
     ]);
 
     const beanie = new pc.Entity('Beanie accessory');
     const glasses = new pc.Entity('Glasses accessory');
     const trailHat = new pc.Entity('Trail hat accessory');
-    [beanie, glasses, trailHat].forEach((root) => this.humanRig.addChild(root));
-    this.addVisual('Beanie crown', 'cone', { x: 0, y: 1.0, z: 0 }, { x: .5, y: .34, z: .5 }, accent, {}, beanie);
-    this.addVisual('Beanie band', 'cylinder', { x: 0, y: .89, z: 0 }, { x: .51, y: .12, z: .51 }, accent, {}, beanie);
-    this.addVisual('Left glasses frame', 'box', { x: -.13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, dark, {}, glasses);
-    this.addVisual('Right glasses frame', 'box', { x: .13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, dark, {}, glasses);
-    this.addVisual('Glasses bridge', 'box', { x: 0, y: .73, z: -.285 }, { x: .08, y: .025, z: .025 }, dark, {}, glasses);
-    this.addVisual('Trail hat brim', 'box', { x: 0, y: .94, z: -.05 }, { x: .72, y: .055, z: .62 }, accent, {}, trailHat);
-    this.addVisual('Trail hat crown', 'cylinder', { x: 0, y: 1.06, z: .02 }, { x: .46, y: .24, z: .46 }, accent, {}, trailHat);
-    this.accessories = new Map([['beanie', beanie], ['glasses', glasses], ['trail-hat', trailHat]]);
+    const fishingCap = new pc.Entity('Fishing cap accessory');
+    const headlamp = new pc.Entity('Headlamp accessory');
+    const scarf = new pc.Entity('Trail scarf accessory');
+    const flowerCrown = new pc.Entity('Flower crown accessory');
+    const goggles = new pc.Entity('Summit goggles accessory');
+    [beanie, glasses, trailHat, fishingCap, headlamp, scarf, flowerCrown, goggles]
+      .forEach((root) => this.humanRig.addChild(root));
+    this.addVisual('Beanie crown', 'cone', { x: 0, y: 1.0, z: 0 }, { x: .5, y: .34, z: .5 }, accessory, {}, beanie);
+    this.addVisual('Beanie band', 'cylinder', { x: 0, y: .89, z: 0 }, { x: .51, y: .12, z: .51 }, accessory, {}, beanie);
+    this.addVisual('Left glasses frame', 'box', { x: -.13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, accessory, {}, glasses);
+    this.addVisual('Right glasses frame', 'box', { x: .13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, accessory, {}, glasses);
+    this.addVisual('Glasses bridge', 'box', { x: 0, y: .73, z: -.285 }, { x: .08, y: .025, z: .025 }, accessory, {}, glasses);
+    this.addVisual('Trail hat brim', 'box', { x: 0, y: .94, z: -.05 }, { x: .72, y: .055, z: .62 }, accessory, {}, trailHat);
+    this.addVisual('Trail hat crown', 'cylinder', { x: 0, y: 1.06, z: .02 }, { x: .46, y: .24, z: .46 }, accessory, {}, trailHat);
+    this.addVisual('Fishing cap crown', 'sphere', { x: 0, y: .96, z: .03 }, { x: .48, y: .21, z: .45 }, accessory, {}, fishingCap);
+    this.addVisual('Fishing cap bill', 'box', { x: 0, y: .91, z: -.38 }, { x: .48, y: .055, z: .35 }, accessory, { x: -5 }, fishingCap);
+    this.addVisual('Headlamp band', 'cylinder', { x: 0, y: .88, z: 0 }, { x: .49, y: .09, z: .49 }, accessory, {}, headlamp);
+    this.addVisual('Headlamp light', 'sphere', { x: 0, y: .89, z: -.46 }, { x: .14, y: .13, z: .11 }, accessory, {}, headlamp);
+    this.addVisual('Scarf collar', 'cylinder', { x: 0, y: .44, z: 0 }, { x: .32, y: .17, z: .32 }, accessory, {}, scarf);
+    this.addVisual('Scarf tail', 'box', { x: .17, y: .17, z: .25 }, { x: .18, y: .55, z: .1 }, accessory, { x: -12, z: -8 }, scarf);
+    this.addVisual('Flower crown band', 'cylinder', { x: 0, y: .91, z: 0 }, { x: .49, y: .06, z: .49 }, accessory, {}, flowerCrown);
+    [-.3, -.15, 0, .15, .3].forEach((x, index) => this.addVisual(`Flower crown bloom ${index + 1}`, 'sphere',
+      { x, y: .98 + (index % 2) * .035, z: -.34 + Math.abs(x) * .2 }, { x: .1, y: .1, z: .08 }, accessory, {}, flowerCrown));
+    this.addVisual('Goggles left lens', 'sphere', { x: -.14, y: .75, z: -.285 }, { x: .17, y: .13, z: .045 }, dark, {}, goggles);
+    this.addVisual('Goggles right lens', 'sphere', { x: .14, y: .75, z: -.285 }, { x: .17, y: .13, z: .045 }, dark, {}, goggles);
+    this.addVisual('Goggles strap', 'cylinder', { x: 0, y: .76, z: 0 }, { x: .47, y: .055, z: .47 }, accessory, {}, goggles);
+    this.accessories = new Map([
+      ['beanie', beanie], ['glasses', glasses], ['trail-hat', trailHat], ['fishing-cap', fishingCap],
+      ['headlamp', headlamp], ['scarf', scarf], ['flower-crown', flowerCrown], ['goggles', goggles]
+    ]);
 
     this.addVisual(
       'Backpack', 'box',
@@ -365,24 +406,14 @@ export class Player {
       ['backpack', this.addJoint('Backpack cosmetic slot', { x: 0, y: 0, z: 0.52 }, this.humanRig)]
     ]);
 
-    this.blobBody = this.addVisual('Blue Blob body', 'sphere', { x: 0, y: .02, z: 0 },
-      { x: .82, y: 1.15, z: .74 }, blobBlue, {}, this.blobRig);
-    this.addVisual('Blue Blob crown', 'sphere', { x: 0, y: .62, z: 0 },
-      { x: .66, y: .64, z: .65 }, blobLight, {}, this.blobRig);
-    this.addVisual('Blue Blob left eye', 'sphere', { x: -.15, y: .66, z: -.58 },
-      { x: .11, y: .14, z: .085 }, dark, {}, this.blobRig);
-    this.addVisual('Blue Blob right eye', 'sphere', { x: .15, y: .66, z: -.58 },
-      { x: .11, y: .14, z: .085 }, dark, {}, this.blobRig);
-    this.blobLimbs = {
-      leftArm: this.addJoint('Blue Blob left arm pivot', { x: -.58, y: .2, z: 0 }, this.blobRig),
-      rightArm: this.addJoint('Blue Blob right arm pivot', { x: .58, y: .2, z: 0 }, this.blobRig),
-      leftFoot: this.addJoint('Blue Blob left foot pivot', { x: -.25, y: -.7, z: -.04 }, this.blobRig),
-      rightFoot: this.addJoint('Blue Blob right foot pivot', { x: .25, y: -.7, z: -.04 }, this.blobRig)
-    };
-    this.addVisual('Blue Blob left arm', 'sphere', { x: -.15, y: -.12, z: 0 }, { x: .38, y: .2, z: .2 }, blobBlue, { z: -22 }, this.blobLimbs.leftArm);
-    this.addVisual('Blue Blob right arm', 'sphere', { x: .15, y: -.12, z: 0 }, { x: .38, y: .2, z: .2 }, blobBlue, { z: 22 }, this.blobLimbs.rightArm);
-    this.addVisual('Blue Blob left foot', 'sphere', { x: 0, y: 0, z: -.1 }, { x: .34, y: .19, z: .45 }, blobBlue, {}, this.blobLimbs.leftFoot);
-    this.addVisual('Blue Blob right foot', 'sphere', { x: 0, y: 0, z: -.1 }, { x: .34, y: .19, z: .45 }, blobBlue, {}, this.blobLimbs.rightFoot);
+    // Restore the original multiplayer proxy silhouette: capsule, round head, and
+    // the small marker that makes its facing direction easy to read.
+    this.blobBody = this.addVisual('Classic Blue Blob body', 'capsule', { x: 0, y: -.05, z: 0 },
+      { x: .72, y: 1.12, z: .72 }, blobBlue, {}, this.blobRig);
+    this.addVisual('Classic Blue Blob head', 'sphere', { x: 0, y: .82, z: 0 },
+      { x: .48, y: .48, z: .48 }, blobBlue, {}, this.blobRig);
+    this.addVisual('Classic Blue Blob facing marker', 'box', { x: 0, y: .35, z: -.43 },
+      { x: .16, y: .16, z: .48 }, blobBlue, {}, this.blobRig);
     this.applyAppearance(this.appearance);
   }
 
@@ -394,6 +425,8 @@ export class Player {
     setMaterialColor(this.appearanceMaterials.skin, resolved.skinToneValue.color);
     setMaterialColor(this.appearanceMaterials.trousers, resolved.pantsColorValue.color);
     setMaterialColor(this.appearanceMaterials.hair, resolved.hairColorValue.color);
+    setMaterialColor(this.appearanceMaterials.accessory, resolved.accessoryColor);
+    setMaterialColor(this.appearanceMaterials.blobBlue, resolved.blobColor);
     this.humanRig.enabled = this.appearance.avatarType === 'human';
     this.blobRig.enabled = this.appearance.avatarType === 'blob';
     for (const [id, root] of this.hairStyles) root.enabled = id === this.appearance.hairStyle;
@@ -403,6 +436,41 @@ export class Player {
 
   getAppearance() {
     return normalizeAppearance(this.appearance);
+  }
+
+  showInventorySpecimen(specimen = null) {
+    if (this.heldInventorySpecimen?.specimenId === specimen?.specimenId && this.inventorySpecimenModel) {
+      return this.heldInventorySpecimen;
+    }
+    destroySpecimenModel(this.inventorySpecimenModel);
+    this.inventorySpecimenModel = null;
+    this.heldInventorySpecimen = specimen ? { ...specimen } : null;
+    if (!specimen) return null;
+    const model = createSpecimenModel(specimen, {
+      name: `Held inventory specimen ${specimen.specimenId}`,
+      maximumScale: .74
+    });
+    model.root.setLocalPosition(.64, -.29, -.4);
+    model.root.setLocalEulerAngles(-8, -18, -5);
+    this.visualRoot.addChild(model.root);
+    this.inventorySpecimenModel = model;
+    return this.heldInventorySpecimen;
+  }
+
+  updateInventorySpecimenPose() {
+    const model = this.inventorySpecimenModel;
+    if (!model) return;
+    const visible = !this.fishing?.active
+      && !['fishing', 'climbing', 'mantling', 'sliding'].includes(this.movementState)
+      && !this.currentEmote;
+    model.root.enabled = visible;
+    if (!visible) return;
+    model.root.setLocalPosition(.64, -.29 + Math.sin(this.motionTime * 1.4) * .012, -.4);
+    if (model.tail) {
+      const base = model.tailBaseEuler ?? model.tail.getLocalEulerAngles().clone();
+      model.tailBaseEuler = base;
+      model.tail.setLocalEulerAngles(base.x, base.y + Math.sin(this.motionTime * 4.8) * 9, base.z);
+    }
   }
 
   getGroundSurfaceInfo() {
@@ -1661,6 +1729,7 @@ export class Player {
     );
 
     this.applyCharacterPose(groundedMotion, slidingPose);
+    this.updateInventorySpecimenPose();
   }
 
   applyCharacterPose(groundedMotion, slidingPose = false) {
@@ -1789,6 +1858,14 @@ export class Player {
       rightKnee = -12;
       leftArmRoll = -22;
       rightArmRoll = 22;
+    } else if (this.heldInventorySpecimen) {
+      leftShoulder = stride * 12;
+      rightShoulder = 52;
+      leftElbow = -8;
+      rightElbow = -58;
+      rightArmRoll = 19;
+      leftHip = -stride * (this.sprinting ? 38 : 24);
+      rightHip = stride * (this.sprinting ? 38 : 24);
     } else if (groundedMotion > 0.03) {
       const strideSize = this.sprinting ? 48 : 32;
       leftShoulder = stride * strideSize;
@@ -1819,17 +1896,13 @@ export class Player {
   }
 
   applyBlobPose({ leftShoulder, rightShoulder, leftHip, rightHip, groundedMotion, slidingPose }) {
-    if (!this.blobRig || !this.blobLimbs) return;
+    if (!this.blobRig) return;
     const bounce = this.grounded
       ? Math.abs(Math.sin(this.motionTime * 1.8)) * .055 * groundedMotion
       : -.035;
     const breathe = Math.sin(this.motionTime * .8) * .018;
     const squash = slidingPose ? .86 : 1 + breathe - bounce * .35;
     this.blobRig.setLocalScale(1 + bounce * .42, squash, 1 + bounce * .28);
-    this.blobLimbs.leftArm.setLocalEulerAngles(leftShoulder * .72, 0, -18);
-    this.blobLimbs.rightArm.setLocalEulerAngles(rightShoulder * .72, 0, 18);
-    this.blobLimbs.leftFoot.setLocalEulerAngles(leftHip * .55, 0, 0);
-    this.blobLimbs.rightFoot.setLocalEulerAngles(rightHip * .55, 0, 0);
   }
 
   respawn() {
@@ -1928,6 +2001,7 @@ export class Player {
       staminaContactSupport: this.getFootSupportInfo().contactFraction,
       movementState: this.movementState,
       appearance: this.getAppearance(),
+      heldSpecimenId: this.heldInventorySpecimen?.specimenId ?? null,
       emote: this.currentEmote ? { ...this.currentEmote } : null,
       slideBraking: this.slideBraking,
       slideActive: this.slideActive,
@@ -1976,6 +2050,8 @@ export class Player {
   }
 
   destroy() {
+    destroySpecimenModel(this.inventorySpecimenModel);
+    this.inventorySpecimenModel = null;
     this.mantleDebugMarkers?.root?.destroy();
     this.input.destroy();
   }

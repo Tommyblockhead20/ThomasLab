@@ -13,6 +13,7 @@ export class HomeInteractionController {
     this.label = document.querySelector('#home-interaction-label');
     this.button = document.querySelector('#home-interaction-action');
     this.current = null;
+    this.pendingSeat = null;
 
     this.onKeyDown = (event) => {
       const editable = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase?.()) || event.target?.isContentEditable;
@@ -31,6 +32,14 @@ export class HomeInteractionController {
   }
 
   update() {
+    if (this.pendingSeat) {
+      if (performance.now() > this.pendingSeat.expiresAt) {
+        this.pendingSeat = null;
+      } else if (this.player.grounded && this.player.movementState === 'grounded') {
+        this.player.startEmote('sit');
+        this.pendingSeat = null;
+      }
+    }
     this.current = this.modalOpen() || this.player.fishing?.active
       ? null
       : this.world.getNearestHomeInteraction?.(this.player.getPosition()) ?? null;
@@ -45,6 +54,11 @@ export class HomeInteractionController {
     if (interaction.action === 'appearance') {
       this.player.cancelEmote();
       window.dispatchEvent(new CustomEvent('reel-ascent:open-appearance'));
+      return true;
+    }
+    if (interaction.action === 'aquarium') {
+      this.player.cancelEmote();
+      window.dispatchEvent(new CustomEvent('reel-ascent:open-aquarium'));
       return true;
     }
     if (interaction.action === 'rest') {
@@ -65,6 +79,17 @@ export class HomeInteractionController {
       );
       return true;
     }
+    if (interaction.action === 'bench') {
+      if (!this.player.grounded || !['grounded', 'sliding'].includes(this.player.movementState)) {
+        this.hud.showToast?.('Stand beside the summit bench to sit.');
+        return false;
+      }
+      this.player.cancelEmote();
+      this.player.teleport(interaction.seatPosition, interaction.facingYaw);
+      this.pendingSeat = { expiresAt: performance.now() + 1800 };
+      this.hud.showToast?.('Seated facing Crooked Peak Tarn • press F to fish.');
+      return true;
+    }
     return false;
   }
 
@@ -72,5 +97,6 @@ export class HomeInteractionController {
     window.removeEventListener('keydown', this.onKeyDown, true);
     this.button?.removeEventListener('click', this.onClick);
     if (this.prompt) this.prompt.hidden = true;
+    this.pendingSeat = null;
   }
 }

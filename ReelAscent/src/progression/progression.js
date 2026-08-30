@@ -62,6 +62,7 @@ export class ProgressionSystem {
     const index = findSpecimenIndex(this.state.inventory, specimenId);
     if (index < 0) return { ok: false, reason: 'Specimen not found in Inventory' };
     const [specimen] = this.state.inventory.splice(index, 1);
+    if (this.state.heldSpecimenId === specimenId) this.state.heldSpecimenId = null;
     this.state.money += specimen.value;
     this.commit();
     return { ok: true, specimen, amount: specimen.value };
@@ -76,6 +77,7 @@ export class ProgressionSystem {
       return { ok: false, reason: 'Specimen already stored in Aquarium' };
     }
     this.state.inventory.splice(index, 1);
+    if (this.state.heldSpecimenId === specimenId) this.state.heldSpecimenId = null;
     this.commit();
     return { ok: true, specimen, amount: 0 };
   }
@@ -99,6 +101,24 @@ export class ProgressionSystem {
 
   getAppearance() {
     return normalizeAppearance(this.state.appearance);
+  }
+
+  getHeldInventorySpecimen() {
+    return this.state.inventory.find((entry) => entry.specimenId === this.state.heldSpecimenId) ?? null;
+  }
+
+  setHeldInventorySpecimen(specimenId = null) {
+    if (specimenId === null || specimenId === this.state.heldSpecimenId) {
+      if (this.state.heldSpecimenId === null) return { ok: true, specimen: null };
+      this.state.heldSpecimenId = null;
+      this.commit();
+      return { ok: true, specimen: null };
+    }
+    const specimen = this.state.inventory.find((entry) => entry.specimenId === specimenId);
+    if (!specimen) return { ok: false, specimen: null, reason: 'Specimen not found in Inventory' };
+    this.state.heldSpecimenId = specimen.specimenId;
+    this.commit();
+    return { ok: true, specimen };
   }
 
   setAppearance(value) {

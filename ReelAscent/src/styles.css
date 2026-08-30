@@ -2125,9 +2125,10 @@ body.inventory-open #game-shell::after {
 .inventory-card dl div { padding: .35rem; background: rgb(0 0 0 / 12%); }
 .inventory-card dt { color: #efd98b; font-size: .44rem; font-weight: 950; }
 .inventory-card dd { margin: .08rem 0 0; font-size: .55rem; }
-.inventory-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .38rem; }
+.inventory-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: .38rem; }
 .inventory-actions button { padding: .52rem .58rem; color: #153a36; font-size: .58rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .42rem; cursor: pointer; }
 .inventory-actions button:last-child { background: #cce5d2; }
+.inventory-card[data-held="true"] { box-shadow: 0 0 0 2px rgb(239 217 139 / 32%); }
 .inventory-mobile-button { right: 7.2rem; }
 .progress-transfer { margin-top: .75rem; padding: .65rem; border: 1px solid rgb(239 217 139 / 24%); border-radius: .5rem; background: rgb(0 0 0 / 12%); }
 .progress-transfer summary { color: #efd98b; font-size: .64rem; font-weight: 950; letter-spacing: .08em; cursor: pointer; }
@@ -2220,6 +2221,11 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-options button:hover { background: rgb(255 255 255 / 13%); }
 .appearance-options button[aria-pressed="true"] { color: #143833; background: #efd98b; border-color: #fff0b8; box-shadow: 0 0 0 2px rgb(239 217 139 / 18%); }
 .appearance-swatch { width: .86rem; height: .86rem; flex: 0 0 auto; border: 1px solid rgb(255 255 255 / 48%); border-radius: 50%; box-shadow: 0 1px 3px rgb(0 0 0 / 36%); }
+.appearance-color-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .46rem; }
+.appearance-color-control { display: grid; grid-template-columns: 1fr 2.4rem auto; gap: .42rem; align-items: center; min-height: 2.45rem; padding: .32rem .4rem; color: #dcece3; font-size: .65rem; font-weight: 800; background: rgb(255 255 255 / 5%); border-radius: .42rem; }
+.appearance-color-control input[type="color"] { width: 2.35rem; height: 1.75rem; padding: .08rem; cursor: pointer; background: rgb(0 0 0 / 22%); border: 1px solid rgb(255 255 255 / 25%); border-radius: .3rem; }
+.appearance-color-control button { min-height: 1.75rem; padding: .2rem .44rem; color: #dcece3; font-size: .55rem; background: rgb(255 255 255 / 8%); border: 1px solid rgb(255 255 255 / 13%); }
+.appearance-color-control button:disabled { opacity: .46; cursor: default; }
 
 .home-interaction-prompt {
   position: absolute;

@@ -64,6 +64,7 @@ export class Game {
     this.saveSystem = new SaveSystem();
     this.progression = new ProgressionSystem(this.saveSystem);
     this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
+    this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot());
     this.lastHomeProgressRevision = this.saveSystem.revision;
     this.journal = new FishJournal(this.saveSystem, FISH_SPECIES);
     this.player = new Player(
@@ -86,7 +87,8 @@ export class Game {
     this.fishing = new FishingController(this.app, this.player, this.world, { progression: this.progression });
     this.ecologyGuide = new EcologyGuidePanel(this.fishing);
     this.fishingPerformance = new FishingPerformanceMenu(this.fishing);
-    this.inventory = new InventoryMenu(this.progression);
+    this.inventory = new InventoryMenu(this.progression, this.player);
+    this.player.showInventorySpecimen(this.progression.getHeldInventorySpecimen());
     this.appearanceMenu = new AppearanceMenu(this.progression, this.player);
     this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud);
     this.mapMenu = new MountainMapMenu();
@@ -197,6 +199,7 @@ export class Game {
     this.syncPersistentProgress();
     if (this.lastHomeProgressRevision !== this.saveSystem.revision) {
       this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
+      this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot());
       this.lastHomeProgressRevision = this.saveSystem.revision;
     }
     this.world.update(dt);

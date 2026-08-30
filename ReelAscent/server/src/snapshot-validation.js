@@ -3,23 +3,28 @@ const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'sit', 'dance']);
 const APPEARANCE_OPTIONS = Object.freeze({
   avatarType: new Set(['human', 'blob']),
   skinTone: new Set(['porcelain', 'warm', 'golden', 'umber', 'deep']),
-  shirtColor: new Set(['alpine', 'ember', 'moss', 'sunset', 'plum', 'cream']),
-  pantsColor: new Set(['pine', 'charcoal', 'denim', 'clay', 'sage']),
-  hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'bald']),
-  hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal']),
-  accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat'])
+  shirtColor: new Set(['alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose']),
+  pantsColor: new Set(['pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand']),
+  hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'long', 'bun', 'braids', 'bald']),
+  hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink']),
+  accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'flower-crown', 'goggles'])
 });
 const DEFAULT_APPEARANCE = Object.freeze({
   avatarType: 'human', skinTone: 'warm', shirtColor: 'alpine', pantsColor: 'pine',
-  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'none'
+  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'none', shirtTint: null,
+  pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
 });
+const APPEARANCE_TINTS = new Set(['shirtTint', 'pantsTint', 'hairTint', 'accessoryTint', 'blobTint']);
+const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const finite = (value) => Number.isFinite(Number(value));
 
 export function sanitizeAppearance(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return Object.fromEntries(Object.entries(DEFAULT_APPEARANCE).map(([key, fallback]) => [
     key,
-    APPEARANCE_OPTIONS[key].has(source[key]) ? source[key] : fallback
+    APPEARANCE_TINTS.has(key)
+      ? (typeof source[key] === 'string' && COLOR_PATTERN.test(source[key]) ? source[key].toLowerCase() : null)
+      : (APPEARANCE_OPTIONS[key].has(source[key]) ? source[key] : fallback)
   ]));
 }
 

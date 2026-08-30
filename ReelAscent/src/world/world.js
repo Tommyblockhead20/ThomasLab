@@ -186,7 +186,7 @@ export class TestWorld {
       .setTranslation(position.x, position.y, position.z)
       .setFriction(0.9)
       .setRestitution(0);
-    this.physicsWorld.createCollider(collider);
+    entity.physicsCollider = this.physicsWorld.createCollider(collider);
     return entity;
   }
 
@@ -201,7 +201,7 @@ export class TestWorld {
       .setTranslation(position.x, position.y, position.z)
       .setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w })
       .setFriction(0.8);
-    this.physicsWorld.createCollider(collider);
+    entity.physicsCollider = this.physicsWorld.createCollider(collider);
     return entity;
   }
 
