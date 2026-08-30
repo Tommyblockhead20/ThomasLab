@@ -997,9 +997,27 @@ export class MountainWorld extends TestWorld {
     for (const side of [-1, 1]) box(`Outfitter roof pitch ${side}`, { x: side * 2.7, y: 4.6, z: 0 },
       { x: 5.8, y: .25, z: 8.2 }, this.materials.cabinRoof, { z: -side * 21 });
     box('Outfitter counter', { x: 0, y: .85, z: 1.4 }, { x: 6.8, y: 1.7, z: 1 }, this.materials.cabinTrim);
+    const counterPromptPosition = this.point(location.angle, location.radius + 2.65, floorY + .08, 0);
+    const angleRadians = degreesToRadians(location.angle);
+    const radialX = Math.cos(angleRadians);
+    const radialZ = Math.sin(angleRadians);
     this.homeInteractions.push({
       id: 'shop-counter', label: 'OPEN OUTFITTER SHOP', action: 'shop',
-      position: this.point(location.angle, location.radius - 1.6, floorY + .2, 0), range: 3.4
+      position: counterPromptPosition,
+      range: 2.8,
+      // Use a counter-shaped interaction volume instead of the old broad sphere. The old
+      // prompt was also authored behind the counter (radius - 1.6), so its target could
+      // remain stale as the player left. This volume is confined to the open customer side.
+      contains: (point) => {
+        const offsetX = point.x - location.worldPosition.x;
+        const offsetZ = point.z - location.worldPosition.z;
+        const radialOffset = offsetX * radialX + offsetZ * radialZ;
+        const tangentOffset = -offsetX * radialZ + offsetZ * radialX;
+        const feetY = point.y - PLAYER_FOOT_OFFSET;
+        return radialOffset >= 1.85 && radialOffset <= 3.45
+          && Math.abs(tangentOffset) <= 2.65
+          && feetY >= floorY - .4 && feetY <= floorY + 1.8;
+      }
     });
   }
 
@@ -1015,6 +1033,22 @@ export class MountainWorld extends TestWorld {
     const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === destinationId);
     if (!location) return null;
     return { location, dockId: location.dock.id, position: { ...location.dock.arrivalPosition }, facingYaw: location.dock.facingYaw };
+  }
+
+  getHomeArrival() {
+    const floorY = this.homeCabinFloorY ?? HOME_CABIN_CONFIG.floorY;
+    return {
+      locationId: 'home-island',
+      label: 'Cabin / Home Island',
+      // Just beyond the lower porch step, centered on the open doorway and facing in.
+      position: this.point(
+        HOME_CABIN_CONFIG.angle,
+        HOME_CABIN_CONFIG.radius + 6.8,
+        floorY + PLAYER_FOOT_OFFSET + .12,
+        0
+      ),
+      facingYaw: inwardYaw(HOME_CABIN_CONFIG.angle)
+    };
   }
 
   buildHomeCabin() {
@@ -1368,15 +1402,18 @@ export class MountainWorld extends TestWorld {
     SUMMIT_BENCH_CONFIG.interactionDistance,
     PUBLIC_AQUARIUM_CONFIG.interactionDistance
   )) {
+    if (![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
     let nearest = null;
     let nearestDistance = maximumDistance;
     for (const interaction of this.homeInteractions ?? []) {
+      if (![interaction.position?.x, interaction.position?.y, interaction.position?.z].every(Number.isFinite)) continue;
       const distance = Math.hypot(
         point.x - interaction.position.x,
         (point.y - PLAYER_FOOT_OFFSET) - interaction.position.y,
         point.z - interaction.position.z
       );
       const interactionRange = interaction.range ?? HOME_CABIN_CONFIG.interactionDistance;
+      if (interaction.contains && !interaction.contains(point)) continue;
       if (distance > interactionRange || distance > nearestDistance) continue;
       nearest = interaction;
       nearestDistance = distance;

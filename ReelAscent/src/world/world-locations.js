@@ -20,6 +20,8 @@ function islandLocation({
     id,
     displayName,
     type,
+    angle,
+    radius,
     worldPosition: Object.freeze(center),
     radii: Object.freeze({ ...radii }),
     elevation,

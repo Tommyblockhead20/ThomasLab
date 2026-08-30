@@ -18,9 +18,9 @@ Status: implemented in the current project tree. No commit, push, deployment, mu
 
 8. **Six island locations** — Home `(462.1, -182.0)`, Shop `(460.8, 200.8)`, Aquarium `(197.5, 270.9)`, Cave Fishing `(-28.4, 82.7)`, Normal Fishing `(548.4, -82.7)`, and Cold `(76.2, -219.1)` in world X/Z coordinates. Ellipse radii range only 15–23 m, versus the main island's 208 m core radius.
 
-9. **Cabin Island** — A wooded/cozy low-poly island now carries the repaired cabin, wardrobe/appearance interaction, rest furniture, trophies, progress display, and climbable trees.
+9. **Cabin Island** — A wooded/cozy low-poly island now carries the repaired cabin, wardrobe/appearance interaction, rest furniture, trophies, progress display, and climbable trees. The HUD Home action returns to a safe arrival directly outside this cabin.
 
-10. **Shop Island** — A developed outpost with cargo, an open-front outfitter, counter interaction, gear purchase/equip, specimen selling, and map sales.
+10. **Shop Island** — A developed outpost with cargo, an open-front outfitter, a counter-local interaction volume (with live click revalidation), gear purchase/equip, specimen selling, and map sales.
 
 11. **Aquarium Island** — A landscaped island with garden accents and the repaired public aquarium pavilion; its physical interaction opens add/remove/display management and its saved residents keep swimming in the tank.
 

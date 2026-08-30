@@ -20,12 +20,19 @@ export class HomeInteractionController {
 
     this.onKeyDown = (event) => {
       const editable = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase?.()) || event.target?.isContentEditable;
-      if (editable || event.repeat || event.code !== 'KeyX' || !this.current) return;
+      if (editable || event.repeat || event.code !== 'KeyX') return;
+      this.refreshCurrent();
+      if (!this.current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       this.interact();
     };
-    this.onClick = () => this.interact();
+    this.onClick = () => {
+      // Re-check the player's live position so a prompt from the previous frame can never
+      // open a location UI after a teleport, fall, or fast movement away from its trigger.
+      this.refreshCurrent();
+      this.interact();
+    };
     window.addEventListener('keydown', this.onKeyDown, true);
     this.button?.addEventListener('click', this.onClick);
   }
@@ -89,21 +96,25 @@ export class HomeInteractionController {
     }
     if (interaction.action === 'appearance') {
       this.player.cancelEmote();
+      this.dismissPrompt();
       window.dispatchEvent(new CustomEvent('reel-ascent:open-appearance'));
       return true;
     }
     if (interaction.action === 'aquarium') {
       this.player.cancelEmote();
+      this.dismissPrompt();
       window.dispatchEvent(new CustomEvent('reel-ascent:open-aquarium'));
       return true;
     }
     if (interaction.action === 'shop') {
       this.player.cancelEmote();
+      this.dismissPrompt();
       window.dispatchEvent(new CustomEvent('reel-ascent:open-shop'));
       return true;
     }
     if (interaction.action === 'boat') {
       this.player.cancelEmote();
+      this.dismissPrompt();
       window.dispatchEvent(new CustomEvent('reel-ascent:open-boat', {
         detail: { currentLocationId: interaction.destinationId }
       }));
@@ -142,6 +153,11 @@ export class HomeInteractionController {
       return true;
     }
     return false;
+  }
+
+  dismissPrompt() {
+    this.current = null;
+    if (this.prompt) this.prompt.hidden = true;
   }
 
   destroy() {

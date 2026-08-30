@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { PLAYER_FOOT_OFFSET } from '../src/config.js';
 import { FishingZone } from '../src/fishing/fishing-zone.js';
 import { getEcologySelection } from '../src/fishing/fish-ecology.js';
 import {
@@ -17,6 +18,7 @@ import {
 } from '../src/world/world-locations.js';
 import { CheatGate } from '../src/debug/cheat-gate.js';
 import { MountainWorld, START_LOCATIONS, createMountainMapData } from '../src/world/mountain-v2.js';
+import { RunManager } from '../src/world/run-manager.js';
 import { MountainMapMenu } from '../src/ui/mountain-map.js';
 
 class MemoryStorage {
@@ -28,6 +30,7 @@ class MemoryStorage {
 test('v9 registry has a main destination and six small, docked islands', () => {
   assert.equal(WORLD_LOCATIONS.length, 7);
   assert.equal(SMALL_ISLAND_LOCATIONS.length, 6);
+  assert.ok(SMALL_ISLAND_LOCATIONS.every((location) => Number.isFinite(location.angle) && Number.isFinite(location.radius)));
   assert.ok(SMALL_ISLAND_LOCATIONS.every((location) => location.dock?.arrivalPosition));
   const cave = SMALL_ISLAND_LOCATIONS.find((location) => location.id === 'cave-fishing-island');
   const normal = SMALL_ISLAND_LOCATIONS.find((location) => location.id === 'normal-fishing-island');
@@ -49,6 +52,58 @@ test('boat arrival lookup reaches an island and randomizes main docks', () => {
   assert.equal(first.dockId, `${START_LOCATIONS[0].id}-dock`);
   assert.equal(last.dockId, `${START_LOCATIONS.at(-1).id}-dock`);
   assert.notEqual(first.dockId, last.dockId);
+});
+
+test('shop interaction exists only in the customer space beside its counter', () => {
+  const world = Object.create(MountainWorld.prototype);
+  world.homeInteractions = [];
+  world.materials = {
+    wood: {}, cabinWall: {}, cabinRoof: {}, cabinTrim: {}
+  };
+  world.createStructureRoot = () => ({});
+  world.addStructureBox = () => ({});
+  world.buildShopOutpost();
+
+  const shop = SMALL_ISLAND_LOCATIONS.find((location) => location.id === 'shop-island');
+  const floorY = shop.elevation + .2;
+  const customerPosition = world.point(
+    shop.angle, shop.radius + 2.65, floorY + PLAYER_FOOT_OFFSET + .1
+  );
+  assert.equal(world.getNearestHomeInteraction(customerPosition)?.id, 'shop-counter');
+  assert.equal(world.getNearestHomeInteraction(START_LOCATIONS[0].position), null);
+  assert.equal(world.getNearestHomeInteraction(world.point(
+    shop.angle, shop.radius - 2, floorY + PLAYER_FOOT_OFFSET
+  )), null);
+});
+
+test('Home action resolves to the cabin porch instead of the run spawn', () => {
+  const world = Object.create(MountainWorld.prototype);
+  world.homeCabinFloorY = .98;
+  const home = world.getHomeArrival();
+  const start = START_LOCATIONS[0];
+  assert.equal(home.locationId, 'home-island');
+  assert.match(home.label, /Cabin/);
+  assert.ok(Math.hypot(home.position.x - start.position.x, home.position.z - start.position.z) > 100);
+
+  let teleported = null;
+  let cameraYaw = null;
+  const manager = Object.assign(Object.create(RunManager.prototype), {
+    debugQueue: [{ type: 'home' }],
+    status: 'ended',
+    endedTime: 2,
+    fishing: { cancel() {} },
+    player: { teleport: (position, facingYaw) => { teleported = { position, facingYaw }; } },
+    camera: { setYaw: (yaw) => { cameraYaw = yaw; } },
+    world: {
+      getHomeArrival: () => home,
+      setDeveloperCourseVisible() {}
+    },
+    currentStart: start
+  });
+  manager.processDebugQueue();
+  assert.deepEqual(teleported, { position: home.position, facingYaw: home.facingYaw });
+  assert.equal(cameraYaw, home.facingYaw);
+  assert.equal(manager.banner.title, 'BACK AT CABIN');
 });
 
 test('data-derived world map includes islands, docks, waters, and in-bounds GPS projection', () => {

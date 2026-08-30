@@ -118,13 +118,14 @@ export class RunManager {
         continue;
       }
       if (action.type === 'home') {
+        const home = this.world.getHomeArrival?.() ?? this.currentStart;
         this.status = 'active';
         this.endedTime = 0;
         this.fishing.cancel();
-        this.player.teleport(this.currentStart.position, this.currentStart.facingYaw);
-        this.camera.setYaw(this.currentStart.facingYaw);
+        this.player.teleport(home.position, home.facingYaw);
+        this.camera.setYaw(home.facingYaw);
         this.world.setDeveloperCourseVisible(false);
-        this.banner = { title: 'BACK AT SPAWN', detail: this.currentStart.label };
+        this.banner = { title: 'BACK AT CABIN', detail: home.label };
         this.bannerTime = 1.5;
         continue;
       }
