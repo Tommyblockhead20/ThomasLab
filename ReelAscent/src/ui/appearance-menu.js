@@ -9,6 +9,7 @@ import {
   SKIN_TONES,
   colorToHex,
   normalizeAppearance,
+  randomizeAppearance,
   resolveAppearance
 } from '../player/appearance.js';
 
@@ -45,12 +46,20 @@ export class AppearanceMenu {
     this.content = document.querySelector('#appearance-content');
     this.status = document.querySelector('#appearance-status');
     this.closeButton = document.querySelector('#close-appearance');
+    this.randomizeButton = document.querySelector('#randomize-appearance');
     this.isOpen = false;
     this.previousFocus = null;
     this.renderedRevision = -1;
 
     this.onOpenRequest = () => this.open();
     this.onCloseClick = () => this.close();
+    this.onRandomizeClick = () => {
+      const randomized = randomizeAppearance();
+      const appearance = this.progression.setAppearance(randomized);
+      this.player.applyAppearance(appearance);
+      if (this.status) this.status.textContent = 'Random trail look saved • click again for another.';
+      this.render(true);
+    };
     this.onKeyDown = (event) => {
       if (event.code !== 'Escape' || !this.isOpen) return;
       event.preventDefault();
@@ -92,6 +101,7 @@ export class AppearanceMenu {
     this.screen?.addEventListener('change', this.onChange);
     this.screen?.addEventListener('click', this.onResetTint);
     this.closeButton?.addEventListener('click', this.onCloseClick);
+    this.randomizeButton?.addEventListener('click', this.onRandomizeClick);
   }
 
   open() {
@@ -191,6 +201,7 @@ export class AppearanceMenu {
     this.screen?.removeEventListener('change', this.onChange);
     this.screen?.removeEventListener('click', this.onResetTint);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
+    this.randomizeButton?.removeEventListener('click', this.onRandomizeClick);
     document.body.classList.remove('appearance-open');
   }
 }

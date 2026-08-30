@@ -23,6 +23,7 @@ export const OCEAN_SEABED_JOIN_RADIUS = 208;
 export const OCEAN_WATER_INNER_RADIUS = 221;
 export const OCEAN_SHALLOW_WALK_END_RADIUS = 239;
 export const OCEAN_SURFACE_Y = -.76;
+export const OCEAN_VISUAL_OUTER_RADIUS = 380;
 export const OCEAN_WADE_DISTANCE = OCEAN_FLOOR_OUTER_RADIUS - OCEAN_WATER_INNER_RADIUS;
 // Compatibility name retained for older diagnostics. It marks generated floor extent only;
 // crossing this radius is not fatal and there is no invisible deep-water boundary.
@@ -35,7 +36,7 @@ export const MOUNTAIN_FOOT_RADIUS = 181;
 const CROWN_BASE_RADIUS = 41;
 const CROWN_TOP_RADIUS = 8;
 const CROWN_BASE_HEIGHT = 215;
-const UPPER_SHOULDER_START_RADIUS = 68;
+export const UPPER_SHOULDER_START_RADIUS = 72;
 const UPPER_SHOULDER_LIFT = 75;
 const TERRAIN_SEGMENTS = 360;
 export const FALLGLASS_WATERFALL_RADII = Object.freeze([
@@ -53,6 +54,7 @@ export const CROWN_DENSITY_CONFIG = Object.freeze({
 });
 export const MOUNTAIN_REST_LEDGE_CONFIG = Object.freeze({
   fiveHundred: Object.freeze({ targetHeight: 152.4, angle: 79, radius: 58.55, anchorIndex: 6, width: 10.6, depth: 7.2, coreTerrain: true, mantleApron: 1.7 }),
+  fiveFifty: Object.freeze({ targetHeight: 167.64, angle: 145, radius: 58.2, width: 12.2, depth: 8.4, coreTerrain: true, mantleApron: 1.9 }),
   sixHundred: Object.freeze({ targetHeight: 182.88, angle: 222, radius: 50, width: 8.4, depth: 5.8, coreTerrain: true }),
   sevenHundred: Object.freeze({ targetHeight: 213.36 })
 });
@@ -75,12 +77,24 @@ export const LOWLAND_TREE_CONFIG = Object.freeze({
   radiusSpan: 33
 });
 export const SUMMIT_BENCH_CONFIG = Object.freeze({
+  id: 'summit-bench',
   angle: 222,
   radius: 6.55,
   seatHeight: .65,
   interactionDistance: 2.8,
   fishingFacing: 'summit-tarn'
 });
+export const SUMMIT_BENCH_CONFIGS = Object.freeze([
+  SUMMIT_BENCH_CONFIG,
+  Object.freeze({
+    id: 'summit-bench-opposite',
+    angle: (SUMMIT_BENCH_CONFIG.angle + 180) % 360,
+    radius: 6.55,
+    seatHeight: .65,
+    interactionDistance: 2.8,
+    fishingFacing: 'summit-tarn'
+  })
+]);
 export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
   angle: 282,
   radius: 191,
@@ -276,9 +290,9 @@ function rawTerrainHeightAt(angle, radius) {
     height += field.amplitude * angleBlend * verticalBlend;
   }
 
-  // V2.6 extends only the inner alpine shoulder upward. At radius 68 this contributes
-  // nothing; by the crown base it adds ~75 m, letting the crown reach 1,000 ft while
-  // keeping roughly the same visual steepness instead of stretching into a needle.
+  // V2.12 extends the inner alpine shoulder slightly onto the middle plateau. At radius
+  // 72 this contributes nothing; by the crown base it adds ~75 m and reaches the same
+  // crown-base height, widening the gray core without turning the middle into a cylinder.
   const upperShoulderProgress = clamp(
     (UPPER_SHOULDER_START_RADIUS - radius) / (UPPER_SHOULDER_START_RADIUS - CROWN_BASE_RADIUS),
     0, 1
@@ -296,7 +310,11 @@ function rawTerrainHeightAt(angle, radius) {
 // nearby climb lines without creating a circumferential shortcut.
 export function applyCoreRestTerraces(angle, radius, sourceHeight) {
   let height = sourceHeight;
-  for (const ledge of [MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred, MOUNTAIN_REST_LEDGE_CONFIG.sixHundred]) {
+  for (const ledge of [
+    MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred,
+    MOUNTAIN_REST_LEDGE_CONFIG.fiveFifty,
+    MOUNTAIN_REST_LEDGE_CONFIG.sixHundred
+  ]) {
     const flatHalfAngle = ledge.width * .5 / ledge.radius * 180 / Math.PI;
     const angleBlend = 1 - smoothstep(flatHalfAngle, flatHalfAngle + 5.5, angularDistance(angle, ledge.angle));
     const radialDistance = Math.abs(radius - ledge.radius);
@@ -616,13 +634,46 @@ export class MountainWorld extends TestWorld {
       HOME_CABIN_CONFIG.angle,
       HOME_CABIN_CONFIG.radius + localZ,
       this.homeCabinFloorY + localY,
-      localX
+      -localX
     );
   }
 
+  createStructureRoot(name, angle, radius, floorY) {
+    const root = new pc.Entity(name);
+    const center = this.point(angle, radius, floorY);
+    root.setPosition(center.x, center.y, center.z);
+    root.setEulerAngles(0, inwardYaw(angle), 0);
+    this.buildTarget.addChild(root);
+    return root;
+  }
+
+  addStructureBox(root, name, localPosition, size, material, rotation = {}, solid = true) {
+    const entity = new pc.Entity(name);
+    entity.addComponent('render', {
+      type: 'box', material, castShadows: true, receiveShadows: true
+    });
+    root.addChild(entity);
+    entity.setLocalPosition(localPosition.x, localPosition.y, localPosition.z);
+    entity.setLocalScale(size.x, size.y, size.z);
+    entity.setLocalEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+    if (!solid) return entity;
+
+    // Author the whole structure in one local coordinate frame, then give Rapier the
+    // exact composed world transform. This avoids the old mixed world-Euler rotations
+    // that twisted roofs, doors, and glass frames away from their adjoining pieces.
+    const position = entity.getPosition();
+    const quaternion = entity.getRotation();
+    const collider = this.RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2)
+      .setTranslation(position.x, position.y, position.z)
+      .setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w })
+      .setFriction(.9)
+      .setRestitution(0);
+    entity.physicsCollider = this.physicsWorld.createCollider(collider);
+    return entity;
+  }
+
   addCabinBox(name, localPosition, size, material, rotation = {}, solid = true) {
-    return this.addBox(name, this.homePoint(localPosition.x, localPosition.y, localPosition.z), size,
-      material, { x: rotation.x ?? 0, y: inwardYaw(HOME_CABIN_CONFIG.angle) + (rotation.y ?? 0), z: rotation.z ?? 0 }, solid);
+    return this.addStructureBox(this.homeCabinRoot, name, localPosition, size, material, rotation, solid);
   }
 
   aquariumPoint(localX, localY, localZ) {
@@ -630,22 +681,20 @@ export class MountainWorld extends TestWorld {
       PUBLIC_AQUARIUM_CONFIG.angle,
       PUBLIC_AQUARIUM_CONFIG.radius + localZ,
       this.publicAquariumFloorY + localY,
-      localX
+      -localX
     );
   }
 
   addAquariumBox(name, localPosition, size, material, rotation = {}, solid = true) {
-    return this.addBox(name, this.aquariumPoint(localPosition.x, localPosition.y, localPosition.z), size,
-      material, {
-        x: rotation.x ?? 0,
-        y: inwardYaw(PUBLIC_AQUARIUM_CONFIG.angle) + (rotation.y ?? 0),
-        z: rotation.z ?? 0
-      }, solid);
+    return this.addStructureBox(this.publicAquariumRoot, name, localPosition, size, material, rotation, solid);
   }
 
   buildHomeCabin() {
     const config = HOME_CABIN_CONFIG;
     this.homeCabinFloorY = this.terrainY(config.angle, config.radius) + .22;
+    this.homeCabinRoot = this.createStructureRoot(
+      'Trail cabin aligned structure', config.angle, config.radius, this.homeCabinFloorY
+    );
     this.homeInteractions = [];
     this.homeTrophies = [];
 
@@ -690,7 +739,7 @@ export class MountainWorld extends TestWorld {
     for (const side of [-1, 1]) {
       this.addCabinBox(`Trail cabin roof ${side < 0 ? 'west' : 'east'} pitch`,
         { x: side * 2.16, y: 4.05, z: 0 }, { x: 4.85, y: .24, z: 7.65 },
-        this.materials.cabinRoof, { z: side * 25 });
+        this.materials.cabinRoof, { z: -side * 25 });
     }
     this.addCabinBox('Trail cabin roof ridge', { x: 0, y: 4.98, z: 0 },
       { x: .24, y: .2, z: 7.75 }, this.materials.cabinTrim);
@@ -803,8 +852,11 @@ export class MountainWorld extends TestWorld {
     this.addCabinBox('Trail cabin woven rug', { x: 0, y: .035, z: -.15 },
       { x: 2.25, y: .035, z: 3.25 }, this.materials.cabinFabric, {}, false);
     for (const z of [-2.65, 0, 2.65]) {
-      this.addCabinBox(`Trail cabin exposed rafter ${z}`, { x: 0, y: 3.62, z },
-        { x: 7.85, y: .12, z: .16 }, this.materials.cabinTrim, {}, false);
+      for (const side of [-1, 1]) {
+        this.addCabinBox(`Trail cabin exposed rafter ${z} ${side < 0 ? 'west' : 'east'}`,
+          { x: side * 2.02, y: 4, z }, { x: 4.55, y: .12, z: .16 },
+          this.materials.cabinTrim, { z: -side * 25 }, false);
+      }
     }
     this.addCabinBox('Trail cabin hanging lantern', { x: 0, y: 3.1, z: .2 },
       { x: .34, y: .55, z: .34 }, this.materials.cabinWarm, {}, false);
@@ -822,6 +874,9 @@ export class MountainWorld extends TestWorld {
   buildPublicAquarium() {
     const config = PUBLIC_AQUARIUM_CONFIG;
     this.publicAquariumFloorY = this.terrainY(config.angle, config.radius) + .28;
+    this.publicAquariumRoot = this.createStructureRoot(
+      'Shoreline aquarium aligned structure', config.angle, config.radius, this.publicAquariumFloorY
+    );
     this.aquariumResidents = [];
     this.aquariumResidentSignature = '';
 
@@ -848,18 +903,34 @@ export class MountainWorld extends TestWorld {
       this.addAquariumBox(`Shoreline aquarium ${side < 0 ? 'left' : 'right'} glass`,
         { x: side * config.width * .5, y: tankCenterY, z: tankCenterZ },
         { x: .16, y: config.tankHeight, z: config.depth }, this.materials.cabinGlass);
-      this.addAquariumBox(`Shoreline aquarium ${side < 0 ? 'left' : 'right'} frame post`,
-        { x: side * config.width * .5, y: tankCenterY, z: tankCenterZ + config.depth * .5 },
-        { x: .22, y: config.tankHeight + .3, z: .22 }, this.materials.cabinTrim);
-      this.addAquariumBox(`Shoreline aquarium ${side < 0 ? 'left' : 'right'} canopy post`,
-        { x: side * 6.05, y: 3.15, z: 3.65 },
-        { x: .24, y: 6.3, z: .24 }, this.materials.cabinTrim);
+      for (const depthSide of [-1, 1]) {
+        this.addAquariumBox(
+          `Shoreline aquarium ${side < 0 ? 'left' : 'right'} ${depthSide < 0 ? 'rear' : 'front'} frame post`,
+          { x: side * config.width * .5, y: tankCenterY, z: tankCenterZ + depthSide * config.depth * .5 },
+          { x: .22, y: config.tankHeight + .3, z: .22 }, this.materials.cabinTrim
+        );
+        this.addAquariumBox(
+          `Shoreline aquarium ${side < 0 ? 'left' : 'right'} ${depthSide < 0 ? 'rear' : 'front'} pavilion post`,
+          { x: side * 6.05, y: 2.45, z: depthSide * 3.65 },
+          { x: .24, y: 4.9, z: .24 }, this.materials.cabinTrim
+        );
+      }
     }
-    this.addAquariumBox('Shoreline aquarium upper frame',
-      { x: 0, y: .8 + config.tankHeight, z: tankCenterZ + config.depth * .5 },
-      { x: config.width + .25, y: .22, z: .22 }, this.materials.cabinTrim);
-    this.addAquariumBox('Shoreline aquarium canopy', { x: 0, y: 6.25, z: .25 },
-      { x: 13.1, y: .24, z: 8.5 }, this.materials.cabinRoof, { x: 4 });
+    for (const depthSide of [-1, 1]) {
+      this.addAquariumBox(`Shoreline aquarium ${depthSide < 0 ? 'rear' : 'front'} upper frame`,
+        { x: 0, y: .8 + config.tankHeight, z: tankCenterZ + depthSide * config.depth * .5 },
+        { x: config.width + .25, y: .22, z: .22 }, this.materials.cabinTrim);
+    }
+    for (const side of [-1, 1]) {
+      this.addAquariumBox(`Shoreline aquarium ${side < 0 ? 'left' : 'right'} upper frame`,
+        { x: side * config.width * .5, y: .8 + config.tankHeight, z: tankCenterZ },
+        { x: .22, y: .22, z: config.depth + .25 }, this.materials.cabinTrim);
+      this.addAquariumBox(`Shoreline aquarium canopy ${side < 0 ? 'west' : 'east'} pitch`,
+        { x: side * 3.12, y: 5.72, z: .15 }, { x: 6.9, y: .24, z: 8.55 },
+        this.materials.cabinRoof, { z: -side * 16 });
+    }
+    this.addAquariumBox('Shoreline aquarium canopy ridge', { x: 0, y: 6.67, z: .15 },
+      { x: .24, y: .22, z: 8.7 }, this.materials.cabinTrim);
     this.addAquariumBox('Shoreline aquarium collection sign', { x: 0, y: 5.45, z: 3.82 },
       { x: 4.7, y: .78, z: .12 }, this.materials.woodLight, {}, false);
 
@@ -885,11 +956,9 @@ export class MountainWorld extends TestWorld {
         { x: 0, y: index * 43, z: index % 2 ? 10 : -10 }, { castShadows: false });
     }
 
-    const residentRootPosition = this.aquariumPoint(0, 0, tankCenterZ);
     this.aquariumResidentRoot = new pc.Entity('Saved aquarium swimming residents');
-    this.aquariumResidentRoot.setPosition(residentRootPosition.x, residentRootPosition.y, residentRootPosition.z);
-    this.aquariumResidentRoot.setEulerAngles(0, inwardYaw(config.angle), 0);
-    this.buildTarget.addChild(this.aquariumResidentRoot);
+    this.aquariumResidentRoot.setLocalPosition(0, 0, tankCenterZ);
+    this.publicAquariumRoot.addChild(this.aquariumResidentRoot);
 
     this.homeInteractions.push({
       id: 'shoreline-aquarium',
@@ -1646,10 +1715,37 @@ export class MountainWorld extends TestWorld {
   }
 
   buildOceanAndContinuousTerrain() {
-    this.ocean = this.addCylinder('Outer ocean', { x: MOUNTAIN_CENTER.x, y: OCEAN_SURFACE_Y - .06, z: MOUNTAIN_CENTER.z },
-      { x: 760, y: .12, z: 760 }, this.materials.deepWater, {}, false);
+    // The old transparent cylinder was a full 760 m disk, so it remained rendered under
+    // the entire island and fought the beach/shore in the transparency pass. Render the
+    // same offshore water as a real annulus whose dry center matches the fishing/ecology
+    // boundary. It no longer exists underneath the mountain at all.
+    const waterVertices = [];
+    const waterTriangles = [];
+    for (let segment = 0; segment < TERRAIN_SEGMENTS; segment += 1) {
+      const radians = degreesToRadians(segment * 360 / TERRAIN_SEGMENTS);
+      for (const radius of [OCEAN_VISUAL_OUTER_RADIUS, OCEAN_WATER_INNER_RADIUS]) {
+        waterVertices.push([Math.cos(radians) * radius, 0, Math.sin(radians) * radius]);
+      }
+    }
+    for (let segment = 0; segment < TERRAIN_SEGMENTS; segment += 1) {
+      const next = (segment + 1) % TERRAIN_SEGMENTS;
+      const outer = segment * 2;
+      const inner = outer + 1;
+      const outerNext = next * 2;
+      const innerNext = outerNext + 1;
+      waterTriangles.push([outer, inner, outerNext], [outerNext, inner, innerNext]);
+    }
+    const waterGeometry = new pc.Geometry();
+    waterGeometry.positions = waterVertices.flat();
+    waterGeometry.indices = waterTriangles.flat();
+    waterGeometry.calculateNormals();
+    const waterMesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, waterGeometry);
+    this.ocean = new pc.Entity('Outer ocean annular surface');
+    this.ocean.addComponent('render');
+    this.ocean.render.meshInstances = [new pc.MeshInstance(waterMesh, this.materials.deepWater, this.ocean)];
     this.ocean.render.castShadows = false;
-    this.mountainWaters.push({ entity: this.ocean, base: { x: 760, y: .12, z: 760 }, rate: .18 });
+    this.ocean.setPosition(MOUNTAIN_CENTER.x, OCEAN_SURFACE_Y - .06, MOUNTAIN_CENTER.z);
+    this.buildTarget.addChild(this.ocean);
     this.buildWadeableOceanShelf();
 
     const vertices = [];
@@ -2463,10 +2559,11 @@ export class MountainWorld extends TestWorld {
         index % 2 ? this.materials.flowers : this.materials.flowerPink, {}, { castShadows: false });
     }
 
-    // Small edge accents make the two core rest shelves recognizable from neighboring
+    // Small edge accents make the core rest shelves recognizable from neighboring
     // lines without hiding their mantle lips or adding collision.
     const restAccents = [
       { id: '500ft', ...MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred },
+      { id: '550ft-alpine', ...MOUNTAIN_REST_LEDGE_CONFIG.fiveFifty },
       { id: '600ft', ...MOUNTAIN_REST_LEDGE_CONFIG.sixHundred }
     ];
     for (const rest of restAccents) {
@@ -2591,35 +2688,39 @@ export class MountainWorld extends TestWorld {
   }
 
   buildSummitBench() {
-    // A compact low-poly bench fits on the solid outer summit rim, clear of the tarn and
-    // each route threshold. Its interaction snaps the capsule safely onto the physical
-    // seat, faces the summit water, and then uses the normal replicated Sit pose.
-    const angle = SUMMIT_BENCH_CONFIG.angle;
-    const radius = SUMMIT_BENCH_CONFIG.radius;
-    const yaw = inwardYaw(angle);
-    const seat = this.point(angle, radius, SUMMIT_HEIGHT + .56);
-    this.addBox('Summit rest bench seat', seat,
-      { x: 2.35, y: .18, z: .72 }, this.materials.wood, { y: yaw });
-    const back = this.point(angle, radius + .34, SUMMIT_HEIGHT + 1.08);
-    this.addBox('Summit rest bench back', back,
-      { x: 2.35, y: .86, z: .16 }, this.materials.wood, { x: -7, y: yaw });
-    for (const side of [-1, 1]) {
-      const tangent = side * .88;
-      this.addBox(`Summit rest bench ${side < 0 ? 'left' : 'right'} leg`,
-        this.point(angle, radius, SUMMIT_HEIGHT + .24, tangent),
-        { x: .18, y: .48, z: .46 }, this.materials.wood, { y: yaw });
+    // Matching benches occupy opposite solid sides of the tarn. Both face inward and
+    // expose explicit seat/exit points to the click-to-toggle interaction controller.
+    for (const [index, config] of SUMMIT_BENCH_CONFIGS.entries()) {
+      const angle = config.angle;
+      const radius = config.radius;
+      const yaw = inwardYaw(angle);
+      const name = index === 0 ? 'Summit west rest bench' : 'Summit east rest bench';
+      const seat = this.point(angle, radius, SUMMIT_HEIGHT + .56);
+      this.addBox(`${name} seat`, seat,
+        { x: 2.35, y: .18, z: .72 }, this.materials.wood, { y: yaw });
+      const back = this.point(angle, radius + .34, SUMMIT_HEIGHT + 1.08);
+      this.addBox(`${name} back`, back,
+        { x: 2.35, y: .86, z: .16 }, this.materials.wood, { x: -7, y: yaw });
+      for (const side of [-1, 1]) {
+        const tangent = side * .88;
+        this.addBox(`${name} ${side < 0 ? 'left' : 'right'} leg`,
+          this.point(angle, radius, SUMMIT_HEIGHT + .24, tangent),
+          { x: .18, y: .48, z: .46 }, this.materials.wood, { y: yaw });
+      }
+      const seatSurface = this.point(angle, radius, SUMMIT_HEIGHT + config.seatHeight);
+      const exitSurface = this.point(angle, radius, SUMMIT_HEIGHT + PLAYER_FOOT_OFFSET + .16, 1.72);
+      this.homeInteractions.push({
+        id: config.id,
+        label: 'CLICK TO SIT & FISH AT THE TARN',
+        action: 'bench',
+        position: seatSurface,
+        seatPosition: { ...seatSurface, y: seatSurface.y + PLAYER_FOOT_OFFSET + .03 },
+        exitPosition: exitSurface,
+        facingYaw: yaw,
+        fishingFacing: config.fishingFacing,
+        range: config.interactionDistance
+      });
     }
-    const seatSurface = this.point(angle, radius, SUMMIT_HEIGHT + SUMMIT_BENCH_CONFIG.seatHeight);
-    this.homeInteractions.push({
-      id: 'summit-bench',
-      label: 'SIT & FISH AT THE TARN',
-      action: 'bench',
-      position: seatSurface,
-      seatPosition: { ...seatSurface, y: seatSurface.y + PLAYER_FOOT_OFFSET + .03 },
-      facingYaw: yaw,
-      fishingFacing: SUMMIT_BENCH_CONFIG.fishingFacing,
-      range: SUMMIT_BENCH_CONFIG.interactionDistance
-    });
   }
 
   crownRadiusAtHeight(y) {

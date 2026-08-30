@@ -2,7 +2,7 @@ import * as pc from 'playcanvas';
 import { resolveSpecies } from '../fishing/fish-data.js';
 import { REMOTE_PLAYER_COLORS } from './player-colors.js';
 import { emoteDurationMs, normalizeEmote } from './emotes.js';
-import { normalizeAppearance, resolveAppearance } from '../player/appearance.js';
+import { accessoryConcealsHair, normalizeAppearance, resolveAppearance } from '../player/appearance.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -224,7 +224,7 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     root.appearance = normalizeAppearance(value);
     const resolved = resolveAppearance(root.appearance);
     setMaterialColor(cloth, resolved.shirtColorValue.color, .035);
-    setMaterialColor(accent, shirtAccent(resolved.shirtColorValue.color));
+    setMaterialColor(accent, resolved.shirtAccentColor ?? shirtAccent(resolved.shirtColorValue.color));
     setMaterialColor(skin, resolved.skinToneValue.color);
     setMaterialColor(trousers, resolved.pantsColorValue.color);
     setMaterialColor(hair, resolved.hairColorValue.color);
@@ -232,7 +232,8 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     setMaterialColor(blobBlue, resolved.blobColor, .03);
     humanRig.enabled = root.appearance.avatarType === 'human';
     blobRig.enabled = root.appearance.avatarType === 'blob';
-    for (const [id, group] of hairStyles) group.enabled = id === root.appearance.hairStyle;
+    const showHair = !accessoryConcealsHair(root.appearance.accessory);
+    for (const [id, group] of hairStyles) group.enabled = showHair && id === root.appearance.hairStyle;
     for (const [id, group] of accessories) group.enabled = id === root.appearance.accessory;
   };
   root.setAppearance(root.appearance);

@@ -40,12 +40,21 @@ export class HomeInteractionController {
         this.pendingSeat = null;
       }
     }
-    this.current = this.modalOpen() || this.player.fishing?.active
+    const seatedInteraction = this.player.benchSeat
+      ? this.world.homeInteractions?.find((interaction) => interaction.id === this.player.benchSeat.id) ?? null
+      : null;
+    this.current = this.modalOpen()
       ? null
-      : this.world.getNearestHomeInteraction?.(this.player.getPosition()) ?? null;
+      : seatedInteraction ?? (this.player.fishing?.active
+        ? null
+        : this.world.getNearestHomeInteraction?.(this.player.getPosition()) ?? null);
     if (!this.prompt) return;
     this.prompt.hidden = !this.current;
-    if (this.current && this.label) this.label.textContent = this.current.label;
+    if (this.current && this.label) {
+      this.label.textContent = seatedInteraction
+        ? (this.player.fishing?.active ? 'STOP FISHING & GET UP' : 'CLICK TO GET UP')
+        : this.current.label;
+    }
   }
 
   interact() {
@@ -80,14 +89,20 @@ export class HomeInteractionController {
       return true;
     }
     if (interaction.action === 'bench') {
+      if (this.player.benchSeat) {
+        this.pendingSeat = null;
+        this.player.clearBenchSeat();
+        this.hud.showToast?.('Left the summit bench.');
+        return true;
+      }
       if (!this.player.grounded || !['grounded', 'sliding'].includes(this.player.movementState)) {
         this.hud.showToast?.('Stand beside the summit bench to sit.');
         return false;
       }
       this.player.cancelEmote();
-      this.player.teleport(interaction.seatPosition, interaction.facingYaw);
+      this.player.setBenchSeat(interaction);
       this.pendingSeat = { expiresAt: performance.now() + 1800 };
-      this.hud.showToast?.('Seated facing Crooked Peak Tarn • press F to fish.');
+      this.hud.showToast?.('Seated facing Crooked Peak Tarn • press F to fish • click the prompt to get up.');
       return true;
     }
     return false;

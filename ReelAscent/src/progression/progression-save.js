@@ -1,7 +1,19 @@
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 3;
+export const PROGRESSION_SCHEMA_VERSION = 4;
+
+const PRE_CLASSIC_DEFAULT_APPEARANCE = Object.freeze({
+  avatarType: 'human', skinTone: 'warm', shirtColor: 'alpine', pantsColor: 'pine',
+  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'none', shirtTint: null,
+  pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
+});
+
+const isPreClassicDefaultAppearance = (value) => {
+  const normalized = normalizeAppearance(value);
+  return Object.entries(PRE_CLASSIC_DEFAULT_APPEARANCE)
+    .every(([key, expected]) => normalized[key] === expected);
+};
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
@@ -94,6 +106,7 @@ function normalizeSpecimenList(values, playerId) {
 }
 
 export function normalizeProgressionState(value = {}) {
+  const sourceSchemaVersion = Math.max(0, Math.floor(finite(value.schemaVersion)));
   const persistedPlayerId = typeof value.player?.id === 'string' && value.player.id
     ? value.player.id.slice(0, 160)
     : createDurableId('player');
@@ -124,7 +137,10 @@ export function normalizeProgressionState(value = {}) {
     heldSpecimenId: typeof value.heldSpecimenId === 'string' && inventoryIds.has(value.heldSpecimenId)
       ? value.heldSpecimenId
       : null,
-    appearance: normalizeAppearance(value.appearance),
+    appearance: sourceSchemaVersion < PROGRESSION_SCHEMA_VERSION
+      && (!value.appearance || isPreClassicDefaultAppearance(value.appearance))
+      ? { ...DEFAULT_APPEARANCE }
+      : normalizeAppearance(value.appearance),
     ownedEquipment: [...owned],
     equipped
   };

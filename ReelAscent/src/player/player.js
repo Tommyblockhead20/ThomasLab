@@ -13,7 +13,7 @@ import { stabilizeWedgeMovement } from './collision-stability.js';
 import { createContactRecovery, sampleContactRecovery } from './contact-recovery.js';
 import { moveToward, PlayerInput, StaminaResource } from './movement.js';
 import { emoteDurationMs, EMOTE_IDS, normalizeEmote } from '../multiplayer/emotes.js';
-import { normalizeAppearance, resolveAppearance } from './appearance.js';
+import { accessoryConcealsHair, normalizeAppearance, resolveAppearance } from './appearance.js';
 import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
 
 function makeMaterial(values, gloss = 0.12) {
@@ -113,6 +113,7 @@ export class Player {
     this.stationaryProbePosition = new pc.Vec3(spawnPoint.x, spawnPoint.y, spawnPoint.z);
     this.movementState = 'airborne';
     this.currentEmote = null;
+    this.benchSeat = null;
     this.canGrip = false;
     this.gripCandidate = null;
     this.surfaceRegistry = surfaceRegistry;
@@ -421,7 +422,7 @@ export class Player {
     this.appearance = normalizeAppearance(value);
     const resolved = resolveAppearance(this.appearance);
     setMaterialColor(this.appearanceMaterials.jacket, resolved.shirtColorValue.color);
-    setMaterialColor(this.appearanceMaterials.accent, shirtAccent(resolved.shirtColorValue.color));
+    setMaterialColor(this.appearanceMaterials.accent, resolved.shirtAccentColor ?? shirtAccent(resolved.shirtColorValue.color));
     setMaterialColor(this.appearanceMaterials.skin, resolved.skinToneValue.color);
     setMaterialColor(this.appearanceMaterials.trousers, resolved.pantsColorValue.color);
     setMaterialColor(this.appearanceMaterials.hair, resolved.hairColorValue.color);
@@ -429,7 +430,8 @@ export class Player {
     setMaterialColor(this.appearanceMaterials.blobBlue, resolved.blobColor);
     this.humanRig.enabled = this.appearance.avatarType === 'human';
     this.blobRig.enabled = this.appearance.avatarType === 'blob';
-    for (const [id, root] of this.hairStyles) root.enabled = id === this.appearance.hairStyle;
+    const showHair = !accessoryConcealsHair(this.appearance.accessory);
+    for (const [id, root] of this.hairStyles) root.enabled = showHair && id === this.appearance.hairStyle;
     for (const [id, root] of this.accessories) root.enabled = id === this.appearance.accessory;
     return this.getAppearance();
   }
@@ -1018,7 +1020,8 @@ export class Player {
     const surfaceNearFeet = Boolean(groundSurface?.nearFeet);
     const onTooSteepSurface = Boolean(surfaceNearFeet
       && groundSurface.slopeDegrees > PLAYER_CONFIG.hardNoStandSlopeDegrees);
-    const manualSlideRequested = Boolean(this.input.slideHeld
+    const manualSlideRequested = Boolean(!this.benchSeat
+      && this.input.slideHeld
       && surfaceNearFeet
       && groundSurface
       && groundSurface.slopeDegrees >= PLAYER_CONFIG.manualSlideMinimumSlopeDegrees);
@@ -1028,7 +1031,7 @@ export class Player {
 
     const inputLength = Math.hypot(axes.x, axes.z);
     const hasMoveInput = inputLength > 0.01;
-    if (this.currentEmote && (hasMoveInput || jumpPressed || fishingToggle
+    if (!this.benchSeat && this.currentEmote && (hasMoveInput || jumpPressed || fishingToggle
       || this.input.sprintHeld || this.input.slideHeld || this.input.gripHeld
       || this.movementState !== 'grounded')) {
       this.cancelEmote();
@@ -1088,6 +1091,18 @@ export class Player {
         this.input.discardPrimaryEdges();
         return;
       }
+    }
+    if (this.benchSeat) {
+      // A bench is an explicit click-to-toggle interaction. Keep the capsule planted while
+      // seated; fishing remains available above, but stray movement keys cannot silently
+      // tear down the seat state or slide the character through the bench.
+      this.sprinting = false;
+      this.canGrip = false;
+      this.horizontalVelocity.set(0, 0, 0);
+      this.verticalVelocity = this.grounded ? -1.8 : this.verticalVelocity - PLAYER_CONFIG.gravity * dt;
+      this.stamina.update(dt, false, false, canRegenerateStamina);
+      this.applyKinematicMovement({ x: 0, y: this.verticalVelocity * dt, z: 0 });
+      return;
     }
     this.input.consumeForceBite();
     this.input.consumeDebugFish();
@@ -1714,7 +1729,7 @@ export class Player {
     this.visualRoot.setLocalPosition(
       0,
       PLAYER_VISUAL_GROUND_OFFSET + bob - (slidingPose ? .11 : 0)
-        - (this.currentEmote?.id === 'sit' ? .42 : 0),
+        - (this.currentEmote?.id === 'sit' || this.benchSeat ? .42 : 0),
       0
     );
     this.visualRoot.setLocalEulerAngles(
@@ -1884,6 +1899,14 @@ export class Player {
       rightElbow = -7;
     }
 
+    if (this.benchSeat && ['grounded', 'fishing'].includes(this.movementState)) {
+      // Preserve the seated lower-body pose while the fishing arms/catch pose runs.
+      leftHip = 74;
+      rightHip = 74;
+      leftKnee = -88;
+      rightKnee = -88;
+    }
+
     left.shoulder.setLocalEulerAngles(leftShoulder, 0, leftArmRoll);
     right.shoulder.setLocalEulerAngles(rightShoulder, 0, rightArmRoll);
     left.elbow.setLocalEulerAngles(leftElbow, 0, 0);
@@ -1911,6 +1934,7 @@ export class Player {
 
   teleport(position, facingYaw = this.facingYaw) {
     this.cancelEmote();
+    this.benchSeat = null;
     const spawn = { x: position.x, y: position.y, z: position.z };
     this.body.setTranslation(spawn, true);
     this.body.setNextKinematicTranslation(spawn);
@@ -1955,6 +1979,27 @@ export class Player {
 
   getPosition() {
     return this.body.translation();
+  }
+
+  setBenchSeat(interaction) {
+    if (!interaction?.seatPosition || !interaction?.id) return false;
+    this.teleport(interaction.seatPosition, interaction.facingYaw);
+    this.benchSeat = {
+      id: interaction.id,
+      seatPosition: { ...interaction.seatPosition },
+      exitPosition: interaction.exitPosition ? { ...interaction.exitPosition } : null,
+      facingYaw: interaction.facingYaw
+    };
+    return true;
+  }
+
+  clearBenchSeat() {
+    const seat = this.benchSeat;
+    if (!seat) return false;
+    this.benchSeat = null;
+    this.cancelEmote();
+    if (seat.exitPosition) this.teleport(seat.exitPosition, seat.facingYaw);
+    return true;
   }
 
   canStartEmote() {

@@ -15,6 +15,7 @@ import {
   MID_MOUNTAIN_ROCK_DENSITY_CONFIG,
   MOUNTAIN_REST_LEDGE_CONFIG,
   SUMMIT_BENCH_CONFIG,
+  SUMMIT_BENCH_CONFIGS,
   applyCoreRestTerraces
 } from '../src/world/mountain-v2.js';
 
@@ -56,10 +57,13 @@ test('summit bench seats the player facing fishable tarn water', async () => {
   ]);
   assert.equal(SUMMIT_BENCH_CONFIG.fishingFacing, 'summit-tarn');
   assert.ok(SUMMIT_BENCH_CONFIG.interactionDistance < 3);
-  assert.match(mountain, /id: 'summit-bench'[\s\S]*action: 'bench'[\s\S]*seatPosition:[\s\S]*facingYaw/);
-  assert.match(interaction, /interaction\.action === 'bench'[\s\S]*player\.teleport\(interaction\.seatPosition, interaction\.facingYaw\)/);
+  assert.equal(SUMMIT_BENCH_CONFIGS.length, 2);
+  assert.equal(Math.abs(SUMMIT_BENCH_CONFIGS[0].angle - SUMMIT_BENCH_CONFIGS[1].angle), 180);
+  assert.match(mountain, /id: config\.id[\s\S]*action: 'bench'[\s\S]*seatPosition:[\s\S]*exitPosition:[\s\S]*facingYaw/);
+  assert.match(interaction, /interaction\.action === 'bench'[\s\S]*player\.setBenchSeat\(interaction\)/);
+  assert.match(interaction, /player\.clearBenchSeat\(\)/);
   assert.match(interaction, /pendingSeat[\s\S]*startEmote\('sit'\)/);
-  assert.match(interaction, /press F to fish/);
+  assert.match(interaction, /press F to fish[\s\S]*click the prompt to get up/);
 });
 
 test('lower forest is denser and its substantial trunks and branches are climbable', async () => {

@@ -3,15 +3,15 @@ const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'sit', 'dance']);
 const APPEARANCE_OPTIONS = Object.freeze({
   avatarType: new Set(['human', 'blob']),
   skinTone: new Set(['porcelain', 'warm', 'golden', 'umber', 'deep']),
-  shirtColor: new Set(['alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose']),
-  pantsColor: new Set(['pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand']),
+  shirtColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose']),
+  pantsColor: new Set(['classic-trail', 'pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand']),
   hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'long', 'bun', 'braids', 'bald']),
   hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink']),
   accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'flower-crown', 'goggles'])
 });
 const DEFAULT_APPEARANCE = Object.freeze({
-  avatarType: 'human', skinTone: 'warm', shirtColor: 'alpine', pantsColor: 'pine',
-  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'none', shirtTint: null,
+  avatarType: 'human', skinTone: 'warm', shirtColor: 'classic-orange', pantsColor: 'classic-trail',
+  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'beanie', shirtTint: null,
   pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
 });
 const APPEARANCE_TINTS = new Set(['shirtTint', 'pantsTint', 'hairTint', 'accessoryTint', 'blobTint']);

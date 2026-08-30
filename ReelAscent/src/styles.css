@@ -2200,6 +2200,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-menu > header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
 .appearance-menu h2 { margin: .12rem 0 .35rem; }
 .appearance-menu > header button,
+.appearance-toolbar button,
 .appearance-options button {
   padding: .52rem .65rem;
   color: #153a36;
@@ -2211,7 +2212,9 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
   cursor: pointer;
 }
 
-.appearance-status { margin: .35rem 0 .8rem; color: rgb(234 244 231 / 68%); font-size: .62rem; line-height: 1.45; }
+.appearance-toolbar { display: flex; gap: .7rem; align-items: center; justify-content: space-between; margin: .35rem 0 .8rem; }
+.appearance-status { margin: 0; color: rgb(234 244 231 / 68%); font-size: .62rem; line-height: 1.45; }
+.appearance-toolbar button { flex: 0 0 auto; color: #153a36; background: #efd98b; }
 .appearance-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .62rem; }
 .appearance-group { display: grid; min-width: 0; margin: 0; padding: .62rem; border: 1px solid rgb(255 255 255 / 12%); border-radius: .55rem; background: rgb(255 255 255 / 4%); }
 .appearance-group[hidden] { display: none; }
@@ -2251,6 +2254,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
   .mountain-map-layout { grid-template-columns: 1fr; }
   .mountain-map-graphic { max-height: 52vh; }
   .appearance-content { grid-template-columns: 1fr; }
+  .appearance-toolbar { align-items: stretch; flex-direction: column; }
 }
 
 /* v8.1 multiplayer room roster */
