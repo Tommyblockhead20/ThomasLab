@@ -2241,6 +2241,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 
 .appearance-toolbar { display: flex; gap: .7rem; align-items: center; justify-content: space-between; margin: .35rem 0 .8rem; }
 .appearance-status { margin: 0; color: rgb(234 244 231 / 68%); font-size: .62rem; line-height: 1.45; }
+.appearance-toolbar-actions { display: flex; flex: 0 0 auto; gap: .45rem; }
 .appearance-toolbar button { flex: 0 0 auto; color: #153a36; background: #efd98b; }
 .appearance-layout { display: grid; grid-template-columns: minmax(17rem, .72fr) minmax(0, 1.7fr); gap: .75rem; align-items: start; }
 .appearance-preview { position: sticky; top: 0; display: grid; gap: .4rem; min-width: 0; margin: 0; }
@@ -2293,6 +2294,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
   .appearance-preview { position: static; }
   .appearance-preview canvas { height: 15rem; }
   .appearance-toolbar { align-items: stretch; flex-direction: column; }
+  .appearance-toolbar-actions { flex-wrap: wrap; }
 }
 
 /* v8.1 multiplayer room roster */

@@ -138,9 +138,11 @@ export class MountainMapMenu {
 
     const markerGroup = this.createSvg('g', { class: 'map-landmarks' });
     for (const start of this.mapData.starts) this.addMarker(markerGroup, start, 'map-start', '', 'S');
-    for (const cave of this.mapData.caves) this.addMarker(markerGroup, cave, 'map-cave', cave.label, 'C');
-    for (const ledge of this.mapData.ledges) this.addMarker(markerGroup, ledge, 'map-ledge', ledge.label, 'L');
-    const wantedLandmarks = new Set(['cabin', 'aquarium', 'waterfall-basin', 'summit-crown', 'summit-tarn', 'split-boulder', 'tilted-slab']);
+    for (const cave of this.mapData.caves) this.addMarker(markerGroup, cave, 'map-cave', '', 'C');
+    // Rest ledges remain real traversal geometry and still shape the five elevation bands,
+    // but individual 500/550/600-ft pins made the overview noisy and are intentionally omitted.
+    // Split Boulder has authored world geometry; the dormant Tilted Slab route does not.
+    const wantedLandmarks = new Set(['cabin', 'aquarium', 'waterfall-basin', 'summit-crown', 'summit-tarn', 'split-boulder']);
     for (const landmark of this.mapData.landmarks.filter((entry) => wantedLandmarks.has(entry.id))) {
       this.addMarker(markerGroup, landmark, 'map-landmark', landmark.label, '◆');
     }

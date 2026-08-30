@@ -2,6 +2,7 @@ import {
   AVATAR_TYPES,
   BACK_ACCESSORIES,
   CUSTOM_COLOR_FIELDS,
+  DEFAULT_APPEARANCE,
   EYEWEAR,
   FACE_ACCESSORIES,
   HAIR_COLORS,
@@ -54,6 +55,7 @@ export class AppearanceMenu {
     this.status = document.querySelector('#appearance-status');
     this.closeButton = document.querySelector('#close-appearance');
     this.randomizeButton = document.querySelector('#randomize-appearance');
+    this.resetButton = document.querySelector('#reset-appearance');
     this.preview = new AppearancePreview(document.querySelector('#appearance-preview-canvas'), this.progression.getAppearance());
     this.preview.setVisible(false);
     this.isOpen = false;
@@ -68,6 +70,13 @@ export class AppearanceMenu {
       this.player.applyAppearance(appearance);
       this.preview.setAppearance(appearance);
       if (this.status) this.status.textContent = 'Random trail look saved • click again for another.';
+      this.render(true);
+    };
+    this.onResetClick = () => {
+      const appearance = this.progression.setAppearance({ ...DEFAULT_APPEARANCE });
+      this.player.applyAppearance(appearance);
+      this.preview.setAppearance(appearance);
+      if (this.status) this.status.textContent = 'Classic v1–v7 trail look restored and saved locally.';
       this.render(true);
     };
     this.onKeyDown = (event) => {
@@ -129,6 +138,7 @@ export class AppearanceMenu {
     this.screen?.addEventListener('click', this.onResetTint);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.randomizeButton?.addEventListener('click', this.onRandomizeClick);
+    this.resetButton?.addEventListener('click', this.onResetClick);
   }
 
   open() {
@@ -257,6 +267,7 @@ export class AppearanceMenu {
     this.screen?.removeEventListener('click', this.onResetTint);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.randomizeButton?.removeEventListener('click', this.onRandomizeClick);
+    this.resetButton?.removeEventListener('click', this.onResetClick);
     document.body.classList.remove('appearance-open');
     this.preview.destroy();
   }

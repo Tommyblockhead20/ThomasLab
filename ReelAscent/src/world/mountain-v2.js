@@ -40,8 +40,12 @@ export const UPPER_SHOULDER_START_RADIUS = 72;
 const UPPER_SHOULDER_LIFT = 75;
 const TERRAIN_SEGMENTS = 360;
 export const FALLGLASS_WATERFALL_RADII = Object.freeze([
-  96, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 148, 152, 156, 160
+  96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126, 128,
+  130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 156, 158, 160
 ]);
+const fallglassPhaseAt = (radius) => (radius - FALLGLASS_WATERFALL_RADII[0]) / 4;
+const fallglassAngleAt = (radius) => 183 + Math.sin(fallglassPhaseAt(radius) * .82) * .28;
+const fallglassTangentAt = (radius) => Math.sin(fallglassPhaseAt(radius) * 1.37) * .22;
 export const SUMMIT_ROUTE_CONNECTOR = Object.freeze({
   lipRadius: CROWN_TOP_RADIUS + .34,
   thresholdRadius: CROWN_TOP_RADIUS - .28,
@@ -551,8 +555,8 @@ export function createMountainMapData() {
       { id: 'aquarium', label: 'Public Aquarium', position: radialPoint(PUBLIC_AQUARIUM_CONFIG.angle, PUBLIC_AQUARIUM_CONFIG.radius, 0) },
       { id: 'summit-tarn', label: 'Summit Tarn + Benches', position: radialPoint(0, 0, SUMMIT_HEIGHT) }
     ],
-    cascade: FALLGLASS_WATERFALL_RADII.map((radius, index) => {
-      const angle = 183 + Math.sin(index * .82) * .28;
+    cascade: FALLGLASS_WATERFALL_RADII.map((radius) => {
+      const angle = fallglassAngleAt(radius);
       return radialPoint(angle, radius, terrainHeightAt(angle, radius));
     })
   };
@@ -2508,25 +2512,32 @@ export class MountainWorld extends TestWorld {
     // Sample the actual ravine at a short cadence and join those samples. Each non-solid
     // sheet overlaps its neighbors and touches the terrain at both ends, so the cascade
     // follows the mountain instead of reading as one suspended vertical wall.
-    const waterfallPath = FALLGLASS_WATERFALL_RADII.map((radius, index) => {
-      const angle = 183 + Math.sin(index * .82) * .28;
-      return this.point(angle, radius, this.terrainY(angle, radius) + .2, Math.sin(index * 1.37) * .22);
-    });
+    const waterfallPoint = (radius, tangentOffset, clearance) => {
+      const angle = fallglassAngleAt(radius);
+      // Tangentially offset ribbon vertices sit over slightly different parts of the
+      // irregular mountain. Sample the terrain at each vertex's real polar position.
+      const sampleRadius = Math.hypot(radius, tangentOffset);
+      const sampleAngle = angle + Math.atan2(tangentOffset, radius) * 180 / Math.PI;
+      return this.point(angle, radius, this.terrainY(sampleAngle, sampleRadius) + clearance, tangentOffset);
+    };
+    const waterfallPath = FALLGLASS_WATERFALL_RADII.map((radius) => (
+      waterfallPoint(radius, fallglassTangentAt(radius), .26)
+    ));
     const cascadeGeometry = new pc.Geometry();
     cascadeGeometry.positions = [];
     cascadeGeometry.indices = [];
-    waterfallPath.forEach((point, index) => {
+    waterfallPath.forEach((_, index) => {
       const radius = FALLGLASS_WATERFALL_RADII[index];
       const width = radius <= 116
-        ? lerp(4.25, 5.45, (radius - 96) / 20)
-        : lerp(3.25, 2.15, (radius - 116) / 44) + Math.sin(index * 1.7) * .18;
-      const angle = 183 + Math.sin(index * .82) * .28;
-      const tangent = degreesToRadians(angle + 90);
+        ? lerp(3.8, 4.65, (radius - 96) / 20)
+        : lerp(2.85, 1.9, (radius - 116) / 44) + Math.sin(fallglassPhaseAt(radius) * 1.7) * .12;
+      const centerTangent = fallglassTangentAt(radius);
       for (const side of [-1, 1]) {
+        const edgePoint = waterfallPoint(radius, centerTangent + width * .5 * side, .28);
         cascadeGeometry.positions.push(
-          point.x + Math.cos(tangent) * width * .5 * side,
-          point.y + .055,
-          point.z + Math.sin(tangent) * width * .5 * side
+          edgePoint.x,
+          edgePoint.y,
+          edgePoint.z
         );
       }
       if (index < waterfallPath.length - 1) {
@@ -2544,7 +2555,11 @@ export class MountainWorld extends TestWorld {
 
     // Soft, irregular joins at the source, plunge pool, and lower runout remove the old
     // hard rectangular sheet ends without adding collision around the fishing bank.
-    for (const [foamIndex, label] of [[0, 'source lip'], [5, 'plunge pool'], [16, 'lower runout']]) {
+    for (const [foamIndex, label] of [
+      [0, 'source lip'],
+      [FALLGLASS_WATERFALL_RADII.indexOf(116), 'plunge pool'],
+      [FALLGLASS_WATERFALL_RADII.length - 1, 'lower runout']
+    ]) {
       const foamPoint = waterfallPath[foamIndex];
       for (let puff = 0; puff < 5; puff += 1) {
         const side = (puff - 2) * .72;
@@ -3382,7 +3397,11 @@ export class MountainWorld extends TestWorld {
       const outerFloor = floorAt(outerT);
       const innerFloor = floorAt(innerT);
       const middleFloor = (outerFloor + innerFloor) * .5;
-      const radius = entranceRadius - midpointT * caveDepth;
+      // The first opaque shell boxes used to extend just beyond the cut mouth because
+      // their 1.2-segment depth was centered only half a segment inward. Recess that row
+      // behind the true mountain opening while retaining overlap with the second row.
+      const entranceRecess = segment === 0 ? segmentLength * .18 : 0;
+      const radius = entranceRadius - midpointT * caveDepth - entranceRecess;
       const pitch = -Math.atan2(outerFloor - innerFloor, segmentLength) * 180 / Math.PI;
       const widthScale = 1 + Math.sin(midpointT * Math.PI) * .08;
       const floorCenter = this.point(location.angle, radius, middleFloor - .48);

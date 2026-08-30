@@ -1,153 +1,83 @@
-# Reel Ascent v8.7 focused continuation handoff
+# Reel Ascent v8.8 focused continuation handoff
 
-Status: implemented in the current project tree. No commit, push, deployment, or production server mutation was performed.
+Status: implemented in the current project tree. No commit, push, deployment, protocol change, progression reset, or production-server mutation was performed.
 
-1. **Unified X + Grip interactions**
+1. **Scope honored**
 
-   `HomeInteractionController` now owns one nearest-valid-target path for X, the on-screen button, mouse/touch Grip, and keyboard Grip. `PlayerInput` exposes a one-shot Grip interaction edge and suppresses that Grip only when a nearby interaction actually succeeds. With no in-range target, held Grip is untouched and climbing behaves normally. The prompt now advertises `X / GRIP`.
+   This pass is limited to the v8.8 map cleanup, seated-fishing input ordering, appearance reset/default verification, Fallglass waterfall clipping, and cave-mouth block cleanup. The future mountain rebalance, islands, GPS/player tracking, and other large world changes remain deferred.
 
-2. **Summit bench status**
+2. **500/550/600-ft map pins removed**
 
-   Both opposite-side summit benches retain explicit seat, exit, facing, range, and `summit-tarn` metadata. Clicking, X, or Grip seats/stands the player. The body is held at the authored anchor, the camera yaw aligns with the bench facing, and the exit uses a clear authored offset.
+   The three individual ledge markers and labels are no longer rendered. Their real traversal geometry and map-data descriptors remain intact, as do the five data-derived elevation regions and their legend.
 
-3. **Cabin chair/bed positioning**
+3. **Cave map labels removed**
 
-   The bed and chair now have explicit world-space seat/rest positions derived from the cabin's composed local transform, explicit facing yaw, clear exit positions, and appropriate interaction ranges. Their capsule centers are calculated from the actual furniture top plus `PLAYER_FOOT_OFFSET`, so they no longer reuse the player's current floor position.
+   All four cave mouths retain the gray `C` symbol at their data-derived entrance position. The visible cave-name text beside each symbol is removed; the numbered water list remains unchanged.
 
-4. **Root cause of rapid seated-fishing cancellation**
+4. **Split Boulder finding**
 
-   A seated player was teleported onto a bench but then continued receiving the normal gravity/ground-contact path. Thin seat contact could report `grounded = false` for a frame; `afterPhysics()` treated every ungrounded fishing frame as a fall and immediately called `exitFishing()`. The seat state itself survived, but the fishing UI/state was cancelled almost immediately.
+   Split Boulder is genuine, deliberately authored world geometry at angle 35°/radius 119: two differently colored, intersecting natural rock teeth approximately 7.2 m and 8.1 m tall, both grounded and climbable. Its map marker is retained.
 
-5. **How SEATED + FISHING coexist now**
+5. **Giant Tilted Slab finding**
 
-   The persistent `benchSeat` posture remains independent of `movementState === 'fishing'`. While either normally seated or seated-and-fishing, `holdSeatAnchor()` submits the exact authored kinematic position, zeroes movement/gravity, preserves facing, and marks the posture as supported. The ungrounded fishing cancellation explicitly excludes an active seat anchor.
+   A construction branch exists for an 11.5 × 5.8 × 9.2 m tilted slab, but no live route descriptor invokes that branch. It is therefore not a reliable world landmark in the current generated mountain, and its map marker is removed. No replacement geometry was added in this cleanup pass.
 
-6. **Fishing finish/cancel behavior while seated**
+6. **Map accuracy sanity check**
 
-   Fishing and rhythm/catch states run normally while the seat remains active. Finishing or pressing F/ESC closes only fishing and returns to grounded seated posture. ESC still runs the centralized fishing cleanup. A deliberate move, jump, sprint, slide, X, Grip, or prompt click cancels fishing first, then moves the capsule to the authored stand-up point. Remote snapshots carry `posture: seated`, so fishing arms and seated legs coexist remotely too.
+   The map still derives 24 waters, four cave mouths, five sampled elevation contours, three shared biome sectors, six shoreline starts, cabin, aquarium, summit crown/tarn, and the Fallglass cascade from live world descriptors. Water centers/radii, cave-depth mouths, biome angles, cabin/aquarium coordinates, summit, cascade, and ocean annulus all share their gameplay sources. No additional obvious mapping bug was found.
 
-7. **500–600 ft rock additions**
+7. **Seated-fishing root cause**
 
-   The 300–700 ft system now has six belts: 300, 400, 500, 550, 600, and 700 ft. Counts are 54/60/76/74/72/54 respectively (390 requested anchors, normally two exposed formations per open anchor). The dedicated 550-ft belt and larger 500/600 belts use the existing 23-form fractured-rock library, deterministic lateral/radial offsets, local terrain support, protected-water exclusions, and varied grip materials rather than a staircase.
+   WASD/arrows serve as rhythm lanes but were also read as normal movement before fishing owned the frame. The generic bench-exit condition treated those song inputs as a request to stand, cancelled fishing, and moved the player off the bench.
 
-8. **Lower-biome trees and density**
+8. **Seated input policy now**
 
-   Lowland candidates increased from 72 to 210, with up to 64 large climbable trees. Fernwood Forest uses density `1.0` and mixes conifers with broadleaf multi-lobe crowns; Blackstone Pinewood uses `0.82` and mixes conifers with wind-bent pines; Sunwash Scrub uses `0.42` with sparse broadleaf/wind-pine forms. Large trunks and low branches are rough climb surfaces. Placement still rejects rocks, fishing approaches/cave tunnels, cabin, and aquarium space. Bushes/grass transition upward and trees remain confined to the low radii.
+   WASD/arrows, sprint, and slide no longer stand a seated player. During fishing they flow into the cast/hook/rhythm system; while merely resting they are harmless. The deliberate stand paths are X/on-screen Interact/Grip interaction, Jump, or Escape while seated but not actively fishing.
 
-9. **How the map derives from actual world data**
+9. **Escape while seated and fishing**
 
-   `MountainWorld.getMapData()` calls `createMountainMapData()`. The data samples `terrainHeightAt()` around 120 angles for each elevation boundary, projects the real fishing descriptors, uses the real cave-depth calculation for entrances, and reads the actual start, ledge, cabin, aquarium, landmark, summit, biome, and waterfall configurations. `MountainMapMenu` builds the SVG at runtime; the old guessed static ellipse/routes diagram was removed from HTML.
+   The frame records whether fishing was active before centralized cleanup. Escape during ready/cast/song/catch cancels fishing, releases fishing input/pointer state through `exitFishing()`, and returns to the same anchored seated posture. It cannot fall through and stand in that same frame. A later Escape while only seated can stand.
 
-10. **Every fishing area on the map**
+10. **RESET TO DEFAULT**
 
-   The map consumes `MOUNTAIN_FISHING_LOCATIONS` plus `OCEAN_FISHING_DESCRIPTOR`. All 24 unique IDs are drawn at their real X/Z positions and numbered into a matching 24-entry list. Inland ellipses use their gameplay radii; the ocean uses its real annulus radii. Cave-pool numbers and separate cave-mouth markers share the same descriptor source.
+   A `RESET TO DEFAULT` button now sits next to `RANDOMIZE LOOK`. It applies every field in `DEFAULT_APPEARANCE`, updates the local player and live preview immediately, saves through the normal appearance-only progression path, and does not touch catches, unlocks, inventory, aquarium residents, records, or other progression.
 
-11. **Five elevation regions**
+11. **Exact legacy v4.5 color verification**
 
-   The five regions come from `MOUNTAIN_BANDS`: Coast/foothills, Lower, Middle, Alpine, and Crown/summit. Each boundary is an isoheight search against the actual terrain function; the crown uses its real taper and angular facet formula. These are simplified data-derived contours, not a rendering of every final 1 m mesh chip.
+   Re-read from the supplied `Mountain Fishing v4.5/src/config.js` and `src/player/player.js`: `COLORS.player` `[0.95, 0.5, 0.22]`; `COLORS.playerAccent` `[0.99, 0.82, 0.33]`; skin `[0.93, 0.72, 0.52]`; boots `[0.18, 0.22, 0.18]`; pack `[0.18, 0.39, 0.34]`; trousers `[0.23, 0.31, 0.29]`; dark `[0.08, 0.11, 0.10]`. Current shared legacy constants match exactly.
 
-12. **Three biome sectors**
+12. **Current default selections**
 
-   The map and vegetation share `MOUNTAIN_BIOME_SECTORS` and `climateThemeAt()`: Sunwash approximately 330°→90°, Blackstone 90°→210°, Fernwood 210°→330°. Runtime map wedges are clipped to the sampled mountain outline, so their orientation matches fishing ecology and vegetation generation.
+   New/default/reset appearance is Human; Warm skin (tone 3); Classic Orange shirt; Classic Trail pants; Tousled Espresso hair; yellow Beanie; no eyewear; no face/neck accessory; Trail Backpack; and no custom shirt/pants/hair/accessory/blob tint. Resolved shirt, accent, skin, trousers, boots, backpack, and dark-detail colors match the exact values above.
 
-13. **Cave entrance/topology changes**
+13. **Existing customized saves**
 
-   Entrances remain actual triangles removed from the continuous mountain surface. There is no exterior mine frame, canyon, trench, or portal box. Side/roof shell pieces begin behind and overlap the cut edge from inside. A single shared `caveDepthAt()` now drives terrain cutting, rock/vegetation protection, map mouths, and tunnel construction.
+   Startup migration behavior is unchanged: only absent appearance data receives `DEFAULT_APPEARANCE`; existing selections are normalized and retained. The new reset occurs only when the player explicitly clicks the button.
 
-14. **New cave locations/elevations**
+14. **Waterfall clipping cause**
 
-   Cave pool radii moved inward while preserving the same four fishing IDs and their tunnel/chamber gameplay: Basalt Grotto mouth radius 152 at about 46 ft (rear pool radius 132/about 105 ft); Echo Cave mouth radius 133 at about 140 ft (pool 110/about 158 ft); Obsidian Cup mouth radius 125 at about 157 ft (pool 105/about 206 ft); High Cirque mouth radius 78 at about 304 ft (pool radius 56/about 515 ft). These mouths are on climbing slopes rather than coastal/rest plateaus.
+   Fallglass previously sampled terrain only beneath the ribbon centerline, then gave both wide edge vertices the center height. On irregular cross-slope terrain, either edge could sink into the mountain; the 4 m longitudinal spacing also made individual triangles more likely to cut through local curvature.
 
-15. **Exact old `COLORS.player`**
+15. **Waterfall fix**
 
-   `[0.95, 0.5, 0.22]`.
+   Sampling cadence is now 2 m (33 shared path rows from radius 96–160). Each left/right vertex computes its real polar position and samples the terrain directly beneath itself with a small surface clearance. The upper width is modestly reduced, the lower runout tapers more tightly, and source/pool/runout foam indices are descriptor-relative. One indexed continuous mesh remains, so the old overlapping-sheet regression is not reintroduced.
 
-16. **Exact old `COLORS.playerAccent`**
+16. **Cave-mouth block cause**
 
-   `[0.99, 0.82, 0.33]`.
+   The first floor/wall/roof shell row used 1.16–1.2 segment depths while centered only half a segment behind the mouth. Its opaque boxes therefore extended slightly beyond the triangle cut and could read as protruding rectangular dark rocks.
 
-17. **Resulting default Character Creator selections**
+17. **Cave-mouth fix and limitation**
 
-   Human, legacy `warm` skin `[0.93, 0.72, 0.52]`, Classic Orange shirt `[0.95, 0.5, 0.22]`, Classic Trail pants `[0.23, 0.31, 0.29]`, Tousled/Espresso hair, yellow Beanie `[0.99, 0.82, 0.33]`, no eyewear/face accessory, and Trail Backpack. Boots `[0.18, 0.22, 0.18]`, backpack `[0.18, 0.39, 0.34]`, and dark detail `[0.08, 0.11, 0.10]` now use shared legacy constants locally and remotely.
+   The first shell row is recessed 18% of one tunnel segment behind the real mountain opening while preserving overlap with row two. No decorative frame, portal, trench, or added rock was introduced. The cave remains a true exterior-triangle opening into a box-built collision shell; close inspection can still reveal planar interior walls because a fully sculpted/carved cave mesh is outside this small pass.
 
-18. **Previous multiplayer override status**
+18. **Files and network impact**
 
-   The current remote builder still accepted a room color index for a fallback name/initial material, but `setAppearance()` replaced visible shirt/blob materials when valid appearance arrived. The practical failures were missing/older appearance fields and the single mixed accessory slot; this pass removes room-color reliance from the final visible configured character and makes the fallback the legacy default.
+   Source changes are in `index.html`, `src/styles.css`, `src/player/player.js`, `src/ui/appearance-menu.js`, `src/ui/mountain-map.js`, `src/world/mountain-v2.js`, and new `test/v88-focused.test.js`; `dist` was refreshed. No multiplayer client/server/protocol file changed, so no server startup or Render redeployment is required specifically for v8.8. A frontend redeploy/build is required to publish these client/world changes.
 
-19. **Actual customized remote appearance**
+19. **Focused validation completed**
 
-   Snapshots carry normalized IDs/tints only. Server allowlists now preserve the new headwear, eyewear, face, and back fields plus eight skin tones. Join state includes the latest appearance and posture, and subsequent 15 Hz snapshots update the same remote representation live. Remote skin, shirt/accent, pants, hair, accessory groups, backpack visibility, Blue Blob tint/type, and legacy fallback all come from the sender's config.
+   `node --test test/v87-focused.test.js test/v88-focused.test.js` passed 8/8. `git diff --check` found no whitespace errors (only the existing Windows LF→CRLF notice). `npm run build` succeeded with 1,268 modules transformed and refreshed `dist/assets/index-D9v2U0LJ.js` plus `index-CDhvQFee.css`; only the existing large-chunk warning remains. The temporary Vite server was stopped. Automated visual control was attempted twice but the desktop browser runtime could not create its local assets (`os error 3`).
 
-20. **Appearance preview**
+20. **Short manual check still required**
 
-   The wardrobe has a large full-body preview canvas beside the controls. `AppearancePreview` instantiates the actual `createRemoteAvatar()` builder used for multiplayer, applies the same normalized config/material logic, lights it with a simple key/fill setup, uses a useful three-quarter camera, and rotates slowly. Every option/color/randomize change updates it immediately.
-
-21. **Skin-tone slider**
-
-   Eight ordered stops replace the separate named buttons. The UI shows a stepped range control, an eight-color visual strip, and numeric `n / 8` readout; it does not present descriptive race/color names. Legacy `warm` is stop 3 and remains the new-player default.
-
-22. **Accessory organization**
-
-   Appearance config/UI now separates Headwear/Hats, Eyewear, Face/Neck, and Back. The deprecated single `accessory` field remains as a compatibility bridge and is promoted into the correct category for old saves/peers. The back category currently offers Trail Backpack or None.
-
-23. **Hair/hat compatibility**
-
-   Full-crown hats hide top hair geometry. Ponytail, Long, and Braids roots remain active while only their cap/top mesh is hidden, leaving tails/back/lower hair visible. Short/Tousled/Mohawk may be fully hidden under a full crown. Face/neck/eyewear and non-full-crown head accessories leave hair visible. Local, remote, and preview paths use the same compatibility function.
-
-24. **Underwater water rendering**
-
-   Shallow water, deep water/ocean, and waterfall materials now disable back-face culling and enable two-sided lighting. The same surface remains visible from below without duplicate water geometry.
-
-25. **Water overlap/terrain clipping fixes**
-
-   Inland visible discs remain slightly inside their real fishing radii and the terrain carve already extends beyond that boundary. The per-frame X/Z water pulse was removed because it repeatedly expanded transparent edges across the fixed basin and caused clipping/z-fighting. Ocean remains a dry-center annulus; fishing coordinates were not changed by these rendering fixes. Cave water remains at the rear of enclosed cave shells.
-
-26. **Waterfall improvements**
-
-   Fallglass is now one terrain-following mesh ribbon from Cloudstep's source edge through the fishable plunge pool and down the runout. Width varies along the flow, the path meanders slightly, neighboring segments share vertices, and source/pool/runout receive cheap irregular translucent foam puffs. The old chain of rectangular box sheets was removed.
-
-27. **Files changed**
-
-   - `index.html`, `src/styles.css`, built `dist/index.html` and hashed assets
-   - `src/game.js`
-   - `src/player/appearance.js`, `src/player/movement.js`, `src/player/player.js`
-   - `src/ui/appearance-menu.js`, new `src/ui/appearance-preview.js`, `src/ui/home-interaction.js`, `src/ui/mountain-map.js`
-   - `src/world/mountain-v2.js`
-   - `src/progression/progression-save.js`
-   - `src/multiplayer/protocol.js`, `src/multiplayer/remote-avatar.js`, `src/multiplayer/remote-player.js`, `src/multiplayer/room-state.js`
-   - `server/src/snapshot-validation.js`, `server/src/room.js`
-   - targeted tests `test/v9-visual-customization.test.js`, `test/v10-world-expansion.test.js`, `test/v11-cosmetics-aquarium.test.js`, `test/v12-polish.test.js`, and new `test/v87-focused.test.js`
-   - `PROJECT_HANDOFF.md`
-
-28. **Multiplayer protocol change**
-
-   Protocol version remains v1 and room/host/join/reconnect semantics are unchanged. Payloads have additive, backward-safe appearance category fields and additive `posture: standing|seated`. Missing fields sanitize to the legacy default/standing. No meshes, textures, inventory, economy, authentication, or fishing rhythm input are transmitted.
-
-29. **Render server redeployment**
-
-   Yes, if the public Render server is to accept/preserve the new category fields and send join-time posture. Redeploy the existing server service from this tree. No data migration or new environment variable is required.
-
-30. **Frontend build requirement**
-
-   Yes. `npm run build` is required for deployment. It was run successfully in this worktree and refreshed `dist`; run it again after any further edits before publishing.
-
-31. **Manual checks after handoff**
-
-   - Near a bench/chair/bed/wardrobe, verify X, keyboard Grip, and primary/touch Grip trigger only the nearby prompt; away from prompts, verify Grip climbing and mantling normally.
-   - Sit/stand on both summit benches, cabin chair, and bed; inspect height, facing, camera yaw, exit clearance, and no trapping.
-   - From each summit bench: press F, charge/cast/hook, complete one success and one failure/rhythm miss, dismiss presentation, confirm still seated; press ESC during ready/cast/song/catch and confirm fishing closes but seat remains; move/jump during fishing and confirm cancel-then-stand.
-   - Open the map and count 24 listed/numbered waters; inspect the irregular five elevation contours, three correctly oriented biome wedges, starts, four cave mouths, 500/550/600 ledges, cabin, aquarium, cascade, Crown, and summit.
-   - Visit all four cave mouths and verify they are holes in slopes, their first shell segment stays behind the cut, tunnels/chambers are navigable, and rear pools are reachable.
-   - Compare lower biomes for visibly different density/silhouette; climb several substantial trunks/branches; inspect for remaining tree/rock/water/building collisions.
-   - Inspect the 500/550/600 ft circumference for exposed, supported, non-staircase route choices and mantle onto the real 550-ft core ledge.
-   - Create a genuinely new save and verify the exact legacy palette; load a customized older save/export and verify no choice is reset.
-   - In two public-multiplayer clients, test several human category combinations and Blue Blob, change them while connected, reconnect, and verify appearance plus standing/seated/fishing posture remotely.
-   - Open Appearance: check full-body preview, rotation, live controls, eight-stop slider, randomize, simultaneous hat+eyewear+scarf, backpack None, ponytail/long/braids under each full hat.
-   - Put the camera below ocean, pond, cave, summit, and aquarium water surfaces; verify the surface remains visible. Inspect every shoreline and Fallglass source/pool/runout for transparent overlap, terrain cutting, or hard seams.
-
-## Focused validation completed
-
-- `node --test test/v9-visual-customization.test.js test/v10-world-expansion.test.js test/v11-cosmetics-aquarium.test.js test/v12-polish.test.js test/v87-focused.test.js` — 30 passed, 0 failed.
-- `npm run build` — final production build successful after all client/protocol edits; `dist` refreshed.
-- Multiplayer server — final startup and `GET /health` succeeded on port 8799; default port 8787 was already occupied and its existing process was left untouched. Temporary validation servers were stopped afterward.
-- In-app visual automation — attempted, but the desktop browser runtime could not create its kernel assets (`os error 3`), so the visual/manual checklist above remains necessary.
+   Open the map and confirm no 500/550/600 pins, cave names, or Tilted Slab pin; retain five bands, gray `C`s, and Split Boulder. From a summit bench, complete a full rhythm song and confirm the player stays seated, then test active-fishing Escape, Jump, and X/Interact. Click Randomize then Reset and confirm the exact classic look without progression loss. Finally inspect Fallglass from source through runout and all four cave mouths at close/oblique angles for any remaining terrain intersection or visible interior block edge.

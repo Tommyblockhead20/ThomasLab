@@ -1013,13 +1013,16 @@ export class Player {
       this.slideAvoidanceSide = 0;
     }
     const cancelPressed = this.input.consumeCancel();
-    if ((cancelPressed && (this.fishing?.active || this.movementState === 'fishing'))
+    const fishingWasActive = Boolean(this.fishing?.active || this.movementState === 'fishing');
+    if ((cancelPressed && fishingWasActive)
       || (this.fishing?.active && this.movementState !== 'fishing')) {
       // Contact recovery can change movementState before the normal fishing branch runs.
       // Repair that split state immediately; Escape is sampled before any early return.
       this.exitFishing({ releasePointerLock: cancelPressed });
     }
-    if (cancelPressed && this.benchSeat && !this.fishing?.active) {
+    if (cancelPressed && this.benchSeat && !fishingWasActive) {
+      // Escape from an active cast/song only cancels fishing. A second, deliberate Escape
+      // while merely seated stands up, matching the click/X interaction path.
       this.clearBenchSeat();
       return;
     }
@@ -1047,9 +1050,9 @@ export class Player {
 
     const inputLength = Math.hypot(axes.x, axes.z);
     const hasMoveInput = inputLength > 0.01;
-    if (this.benchSeat && (hasMoveInput || jumpPressed || this.input.sprintHeld || this.input.slideHeld)) {
-      // A deliberate stand request owns the whole frame: seated fishing is cancelled first,
-      // then the capsule is placed at the authored clear exit instead of being pulled through furniture.
+    if (this.benchSeat && jumpPressed) {
+      // Jump is the only movement binding that deliberately stands. WASD/arrows are rhythm
+      // lanes while fishing and harmless while resting; sprint/slide cannot tear down the seat.
       this.clearBenchSeat();
       return;
     }
