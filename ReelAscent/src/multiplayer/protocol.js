@@ -41,6 +41,7 @@ export function createPlayerSnapshot(playerId, state, sequence) {
     position: state.position,
     yaw: state.yaw,
     movement: state.movement,
+    posture: state.posture === 'seated' ? 'seated' : 'standing',
     appearance: compactAppearance(state.appearance),
     emote: state.emote ?? null,
     fishingState: state.fishingState ?? null

@@ -90,8 +90,8 @@ export class Game {
     this.inventory = new InventoryMenu(this.progression, this.player);
     this.player.showInventorySpecimen(this.progression.getHeldInventorySpecimen());
     this.appearanceMenu = new AppearanceMenu(this.progression, this.player);
-    this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud);
-    this.mapMenu = new MountainMapMenu();
+    this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud, this.camera);
+    this.mapMenu = new MountainMapMenu(this.world.getMapData());
     this.emoteMenu = new EmoteMenu(
       (emoteId) => this.player.startEmote(emoteId),
       () => this.player.canStartEmote()
@@ -190,6 +190,9 @@ export class Game {
       && !this.mapMenu.isOpen && !this.emoteMenu.isOpen && !this.appearanceMenu.isOpen) {
       this.runManager.update(dt);
       if (!this.runManager.paused) {
+        // Sample the shared X/Grip interaction target before climbing consumes a held Grip.
+        // With no nearby target, Grip remains completely untouched for traversal.
+        this.homeInteraction.captureInteractionInput();
         this.player.update(dt, this.camera.getPlanarAxes());
         this.physicsWorld.timestep = dt;
         this.physicsWorld.step();
@@ -209,6 +212,7 @@ export class Game {
       position: multiplayerPlayerState.position,
       yaw: this.player.facingYaw,
       movement: multiplayerPlayerState.movementState,
+      posture: multiplayerPlayerState.posture,
       appearance: multiplayerPlayerState.appearance,
       emote: multiplayerPlayerState.emote,
       fishingState: multiplayerPlayerState.movementState === 'fishing' ? 'active' : null

@@ -52,6 +52,8 @@ export class RoomState {
           createRepresentation(playerId, colorIndex, presentation?.appearance)));
       }
       this.members.get(playerId)?.representation?.setAppearance?.(presentation?.appearance);
+      this.members.get(playerId)?.representation?.setPosture?.(presentation?.posture);
+      this.members.get(playerId)?.representation?.setFishingState?.(presentation?.fishingState);
     }
     for (const [playerId, player] of this.members) {
       if (activeIds.has(playerId)) continue;

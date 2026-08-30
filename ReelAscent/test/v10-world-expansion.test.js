@@ -22,8 +22,8 @@ import {
 test('300–700 ft has a dedicated high-density two-rock field', async () => {
   const mountain = await readFile(new URL('../src/world/mountain-v2.js', import.meta.url), 'utf8');
   assert.deepEqual(MID_MOUNTAIN_ROCK_DENSITY_CONFIG.belts.map((belt) => belt.height),
-    [91.44, 121.92, 152.4, 182.88, 213.36]);
-  assert.ok(MID_MOUNTAIN_ROCK_DENSITY_CONFIG.belts.reduce((sum, belt) => sum + belt.count, 0) >= 230);
+    [91.44, 121.92, 152.4, 167.64, 182.88, 213.36]);
+  assert.ok(MID_MOUNTAIN_ROCK_DENSITY_CONFIG.belts.reduce((sum, belt) => sum + belt.count, 0) >= 390);
   assert.equal(MID_MOUNTAIN_ROCK_DENSITY_CONFIG.rocksPerOpenAnchor, 2);
   assert.match(mountain, /buildHighAltitudeInfill\(\);\s*this\.buildThreeToSevenHundredRockField\(\);\s*this\.buildMidHighTraversalAnchors\(\)/);
   assert.match(mountain, /dense formation[\s\S]*dense companion/);
@@ -71,8 +71,8 @@ test('lower forest is denser and its substantial trunks and branches are climbab
     readFile(new URL('../src/world/mountain-v2.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/world/world.js', import.meta.url), 'utf8')
   ]);
-  assert.ok(LOWLAND_TREE_CONFIG.candidateCount >= 70);
-  assert.ok(LOWLAND_TREE_CONFIG.maximumClimbableTrees >= 24);
+  assert.ok(LOWLAND_TREE_CONFIG.candidateCount >= 200);
+  assert.ok(LOWLAND_TREE_CONFIG.maximumClimbableTrees >= 60);
   assert.match(mountain, /climbable trunk[\s\S]*registerClimbSurface\(trunk, trunk\.physicsCollider, 'rough'/);
   assert.match(mountain, /climbable branch[\s\S]*registerClimbSurface\(branch, branch\.physicsCollider, 'rough'/);
   assert.match(mountain, /attempt < 4[\s\S]*lowlandTreeAudit/);

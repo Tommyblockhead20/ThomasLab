@@ -122,6 +122,8 @@ export class PlayerInput {
     this.primaryPressed = false;
     this.primaryReleased = false;
     this.primarySuppressed = false;
+    this.gripInteractionQueued = false;
+    this.gripInteractionSuppressed = false;
     this.rhythmCapture = false;
     this.rhythmLaneInput = new RhythmLaneInputState();
     this.touchPointers = new Map();
@@ -146,6 +148,9 @@ export class PlayerInput {
       }
       if (event.code === 'KeyF' && !event.repeat) {
         this.fishingToggleQueued = true;
+      }
+      if (event.code === 'KeyG' && !event.repeat && !wasHeld) {
+        this.gripInteractionQueued = true;
       }
       if (FISHING_CAST_CODES.includes(event.code) && !event.repeat && !wasHeld) {
         this.fishingCastPressed = true;
@@ -174,6 +179,7 @@ export class PlayerInput {
         this.fishingCastReleased = true;
       }
       this.held.delete(event.code);
+      if (!this.rawGripHeld) this.gripInteractionSuppressed = false;
       this.rhythmLaneInput.release(`key:${event.code}`);
     };
 
@@ -287,7 +293,10 @@ export class PlayerInput {
 
   pressPrimary(source) {
     if (this.primarySources.has(source)) return;
-    if (!this.primaryHeld) this.primaryPressed = true;
+    if (!this.primaryHeld) {
+      this.primaryPressed = true;
+      this.gripInteractionQueued = true;
+    }
     this.primarySources.add(source);
   }
 
@@ -297,6 +306,7 @@ export class PlayerInput {
       this.primaryReleased = true;
       this.primarySuppressed = false;
     }
+    if (!this.rawGripHeld) this.gripInteractionSuppressed = false;
   }
 
   get primaryHeld() {
@@ -324,10 +334,16 @@ export class PlayerInput {
       || this.touchActions.has('slide');
   }
 
-  get gripHeld() {
+  get rawGripHeld() {
     return this.held.has('KeyG')
       || this.touchActions.has('grip')
-      || (this.primaryHeld && !this.primarySuppressed);
+      || this.primaryHeld;
+  }
+
+  get gripHeld() {
+    return !this.gripInteractionSuppressed && (this.held.has('KeyG')
+      || this.touchActions.has('grip')
+      || (this.primaryHeld && !this.primarySuppressed));
   }
 
   get fishingCastHeld() {
@@ -394,6 +410,17 @@ export class PlayerInput {
     return queued;
   }
 
+  consumeGripInteraction() {
+    const queued = this.gripInteractionQueued;
+    this.gripInteractionQueued = false;
+    return queued;
+  }
+
+  suppressGripUntilRelease() {
+    this.gripInteractionSuppressed = this.rawGripHeld;
+    this.suppressPrimaryUntilRelease();
+  }
+
   discardPrimaryEdges() {
     this.primaryPressed = false;
     this.primaryReleased = false;
@@ -409,6 +436,8 @@ export class PlayerInput {
     this.primaryPressed = false;
     this.primaryReleased = false;
     this.primarySuppressed = false;
+    this.gripInteractionQueued = false;
+    this.gripInteractionSuppressed = false;
   }
 
   beginRhythmCapture() {

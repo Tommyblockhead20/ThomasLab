@@ -41,7 +41,9 @@ export class Room {
         id: player.playerId,
         connected: player.connected,
         host: player.playerId === this.hostId,
-        appearance: player.lastSnapshot?.appearance ?? null
+        appearance: player.lastSnapshot?.appearance ?? null,
+        posture: player.lastSnapshot?.posture ?? 'standing',
+        fishingState: player.lastSnapshot?.fishingState ?? null
       }))
     };
   }

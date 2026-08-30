@@ -1,9 +1,12 @@
 import {
-  ACCESSORIES,
   AVATAR_TYPES,
+  BACK_ACCESSORIES,
   CUSTOM_COLOR_FIELDS,
+  EYEWEAR,
+  FACE_ACCESSORIES,
   HAIR_COLORS,
   HAIR_STYLES,
+  HEADWEAR,
   PANTS_COLORS,
   SHIRT_COLORS,
   SKIN_TONES,
@@ -12,6 +15,7 @@ import {
   randomizeAppearance,
   resolveAppearance
 } from '../player/appearance.js';
+import { AppearancePreview } from './appearance-preview.js';
 
 const BLOCKING_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open',
@@ -20,12 +24,15 @@ const BLOCKING_CLASSES = Object.freeze([
 
 const GROUPS = Object.freeze([
   Object.freeze({ key: 'avatarType', label: 'Avatar Type', options: AVATAR_TYPES }),
-  Object.freeze({ key: 'skinTone', label: 'Skin Tone', options: SKIN_TONES, human: true, swatches: true }),
+  Object.freeze({ key: 'skinTone', label: 'Skin Tone', options: SKIN_TONES, human: true, slider: true }),
   Object.freeze({ key: 'shirtColor', label: 'Shirt / Top', options: SHIRT_COLORS, human: true, swatches: true }),
   Object.freeze({ key: 'pantsColor', label: 'Pants / Bottom', options: PANTS_COLORS, human: true, swatches: true }),
   Object.freeze({ key: 'hairStyle', label: 'Hair Style', options: HAIR_STYLES, human: true }),
   Object.freeze({ key: 'hairColor', label: 'Hair Color', options: HAIR_COLORS, human: true, swatches: true }),
-  Object.freeze({ key: 'accessory', label: 'Accessory', options: ACCESSORIES, human: true })
+  Object.freeze({ key: 'headwear', label: 'Headwear / Hats', options: HEADWEAR, human: true }),
+  Object.freeze({ key: 'eyewear', label: 'Eyewear', options: EYEWEAR, human: true }),
+  Object.freeze({ key: 'faceAccessory', label: 'Face / Neck', options: FACE_ACCESSORIES, human: true }),
+  Object.freeze({ key: 'backAccessory', label: 'Back', options: BACK_ACCESSORIES, human: true })
 ]);
 
 const colorCss = (color) => color
@@ -47,6 +54,8 @@ export class AppearanceMenu {
     this.status = document.querySelector('#appearance-status');
     this.closeButton = document.querySelector('#close-appearance');
     this.randomizeButton = document.querySelector('#randomize-appearance');
+    this.preview = new AppearancePreview(document.querySelector('#appearance-preview-canvas'), this.progression.getAppearance());
+    this.preview.setVisible(false);
     this.isOpen = false;
     this.previousFocus = null;
     this.renderedRevision = -1;
@@ -57,6 +66,7 @@ export class AppearanceMenu {
       const randomized = randomizeAppearance();
       const appearance = this.progression.setAppearance(randomized);
       this.player.applyAppearance(appearance);
+      this.preview.setAppearance(appearance);
       if (this.status) this.status.textContent = 'Random trail look saved • click again for another.';
       this.render(true);
     };
@@ -76,14 +86,29 @@ export class AppearanceMenu {
       if (TINT_BY_OPTION[key]) patch[TINT_BY_OPTION[key]] = null;
       const appearance = this.progression.setAppearance(patch);
       this.player.applyAppearance(appearance);
+      this.preview.setAppearance(appearance);
       if (this.status) this.status.textContent = 'Saved locally • multiplayer appearance updates live.';
       this.render(true);
     };
     this.onChange = (event) => {
+      const skinSlider = event.target.closest?.('[data-appearance-skin-slider]');
+      if (skinSlider) {
+        const entry = SKIN_TONES[Math.max(0, Math.min(SKIN_TONES.length - 1, Number(skinSlider.value) || 0))];
+        const appearance = this.progression.setAppearance({ skinTone: entry.id });
+        this.player.applyAppearance(appearance);
+        this.preview.setAppearance(appearance);
+        if (this.status) this.status.textContent = `Skin tone ${Number(skinSlider.value) + 1} of ${SKIN_TONES.length} saved.`;
+        const readout = skinSlider.parentElement?.querySelector('.appearance-tone-readout');
+        if (readout) readout.textContent = `${Number(skinSlider.value) + 1} / ${SKIN_TONES.length}`;
+        if (event.type === 'change') this.render(true);
+        else this.renderedRevision = this.progression.revision;
+        return;
+      }
       const input = event.target.closest?.('[data-appearance-tint]');
       if (!input || !CUSTOM_COLOR_FIELDS.some((field) => field.key === input.dataset.appearanceTint)) return;
       const appearance = this.progression.setAppearance({ [input.dataset.appearanceTint]: input.value });
       this.player.applyAppearance(appearance);
+      this.preview.setAppearance(appearance);
       if (this.status) this.status.textContent = 'Custom color saved • multiplayer appearance updates live.';
       this.render(true);
     };
@@ -92,6 +117,7 @@ export class AppearanceMenu {
       if (!reset || !CUSTOM_COLOR_FIELDS.some((field) => field.key === reset.dataset.appearanceResetTint)) return;
       const appearance = this.progression.setAppearance({ [reset.dataset.appearanceResetTint]: null });
       this.player.applyAppearance(appearance);
+      this.preview.setAppearance(appearance);
       this.render(true);
     };
 
@@ -99,6 +125,7 @@ export class AppearanceMenu {
     window.addEventListener('keydown', this.onKeyDown, true);
     this.screen?.addEventListener('click', this.onClick);
     this.screen?.addEventListener('change', this.onChange);
+    this.screen?.addEventListener('input', this.onChange);
     this.screen?.addEventListener('click', this.onResetTint);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.randomizeButton?.addEventListener('click', this.onRandomizeClick);
@@ -112,6 +139,7 @@ export class AppearanceMenu {
     this.screen.hidden = false;
     document.body.classList.add('appearance-open');
     this.render(true);
+    this.preview.setVisible(true);
     this.screen.querySelector('[data-appearance-key]')?.focus({ preventScroll: true });
   }
 
@@ -120,6 +148,7 @@ export class AppearanceMenu {
     this.isOpen = false;
     this.screen.hidden = true;
     document.body.classList.remove('appearance-open');
+    this.preview.setVisible(false);
     const target = this.previousFocus?.isConnected ? this.previousFocus : document.querySelector('#game-canvas');
     target?.focus({ preventScroll: true });
     this.previousFocus = null;
@@ -142,6 +171,30 @@ export class AppearanceMenu {
       legend.textContent = group.label;
       const options = document.createElement('div');
       options.className = 'appearance-options';
+      if (group.slider) {
+        const selectedIndex = Math.max(0, group.options.findIndex((entry) => entry.id === appearance[group.key]));
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = String(group.options.length - 1);
+        slider.step = '1';
+        slider.value = String(selectedIndex);
+        slider.dataset.appearanceSkinSlider = 'true';
+        slider.setAttribute('aria-label', `Skin tone ${selectedIndex + 1} of ${group.options.length}`);
+        const strip = document.createElement('div');
+        strip.className = 'appearance-tone-strip';
+        for (const entry of group.options) {
+          const swatch = document.createElement('span');
+          swatch.style.backgroundColor = colorCss(entry.color);
+          strip.appendChild(swatch);
+        }
+        const readout = document.createElement('strong');
+        readout.className = 'appearance-tone-readout';
+        readout.textContent = `${selectedIndex + 1} / ${group.options.length}`;
+        options.append(slider, strip, readout);
+        fieldset.append(legend, options);
+        return fieldset;
+      }
       for (const entry of group.options) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -191,6 +244,7 @@ export class AppearanceMenu {
     }
     customColors.append(customLegend, customGrid);
     this.content.replaceChildren(...groups, customColors);
+    this.preview.setAppearance(appearance);
     this.renderedRevision = this.progression.revision;
   }
 
@@ -199,9 +253,11 @@ export class AppearanceMenu {
     window.removeEventListener('keydown', this.onKeyDown, true);
     this.screen?.removeEventListener('click', this.onClick);
     this.screen?.removeEventListener('change', this.onChange);
+    this.screen?.removeEventListener('input', this.onChange);
     this.screen?.removeEventListener('click', this.onResetTint);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.randomizeButton?.removeEventListener('click', this.onRandomizeClick);
     document.body.classList.remove('appearance-open');
+    this.preview.destroy();
   }
 }

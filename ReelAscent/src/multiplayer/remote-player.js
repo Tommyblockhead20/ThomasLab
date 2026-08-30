@@ -14,6 +14,7 @@ export class RemotePlayer {
   consumeSnapshot(snapshot) {
     if (snapshot?.playerId !== this.playerId) return false;
     if (snapshot.appearance !== undefined) this.representation?.setAppearance?.(snapshot.appearance);
+    if (snapshot.posture !== undefined) this.representation?.setPosture?.(snapshot.posture);
     if (snapshot.fishingState !== undefined) {
       this.fishingState = snapshot.fishingState;
       this.representation?.setFishingState?.(snapshot.fishingState);

@@ -4,11 +4,12 @@ const MODAL_CLASSES = Object.freeze([
 ]);
 
 export class HomeInteractionController {
-  constructor(world, player, progression, hud) {
+  constructor(world, player, progression, hud, camera = null) {
     this.world = world;
     this.player = player;
     this.progression = progression;
     this.hud = hud;
+    this.camera = camera;
     this.prompt = document.querySelector('#home-interaction-prompt');
     this.label = document.querySelector('#home-interaction-label');
     this.button = document.querySelector('#home-interaction-action');
@@ -31,6 +32,28 @@ export class HomeInteractionController {
     return MODAL_CLASSES.some((name) => document.body.classList.contains(name));
   }
 
+  refreshCurrent() {
+    const seatedInteraction = this.player.benchSeat
+      ? this.world.homeInteractions?.find((interaction) => interaction.id === this.player.benchSeat.id) ?? null
+      : null;
+    this.current = this.modalOpen()
+      ? null
+      : seatedInteraction ?? (this.player.fishing?.active
+        ? null
+        : this.world.getNearestHomeInteraction?.(this.player.getPosition()) ?? null);
+    return { seatedInteraction, current: this.current };
+  }
+
+  captureInteractionInput() {
+    const pressed = this.player.input.consumeGripInteraction?.();
+    if (!pressed) return false;
+    this.refreshCurrent();
+    if (!this.current) return false;
+    const handled = this.interact();
+    if (handled) this.player.input.suppressGripUntilRelease?.();
+    return handled;
+  }
+
   update() {
     if (this.pendingSeat) {
       if (performance.now() > this.pendingSeat.expiresAt) {
@@ -40,14 +63,7 @@ export class HomeInteractionController {
         this.pendingSeat = null;
       }
     }
-    const seatedInteraction = this.player.benchSeat
-      ? this.world.homeInteractions?.find((interaction) => interaction.id === this.player.benchSeat.id) ?? null
-      : null;
-    this.current = this.modalOpen()
-      ? null
-      : seatedInteraction ?? (this.player.fishing?.active
-        ? null
-        : this.world.getNearestHomeInteraction?.(this.player.getPosition()) ?? null);
+    const { seatedInteraction } = this.refreshCurrent();
     if (!this.prompt) return;
     this.prompt.hidden = !this.current;
     if (this.current && this.label) {
@@ -60,6 +76,12 @@ export class HomeInteractionController {
   interact() {
     const interaction = this.current;
     if (!interaction || this.modalOpen()) return false;
+    if (this.player.benchSeat) {
+      this.pendingSeat = null;
+      this.player.clearBenchSeat();
+      this.hud.showToast?.('Stood up safely.');
+      return true;
+    }
     if (interaction.action === 'appearance') {
       this.player.cancelEmote();
       window.dispatchEvent(new CustomEvent('reel-ascent:open-appearance'));
@@ -70,15 +92,17 @@ export class HomeInteractionController {
       window.dispatchEvent(new CustomEvent('reel-ascent:open-aquarium'));
       return true;
     }
-    if (interaction.action === 'rest') {
+    if (interaction.action === 'rest' && interaction.seatPosition) {
       if (!this.player.grounded || this.player.movementState !== 'grounded') {
         this.hud.showToast?.('Stand beside the bed or chair to rest.');
         return false;
       }
       this.player.cancelEmote();
       this.player.stamina.reset();
-      this.player.startEmote('sit');
-      this.hud.showToast?.('Rested at the cabin • stamina restored.');
+      this.player.setBenchSeat(interaction);
+      this.camera?.setYaw?.(interaction.facingYaw);
+      this.pendingSeat = { expiresAt: performance.now() + 1800 };
+      this.hud.showToast?.(`Rested on the ${interaction.seatKind ?? 'seat'} • stamina restored • move or interact to stand.`);
       return true;
     }
     if (interaction.action === 'trophies') {
@@ -89,18 +113,13 @@ export class HomeInteractionController {
       return true;
     }
     if (interaction.action === 'bench') {
-      if (this.player.benchSeat) {
-        this.pendingSeat = null;
-        this.player.clearBenchSeat();
-        this.hud.showToast?.('Left the summit bench.');
-        return true;
-      }
       if (!this.player.grounded || !['grounded', 'sliding'].includes(this.player.movementState)) {
         this.hud.showToast?.('Stand beside the summit bench to sit.');
         return false;
       }
       this.player.cancelEmote();
       this.player.setBenchSeat(interaction);
+      this.camera?.setYaw?.(interaction.facingYaw);
       this.pendingSeat = { expiresAt: performance.now() + 1800 };
       this.hud.showToast?.('Seated facing Crooked Peak Tarn • press F to fish • click the prompt to get up.');
       return true;

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import {
   DEFAULT_APPEARANCE,
   accessoryConcealsHair,
+  hairVisibilityForHeadwear,
   randomizeAppearance,
   resolveAppearance
 } from '../src/player/appearance.js';
@@ -24,8 +25,11 @@ test('classic v1-v7 trail appearance is restored and full hats conceal hair', ()
   assert.deepEqual(resolved.pantsColorValue.color, [.23, .31, .29]);
   assert.deepEqual(resolved.accessoryColor, [.99, .82, .33]);
   assert.equal(DEFAULT_APPEARANCE.accessory, 'beanie');
+  assert.equal(DEFAULT_APPEARANCE.headwear, 'beanie');
   for (const id of ['beanie', 'trail-hat', 'fishing-cap']) assert.equal(accessoryConcealsHair(id), true);
   for (const id of ['glasses', 'headlamp', 'scarf']) assert.equal(accessoryConcealsHair(id), false);
+  assert.deepEqual(hairVisibilityForHeadwear('ponytail', 'beanie'), { root: true, top: false });
+  assert.deepEqual(hairVisibilityForHeadwear('tousled', 'beanie'), { root: false, top: false });
 });
 
 test('appearance randomizer returns a complete normalized cosmetic selection', () => {
@@ -37,14 +41,17 @@ test('appearance randomizer returns a complete normalized cosmetic selection', (
   assert.equal(appearance.accessoryTint, null);
 });
 
-test('only the former untouched default migrates to the classic trail look', () => {
+test('only genuinely missing appearance data receives the classic trail look', () => {
   const formerDefault = {
     avatarType: 'human', skinTone: 'warm', shirtColor: 'alpine', pantsColor: 'pine',
     hairStyle: 'tousled', hairColor: 'espresso', accessory: 'none', shirtTint: null,
     pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
   };
-  assert.deepEqual(normalizeProgressionState({ schemaVersion: 3, appearance: formerDefault }).appearance,
-    DEFAULT_APPEARANCE);
+  const preservedFormerDefault = normalizeProgressionState({ schemaVersion: 3, appearance: formerDefault }).appearance;
+  assert.equal(preservedFormerDefault.shirtColor, 'alpine');
+  assert.equal(preservedFormerDefault.pantsColor, 'pine');
+  assert.equal(preservedFormerDefault.headwear, 'none');
+  assert.deepEqual(normalizeProgressionState({ schemaVersion: 3 }).appearance, DEFAULT_APPEARANCE);
   const customized = normalizeProgressionState({
     schemaVersion: 3,
     appearance: { ...formerDefault, shirtColor: 'rose' }

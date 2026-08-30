@@ -1,17 +1,23 @@
 const MOVEMENT_STATES = new Set(['grounded', 'airborne', 'sliding', 'climbing', 'mantling', 'fishing']);
+const POSTURES = new Set(['standing', 'seated']);
 const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'sit', 'dance']);
 const APPEARANCE_OPTIONS = Object.freeze({
   avatarType: new Set(['human', 'blob']),
-  skinTone: new Set(['porcelain', 'warm', 'golden', 'umber', 'deep']),
+  skinTone: new Set(['porcelain', 'light', 'warm', 'honey', 'golden', 'bronze', 'umber', 'deep']),
   shirtColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose']),
   pantsColor: new Set(['classic-trail', 'pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand']),
   hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'long', 'bun', 'braids', 'bald']),
   hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink']),
-  accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'flower-crown', 'goggles'])
+  accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'flower-crown', 'goggles']),
+  headwear: new Set(['none', 'beanie', 'trail-hat', 'fishing-cap', 'headlamp', 'flower-crown']),
+  eyewear: new Set(['none', 'glasses', 'goggles']),
+  faceAccessory: new Set(['none', 'scarf']),
+  backAccessory: new Set(['none', 'backpack'])
 });
 const DEFAULT_APPEARANCE = Object.freeze({
   avatarType: 'human', skinTone: 'warm', shirtColor: 'classic-orange', pantsColor: 'classic-trail',
-  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'beanie', shirtTint: null,
+  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'beanie', headwear: 'beanie',
+  eyewear: 'none', faceAccessory: 'none', backAccessory: 'backpack', shirtTint: null,
   pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
 });
 const APPEARANCE_TINTS = new Set(['shirtTint', 'pantsTint', 'hairTint', 'accessoryTint', 'blobTint']);
@@ -20,12 +26,21 @@ const finite = (value) => Number.isFinite(Number(value));
 
 export function sanitizeAppearance(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  return Object.fromEntries(Object.entries(DEFAULT_APPEARANCE).map(([key, fallback]) => [
+  const appearance = Object.fromEntries(Object.entries(DEFAULT_APPEARANCE).map(([key, fallback]) => [
     key,
     APPEARANCE_TINTS.has(key)
       ? (typeof source[key] === 'string' && COLOR_PATTERN.test(source[key]) ? source[key].toLowerCase() : null)
       : (APPEARANCE_OPTIONS[key].has(source[key]) ? source[key] : fallback)
   ]));
+  const legacy = APPEARANCE_OPTIONS.accessory.has(source.accessory) ? source.accessory : null;
+  const categorized = ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']
+    .some((key) => APPEARANCE_OPTIONS[key].has(source[key]));
+  if (legacy && !categorized) {
+    appearance.headwear = APPEARANCE_OPTIONS.headwear.has(legacy) ? legacy : 'none';
+    appearance.eyewear = APPEARANCE_OPTIONS.eyewear.has(legacy) ? legacy : 'none';
+    appearance.faceAccessory = APPEARANCE_OPTIONS.faceAccessory.has(legacy) ? legacy : 'none';
+  }
+  return appearance;
 }
 
 export function validateSnapshot(payload, session, now = Date.now()) {
@@ -65,6 +80,7 @@ export function validateSnapshot(payload, session, now = Date.now()) {
       position: normalizedPosition,
       yaw: ((yaw % 360) + 360) % 360,
       movement,
+      posture: POSTURES.has(payload.posture) ? payload.posture : 'standing',
       appearance: sanitizeAppearance(payload.appearance),
       emote: EMOTE_IDS.has(payload.emote?.id) ? {
         id: payload.emote.id,

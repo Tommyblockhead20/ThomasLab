@@ -99,7 +99,7 @@ test('held specimen selection migrates safely and display size remains bounded',
   const valid = normalizeProgressionState({
     ...defaultProgressionState('player-v11'), inventory: [specimen], heldSpecimenId: specimen.specimenId
   });
-  assert.equal(PROGRESSION_SCHEMA_VERSION, 4);
+  assert.equal(PROGRESSION_SCHEMA_VERSION, 5);
   assert.equal(valid.heldSpecimenId, specimen.specimenId);
   assert.equal(normalizeProgressionState({ ...valid, heldSpecimenId: 'missing' }).heldSpecimenId, null);
   assert.ok(specimenDisplayScale({ length: .01 }, .8) >= .34);

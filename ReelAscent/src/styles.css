@@ -2163,18 +2163,45 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .mountain-map-layout { display: grid; grid-template-columns: minmax(18rem, 1.55fr) minmax(14rem, .75fr); gap: 1rem; align-items: center; }
 .mountain-map-graphic { width: 100%; max-height: min(67vh, 42rem); border: 1px solid rgb(239 217 139 / 30%); border-radius: .6rem; }
 .map-paper { fill: #d9d0a8; }
-.map-contours { fill: none; stroke: #496a58; stroke-width: 2.2; opacity: .68; }
+.map-ocean { fill: #76aeb1; stroke: #2c7475; stroke-width: 2; }
+.map-shore { fill: #c6ba88; }
+.map-elevation { stroke: none; }
+.map-elevation-coast { fill: #b8b783; }
+.map-elevation-lower { fill: #8fa16f; }
+.map-elevation-middle { fill: #788e68; }
+.map-elevation-alpine { fill: #93998a; }
+.map-elevation-summit { fill: #c7c8b9; }
+.map-contours { fill: none; stroke: #3f614f; stroke-width: 1.45; opacity: .72; }
+.map-biome { opacity: .2; }
+.map-biome-sunwash { fill: #d9a850; }
+.map-biome-fernwood { fill: #1e6947; }
+.map-biome-blackstone { fill: #3f4d58; }
+.map-cascade { fill: none; stroke: #d6f6f4; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.map-waters ellipse { fill: #64aeb2; stroke: #185e68; stroke-width: 1.5; }
+.map-waters text { fill: #f7f0c9; font: 900 6.8px ui-monospace, monospace; text-anchor: middle; paint-order: stroke; stroke: #164c50; stroke-width: 1.4; }
 .map-water { fill: #82b4b2; stroke: #2c7475; stroke-width: 3; }
 .map-route { fill: none; stroke: #9a4b34; stroke-width: 5; stroke-dasharray: 10 7; }
 .map-route.alt { stroke: #73543c; stroke-width: 3.5; }
 .map-landmarks { fill: #294f44; stroke: #f0df9a; stroke-width: 2; }
 .map-landmarks text,
 .map-compass text { fill: #173d38; stroke: none; font: 900 12px ui-monospace, monospace; letter-spacing: .04em; }
+.map-landmarks text { font-size: 7.5px; paint-order: stroke; stroke: #d9d0a8; stroke-width: 2.4px; stroke-linejoin: round; }
+.map-landmarks .map-marker-glyph { fill: #f8e7a3; stroke: none; font-size: 5px; text-anchor: middle; paint-order: normal; }
+.map-start circle { fill: #9a4b34; }
+.map-cave circle { fill: #303a3a; }
+.map-ledge circle { fill: #cb8e35; }
+.map-landmark circle { fill: #2c6657; }
 .map-compass { fill: #9a4b34; }
 .mountain-map aside { font-size: .72rem; line-height: 1.55; }
 .mountain-map aside p { color: rgb(234 244 231 / 72%); }
 .mountain-map aside li { margin: .55rem 0; }
 .mountain-map aside b { color: #efd98b; }
+.mountain-map aside h3 { margin: .85rem 0 .35rem; color: #efd98b; font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; }
+.map-legend-list { margin: 0; padding-left: 1.4rem; }
+.map-legend-list li { margin: .2rem 0 !important; }
+.map-biome-key { margin: 0; }
+.map-water-list { max-height: 18rem; margin: .25rem 0 0; padding-left: 1.6rem; overflow: auto; column-count: 2; column-gap: 1.25rem; font-size: .58rem; }
+.map-water-list li { break-inside: avoid; margin: .18rem 0 !important; }
 .emote-menu { width: min(27rem, calc(100vw - 2rem)); padding: 1rem; }
 .emote-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem; margin: .7rem 0; }
 .emote-grid button:last-child { grid-column: 1 / -1; }
@@ -2185,7 +2212,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
   z-index: 72;
   inset: 50% auto auto 50%;
   box-sizing: border-box;
-  width: min(58rem, calc(100vw - 2rem));
+  width: min(76rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   padding: 1rem;
   overflow: auto;
@@ -2215,6 +2242,10 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-toolbar { display: flex; gap: .7rem; align-items: center; justify-content: space-between; margin: .35rem 0 .8rem; }
 .appearance-status { margin: 0; color: rgb(234 244 231 / 68%); font-size: .62rem; line-height: 1.45; }
 .appearance-toolbar button { flex: 0 0 auto; color: #153a36; background: #efd98b; }
+.appearance-layout { display: grid; grid-template-columns: minmax(17rem, .72fr) minmax(0, 1.7fr); gap: .75rem; align-items: start; }
+.appearance-preview { position: sticky; top: 0; display: grid; gap: .4rem; min-width: 0; margin: 0; }
+.appearance-preview canvas { display: block; width: 100%; height: min(62vh, 36rem); background: radial-gradient(circle at 50% 35%, #315b58, #071d20 72%); border: 1px solid rgb(239 217 139 / 36%); border-radius: .62rem; }
+.appearance-preview figcaption { color: rgb(239 217 139 / 72%); font-size: .5rem; font-weight: 950; letter-spacing: .1em; text-align: center; }
 .appearance-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .62rem; }
 .appearance-group { display: grid; min-width: 0; margin: 0; padding: .62rem; border: 1px solid rgb(255 255 255 / 12%); border-radius: .55rem; background: rgb(255 255 255 / 4%); }
 .appearance-group[hidden] { display: none; }
@@ -2223,6 +2254,10 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-options button { display: flex; gap: .38rem; align-items: center; justify-content: center; min-height: 2.25rem; color: #dcece3; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 12%); }
 .appearance-options button:hover { background: rgb(255 255 255 / 13%); }
 .appearance-options button[aria-pressed="true"] { color: #143833; background: #efd98b; border-color: #fff0b8; box-shadow: 0 0 0 2px rgb(239 217 139 / 18%); }
+.appearance-options input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: #efd98b; }
+.appearance-tone-strip { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); height: 1.1rem; overflow: hidden; border: 1px solid rgb(255 255 255 / 28%); border-radius: 999px; }
+.appearance-tone-strip span { min-width: 0; }
+.appearance-tone-readout { grid-column: 1 / -1; color: #efd98b; font-size: .58rem; text-align: center; }
 .appearance-swatch { width: .86rem; height: .86rem; flex: 0 0 auto; border: 1px solid rgb(255 255 255 / 48%); border-radius: 50%; box-shadow: 0 1px 3px rgb(0 0 0 / 36%); }
 .appearance-color-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .46rem; }
 .appearance-color-control { display: grid; grid-template-columns: 1fr 2.4rem auto; gap: .42rem; align-items: center; min-height: 2.45rem; padding: .32rem .4rem; color: #dcece3; font-size: .65rem; font-weight: 800; background: rgb(255 255 255 / 5%); border-radius: .42rem; }
@@ -2254,6 +2289,9 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
   .mountain-map-layout { grid-template-columns: 1fr; }
   .mountain-map-graphic { max-height: 52vh; }
   .appearance-content { grid-template-columns: 1fr; }
+  .appearance-layout { grid-template-columns: 1fr; }
+  .appearance-preview { position: static; }
+  .appearance-preview canvas { height: 15rem; }
   .appearance-toolbar { align-items: stretch; flex-direction: column; }
 }
 

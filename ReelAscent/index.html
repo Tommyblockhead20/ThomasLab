@@ -79,7 +79,7 @@
         <aside id="home-interaction-prompt" class="home-interaction-prompt" hidden aria-live="polite">
           <span class="eyebrow">TRAIL CABIN</span>
           <strong id="home-interaction-label">INTERACT</strong>
-          <button id="home-interaction-action" type="button">INTERACT <kbd>X</kbd></button>
+          <button id="home-interaction-action" type="button">INTERACT <kbd>X</kbd> / <kbd>GRIP</kbd></button>
         </aside>
 
         <div id="grip-prompt" class="grip-prompt" hidden>Hold <kbd>Click / G</kbd> — Grip</div>
@@ -243,7 +243,13 @@
           <p id="appearance-status" class="appearance-status" aria-live="polite">The classic orange-and-yellow climber is the default. Blue Blob remains an optional cosmetic.</p>
           <button id="randomize-appearance" type="button">RANDOMIZE LOOK</button>
         </div>
-        <div id="appearance-content" class="appearance-content"></div>
+        <div class="appearance-layout">
+          <figure class="appearance-preview">
+            <canvas id="appearance-preview-canvas" aria-label="Live rotating full-body character preview"></canvas>
+            <figcaption>LIVE MODEL • YOUR MULTIPLAYER LOOK</figcaption>
+          </figure>
+          <div id="appearance-content" class="appearance-content"></div>
+        </div>
       </section>
 
       <section id="mountain-map" class="mountain-map" role="dialog" aria-modal="true" hidden aria-labelledby="mountain-map-title">
@@ -252,43 +258,8 @@
           <button id="close-mountain-map" type="button">CLOSE <kbd>Esc</kbd></button>
         </header>
         <div class="mountain-map-layout">
-          <svg class="mountain-map-graphic" viewBox="0 0 520 520" role="img" aria-label="Stylized topographic map showing the coast, major waters, caves, progression shelves, Crown, and summit">
-            <defs><filter id="map-ink"><feTurbulence baseFrequency=".022" numOctaves="2" seed="8" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="4"/></filter></defs>
-            <rect width="520" height="520" rx="18" class="map-paper"/>
-            <g class="map-contours" filter="url(#map-ink)">
-              <ellipse cx="260" cy="268" rx="218" ry="204"/>
-              <ellipse cx="260" cy="266" rx="183" ry="170"/>
-              <ellipse cx="260" cy="264" rx="149" ry="137"/>
-              <ellipse cx="260" cy="261" rx="113" ry="104"/>
-              <ellipse cx="260" cy="257" rx="78" ry="72"/>
-              <ellipse cx="260" cy="252" rx="43" ry="39"/>
-            </g>
-            <path class="map-water" d="M30 424 C110 392 168 455 246 424 S390 390 494 426 L494 500 L30 500 Z"/>
-            <path class="map-route" d="M72 412 C128 374 130 322 190 303 S205 238 266 217 S324 163 288 101"/>
-            <path class="map-route alt" d="M447 415 C390 377 401 316 337 294 S329 232 266 217"/>
-            <g class="map-landmarks">
-              <g transform="translate(75 407)"><circle r="8"/><text x="12" y="4">COAST STARTS</text></g>
-              <g transform="translate(164 325)"><rect x="-7" y="-7" width="14" height="14"/><text x="12" y="4">CAVES + LOWER WATERS</text></g>
-              <g transform="translate(190 303)"><circle r="8"/><text x="12" y="-9">500 FT REST</text></g>
-              <g transform="translate(337 278)"><circle r="8"/><text x="12" y="4">550 FT ALPINE LEDGE</text></g>
-              <g transform="translate(222 254)"><circle r="8"/><text x="12" y="4">600 FT CORE SHELF</text></g>
-              <g transform="translate(266 217)"><circle r="8"/><text x="12" y="4">700 FT SHOULDER</text></g>
-              <g transform="translate(298 154)"><path d="M0 -9 L9 7 L-9 7 Z"/><text x="14" y="4">CROWN</text></g>
-              <g transform="translate(288 101)"><path d="M0 -11 L4 -3 L12 -3 L6 3 L8 11 L0 7 L-8 11 L-6 3 L-12 -3 L-4 -3 Z"/><text x="15" y="4">SUMMIT TARN + 2 BENCHES</text></g>
-              <g transform="translate(354 330)"><path d="M-10 7 Q0 -13 10 7 Z"/><text x="14" y="4">FALLGLASS CASCADE</text></g>
-            </g>
-            <g class="map-compass" transform="translate(462 62)"><path d="M0 -22 L7 0 L0 22 L-7 0 Z"/><text x="-5" y="-28">N</text></g>
-          </svg>
-          <aside>
-            <p>This paper map shows broad landmarks and elevation structure only. It does not track your position.</p>
-            <ol>
-              <li><b>500 ft</b> — wide natural rest ledge and branch choices.</li>
-              <li><b>550 ft</b> — broad Alpine core ledge with a mantleable lip.</li>
-              <li><b>600 ft</b> — a true shelf cut into the mountain core.</li>
-              <li><b>700 ft</b> — preserved shoulder rest terrain.</li>
-              <li><b>Crown</b> — dense final climbing web to the summit rim.</li>
-            </ol>
-          </aside>
+          <svg class="mountain-map-graphic" viewBox="0 0 520 520" role="img" aria-label="Data-derived topographic map of the actual Crooked Peak mountain, waters, caves, biomes, and landmarks"></svg>
+          <aside data-mountain-map-legend></aside>
         </div>
       </section>
 

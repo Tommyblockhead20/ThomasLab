@@ -2,7 +2,7 @@ import * as pc from 'playcanvas';
 import { resolveSpecies } from '../fishing/fish-data.js';
 import { REMOTE_PLAYER_COLORS } from './player-colors.js';
 import { emoteDurationMs, normalizeEmote } from './emotes.js';
-import { accessoryConcealsHair, normalizeAppearance, resolveAppearance } from '../player/appearance.js';
+import { LEGACY_CHARACTER_PALETTE, hairVisibilityForHeadwear, normalizeAppearance, resolveAppearance } from '../player/appearance.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -102,10 +102,12 @@ function createCatchModel(root, catchData) {
 export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppearance = null) {
   const palette = REMOTE_PLAYER_COLORS[colorIndex % REMOTE_PLAYER_COLORS.length];
   const cloth = material(palette.rgb, { emissive: palette.rgb.map((value) => value * .035) });
-  const skin = material([.78, .58, .42], { gloss: .2 });
-  const trousers = material([.16, .2, .18], { gloss: .16 });
+  const skin = material(LEGACY_CHARACTER_PALETTE.skin, { gloss: .2 });
+  const trousers = material(LEGACY_CHARACTER_PALETTE.trousers, { gloss: .16 });
+  const boots = material(LEGACY_CHARACTER_PALETTE.boots, { gloss: .18 });
+  const pack = material(LEGACY_CHARACTER_PALETTE.backpack, { gloss: .16 });
   const hair = material([.08, .055, .04], { gloss: .14 });
-  const dark = material([.055, .075, .07], { gloss: .18 });
+  const dark = material(LEGACY_CHARACTER_PALETTE.dark, { gloss: .18 });
   const accent = material(palette.rgb.map((value) => clamp(value * .62, 0, 1)));
   const accessory = material([.84, .42, .13], { gloss: .3 });
   const blobBlue = material([.28, .72, .95], { emissive: [.01, .03, .05], gloss: .38 });
@@ -121,7 +123,7 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
 
   primitive(humanRig, 'Remote upper torso', 'box', { x: 0, y: .1, z: 0 }, { x: .7, y: .62, z: .4 }, cloth);
   primitive(humanRig, 'Remote lower torso', 'box', { x: 0, y: -.27, z: 0 }, { x: .55, y: .18, z: .36 }, accent);
-  primitive(humanRig, 'Remote pack', 'box', { x: 0, y: .08, z: .27 }, { x: .5, y: .58, z: .2 }, accent);
+  const backpack = primitive(humanRig, 'Remote pack', 'box', { x: 0, y: .08, z: .27 }, { x: .5, y: .58, z: .2 }, pack);
   primitive(humanRig, 'Remote neck', 'cylinder', { x: 0, y: .52, z: 0 }, { x: .14, y: .2, z: .14 }, skin);
   primitive(humanRig, 'Remote head', 'sphere', { x: 0, y: .77, z: 0 }, { x: .45, y: .5, z: .43 }, skin);
   primitive(humanRig, 'Remote nose', 'cone', { x: 0, y: .74, z: -.42 }, { x: .07, y: .14, z: .07 }, skin, { x: 90 });
@@ -147,19 +149,22 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   primitive(hairStyles.get('tousled'), 'Remote tousled hair cap', 'sphere', { x: 0, y: .95, z: .015 }, { x: .46, y: .18, z: .44 }, hair);
   [-.2, 0, .2].forEach((x, index) => primitive(hairStyles.get('tousled'), `Remote hair lock ${index + 1}`,
     'cone', { x, y: 1.04 + (index % 2) * .035, z: -.01 }, { x: .12, y: .22, z: .12 }, hair, { z: (index - 1) * -12 }));
-  primitive(hairStyles.get('ponytail'), 'Remote ponytail cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
+  const ponytailTop = primitive(hairStyles.get('ponytail'), 'Remote ponytail cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
   primitive(hairStyles.get('ponytail'), 'Remote ponytail', 'sphere', { x: 0, y: .66, z: .39 }, { x: .2, y: .36, z: .19 }, hair);
   [-.18, 0, .18].forEach((z, index) => primitive(hairStyles.get('mohawk'), `Remote mohawk ${index + 1}`,
     'cone', { x: 0, y: 1.05, z }, { x: .15, y: .34 + (index === 1 ? .06 : 0), z: .15 }, hair));
-  primitive(hairStyles.get('long'), 'Remote long hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
+  const longHairTop = primitive(hairStyles.get('long'), 'Remote long hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
   primitive(hairStyles.get('long'), 'Remote long hair back', 'sphere', { x: 0, y: .64, z: .3 }, { x: .42, y: .56, z: .19 }, hair);
   primitive(hairStyles.get('bun'), 'Remote bun hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
   primitive(hairStyles.get('bun'), 'Remote trail bun', 'sphere', { x: 0, y: 1, z: .36 }, { x: .26, y: .26, z: .26 }, hair);
-  primitive(hairStyles.get('braids'), 'Remote braids hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
+  const braidsTop = primitive(hairStyles.get('braids'), 'Remote braids hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
   for (const side of [-1, 1]) {
     primitive(hairStyles.get('braids'), `Remote braid ${side}`, 'cylinder',
       { x: side * .32, y: .62, z: .18 }, { x: .1, y: .48, z: .1 }, hair, { z: side * 5 });
   }
+  const hairTopParts = new Map([
+    ['ponytail', [ponytailTop]], ['long', [longHairTop]], ['braids', [braidsTop]]
+  ]);
 
   const accessories = new Map([
     ['beanie', makeGroup('Remote beanie')],
@@ -199,8 +204,8 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   };
   primitive(limbs.leftArm, 'Remote left hand', 'sphere', { x: 0, y: -.72, z: 0 }, { x: .2, y: .2, z: .2 }, skin);
   primitive(limbs.rightArm, 'Remote right hand', 'sphere', { x: 0, y: -.72, z: 0 }, { x: .2, y: .2, z: .2 }, skin);
-  primitive(limbs.leftLeg, 'Remote left boot', 'box', { x: 0, y: -.55, z: -.1 }, { x: .28, y: .17, z: .43 }, dark);
-  primitive(limbs.rightLeg, 'Remote right boot', 'box', { x: 0, y: -.55, z: -.1 }, { x: .28, y: .17, z: .43 }, dark);
+  primitive(limbs.leftLeg, 'Remote left boot', 'box', { x: 0, y: -.55, z: -.1 }, { x: .28, y: .17, z: .43 }, boots);
+  primitive(limbs.rightLeg, 'Remote right boot', 'box', { x: 0, y: -.55, z: -.1 }, { x: .28, y: .17, z: .43 }, boots);
 
   // Match the original multiplayer proxy: capsule, round head, and facing marker.
   primitive(blobRig, 'Remote classic Blue Blob body', 'capsule', { x: 0, y: -.05, z: 0 }, { x: .72, y: 1.12, z: .72 }, blobBlue);
@@ -219,6 +224,7 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   root.catchPresentationId = null;
   root.catchPresentationExpiresAt = 0;
   root.currentEmote = null;
+  root.posture = 'standing';
   root.appearance = normalizeAppearance(initialAppearance);
   root.setAppearance = (value) => {
     root.appearance = normalizeAppearance(value);
@@ -232,11 +238,17 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     setMaterialColor(blobBlue, resolved.blobColor, .03);
     humanRig.enabled = root.appearance.avatarType === 'human';
     blobRig.enabled = root.appearance.avatarType === 'blob';
-    const showHair = !accessoryConcealsHair(root.appearance.accessory);
-    for (const [id, group] of hairStyles) group.enabled = showHair && id === root.appearance.hairStyle;
-    for (const [id, group] of accessories) group.enabled = id === root.appearance.accessory;
+    const hairVisibility = hairVisibilityForHeadwear(root.appearance.hairStyle, root.appearance.headwear);
+    for (const [id, group] of hairStyles) group.enabled = hairVisibility.root && id === root.appearance.hairStyle;
+    for (const part of hairTopParts.get(root.appearance.hairStyle) ?? []) part.enabled = hairVisibility.top;
+    const wornAccessories = new Set([
+      root.appearance.headwear, root.appearance.eyewear, root.appearance.faceAccessory
+    ]);
+    for (const [id, group] of accessories) group.enabled = wornAccessories.has(id);
+    backpack.enabled = root.appearance.backAccessory === 'backpack';
   };
   root.setAppearance(root.appearance);
+  root.setPosture = (value) => { root.posture = value === 'seated' ? 'seated' : 'standing'; };
   root.setFishingState = (value) => {
     fishingRod.enabled = typeof value === 'object' ? Boolean(value?.active) : value === 'active';
   };
@@ -250,9 +262,10 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     let rightLeg = moving ? Math.sin(phase) * 30 : 0;
     if (root.currentEmote
       && now - root.currentEmote.startedAt >= emoteDurationMs(root.currentEmote.id)) root.currentEmote = null;
+    const seated = root.posture === 'seated';
     const emote = state === 'grounded' && speed <= .25 && !fishingRod.enabled && !catchRoot.enabled
       ? root.currentEmote : null;
-    rig.setLocalPosition(0, emote?.id === 'sit' ? -.48 : -.06, 0);
+    rig.setLocalPosition(0, seated || emote?.id === 'sit' ? -.48 : -.06, 0);
     if (state === 'airborne') { leftArm = -38; rightArm = -38; leftLeg = 20; rightLeg = -12; }
     if (state === 'sliding') { leftArm = 34; rightArm = -22; leftLeg = -38; rightLeg = -48; }
     if (state === 'climbing' || state === 'mantling') {
@@ -282,7 +295,12 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
       leftLeg = -swing * 25;
       rightLeg = swing * 25;
     }
-    if (fishingRod.enabled || catchRoot.enabled) { leftArm = 72; rightArm = 58; leftLeg = 0; rightLeg = 0; }
+    if (seated) { leftLeg = 76; rightLeg = 76; }
+    if (fishingRod.enabled || catchRoot.enabled) {
+      leftArm = 72;
+      rightArm = 58;
+      if (!seated) { leftLeg = 0; rightLeg = 0; }
+    }
     limbs.leftArm.setLocalEulerAngles(leftArm, 0, 8);
     limbs.rightArm.setLocalEulerAngles(rightArm, 0, -8);
     limbs.leftLeg.setLocalEulerAngles(leftLeg, 0, 0);

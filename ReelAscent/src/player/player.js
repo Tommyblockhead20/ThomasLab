@@ -13,7 +13,7 @@ import { stabilizeWedgeMovement } from './collision-stability.js';
 import { createContactRecovery, sampleContactRecovery } from './contact-recovery.js';
 import { moveToward, PlayerInput, StaminaResource } from './movement.js';
 import { emoteDurationMs, EMOTE_IDS, normalizeEmote } from '../multiplayer/emotes.js';
-import { accessoryConcealsHair, normalizeAppearance, resolveAppearance } from './appearance.js';
+import { LEGACY_CHARACTER_PALETTE, hairVisibilityForHeadwear, normalizeAppearance, resolveAppearance } from './appearance.js';
 import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
 
 function makeMaterial(values, gloss = 0.12) {
@@ -270,12 +270,12 @@ export class Player {
   buildCharacter() {
     const jacket = makeMaterial(COLORS.player);
     const accent = makeMaterial(COLORS.playerAccent);
-    const skin = makeMaterial([0.93, 0.72, 0.52]);
-    const boots = makeMaterial([0.16, 0.18, 0.16]);
-    const pack = makeMaterial([0.18, 0.39, 0.34]);
-    const trousers = makeMaterial([0.23, 0.31, 0.29]);
+    const skin = makeMaterial(LEGACY_CHARACTER_PALETTE.skin);
+    const boots = makeMaterial(LEGACY_CHARACTER_PALETTE.boots);
+    const pack = makeMaterial(LEGACY_CHARACTER_PALETTE.backpack);
+    const trousers = makeMaterial(LEGACY_CHARACTER_PALETTE.trousers);
     const hair = makeMaterial([0.08, 0.05, 0.035], 0.18);
-    const dark = makeMaterial([0.055, 0.075, 0.07], 0.4);
+    const dark = makeMaterial(LEGACY_CHARACTER_PALETTE.dark, 0.4);
     const accessory = makeMaterial([0.84, 0.42, 0.13], .3);
     const blobBlue = makeMaterial([0.28, 0.72, 0.95], .38);
     this.appearanceMaterials = { jacket, accent, skin, boots, pack, trousers, hair, dark, accessory, blobBlue };
@@ -331,18 +331,18 @@ export class Player {
     [-.23, 0, .22].forEach((x, index) => this.addVisual(`Tousled lock ${index + 1}`, 'cone',
       { x, y: .995 + (index % 2) * .045, z: -.02 }, { x: .13, y: .25, z: .13 }, hair,
       { z: (index - 1) * -12 }, tousledHair));
-    this.addVisual('Ponytail hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, ponytailHair);
+    const ponytailTop = this.addVisual('Ponytail hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, ponytailHair);
     this.addVisual('Ponytail tie', 'sphere', { x: 0, y: .77, z: .4 }, { x: .17, y: .17, z: .17 }, accent, {}, ponytailHair);
     this.addVisual('Ponytail', 'sphere', { x: 0, y: .58, z: .45 }, { x: .22, y: .38, z: .2 }, hair, { x: -8 }, ponytailHair);
     [-.2, 0, .2].forEach((z, index) => this.addVisual(`Mohawk crest ${index + 1}`, 'cone',
       { x: 0, y: 1.02, z }, { x: .16, y: .35 + (index === 1 ? .08 : 0), z: .16 }, hair, {}, mohawkHair));
-    this.addVisual('Long hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .48, y: .2, z: .46 }, hair, {}, longHair);
+    const longHairTop = this.addVisual('Long hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .48, y: .2, z: .46 }, hair, {}, longHair);
     this.addVisual('Long hair back', 'sphere', { x: 0, y: .58, z: .3 }, { x: .43, y: .58, z: .2 }, hair, { x: -5 }, longHair);
     for (const side of [-1, 1]) this.addVisual(`Long hair side ${side}`, 'sphere',
       { x: side * .37, y: .62, z: .05 }, { x: .13, y: .46, z: .15 }, hair, { z: side * 5 }, longHair);
     this.addVisual('Trail bun hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, bunHair);
     this.addVisual('Trail bun', 'sphere', { x: 0, y: .96, z: .36 }, { x: .27, y: .27, z: .27 }, hair, {}, bunHair);
-    this.addVisual('Braids hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, braidsHair);
+    const braidsTop = this.addVisual('Braids hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, braidsHair);
     for (const side of [-1, 1]) {
       this.addVisual(`Braid ${side} upper`, 'cylinder', { x: side * .33, y: .57, z: .18 },
         { x: .11, y: .48, z: .11 }, hair, { z: side * 5 }, braidsHair);
@@ -352,6 +352,9 @@ export class Player {
     this.hairStyles = new Map([
       ['short', shortHair], ['tousled', tousledHair], ['ponytail', ponytailHair],
       ['mohawk', mohawkHair], ['long', longHair], ['bun', bunHair], ['braids', braidsHair], ['bald', baldHair]
+    ]);
+    this.hairTopParts = new Map([
+      ['ponytail', [ponytailTop]], ['long', [longHairTop]], ['braids', [braidsTop]]
     ]);
 
     const beanie = new pc.Entity('Beanie accessory');
@@ -388,14 +391,15 @@ export class Player {
       ['headlamp', headlamp], ['scarf', scarf], ['flower-crown', flowerCrown], ['goggles', goggles]
     ]);
 
-    this.addVisual(
+    const backpackBody = this.addVisual(
       'Backpack', 'box',
       { x: 0, y: -0.03, z: 0.34 },
       { x: 0.55, y: 0.66, z: 0.27 },
       pack,
       { x: -7, y: 0, z: 0 }, this.humanRig
     );
-    this.addVisual('Backpack flap', 'box', { x: 0, y: 0.15, z: 0.495 }, { x: 0.45, y: 0.18, z: 0.05 }, accent, { x: -7 }, this.humanRig);
+    const backpackFlap = this.addVisual('Backpack flap', 'box', { x: 0, y: 0.15, z: 0.495 }, { x: 0.45, y: 0.18, z: 0.05 }, accent, { x: -7 }, this.humanRig);
+    this.backAccessoryRoots = new Map([['backpack', [backpackBody, backpackFlap]]]);
 
     this.leftLimb = this.buildLimb('Left', jacket, skin, trousers, boots, this.humanRig);
     this.rightLimb = this.buildLimb('Right', jacket, skin, trousers, boots, this.humanRig);
@@ -430,9 +434,16 @@ export class Player {
     setMaterialColor(this.appearanceMaterials.blobBlue, resolved.blobColor);
     this.humanRig.enabled = this.appearance.avatarType === 'human';
     this.blobRig.enabled = this.appearance.avatarType === 'blob';
-    const showHair = !accessoryConcealsHair(this.appearance.accessory);
-    for (const [id, root] of this.hairStyles) root.enabled = showHair && id === this.appearance.hairStyle;
-    for (const [id, root] of this.accessories) root.enabled = id === this.appearance.accessory;
+    const hairVisibility = hairVisibilityForHeadwear(this.appearance.hairStyle, this.appearance.headwear);
+    for (const [id, root] of this.hairStyles) root.enabled = hairVisibility.root && id === this.appearance.hairStyle;
+    for (const part of this.hairTopParts.get(this.appearance.hairStyle) ?? []) part.enabled = hairVisibility.top;
+    const wornAccessories = new Set([
+      this.appearance.headwear, this.appearance.eyewear, this.appearance.faceAccessory
+    ]);
+    for (const [id, root] of this.accessories) root.enabled = wornAccessories.has(id);
+    for (const [id, roots] of this.backAccessoryRoots) {
+      for (const root of roots) root.enabled = id === this.appearance.backAccessory;
+    }
     return this.getAppearance();
   }
 
@@ -983,6 +994,7 @@ export class Player {
     this.contactRecovery = null;
     this.clearContactMotionLock();
     this.resetSlideState();
+    if (this.benchSeat) this.grounded = true;
     this.movementState = this.grounded ? 'grounded' : 'airborne';
     const position = this.body.translation();
     this.stationaryProbePosition.set(position.x, position.y, position.z);
@@ -1006,6 +1018,10 @@ export class Player {
       // Contact recovery can change movementState before the normal fishing branch runs.
       // Repair that split state immediately; Escape is sampled before any early return.
       this.exitFishing({ releasePointerLock: cancelPressed });
+    }
+    if (cancelPressed && this.benchSeat && !this.fishing?.active) {
+      this.clearBenchSeat();
+      return;
     }
     if (this.updateContactRecovery(dt)) return;
     this.slideBraking = false;
@@ -1031,6 +1047,12 @@ export class Player {
 
     const inputLength = Math.hypot(axes.x, axes.z);
     const hasMoveInput = inputLength > 0.01;
+    if (this.benchSeat && (hasMoveInput || jumpPressed || this.input.sprintHeld || this.input.slideHeld)) {
+      // A deliberate stand request owns the whole frame: seated fishing is cancelled first,
+      // then the capsule is placed at the authored clear exit instead of being pulled through furniture.
+      this.clearBenchSeat();
+      return;
+    }
     if (!this.benchSeat && this.currentEmote && (hasMoveInput || jumpPressed || fishingToggle
       || this.input.sprintHeld || this.input.slideHeld || this.input.gripHeld
       || this.movementState !== 'grounded')) {
@@ -1073,10 +1095,11 @@ export class Player {
         this.sprinting = false;
         this.canGrip = false;
         this.horizontalVelocity.set(0, 0, 0);
-        this.verticalVelocity = this.grounded ? -1.8 : this.verticalVelocity - PLAYER_CONFIG.gravity * dt;
+        this.verticalVelocity = this.benchSeat ? 0 : (this.grounded ? -1.8 : this.verticalVelocity - PLAYER_CONFIG.gravity * dt);
         this.stamina.update(dt, false, false, canRegenerateStamina);
         this.fishing.update(dt, cameraAxes);
-        this.applyKinematicMovement({ x: 0, y: this.verticalVelocity * dt, z: 0 });
+        if (this.benchSeat) this.holdSeatAnchor();
+        else this.applyKinematicMovement({ x: 0, y: this.verticalVelocity * dt, z: 0 });
         return;
       }
     } else if (fishingToggle && this.fishing && this.grounded) {
@@ -1099,9 +1122,11 @@ export class Player {
       this.sprinting = false;
       this.canGrip = false;
       this.horizontalVelocity.set(0, 0, 0);
-      this.verticalVelocity = this.grounded ? -1.8 : this.verticalVelocity - PLAYER_CONFIG.gravity * dt;
+      this.verticalVelocity = 0;
+      this.grounded = true;
+      this.movementState = 'grounded';
       this.stamina.update(dt, false, false, canRegenerateStamina);
-      this.applyKinematicMovement({ x: 0, y: this.verticalVelocity * dt, z: 0 });
+      this.holdSeatAnchor();
       return;
     }
     this.input.consumeForceBite();
@@ -1687,7 +1712,7 @@ export class Player {
       else this.respawn();
       return;
     }
-    if (this.movementState === 'fishing' && !this.grounded) {
+    if (this.movementState === 'fishing' && !this.grounded && !this.benchSeat) {
       this.exitFishing();
     }
     if (this.movementState !== 'climbing'
@@ -1988,14 +2013,30 @@ export class Player {
       id: interaction.id,
       seatPosition: { ...interaction.seatPosition },
       exitPosition: interaction.exitPosition ? { ...interaction.exitPosition } : null,
-      facingYaw: interaction.facingYaw
+      facingYaw: interaction.facingYaw,
+      seatKind: interaction.seatKind ?? (interaction.action === 'bench' ? 'bench' : 'seat')
     };
+    this.grounded = true;
+    this.movementState = 'grounded';
+    this.verticalVelocity = 0;
+    return true;
+  }
+
+  holdSeatAnchor() {
+    const seat = this.benchSeat;
+    if (!seat?.seatPosition) return false;
+    this.body.setNextKinematicTranslation(seat.seatPosition);
+    this.horizontalVelocity.set(0, 0, 0);
+    this.verticalVelocity = 0;
+    this.grounded = true;
+    this.facingYaw = seat.facingYaw;
     return true;
   }
 
   clearBenchSeat() {
     const seat = this.benchSeat;
     if (!seat) return false;
+    this.exitFishing();
     this.benchSeat = null;
     this.cancelEmote();
     if (seat.exitPosition) this.teleport(seat.exitPosition, seat.facingYaw);
@@ -2045,6 +2086,7 @@ export class Player {
       staminaSupport: this.getFootSupportInfo().fraction,
       staminaContactSupport: this.getFootSupportInfo().contactFraction,
       movementState: this.movementState,
+      posture: this.benchSeat ? 'seated' : 'standing',
       appearance: this.getAppearance(),
       heldSpecimenId: this.heldInventorySpecimen?.specimenId ?? null,
       emote: this.currentEmote ? { ...this.currentEmote } : null,

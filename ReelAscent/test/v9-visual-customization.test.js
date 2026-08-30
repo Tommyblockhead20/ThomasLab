@@ -38,6 +38,10 @@ const customAppearance = Object.freeze({
   hairStyle: 'mohawk',
   hairColor: 'teal',
   accessory: 'glasses',
+  headwear: 'none',
+  eyewear: 'glasses',
+  faceAccessory: 'none',
+  backAccessory: 'backpack',
   shirtTint: '#123456',
   pantsTint: '#654321',
   hairTint: '#abcdef',
@@ -143,7 +147,7 @@ test('environment pass tapers vegetation and keeps small detail decorative', asy
   ]);
   assert.match(mountain, /buildEnvironmentAesthetics/);
   assert.match(mountain, /solidTrees < LOWLAND_TREE_CONFIG\.maximumClimbableTrees/);
-  assert.match(mountain, /Lowland pine[\s\S]*Lower mountain bush[\s\S]*Hardy alpine scrub/);
+  assert.match(mountain, /addEnvironmentTree[\s\S]*Lower mountain bush[\s\S]*Hardy alpine scrub/);
   assert.match(mountain, /Coastal grass cluster[\s\S]*castShadows: false/);
   assert.match(mountain, /isEnvironmentPlacementOpen[\s\S]*rockPlacements\.some/);
   assert.match(mountain, /500ft wind-bent landmark shrub|\$\{rest\.id\} wind-bent landmark shrub/);
