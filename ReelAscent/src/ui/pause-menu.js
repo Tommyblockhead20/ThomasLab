@@ -30,16 +30,25 @@ const downloadProgressJson = (text, prefix = 'reel-ascent-progress') => {
 };
 
 export class PauseMenu {
-  constructor(progression, { getStats = () => ({}), onResume = () => {} } = {}) {
+  constructor(progression, { getStats = () => ({}), onResume = () => {}, onMultiplayer = () => {} } = {}) {
     this.progression = progression;
     this.getStats = getStats;
     this.onResume = onResume;
+    this.onMultiplayer = onMultiplayer;
     this.screen = document.querySelector('#pause-menu');
     this.content = document.querySelector('#pause-content');
     this.status = document.querySelector('#pause-status');
     this.resumeButton = document.querySelector('#pause-resume');
     this.tabs = document.querySelector('#pause-tabs');
     this.fileInput = document.querySelector('#pause-progress-file');
+    this.multiplayerButton = this.tabs?.querySelector('[data-pause-open-multiplayer]') ?? null;
+    if (!this.multiplayerButton && this.tabs) {
+      this.multiplayerButton = document.createElement('button');
+      this.multiplayerButton.type = 'button';
+      this.multiplayerButton.dataset.pauseOpenMultiplayer = '';
+      this.multiplayerButton.textContent = 'MULTIPLAYER';
+      this.tabs.appendChild(this.multiplayerButton);
+    }
     this.activeTab = 'stats';
     this.isOpen = false;
     this.awaitingBinding = null;
@@ -136,6 +145,10 @@ export class PauseMenu {
   }
 
   handleClick(event) {
+    if (event.target.closest('[data-pause-open-multiplayer]')) {
+      this.onMultiplayer();
+      return;
+    }
     const tab = event.target.closest('[data-pause-tab]');
     if (tab) {
       this.activeTab = tab.dataset.pauseTab;

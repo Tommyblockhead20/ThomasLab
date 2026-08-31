@@ -151,8 +151,8 @@ export class Game {
     this.remoteCatchNotices = new Map();
     this.multiplayerCatchFeed = document.querySelector('#multiplayer-catch-feed');
     this.multiplayer = new MultiplayerClient(this.saveSystem.multiplayerPlayerId, {
-      createRemoteRepresentation: (playerId, colorIndex, appearance) => (
-        this.createRemotePlayerRepresentation(playerId, colorIndex, appearance)
+      createRemoteRepresentation: (playerId, colorIndex, appearance, displayName) => (
+        this.createRemotePlayerRepresentation(playerId, colorIndex, appearance, displayName)
       ),
       onAuthoritativeRunSeed: (runSeed) => this.applyAuthoritativeRunSeed(runSeed)
     });
@@ -178,7 +178,11 @@ export class Game {
     this.camera.update(1 / 60, true);
     this.pauseMenu = new PauseMenu(this.progression, {
       getStats: () => this.getLifetimeStats(),
-      onResume: () => this.setLocalPause(false)
+      onResume: () => this.setLocalPause(false),
+      onMultiplayer: () => {
+        this.setLocalPause(false);
+        this.multiplayerMenu.open();
+      }
     });
 
     this.onResize = () => this.app.resizeCanvas();
@@ -309,7 +313,8 @@ export class Game {
       posture: multiplayerPlayerState.posture,
       appearance: multiplayerPlayerState.appearance,
       emote: multiplayerPlayerState.emote,
-      fishingState: multiplayerPlayerState.movementState === 'fishing' ? 'active' : null
+      fishingState: multiplayerPlayerState.movementState === 'fishing' ? 'active' : null,
+      heldItem: multiplayerPlayerState.heldItem
     });
     this.syncMultiplayerFishingState(multiplayerPlayerState);
     this.syncMultiplayerCatchPresentation();
@@ -337,7 +342,7 @@ export class Game {
 
   isGameplayInputCode(code) {
     return Boolean(this.player?.input?.matchesAnyGameplayCode?.(code))
-      || ['KeyJ', 'KeyI', 'KeyM', 'KeyE'].includes(code);
+      || ['KeyJ', 'KeyI', 'KeyE'].includes(code);
   }
 
   isGameplayModalOpen() {
@@ -523,8 +528,8 @@ export class Game {
     };
   }
 
-  createRemotePlayerRepresentation(playerId, colorIndex = 0, appearance = null) {
-    return createRemoteAvatar(this.app, playerId, colorIndex, appearance);
+  createRemotePlayerRepresentation(playerId, colorIndex = 0, appearance = null, displayName = 'Player') {
+    return createRemoteAvatar(this.app, playerId, colorIndex, appearance, displayName);
   }
 
   travelByBoat(destinationId) {
@@ -586,7 +591,7 @@ export class Game {
     }
     const shiny = catchData.shiny ? ' SHINY' : '';
     const player = this.multiplayer.room.getPlayerPresentation(catchData.playerId);
-    const identity = `${player?.colorName ?? 'REMOTE'} PLAYER`;
+    const identity = player?.displayName || player?.name || `${player?.colorName ?? 'REMOTE'} PLAYER`;
     this.remoteCatchNotices.set(catchData.playerId, {
       presentationId: catchData.presentationId,
       identity,

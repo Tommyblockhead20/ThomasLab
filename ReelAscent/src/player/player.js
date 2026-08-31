@@ -113,6 +113,7 @@ export class Player {
     this.stationaryProbePosition = new pc.Vec3(spawnPoint.x, spawnPoint.y, spawnPoint.z);
     this.movementState = 'airborne';
     this.currentEmote = null;
+    this.sitFishingPausedAt = null;
     this.benchSeat = null;
     this.canGrip = false;
     this.gripCandidate = null;
@@ -1031,6 +1032,10 @@ export class Player {
 
   exitFishing(options = {}) {
     const wasFishing = Boolean(this.fishing?.active || this.movementState === 'fishing');
+    if (this.currentEmote?.id === 'sit' && this.sitFishingPausedAt !== null) {
+      this.currentEmote.startedAt += Math.max(0, Date.now() - this.sitFishingPausedAt);
+      this.sitFishingPausedAt = null;
+    }
     this.fishing?.cancel();
     this.input.endRhythmCapture();
     this.input.discardPrimaryEdges();
@@ -1102,9 +1107,12 @@ export class Player {
       this.clearBenchSeat();
       return;
     }
-    if (!this.benchSeat && this.currentEmote && (hasMoveInput || jumpPressed || fishingToggle
+    const sitFishingCompatible = this.currentEmote?.id === 'sit'
+      && (this.movementState === 'fishing' || fishingToggle);
+    if (!this.benchSeat && this.currentEmote && (hasMoveInput || jumpPressed
+      || (!sitFishingCompatible && fishingToggle)
       || this.input.sprintHeld || this.input.slideHeld || this.input.gripHeld
-      || this.movementState !== 'grounded')) {
+      || (!sitFishingCompatible && this.movementState !== 'grounded'))) {
       this.cancelEmote();
     }
     const footSupport = this.getFootSupportInfo();
@@ -1154,6 +1162,7 @@ export class Player {
     } else if (fishingToggle && this.fishing && this.grounded) {
       const zone = this.fishing.findNearbyZone();
       if (zone && this.fishing.enter(zone)) {
+        if (this.currentEmote?.id === 'sit') this.sitFishingPausedAt = Date.now();
         this.resetSlideState();
         this.movementState = 'fishing';
         this.sprinting = false;
@@ -1858,13 +1867,15 @@ export class Player {
         leftArmRoll = -22;
         rightArmRoll = 22;
       } else if (this.currentEmote.id === 'clap') {
-        const clap = Math.sin(phase * 9);
-        leftShoulder = 78 + clap * 5;
-        rightShoulder = 78 + clap * 5;
-        leftElbow = -72 - clap * 14;
-        rightElbow = -72 - clap * 14;
-        leftArmRoll = -52 + clap * 12;
-        rightArmRoll = 52 - clap * 12;
+        // Smooth open -> contact -> open cycles. Most of the visible travel comes from the
+        // shoulders/roll, while the elbows fold slightly at contact so the hands meet in front.
+        const contact = (1 - Math.cos(phase * Math.PI * 2 * 1.7)) * .5;
+        leftShoulder = 72 + contact * 14;
+        rightShoulder = 72 + contact * 14;
+        leftElbow = -54 - contact * 24;
+        rightElbow = -54 - contact * 24;
+        leftArmRoll = -30 - contact * 38;
+        rightArmRoll = 30 + contact * 38;
       } else if (this.currentEmote.id === 'sit') {
         leftShoulder = -8;
         rightShoulder = -8;
@@ -1983,8 +1994,8 @@ export class Player {
       rightElbow = -7;
     }
 
-    if (this.benchSeat && ['grounded', 'fishing'].includes(this.movementState)) {
-      // Preserve the seated lower-body pose while the fishing arms/catch pose runs.
+    if ((this.benchSeat || this.currentEmote?.id === 'sit') && ['grounded', 'fishing'].includes(this.movementState)) {
+      // Preserve the seated lower-body pose while fishing arms/catch presentation runs.
       leftHip = 74;
       rightHip = 74;
       leftKnee = -88;
@@ -2171,11 +2182,16 @@ export class Player {
   cancelEmote() {
     const active = Boolean(this.currentEmote);
     this.currentEmote = null;
+    this.sitFishingPausedAt = null;
     return active;
   }
 
   updateEmote(now = Date.now()) {
     if (!this.currentEmote) return;
+    if (this.currentEmote.id === 'sit' && this.movementState === 'fishing') {
+      if (this.sitFishingPausedAt === null) this.sitFishingPausedAt = now;
+      return;
+    }
     if (now - this.currentEmote.startedAt >= emoteDurationMs(this.currentEmote.id)) this.cancelEmote();
   }
 
@@ -2203,6 +2219,16 @@ export class Player {
       posture: this.benchSeat ? 'seated' : 'standing',
       appearance: this.getAppearance(),
       heldSpecimenId: this.heldInventorySpecimen?.specimenId ?? null,
+      heldItem: this.heldInventorySpecimen ? {
+        type: 'specimen',
+        specimenId: this.heldInventorySpecimen.specimenId ?? '',
+        speciesId: this.heldInventorySpecimen.speciesId ?? '',
+        name: this.heldInventorySpecimen.name ?? '',
+        rarity: this.heldInventorySpecimen.rarity ?? 'Common',
+        length: Number(this.heldInventorySpecimen.length) || 0,
+        weight: Number(this.heldInventorySpecimen.weight) || 0,
+        shiny: Boolean(this.heldInventorySpecimen.shiny)
+      } : null,
       emote: this.currentEmote ? { ...this.currentEmote } : null,
       slideBraking: this.slideBraking,
       slideActive: this.slideActive,

@@ -35,6 +35,22 @@ export function parseProtocolMessage(value) {
 // Rhythm key presses, held lanes, chart judgments, and note timing deliberately never
 // cross this boundary. Only remote presentation state is included in a snapshot.
 export function createPlayerSnapshot(playerId, state, sequence) {
+  const now = Date.now();
+  const emote = state.emote?.id ? {
+    id: state.emote.id,
+    startedAt: Number(state.emote.startedAt) || now,
+    elapsedMs: Math.max(0, now - (Number(state.emote.startedAt) || now))
+  } : null;
+  const heldItem = state.heldItem?.type === 'specimen' && state.heldItem.speciesId ? {
+    type: 'specimen',
+    specimenId: String(state.heldItem.specimenId ?? '').slice(0, 140),
+    speciesId: String(state.heldItem.speciesId).slice(0, 100),
+    name: String(state.heldItem.name ?? '').slice(0, 100),
+    rarity: String(state.heldItem.rarity ?? 'Common').slice(0, 24),
+    length: Number(state.heldItem.length) || 0,
+    weight: Number(state.heldItem.weight) || 0,
+    shiny: Boolean(state.heldItem.shiny)
+  } : null;
   return createProtocolMessage(MESSAGE_TYPES.PLAYER_SNAPSHOT, {
     playerId,
     sequence,
@@ -48,7 +64,8 @@ export function createPlayerSnapshot(playerId, state, sequence) {
     movement: state.movement,
     posture: state.posture === 'seated' ? 'seated' : 'standing',
     appearance: compactAppearance(state.appearance),
-    emote: state.emote ?? null,
-    fishingState: state.fishingState ?? null
+    emote,
+    fishingState: state.fishingState ?? null,
+    heldItem
   });
 }

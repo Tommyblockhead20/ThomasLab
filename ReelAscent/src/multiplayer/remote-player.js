@@ -6,6 +6,8 @@ export class RemotePlayer {
     this.representation = representation;
     this.snapshots = new SnapshotBuffer();
     this.fishingState = null;
+    this.displayName = '';
+    this.heldItem = null;
     this.movement = 'airborne';
     this.locationId = 'main-mountain';
     this.coordinateSpace = 'global-world';
@@ -33,6 +35,10 @@ export class RemotePlayer {
     }
     if (typeof snapshot.movement === 'string') this.movement = snapshot.movement;
     if (snapshot.emote !== undefined) this.representation?.setEmote?.(snapshot.emote);
+    if (snapshot.heldItem !== undefined) {
+      this.heldItem = snapshot.heldItem;
+      this.representation?.setHeldItem?.(snapshot.heldItem);
+    }
     return this.snapshots.push(snapshot);
   }
 
@@ -42,7 +48,9 @@ export class RemotePlayer {
   }
 
   syncVisibility() {
-    if (this.representation) this.representation.enabled = this.locationId === this.localLocationId;
+    const visible = this.locationId === this.localLocationId;
+    if (this.representation?.setRemoteVisible) this.representation.setRemoteVisible(visible);
+    else if (this.representation) this.representation.enabled = visible;
   }
 
   update(now = Date.now()) {

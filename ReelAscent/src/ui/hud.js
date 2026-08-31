@@ -18,7 +18,15 @@ export class Hud {
     this.debugPanel = document.querySelector('#debug-panel');
     this.gripPrompt = document.querySelector('#grip-prompt');
     this.fishPrompt = document.querySelector('#fish-prompt');
-    this.controlHints = Object.fromEntries(['move', 'sprint', 'jump', 'slide', 'grip', 'fish', 'inventory', 'journal', 'multiplayer', 'emotes', 'map'].map((id) => [
+    const multiplayerHints = new Set([
+      ...document.querySelectorAll('[data-control-hint="multiplayer"]'),
+      ...[...document.querySelectorAll('.controls-card > span')].filter((hint) => /multiplayer/i.test(hint.textContent ?? ''))
+    ]);
+    for (const hint of multiplayerHints) {
+      hint.dataset.controlHint = 'settings';
+      hint.innerHTML = '<kbd>Esc</kbd> Settings';
+    }
+    this.controlHints = Object.fromEntries(['move', 'sprint', 'jump', 'slide', 'grip', 'fish', 'inventory', 'journal', 'settings', 'emotes', 'map'].map((id) => [
       id, [...document.querySelectorAll(`[data-control-hint="${id}"] kbd, [data-control-key="${id}"]`)]
     ]));
     this.fishingPanel = document.querySelector('#fishing-panel');
@@ -169,7 +177,7 @@ export class Hud {
       fish: formatInputCode(bindings.fish ?? 'KeyF'),
       inventory: formatInputCode(bindings.inventory ?? 'KeyI'),
       journal: formatInputCode(bindings.journal ?? 'KeyJ'),
-      multiplayer: formatInputCode(bindings.multiplayer ?? 'KeyM'),
+      settings: 'Esc',
       emotes: formatInputCode(bindings.emotes ?? 'KeyE'),
       map: formatInputCode(bindings.map ?? 'KeyV')
     };

@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import { resolveSpecies } from '../fishing/fish-data.js';
+import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
 import { REMOTE_PLAYER_COLORS } from './player-colors.js';
 import { emoteDurationMs, normalizeEmote } from './emotes.js';
 import { LEGACY_CHARACTER_PALETTE, hairVisibilityForHeadwear, normalizeAppearance, resolveAppearance } from '../player/appearance.js';
@@ -43,63 +43,24 @@ function limb(parent, name, pivotPosition, scale, surface) {
   return pivot;
 }
 
-function clearChildren(entity) {
-  for (const child of [...entity.children]) child.destroy();
-}
-
-function createCatchModel(root, catchData) {
-  clearChildren(root);
-  const species = resolveSpecies(catchData.speciesId, true);
-  const visual = species?.visual ?? {};
-  const base = material(visual.colors?.[0] ?? [.4, .68, .42], {
-    emissive: catchData.shiny ? [.08, .08, .025] : [0, 0, 0], gloss: .46
-  });
-  const accent = material(visual.colors?.[1] ?? [.82, .58, .22], {
-    emissive: catchData.shiny ? [.11, .08, .02] : [0, 0, 0], gloss: .38
-  });
-  const eye = material([.025, .035, .03], { gloss: .8 });
-  const lengthMeters = clamp((Number(catchData.length) || 8) * .0254, .18, 4.4);
-  const displayLength = lengthMeters <= 1.5 ? lengthMeters : 1.5 + Math.sqrt(lengthMeters - 1.5) * .72;
-  const lengthScale = clamp(visual.lengthScale ?? 1, .58, 1.55);
-  const depth = clamp(visual.depth ?? 1, .55, 1.55);
-  const width = clamp(visual.width ?? 1, .5, 1.5);
-  const archetype = visual.archetype ?? 'panfish';
-
-  if (['octopus', 'squid', 'jellyfish', 'anemone'].includes(archetype)) {
-    primitive(root, 'Remote catch mantle', 'sphere', { x: .16, y: .03, z: 0 }, { x: .42, y: .46, z: .36 }, base);
-    for (let index = 0; index < 6; index += 1) {
-      primitive(root, `Remote catch tentacle ${index + 1}`, 'cylinder',
-        { x: -.18 - index * .04, y: -.2 + (index % 2) * .1, z: (index - 2.5) * .1 },
-        { x: .045, y: .42 + (index % 3) * .08, z: .045 }, accent, { z: 70 + index * 5 });
-    }
-  } else if (['crab', 'lobster', 'crayfish'].includes(archetype)) {
-    primitive(root, 'Remote catch shell', 'sphere', { x: 0, y: 0, z: 0 }, { x: .48, y: .22, z: .4 }, base);
-    primitive(root, 'Remote catch left claw', 'sphere', { x: .46, y: .03, z: .35 }, { x: .25, y: .15, z: .2 }, accent);
-    primitive(root, 'Remote catch right claw', 'sphere', { x: .46, y: .03, z: -.35 }, { x: .25, y: .15, z: .2 }, accent);
-    for (const side of [-1, 1]) for (let index = 0; index < 3; index += 1) {
-      primitive(root, `Remote catch leg ${side} ${index}`, 'box',
-        { x: -.2 + index * .18, y: -.12, z: side * (.34 + index * .05) },
-        { x: .28, y: .035, z: .035 }, accent, { y: side * (28 + index * 9), z: side * 12 });
-    }
-  } else if (['clam', 'oyster', 'mussel', 'scallop'].includes(archetype)) {
-    primitive(root, 'Remote catch shell', 'sphere', { x: 0, y: 0, z: 0 }, { x: .55, y: .18, z: .43 }, base, { z: -8 });
-    primitive(root, 'Remote catch shell lip', 'sphere', { x: .05, y: .08, z: 0 }, { x: .48, y: .13, z: .38 }, accent, { z: 6 });
+function replaceSpecimenModel(parent, currentModel, specimen, { name, mode = 'held' } = {}) {
+  destroySpecimenModel(currentModel);
+  if (!specimen?.speciesId) return null;
+  const model = createSpecimenModel(specimen, { name });
+  if (!model?.root) return null;
+  parent.addChild(model.root);
+  if (mode === 'catch') {
+    model.root.setLocalPosition(0, 0, 0);
+    model.root.setLocalEulerAngles(-6, -8, -4);
   } else {
-    primitive(root, 'Remote catch body', 'sphere', { x: -.05, y: 0, z: 0 },
-      { x: .58 * lengthScale, y: .25 * depth, z: .22 * width }, base);
-    primitive(root, 'Remote catch head', 'sphere', { x: .42 * lengthScale, y: .02, z: 0 },
-      { x: .29, y: .25 * depth, z: .22 * width }, base);
-    primitive(root, 'Remote catch tail', 'cone', { x: -.58 * lengthScale, y: 0, z: 0 },
-      { x: .28, y: .38 * depth, z: .09 }, accent, { z: 90 });
-    primitive(root, 'Remote catch fin', 'cone', { x: -.05, y: .22 * depth, z: 0 },
-      { x: .16, y: .25, z: .06 }, accent);
-    primitive(root, 'Remote catch eye', 'sphere', { x: .53 * lengthScale, y: .08, z: .2 * width },
-      { x: .045, y: .045, z: .035 }, eye);
+    const x = .45 + Math.min(4, (model.physicalLengthMeters ?? .5) * .42);
+    model.root.setLocalPosition(x, -.29, -.42);
+    model.root.setLocalEulerAngles(-8, -18, -5);
   }
-  root.setLocalScale(displayLength, displayLength, displayLength);
+  return model;
 }
 
-export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppearance = null) {
+export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppearance = null, initialDisplayName = 'Player') {
   const palette = REMOTE_PLAYER_COLORS[colorIndex % REMOTE_PLAYER_COLORS.length];
   const cloth = material(palette.rgb, { emissive: palette.rgb.map((value) => value * .035) });
   const skin = material(LEGACY_CHARACTER_PALETTE.skin, { gloss: .2 });
@@ -126,7 +87,7 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   const backpack = primitive(humanRig, 'Remote pack', 'box', { x: 0, y: .08, z: .27 }, { x: .5, y: .58, z: .2 }, pack);
   primitive(humanRig, 'Remote neck', 'cylinder', { x: 0, y: .52, z: 0 }, { x: .14, y: .2, z: .14 }, skin);
   primitive(humanRig, 'Remote head', 'sphere', { x: 0, y: .77, z: 0 }, { x: .45, y: .5, z: .43 }, skin);
-  primitive(humanRig, 'Remote nose', 'cone', { x: 0, y: .74, z: -.42 }, { x: .07, y: .14, z: .07 }, skin, { x: 90 });
+  primitive(humanRig, 'Remote nose', 'cone', { x: 0, y: .64, z: -.27 }, { x: .065, y: .11, z: .065 }, skin, { x: 90 });
   primitive(humanRig, 'Remote left shoulder', 'sphere', { x: -.38, y: .35, z: 0 }, { x: .24, y: .24, z: .25 }, cloth);
   primitive(humanRig, 'Remote right shoulder', 'sphere', { x: .38, y: .35, z: 0 }, { x: .24, y: .24, z: .25 }, cloth);
 
@@ -225,10 +186,14 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   primitive(blobRig, 'Remote classic Blue Blob head', 'sphere', { x: 0, y: .82, z: 0 }, { x: .48, y: .48, z: .48 }, blobBlue);
   primitive(blobRig, 'Remote classic Blue Blob facing marker', 'box', { x: 0, y: .35, z: -.43 }, { x: .16, y: .16, z: .48 }, blobBlue);
 
-  const fishingRod = primitive(rig, 'Remote fishing rod', 'cylinder',
-    { x: .62, y: .42, z: -.3 }, { x: .035, y: 1.25, z: .035 }, dark, { x: 28, z: -18 });
+  // Keep the rod in hand-local space so interpolation/yaw/avatar pose move it naturally.
+  const fishingRod = primitive(limbs.rightArm, 'Remote fishing rod', 'cylinder',
+    { x: .02, y: -.77, z: -.18 }, { x: .035, y: 1.25, z: .035 }, dark, { x: 23, z: -8 });
   fishingRod.enabled = false;
-  const catchRoot = new pc.Entity('Remote held catch');
+  const heldRoot = new pc.Entity('Remote held inventory specimen');
+  rig.addChild(heldRoot);
+  heldRoot.enabled = false;
+  const catchRoot = new pc.Entity('Remote catch presentation');
   catchRoot.setLocalPosition(0, .22, -1.05);
   rig.addChild(catchRoot);
   catchRoot.enabled = false;
@@ -237,8 +202,49 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   root.catchPresentationId = null;
   root.catchPresentationExpiresAt = 0;
   root.currentEmote = null;
+  root.heldItem = null;
+  root.heldSpecimenModel = null;
+  root.catchSpecimenModel = null;
+  root.fishingActive = false;
   root.posture = 'standing';
   root.appearance = normalizeAppearance(initialAppearance);
+  const nameplate = document.createElement('div');
+  nameplate.className = 'remote-player-nameplate';
+  nameplate.textContent = String(initialDisplayName || 'Player').slice(0, 18);
+  nameplate.hidden = true;
+  (document.querySelector('#game-shell') ?? document.body)?.appendChild(nameplate);
+  const screenPoint = new pc.Vec3();
+  const worldPoint = new pc.Vec3();
+  const updateNameplate = () => {
+    const camera = app.root.findComponents?.('camera')?.[0];
+    const canvas = app.graphicsDevice?.canvas;
+    if (!camera?.worldToScreen || !canvas || !root.enabled) { nameplate.hidden = true; return; }
+    const position = root.getPosition();
+    worldPoint.set(position.x, position.y + 2.15, position.z);
+    camera.worldToScreen(worldPoint, screenPoint);
+    const width = canvas.clientWidth || canvas.width || 1;
+    const height = canvas.clientHeight || canvas.height || 1;
+    const sx = width / Math.max(1, canvas.width || width);
+    const sy = height / Math.max(1, canvas.height || height);
+    const visible = screenPoint.z > 0 && screenPoint.x >= 0 && screenPoint.y >= 0
+      && screenPoint.x <= (canvas.width || width) && screenPoint.y <= (canvas.height || height);
+    nameplate.hidden = !visible;
+    if (!visible) return;
+    nameplate.style.transform = `translate(-50%, -100%) translate(${screenPoint.x * sx}px, ${screenPoint.y * sy}px)`;
+  };
+  root.setDisplayName = (value) => {
+    nameplate.textContent = String(value || 'Player').trim().slice(0, 18) || 'Player';
+  };
+  root.setRemoteVisible = (visible) => {
+    root.enabled = Boolean(visible);
+    nameplate.hidden = !root.enabled;
+    if (root.enabled) updateNameplate();
+  };
+  const setWorldPosition = root.setPosition.bind(root);
+  root.setPosition = (...args) => {
+    setWorldPosition(...args);
+    updateNameplate();
+  };
   root.setAppearance = (value) => {
     root.appearance = normalizeAppearance(value);
     const resolved = resolveAppearance(root.appearance);
@@ -263,21 +269,52 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   };
   root.setAppearance(root.appearance);
   root.setPosture = (value) => { root.posture = value === 'seated' ? 'seated' : 'standing'; };
-  root.setFishingState = (value) => {
-    fishingRod.enabled = typeof value === 'object' ? Boolean(value?.active) : value === 'active';
+  const syncHeldVisibility = () => {
+    heldRoot.enabled = Boolean(root.heldSpecimenModel) && !root.fishingActive && !catchRoot.enabled;
+    fishingRod.enabled = root.fishingActive && !catchRoot.enabled;
   };
-  root.setEmote = (value) => { root.currentEmote = normalizeEmote(value); };
+  root.setFishingState = (value) => {
+    root.fishingActive = typeof value === 'object' ? Boolean(value?.active) : value === 'active';
+    syncHeldVisibility();
+  };
+  root.setEmote = (value) => {
+    if (!value) { root.currentEmote = null; return; }
+    const nextId = value?.id ?? value;
+    const elapsedMs = Math.max(0, Number(value?.elapsedMs) || 0);
+    if (root.currentEmote?.id === nextId) {
+      const localElapsedMs = Math.max(0, Date.now() - root.currentEmote.startedAt);
+      if (Math.abs(localElapsedMs - elapsedMs) > 180) root.currentEmote.startedAt = Date.now() - elapsedMs;
+      return;
+    }
+    root.currentEmote = normalizeEmote({ id: nextId, startedAt: Date.now() - elapsedMs });
+  };
+  root.setHeldItem = (value) => {
+    const next = value?.type === 'specimen' && value.speciesId ? { ...value } : null;
+    const same = root.heldItem?.specimenId && next?.specimenId
+      ? root.heldItem.specimenId === next.specimenId
+      : root.heldItem?.speciesId === next?.speciesId && root.heldItem?.length === next?.length && root.heldItem?.shiny === next?.shiny;
+    root.heldItem = next;
+    if (!same) root.heldSpecimenModel = replaceSpecimenModel(heldRoot, root.heldSpecimenModel, next, {
+      name: `Remote held specimen ${next?.specimenId || next?.speciesId || ''}`, mode: 'held'
+    });
+    syncHeldVisibility();
+  };
   root.setMovementState = (state, now, speed = 0) => {
     const phase = now * .008;
+    const emotePhase = root.currentEmote ? Math.max(0, now - root.currentEmote.startedAt) / 1000 : 0;
     const moving = speed > .25 && state === 'grounded';
     let leftArm = moving ? Math.sin(phase) * 34 : -5;
     let rightArm = moving ? -Math.sin(phase) * 34 : 5;
     let leftLeg = moving ? -Math.sin(phase) * 30 : 0;
     let rightLeg = moving ? Math.sin(phase) * 30 : 0;
+    let leftArmRoll = 8;
+    let rightArmRoll = -8;
     if (root.currentEmote
+      && !(root.currentEmote.id === 'sit' && state === 'fishing')
       && now - root.currentEmote.startedAt >= emoteDurationMs(root.currentEmote.id)) root.currentEmote = null;
     const seated = root.posture === 'seated';
-    const emote = state === 'grounded' && speed <= .25 && !fishingRod.enabled && !catchRoot.enabled
+    const sitWhileFishing = root.currentEmote?.id === 'sit' && state === 'fishing';
+    const emote = ((state === 'grounded' && speed <= .25 && !catchRoot.enabled) || sitWhileFishing)
       ? root.currentEmote : null;
     rig.setLocalPosition(0, seated || emote?.id === 'sit' ? -.48 : -.06, 0);
     if (state === 'airborne') { leftArm = -38; rightArm = -38; leftLeg = 20; rightLeg = -12; }
@@ -290,37 +327,39 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     }
     if (emote?.id === 'wave') {
       leftArm = -5;
-      rightArm = 145 + Math.sin(phase * 4) * 18;
+      rightArm = 145 + Math.sin(emotePhase * 8) * 18;
     } else if (emote?.id === 'point') {
       leftArm = -5;
       rightArm = 88;
     } else if (emote?.id === 'cheer') {
-      leftArm = 148 + Math.sin(phase * 3) * 9;
-      rightArm = 148 - Math.sin(phase * 3) * 9;
+      leftArm = 148 + Math.sin(emotePhase * 7) * 9;
+      rightArm = 148 - Math.sin(emotePhase * 7) * 9;
     } else if (emote?.id === 'clap') {
-      const clap = Math.sin(phase * 5);
-      leftArm = 76 + clap * 8;
-      rightArm = 76 + clap * 8;
+      const contact = (1 - Math.cos(emotePhase * Math.PI * 2 * 1.7)) * .5;
+      leftArm = 70 + contact * 16;
+      rightArm = 70 + contact * 16;
+      leftArmRoll = -18 - contact * 44;
+      rightArmRoll = 18 + contact * 44;
     } else if (emote?.id === 'sit') {
       leftArm = -10;
       rightArm = -10;
       leftLeg = 76;
       rightLeg = 76;
     } else if (emote?.id === 'dance') {
-      const swing = Math.sin(phase * 3.5);
+      const swing = Math.sin(emotePhase * 6.5);
       leftArm = 72 + swing * 46;
       rightArm = 72 - swing * 46;
       leftLeg = -swing * 25;
       rightLeg = swing * 25;
     }
     if (seated) { leftLeg = 76; rightLeg = 76; }
-    if (fishingRod.enabled || catchRoot.enabled) {
+    if (root.fishingActive || catchRoot.enabled) {
       leftArm = 72;
       rightArm = 58;
-      if (!seated) { leftLeg = 0; rightLeg = 0; }
+      if (!(seated || emote?.id === 'sit')) { leftLeg = 0; rightLeg = 0; }
     }
-    limbs.leftArm.setLocalEulerAngles(leftArm, 0, 8);
-    limbs.rightArm.setLocalEulerAngles(rightArm, 0, -8);
+    limbs.leftArm.setLocalEulerAngles(leftArm, 0, leftArmRoll);
+    limbs.rightArm.setLocalEulerAngles(rightArm, 0, rightArmRoll);
     limbs.leftLeg.setLocalEulerAngles(leftLeg, 0, 0);
     limbs.rightLeg.setLocalEulerAngles(rightLeg, 0, 0);
     const bounce = moving ? Math.abs(Math.sin(phase)) * .055 : Math.sin(phase * .2) * .012;
@@ -330,13 +369,27 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   root.showCatch = (catchData) => {
     root.catchPresentationId = catchData.presentationId ?? null;
     root.catchPresentationExpiresAt = Date.now() + 22_000;
-    createCatchModel(catchRoot, catchData);
-    catchRoot.enabled = true;
+    root.catchSpecimenModel = replaceSpecimenModel(catchRoot, root.catchSpecimenModel, catchData, {
+      name: `Remote catch ${catchData.speciesId ?? ''}`, mode: 'catch'
+    });
+    catchRoot.enabled = Boolean(root.catchSpecimenModel);
+    syncHeldVisibility();
   };
   root.clearCatch = (presentationId = null) => {
     if (presentationId && root.catchPresentationId && presentationId !== root.catchPresentationId) return;
     catchRoot.enabled = false;
     root.catchPresentationId = null;
+    destroySpecimenModel(root.catchSpecimenModel);
+    root.catchSpecimenModel = null;
+    syncHeldVisibility();
+  };
+
+  const destroyEntity = root.destroy.bind(root);
+  root.destroy = () => {
+    nameplate.remove();
+    destroySpecimenModel(root.heldSpecimenModel);
+    destroySpecimenModel(root.catchSpecimenModel);
+    destroyEntity();
   };
 
   root.setPosition(0, -1000, 0);

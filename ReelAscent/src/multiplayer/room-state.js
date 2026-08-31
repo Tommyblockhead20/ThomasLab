@@ -50,14 +50,17 @@ export class RoomState {
       if (!this.members.has(playerId)) {
         const colorIndex = this.colorAssignments.get(playerId) ?? this.assignColor(playerId);
         const remote = new RemotePlayer(playerId,
-          createRepresentation(playerId, colorIndex, presentation?.appearance));
+          createRepresentation(playerId, colorIndex, presentation?.appearance, presentation?.displayName ?? presentation?.name ?? 'Player'));
         remote.setLocalLocationId(this.localLocationId);
         this.members.set(playerId, remote);
       }
       this.members.get(playerId)?.representation?.setAppearance?.(presentation?.appearance);
+      this.members.get(playerId)?.representation?.setDisplayName?.(presentation?.displayName ?? presentation?.name ?? 'Player');
       this.members.get(playerId)?.representation?.setPosture?.(presentation?.posture);
+      this.members.get(playerId)?.representation?.setEmote?.(presentation?.emote ?? null);
       const remote = this.members.get(playerId);
       remote?.representation?.setFishingState?.(presentation?.fishingState);
+      remote?.representation?.setHeldItem?.(presentation?.heldItem ?? null);
       if (typeof presentation?.locationId === 'string') remote.locationId = presentation.locationId;
       if (presentation?.globalPosition) remote.globalPosition = { ...presentation.globalPosition };
       remote?.syncVisibility?.();

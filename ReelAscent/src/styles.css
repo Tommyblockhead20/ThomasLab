@@ -2219,13 +2219,36 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .multiplayer-menu header { display: flex; justify-content: space-between; gap: 1rem; align-items: start; }
 .multiplayer-menu h2 { margin: .12rem 0; }
 .multiplayer-menu header button, .multiplayer-actions button { padding: .52rem .65rem; border: 0; border-radius: .4rem; color: #153a36; background: #edd58c; font-size: .58rem; font-weight: 950; cursor: pointer; }
-.multiplayer-actions { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: .45rem; align-items: end; margin: .8rem 0; }
+.multiplayer-actions { display: grid; grid-template-columns: minmax(7rem, 1.2fr) auto minmax(7rem, 1fr) auto; gap: .45rem; align-items: end; margin: .8rem 0; }
 .multiplayer-actions label { display: grid; gap: .2rem; color: #efd98b; font-size: .5rem; font-weight: 900; }
-.multiplayer-actions input { min-width: 0; padding: .5rem; color: #edf6e9; background: rgb(2 18 19 / 72%); border: 1px solid rgb(255 255 255 / 18%); border-radius: .38rem; text-transform: uppercase; }
+.multiplayer-actions input { min-width: 0; padding: .5rem; color: #edf6e9; background: rgb(2 18 19 / 72%); border: 1px solid rgb(255 255 255 / 18%); border-radius: .38rem; }
+.multiplayer-actions #multiplayer-code { font-variant-numeric: tabular-nums; letter-spacing: .12em; text-align: center; }
 .multiplayer-actions button:disabled { opacity: .38; cursor: not-allowed; }
 .multiplayer-status { color: #efd98b; font-weight: 800; }
 .multiplayer-menu > small, .multiplayer-menu > p { font-size: .62rem; line-height: 1.45; }
 body.multiplayer-open #game-shell::after { position: absolute; z-index: 60; inset: 0; content: ""; background: rgb(2 13 15 / 58%); }
+
+.remote-player-nameplate {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  max-width: 10rem;
+  padding: .18rem .38rem;
+  overflow: hidden;
+  color: #fff9dc;
+  font-size: .58rem;
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 4px rgb(0 0 0 / 65%);
+  white-space: nowrap;
+  background: rgb(8 35 34 / 58%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  pointer-events: none;
+}
+.remote-player-nameplate[hidden] { display: none; }
 
 body.mountain-map-open #game-shell::after,
 body.emote-menu-open #game-shell::after,
@@ -2567,4 +2590,8 @@ body.rhythm-high-contrast .rhythm-note { filter: saturate(1.4) contrast(1.45); o
   .keybind-row { grid-template-columns: minmax(0, 1fr) auto; }
   .keybind-row button { grid-column: 1 / -1; }
   .home-interaction-prompt { bottom: 10.8rem; max-width: calc(100vw - 1rem); }
+}
+
+@media (max-width: 720px) {
+  .multiplayer-actions { grid-template-columns: minmax(0, 1fr) auto; }
 }

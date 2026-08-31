@@ -16,7 +16,6 @@ export const KEY_BINDING_DEFINITIONS = Object.freeze({
   interact: Object.freeze({ label: 'World Interact', defaultCode: 'KeyX', fixedCodes: Object.freeze([]) }),
   inventory: Object.freeze({ label: 'Inventory', defaultCode: 'KeyI', fixedCodes: Object.freeze([]) }),
   journal: Object.freeze({ label: 'Fish Journal', defaultCode: 'KeyJ', fixedCodes: Object.freeze([]) }),
-  multiplayer: Object.freeze({ label: 'Multiplayer', defaultCode: 'KeyM', fixedCodes: Object.freeze([]) }),
   emotes: Object.freeze({ label: 'Emotes', defaultCode: 'KeyE', fixedCodes: Object.freeze([]) }),
   map: Object.freeze({ label: 'Use Map / GPS', defaultCode: 'KeyV', fixedCodes: Object.freeze([]) })
 });

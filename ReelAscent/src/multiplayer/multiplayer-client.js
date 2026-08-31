@@ -10,8 +10,10 @@ export const MULTIPLAYER_ENDPOINT = String(import.meta.env?.VITE_MULTIPLAYER_END
 
 const SNAPSHOT_INTERVAL_MS = 1000 / 15;
 const RECONNECT_DELAYS_MS = Object.freeze([500, 1000, 2000, 3000, 4500, 6000]);
-export const ROOM_CODE_LENGTH = 5;
+export const ROOM_CODE_LENGTH = 4;
+export const DISPLAY_NAME_MAX_LENGTH = 18;
 export const normalizeRoomCode = (value) => String(value ?? '').replace(/\D/g, '').slice(0, ROOM_CODE_LENGTH);
+export const normalizeDisplayName = (value) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, DISPLAY_NAME_MAX_LENGTH);
 
 export class MultiplayerClient extends EventTarget {
   constructor(playerId, {
@@ -36,6 +38,7 @@ export class MultiplayerClient extends EventTarget {
     this.reconnectTimer = null;
     this.destroyed = false;
     this.pendingRoomRequest = null;
+    this.displayName = '';
     this.transport.onMessage = (value) => this.handleMessage(value);
     this.transport.onClose = () => this.handleClose();
   }
@@ -51,7 +54,8 @@ export class MultiplayerClient extends EventTarget {
     return this.transport.send(createProtocolMessage(MESSAGE_TYPES.HELLO, {
       playerId: this.playerId,
       reconnectToken: this.reconnectToken || undefined,
-      roomCode: this.room.roomCode || undefined
+      roomCode: this.room.roomCode || undefined,
+      displayName: this.displayName || undefined
     }));
   }
 
@@ -82,22 +86,37 @@ export class MultiplayerClient extends EventTarget {
     }
   }
 
-  async host() {
-    this.pendingRoomRequest = { type: MESSAGE_TYPES.HOST_ROOM, payload: { playerId: this.playerId } };
+  async host(displayName) {
+    const normalizedName = normalizeDisplayName(displayName);
+    if (!normalizedName) {
+      this.setState('error', 'Enter a display name.');
+      return false;
+    }
+    this.displayName = normalizedName;
+    this.pendingRoomRequest = {
+      type: MESSAGE_TYPES.HOST_ROOM,
+      payload: { playerId: this.playerId, displayName: normalizedName }
+    };
     if (!(await this.connect())) return false;
     this.setState('joining');
     return this.transport.send(createProtocolMessage(this.pendingRoomRequest.type, this.pendingRoomRequest.payload));
   }
 
-  async join(roomCode) {
+  async join(roomCode, displayName) {
     const normalized = normalizeRoomCode(roomCode);
-    if (normalized.length !== ROOM_CODE_LENGTH) {
-      this.setState('error', 'Enter the five-digit room code.');
+    const normalizedName = normalizeDisplayName(displayName);
+    if (!normalizedName) {
+      this.setState('error', 'Enter a display name.');
       return false;
     }
+    if (normalized.length !== ROOM_CODE_LENGTH) {
+      this.setState('error', 'Enter the four-digit room code.');
+      return false;
+    }
+    this.displayName = normalizedName;
     this.pendingRoomRequest = {
       type: MESSAGE_TYPES.JOIN_ROOM,
-      payload: { playerId: this.playerId, roomCode: normalized }
+      payload: { playerId: this.playerId, roomCode: normalized, displayName: normalizedName }
     };
     if (!(await this.connect())) return false;
     this.setState('joining');
@@ -230,7 +249,8 @@ export class MultiplayerClient extends EventTarget {
       runSeed: this.room.runSeed,
       remotePlayers: this.room.members.size,
       players,
-      reconnecting: this.state === 'reconnecting'
+      reconnecting: this.state === 'reconnecting',
+      displayName: this.displayName
     };
   }
 
