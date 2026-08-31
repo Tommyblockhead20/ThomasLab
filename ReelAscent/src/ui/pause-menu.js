@@ -184,7 +184,6 @@ export class PauseMenu {
       stats: () => this.renderStats(),
       'save-data': () => this.renderSaveData(),
       settings: () => this.renderSettings(),
-      accessibility: () => this.renderAccessibility(),
       keybinds: () => this.renderKeybinds()
     })[this.activeTab]?.() ?? this.renderStats();
   }
@@ -214,15 +213,14 @@ export class PauseMenu {
       return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'CURRENT' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} discovered</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} fish • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions">${slot.active ? '' : `<button data-pause-slot-action="select" data-slot-id="${slot.id}">LOAD</button>`}<button data-pause-slot-action="${slot.active ? 'reset' : 'delete'}" data-slot-id="${slot.id}">${slot.active ? 'RESET CURRENT SAVE' : 'DELETE'}</button></div></article>`;
     }).join('');
     const options = this.progression.saveSystem.getSlotSummaries().map((slot) => `<option value="${slot.id}" ${slot.active ? 'selected' : ''}>${slot.label}${slot.empty ? ' (empty)' : slot.active ? ' (current)' : ''}</option>`).join('');
-    return `<div class="save-data-content">${slotCards}</div><details class="progress-transfer"><summary>PORTABLE PROGRESS</summary><p>Export durable progress or import it into a chosen local slot.</p><textarea id="pause-progress-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste progress JSON here."></textarea><div class="progress-transfer-actions"><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="download">DOWNLOAD PROGRESS</button><button data-pause-progress-action="file">LOAD FILE</button><button data-pause-progress-action="import">IMPORT PROGRESS</button></div></details>`;
+    return `<div class="save-data-content">${slotCards}</div><section class="progress-transfer"><header><h3>PORTABLE PROGRESS</h3><strong>EXPORT / IMPORT</strong></header><p>Export durable progress or import it into a chosen local slot.</p><textarea id="pause-progress-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste progress JSON here."></textarea><div class="progress-transfer-actions"><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="download">DOWNLOAD PROGRESS</button><button data-pause-progress-action="file">LOAD FILE</button><button data-pause-progress-action="import">IMPORT PROGRESS</button></div></section>`;
   }
 
   renderSettings() {
-    return `<div class="pause-setting-list"><label><input type="checkbox" data-pause-preference="showControlHints" ${this.preferences.showControlHints ? 'checked' : ''}> Show the always-on control hint card</label></div>`;
-  }
-
-  renderAccessibility() {
     return `<div class="pause-setting-list">
+      <h3>GAMEPLAY &amp; INTERFACE</h3>
+      <label><input type="checkbox" data-pause-preference="showControlHints" ${this.preferences.showControlHints ? 'checked' : ''}> Show the always-on control hint card</label>
+      <h3>ACCESSIBILITY</h3>
       <label><span>Interface scale</span><select data-pause-preference="uiScale"><option value="compact" ${this.preferences.uiScale === 'compact' ? 'selected' : ''}>Compact</option><option value="normal" ${this.preferences.uiScale === 'normal' ? 'selected' : ''}>Normal</option><option value="large" ${this.preferences.uiScale === 'large' ? 'selected' : ''}>Large</option></select></label>
       <label><input type="checkbox" data-pause-preference="reduceMotion" ${this.preferences.reduceMotion ? 'checked' : ''}> Reduce non-gameplay UI animation</label>
       <label><input type="checkbox" data-pause-preference="rhythmHighContrast" ${this.preferences.rhythmHighContrast ? 'checked' : ''}> High-contrast rhythm lanes and notes</label>
@@ -232,7 +230,12 @@ export class PauseMenu {
 
   renderKeybinds() {
     const bindings = loadKeyBindings();
-    const rows = Object.entries(KEY_BINDING_DEFINITIONS).map(([action, definition]) => `<article class="keybind-row ${this.awaitingBinding === action ? 'is-waiting' : ''}"><div><strong>${escapeHtml(definition.label)}</strong>${definition.fixedCodes.length ? `<small>Always also: ${definition.fixedCodes.map(formatInputCode).join(', ')}</small>` : ''}</div><kbd>${escapeHtml(formatInputCode(bindings[action]))}</kbd><button data-rebind-action="${action}">${this.awaitingBinding === action ? 'PRESS A KEY…' : 'REBIND'}</button></article>`).join('');
+    const rows = Object.entries(KEY_BINDING_DEFINITIONS).map(([action, definition]) => {
+      const currentLabel = formatInputCode(bindings[action]);
+      const fixedLabels = [...new Set(definition.fixedCodes.map(formatInputCode))]
+        .filter((label) => label !== currentLabel);
+      return `<article class="keybind-row ${this.awaitingBinding === action ? 'is-waiting' : ''}"><div><strong>${escapeHtml(definition.label)}</strong>${fixedLabels.length ? `<small>Always also: ${fixedLabels.join(', ')}</small>` : ''}</div><kbd>${escapeHtml(currentLabel)}</kbd><button data-rebind-action="${action}">${this.awaitingBinding === action ? 'PRESS A KEY…' : 'REBIND'}</button></article>`;
+    }).join('');
     return `<div class="keybind-list">${rows}</div><button class="pause-secondary-action" data-reset-bindings>RESET GAMEPLAY BINDINGS</button>`;
   }
 

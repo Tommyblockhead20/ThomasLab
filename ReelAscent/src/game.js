@@ -67,13 +67,15 @@ export class Game {
 
     this.createLighting();
     this.world = new MountainWorld(this.app, physics, this.physicsWorld);
-    const initialStart = this.world.chooseStart();
-    const initialWorldLocation = this.world.getWorldLocations?.().find((location) => location.id === initialStart.locationId)
-      ?? this.world.getWorldLocations?.().find((location) => location.type === 'main-island')
+    const initialStart = this.world.getHomeArrival?.() ?? this.world.chooseStart();
+    const worldLocations = this.world.getWorldLocations?.() ?? [];
+    const initialWorldLocation = worldLocations.find((location) => location.id === initialStart.locationId)
+      ?? worldLocations.find((location) => location.type === 'main-island')
       ?? null;
+    const mainWorldLocation = worldLocations.find((location) => location.type === 'main-island') ?? initialWorldLocation;
     this.currentLocationId = initialStart.locationId ?? initialWorldLocation?.id ?? null;
     this.currentCoordinateSpace = initialStart.coordinateSpace ?? 'global-world';
-    this.mainWorldLocationId = initialWorldLocation?.id ?? this.currentLocationId;
+    this.mainWorldLocationId = mainWorldLocation?.id ?? this.currentLocationId;
     this.world.setActiveLocation?.(this.currentLocationId);
     this.localPause = { active: false, openedAt: null, totalPausedSeconds: 0 };
     this.sessionStats = {
@@ -165,7 +167,8 @@ export class Game {
       this.world,
       this.hud,
       this.camera,
-      initialStart
+      initialStart,
+      { onLocationChange: (locationId, coordinateSpace) => this.setCurrentLocation(locationId, coordinateSpace) }
     );
     this.player.setRunManager(this.runManager);
     this.runManager.startRun(initialStart, false);

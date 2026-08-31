@@ -1,3 +1,8 @@
+import {
+  WORLD_MAP_DISPLAY_RADIUS,
+  compressWorldMapPosition
+} from '../world/world-locations.js';
+
 const BLOCKING_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'emote-menu-open',
   'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open', 'pause-open'
@@ -31,10 +36,11 @@ export class MountainMapMenu {
   }
 
   project(point) {
-    const scale = 220 / Math.max(1, this.mapData.outerRadius);
+    const mapped = compressWorldMapPosition(point);
+    const scale = 220 / Math.max(1, WORLD_MAP_DISPLAY_RADIUS);
     return {
-      x: 260 + (point.x - this.mapData.center.x) * scale,
-      y: 260 + (point.z - this.mapData.center.z) * scale,
+      x: 260 + (mapped.x - this.mapData.center.x) * scale,
+      y: 260 + (mapped.z - this.mapData.center.z) * scale,
       scale
     };
   }
@@ -51,6 +57,14 @@ export class MountainMapMenu {
       const projected = this.project(point);
       return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
     }).join(' ');
+  }
+
+  islandPolygon(location) {
+    const center = this.project(location.position);
+    const markerMagnification = 2.2;
+    return location.outline.map((point) => (
+      `${(center.x + (point.x - location.position.x) * center.scale * markerMagnification).toFixed(1)},${(center.y + (point.z - location.position.z) * center.scale * markerMagnification).toFixed(1)}`
+    )).join(' ');
   }
 
   biomeWedge(biome) {
@@ -94,7 +108,7 @@ export class MountainMapMenu {
 
     const ocean = this.mapData.waters.find((water) => water.tier === 'ocean');
     svg.appendChild(this.createSvg('circle', {
-      cx: 260, cy: 260, r: (ocean.outerRadius * scale).toFixed(1), class: 'map-ocean'
+      cx: 260, cy: 260, r: (Math.min(ocean.outerRadius, WORLD_MAP_DISPLAY_RADIUS) * scale).toFixed(1), class: 'map-ocean'
     }));
     svg.appendChild(this.createSvg('circle', {
       cx: 260, cy: 260, r: (ocean.innerRadius * scale).toFixed(1), class: 'map-shore'
@@ -105,7 +119,7 @@ export class MountainMapMenu {
       const point = this.project(location.position);
       const marker = this.createSvg('g', { class: `map-island map-island-${location.type}` });
       const footprint = location.outline?.length >= 3
-        ? this.createSvg('polygon', { points: this.polygon(location.outline) })
+        ? this.createSvg('polygon', { points: this.islandPolygon(location) })
         : this.createSvg('ellipse', {
             cx: point.x.toFixed(1), cy: point.y.toFixed(1),
             rx: Math.max(5, location.radii.x * scale).toFixed(1),
@@ -113,7 +127,7 @@ export class MountainMapMenu {
           });
       marker.append(
         footprint,
-        this.createSvg('text', { x: point.x.toFixed(1), y: (point.y - Math.max(7, location.radii.z * scale + 4)).toFixed(1) }, location.label)
+        this.createSvg('text', { x: point.x.toFixed(1), y: (point.y - Math.max(13, location.radii.z * scale * 2.2 + 4)).toFixed(1) }, location.label)
       );
       islandGroup.appendChild(marker);
     }
@@ -166,7 +180,7 @@ export class MountainMapMenu {
     // Rest ledges remain real traversal geometry and still shape the five elevation bands,
     // but individual 500/550/600-ft pins made the overview noisy and are intentionally omitted.
     // Split Boulder has authored world geometry; the dormant Tilted Slab route does not.
-    const wantedLandmarks = new Set(['cabin', 'shop', 'aquarium', 'waterfall-basin', 'summit-crown', 'summit-tarn', 'split-boulder']);
+    const wantedLandmarks = new Set(['waterfall-basin', 'summit-crown', 'summit-tarn', 'split-boulder']);
     for (const landmark of this.mapData.landmarks.filter((entry) => wantedLandmarks.has(entry.id))) {
       this.addMarker(markerGroup, landmark, 'map-landmark', landmark.id === 'split-boulder' ? '' : landmark.label, '◆');
     }

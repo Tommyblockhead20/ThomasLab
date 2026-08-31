@@ -71,7 +71,7 @@ export class AquariumMenu {
       `<article class="aquarium-card" data-rarity="${escapeHtml(specimen.rarity.toLowerCase())}">
         <div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)} • ${escapeHtml(specimen.quality)}</small></div>
         <dl><div><dt>LENGTH</dt><dd>${specimen.length.toFixed(1)} in • ${escapeHtml(specimen.lengthCategory)}</dd></div><div><dt>BODY</dt><dd>${specimen.weight.toFixed(2)} lb • ${escapeHtml(specimen.sizeCategory)}</dd></div></dl>
-        <small>${escapeHtml(specimen.provenance.locationLabel || 'Unknown water')} • ${new Date(specimen.provenance.caughtAt).toLocaleDateString()}</small><button data-aquarium-action="remove" data-specimen-id="${escapeHtml(specimen.specimenId)}">RETURN TO INVENTORY</button>
+        <small>${escapeHtml(specimen.provenance.locationLabel || 'Unknown water')} • ${new Date(specimen.provenance.caughtAt).toLocaleDateString()}</small><button data-aquarium-action="remove" data-specimen-id="${escapeHtml(specimen.specimenId)}">REMOVE → INVENTORY</button>
       </article>`
     )).join('') : '<p class="shop-empty">No specimens displayed yet.</p>';
     const carried = state.inventory.length ? [...state.inventory].reverse().map((specimen) => (

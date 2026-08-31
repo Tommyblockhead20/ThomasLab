@@ -16,24 +16,43 @@ function colorCss(color = [.45, .62, .55]) {
   return `rgb(${color.map((channel) => Math.round(channel * 255)).join(' ')})`;
 }
 
+const SPECIMEN_PREVIEW_CACHE = new Map();
+
 function specimenPreview(specimen) {
   const species = resolveSpecies(specimen.speciesId);
   const [primary, accent] = species?.visual?.colors ?? [[.45, .62, .55], [.82, .72, .38]];
-  const longBody = ['slender', 'eel', 'serpent'].includes(species?.visual?.archetype);
-  const bodyRx = longBody ? 30 : 23;
+  const archetype = species?.visual?.archetype ?? 'panfish';
+  const key = `${species?.id ?? specimen.speciesId}:${archetype}:${specimen.shiny ? 1 : 0}`;
+  let drawing = SPECIMEN_PREVIEW_CACHE.get(key);
+  const p = colorCss(primary);
+  const a = colorCss(accent);
   const sparkle = specimen.shiny ? '<path d="M78 11v10M73 16h10" class="specimen-sparkle" />' : '';
-  return `<svg class="inventory-specimen-preview" viewBox="0 0 96 56" role="img" aria-label="${escapeHtml(specimen.name)} specimen preview">
-    <path d="M18 28 4 17v22z" fill="${colorCss(accent)}" />
-    <ellipse cx="48" cy="28" rx="${bodyRx}" ry="15" fill="${colorCss(primary)}" />
-    <path d="M38 15 51 4l11 13M40 41l12 10 10-12" fill="${colorCss(accent)}" />
-    <circle cx="${48 + bodyRx - 8}" cy="23" r="2.4" fill="#102d30" />
-    <path d="M${48 + bodyRx - 4} 31q7 4 10-1" fill="none" stroke="${colorCss(accent)}" stroke-width="2" />${sparkle}
-  </svg>`;
+  if (!drawing) {
+    if (['ray', 'skate', 'flatfish'].includes(archetype)) drawing = `<path d="M13 28Q39 2 72 23L90 28 72 33Q39 54 13 28Z" fill="${p}"/><path d="M72 28H94" stroke="${a}" stroke-width="3"/><circle cx="63" cy="22" r="2" fill="#102d30"/>`;
+    else if (['shark', 'dogfish'].includes(archetype)) drawing = `<path d="M15 28 3 16v24z" fill="${a}"/><ellipse cx="49" cy="28" rx="32" ry="12" fill="${p}"/><path d="M44 17 53 4l7 15M42 38l10 12 7-13" fill="${a}"/><path d="m72 24 15 4-15 4" fill="${p}"/><circle cx="71" cy="23" r="2" fill="#102d30"/>`;
+    else if (['octopus', 'squid', 'cuttlefish', 'jellyfish', 'anemone', 'lusca', 'softbody'].includes(archetype)) drawing = `<ellipse cx="49" cy="20" rx="21" ry="16" fill="${p}"/><path d="M31 31q-8 17 3 20M39 33q-5 14 2 20M48 34v19M57 33q5 14-2 20M65 31q8 17-3 20" fill="none" stroke="${a}" stroke-width="4" stroke-linecap="round"/><circle cx="42" cy="18" r="2"/><circle cx="56" cy="18" r="2"/>`;
+    else if (['crab', 'lobster', 'crayfish', 'shrimp', 'insect', 'arachnid', 'horseshoe'].includes(archetype)) drawing = `<ellipse cx="49" cy="28" rx="22" ry="13" fill="${p}"/><circle cx="22" cy="20" r="8" fill="${a}"/><circle cx="76" cy="20" r="8" fill="${a}"/><path d="M31 35 17 47M40 38 34 52M58 38l6 14M67 35l14 12" stroke="${a}" stroke-width="4"/><circle cx="43" cy="23" r="2"/><circle cx="55" cy="23" r="2"/>`;
+    else if (['clam', 'oyster', 'mussel', 'scallop', 'bivalve', 'nautilus', 'snail'].includes(archetype)) drawing = `<path d="M19 38Q26 7 49 7t30 31Q49 52 19 38Z" fill="${p}" stroke="${a}" stroke-width="3"/><path d="M49 9v35M35 13l8 32M63 13l-8 32" stroke="${a}" stroke-width="2" opacity=".75"/>`;
+    else if (['turtle', 'frog', 'salamander'].includes(archetype)) drawing = `<ellipse cx="47" cy="28" rx="23" ry="15" fill="${p}"/><circle cx="73" cy="27" r="9" fill="${a}"/><path d="M31 18 17 10M31 38 16 47M60 18 69 8M60 38l10 10" stroke="${a}" stroke-width="6" stroke-linecap="round"/><circle cx="77" cy="24" r="2"/>`;
+    else if (['starfish', 'urchin'].includes(archetype)) drawing = archetype === 'starfish'
+      ? `<path d="m49 4 8 17 20-5-13 15 13 17-21-7-8 13-7-14-22 7 14-17-13-15 21 6Z" fill="${p}" stroke="${a}" stroke-width="2"/>`
+      : `<circle cx="49" cy="28" r="17" fill="${p}"/><path d="M49 3v50M24 28h50M31 10l36 36M67 10 31 46M39 5l20 46M20 18l58 20" stroke="${a}" stroke-width="2"/>`;
+    else if (['cetacean', 'pinniped', 'sirenian', 'otter', 'beaver', 'rodent', 'platypus', 'mammal'].includes(archetype)) drawing = `<ellipse cx="47" cy="29" rx="30" ry="14" fill="${p}"/><circle cx="76" cy="25" r="10" fill="${a}"/><path d="M18 28 4 17v22zM44 40l10 10 9-13" fill="${a}"/><circle cx="79" cy="22" r="2"/>`;
+    else if (archetype === 'wisp') drawing = `<circle cx="62" cy="23" r="14" fill="${p}"/><circle cx="43" cy="30" r="10" fill="${a}"/><circle cx="28" cy="36" r="7" fill="${p}"/><path d="M14 43Q34 23 54 31" fill="none" stroke="${a}" stroke-width="4"/>`;
+    else if (['serpent', 'dragon', 'plesiosaur', 'waterhorse', 'eel', 'lamprey'].includes(archetype)) drawing = `<path d="M7 36Q23 9 44 31T81 24" fill="none" stroke="${p}" stroke-width="13" stroke-linecap="round"/><ellipse cx="82" cy="24" rx="10" ry="8" fill="${a}"/><circle cx="85" cy="21" r="2"/>`;
+    else {
+      const bodyRx = ['slender', 'eel'].includes(archetype) ? 30 : 23;
+      drawing = `<path d="M18 28 4 17v22z" fill="${a}"/><ellipse cx="48" cy="28" rx="${bodyRx}" ry="15" fill="${p}"/><path d="M38 15 51 4l11 13M40 41l12 10 10-12" fill="${a}"/><circle cx="${48 + bodyRx - 8}" cy="23" r="2.4" fill="#102d30"/>`;
+    }
+    drawing += sparkle;
+    SPECIMEN_PREVIEW_CACHE.set(key, drawing);
+  }
+  return `<svg class="inventory-specimen-preview" viewBox="0 0 96 56" role="img" aria-label="${escapeHtml(specimen.name)} ${escapeHtml(archetype)} specimen preview">${drawing}</svg>`;
 }
 
 const CATEGORY_LABELS = Object.freeze({
   rod: 'Rod', reel: 'Reel', line: 'Line', lure: 'Lure', guide: 'Ecology Guide',
-  boots: 'Boots', gloves: 'Gloves', climbing: 'Climbing Equipment'
+  boots: 'Boots', gloves: 'Gloves', climbingTool: 'Climbing Tool', harness: 'Harness / Pack'
 });
 
 export class InventoryMenu {
@@ -152,8 +171,8 @@ export class InventoryMenu {
       button.setAttribute('aria-pressed', String(button.dataset.collectionTab === this.activeTab));
     }
     if (!preserveStatus) this.status.textContent = this.activeTab === 'catches'
-      ? 'Every landed catch stays here until you sell it at Shop Island or move it at Aquarium Island.'
-      : 'Equip owned gear here. Buying and selling stay at Shop Island.';
+      ? "Every landed catch stays here until you sell it at Outfitter's Reach or move it to Glasswater Isle."
+      : "Equip owned gear here. Buying and selling stay at Outfitter's Reach.";
     this.content.className = `inventory-content inventory-${this.activeTab}`;
     this.content.innerHTML = this.activeTab === 'catches' ? this.renderCatches(state) : this.renderGear(state);
     this.renderedRevision = this.progression.revision;
@@ -180,7 +199,7 @@ export class InventoryMenu {
       return `<section class="inventory-gear-group"><h3>${label}</h3><div class="inventory-gear-row">${cards}</div></section>`;
     }).join('');
     return `${maps ? `<section class="inventory-gear-group"><h3>Maps</h3><div class="inventory-gear-row">${maps}</div></section>` : ''}${equipment}`
-      || '<p class="shop-empty">No gear yet. Visit Shop Island.</p>';
+      || "<p class=\"shop-empty\">No gear yet. Visit Outfitter's Reach.</p>";
   }
 
   destroy() {

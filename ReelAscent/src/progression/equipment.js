@@ -36,15 +36,18 @@ export const EQUIPMENT_CATALOG = Object.freeze([
 
   item('trail-boots', 'boots', 'Trail Boots', 0, 'Balanced starter boots.'),
   item('trail-gloves', 'gloves', 'Trail Gloves', 0, 'Balanced starter gloves.'),
-  item('trail-kit', 'climbing', 'Trail Kit', 0, 'Balanced starter climbing equipment.'),
+  item('trail-kit', 'climbingTool', 'Trail Kit', 0, 'Standard climbing tool with no traversal bonus.'),
+  item('trail-harness', 'harness', 'Trail Harness', 0, 'Balanced starter harness and pack.'),
   item('trail-runners', 'boots', 'Trail Runners', 1250, 'Sprint speed increases by 15%.', { sprintSpeedMultiplier: 1.15 }),
   // Keep the durable id so existing saves migrate cleanly, but this is the v9 replacement item.
   item('endurance-belt', 'boots', 'Endurance Boots', 1750, 'Normal sprinting consumes no stamina.', { sprintDrain: 0 }),
-  item('chalk-gloves', 'gloves', 'Chalk Gloves', 2000, 'Grip stamina use decreases by 25%.', { gripDrain: .75 }),
-  item('alpine-harness', 'climbing', 'Alpine Harness', 3000, 'Climbing and grip stamina costs decrease by 20%.', { climbCostMultiplier: .8 }),
+  item('chalk-gloves', 'gloves', 'Climbing Gloves', 2000, 'Climbing and grip stamina costs decrease by 20%.', { gripDrain: .8 }),
+  item('climber-chalk', 'climbingTool', "Climber's Chalk", 5000, 'Climbing and grip stamina costs decrease by 30%.', { gripDrain: .7 }),
+  item('ice-axe', 'climbingTool', 'Ice Axe', 8500, 'On ice and smooth slippery rock: 25% less climb/grip stamina, reduced slip, and better slide stability.', { iceClimbCostMultiplier: .75, iceSlipMultiplier: .55, iceSlideThresholdMultiplier: 1.08 }),
+  item('alpine-harness', 'harness', 'Alpine Harness', 3500, 'Climbing and grip stamina costs decrease by 20%.', { climbCostMultiplier: .8 }),
   item('springstep-boots', 'boots', 'Springstep Boots', 4000, 'Jump impulse increases by 25%.', { jumpImpulseMultiplier: 1.25 }),
   item('summit-vault-boots', 'boots', 'Summit Vault Boots', 12000, 'Jump impulse increases by 50%.', { jumpImpulseMultiplier: 1.5 }),
-  item('ultralight-kit', 'climbing', 'Ultralight Kit', 6000, 'Reduces several normal traversal stamina costs by 18%.', { sprintDrain: .82, gripDrain: .82, climbCostMultiplier: .82, jumpCostMultiplier: .82, slideCostMultiplier: .82 })
+  item('ultralight-kit', 'harness', 'Ultralight Harness', 10000, 'All normal traversal stamina costs use a centralized 0.60 multiplier.', { staminaCostMultiplier: .6 })
 ]);
 
 export const EQUIPMENT_BY_ID = new Map(EQUIPMENT_CATALOG.map((entry) => [entry.id, entry]));
@@ -66,7 +69,7 @@ export class EquipmentManager {
       for (const [name, value] of Object.entries(modifiers)) {
         if (name === 'minimumSuccessfulQuality') {
           if ((QUALITY_RANK[value] ?? 0) > (QUALITY_RANK[result[name]] ?? 0)) result[name] = value;
-        } else if (Number.isFinite(value)) result[name] = (result[name] ?? 1) * value;
+        } else if (Number.isFinite(value)) result[name] = (result[name] ?? 1) * Math.max(0, value);
       }
     }
     return Object.freeze(result);
@@ -104,7 +107,8 @@ export class EquipmentManager {
   repairDefaults() {
     const state = this.getState();
     for (const [category, itemId] of Object.entries(DEFAULT_EQUIPPED)) {
-      if (!EQUIPMENT_BY_ID.has(state.equipped[category])) state.equipped[category] = itemId;
+      const equipped = EQUIPMENT_BY_ID.get(state.equipped[category]);
+      if (!equipped || equipped.category !== category) state.equipped[category] = itemId;
     }
     if (state.equipped.guide && !EQUIPMENT_BY_ID.has(state.equipped.guide)) delete state.equipped.guide;
   }

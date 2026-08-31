@@ -23,18 +23,18 @@ const BLOCKING_CLASSES = Object.freeze([
 ]);
 
 const GROUPS = Object.freeze([
-  Object.freeze({ key: 'avatarType', label: 'Avatar Type', options: AVATAR_TYPES }),
-  Object.freeze({ key: 'blobColor', label: 'Blob Color', options: BLOB_COLORS, blob: true, swatches: true }),
-  Object.freeze({ key: 'skinTone', label: 'Skin Tone', options: SKIN_TONES, human: true, slider: true }),
-  Object.freeze({ key: 'shirtColor', label: 'Shirt / Top', options: SHIRT_COLORS, human: true, swatches: true }),
-  Object.freeze({ key: 'pantsColor', label: 'Pants / Bottom', options: PANTS_COLORS, human: true, swatches: true }),
-  Object.freeze({ key: 'hairStyle', label: 'Hair Style', options: HAIR_STYLES, human: true }),
-  Object.freeze({ key: 'hairColor', label: 'Hair Color', options: HAIR_COLORS, human: true, swatches: true }),
-  Object.freeze({ key: 'headwear', label: 'Headwear / Hats', options: HEADWEAR, human: true }),
-  Object.freeze({ key: 'eyewear', label: 'Eyewear', options: EYEWEAR, human: true }),
-  Object.freeze({ key: 'faceAccessory', label: 'Face / Neck', options: FACE_ACCESSORIES, human: true }),
-  Object.freeze({ key: 'backAccessory', label: 'Back', options: BACK_ACCESSORIES, human: true }),
-  Object.freeze({ key: 'backpackColor', label: 'Backpack Color', options: BACKPACK_COLORS, human: true, swatches: true })
+  Object.freeze({ key: 'avatarType', label: 'Avatar Type', options: AVATAR_TYPES, section: 'all' }),
+  Object.freeze({ key: 'blobColor', label: 'Blob Color', options: BLOB_COLORS, blob: true, swatches: true, section: 'body' }),
+  Object.freeze({ key: 'skinTone', label: 'Skin Tone', options: SKIN_TONES, human: true, slider: true, section: 'body' }),
+  Object.freeze({ key: 'shirtColor', label: 'Shirt / Top', options: SHIRT_COLORS, human: true, swatches: true, section: 'body' }),
+  Object.freeze({ key: 'pantsColor', label: 'Pants / Bottom', options: PANTS_COLORS, human: true, swatches: true, section: 'body' }),
+  Object.freeze({ key: 'hairStyle', label: 'Hair Style', options: HAIR_STYLES, human: true, section: 'body' }),
+  Object.freeze({ key: 'hairColor', label: 'Hair Color', options: HAIR_COLORS, human: true, swatches: true, section: 'body' }),
+  Object.freeze({ key: 'headwear', label: 'Headwear / Hats', options: HEADWEAR, human: true, section: 'accessories' }),
+  Object.freeze({ key: 'eyewear', label: 'Eyewear', options: EYEWEAR, human: true, section: 'accessories' }),
+  Object.freeze({ key: 'faceAccessory', label: 'Face / Neck', options: FACE_ACCESSORIES, human: true, section: 'accessories' }),
+  Object.freeze({ key: 'backAccessory', label: 'Back', options: BACK_ACCESSORIES, human: true, section: 'accessories' }),
+  Object.freeze({ key: 'backpackColor', label: 'Backpack Color', options: BACKPACK_COLORS, human: true, swatches: true, section: 'accessories' })
 ]);
 
 const colorCss = (color) => color
@@ -61,6 +61,7 @@ export class AppearanceMenu {
     this.preview = new AppearancePreview(document.querySelector('#appearance-preview-canvas'), this.progression.getAppearance());
     this.preview.setVisible(false);
     this.isOpen = false;
+    this.activeTab = 'body';
     this.previousFocus = null;
     this.renderedRevision = -1;
 
@@ -88,6 +89,13 @@ export class AppearanceMenu {
       this.close();
     };
     this.onClick = (event) => {
+      const tab = event.target.closest('[data-appearance-tab]');
+      if (tab) {
+        this.activeTab = tab.dataset.appearanceTab === 'accessories' ? 'accessories' : 'body';
+        this.render(true);
+        this.screen.querySelector(`[data-appearance-tab="${this.activeTab}"]`)?.focus({ preventScroll: true });
+        return;
+      }
       const option = event.target.closest('[data-appearance-key][data-appearance-value]');
       if (!option) return;
       const key = option.dataset.appearanceKey;
@@ -158,7 +166,10 @@ export class AppearanceMenu {
     if (!this.isOpen || !this.content || (!force && this.renderedRevision === this.progression.revision)) return;
     const appearance = normalizeAppearance(this.progression.getAppearance());
     const human = appearance.avatarType === 'human';
-    const groups = GROUPS.map((group) => {
+    for (const tab of this.screen.querySelectorAll('[data-appearance-tab]')) {
+      tab.setAttribute('aria-pressed', String(tab.dataset.appearanceTab === this.activeTab));
+    }
+    const groups = GROUPS.filter((group) => group.section === 'all' || group.section === this.activeTab).map((group) => {
       const fieldset = document.createElement('fieldset');
       fieldset.className = 'appearance-group';
       fieldset.hidden = Boolean((group.human && !human) || (group.blob && human));

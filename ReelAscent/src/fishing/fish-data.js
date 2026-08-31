@@ -59,6 +59,7 @@ const SUMMIT_COMPATIBLE_SPECIES = new Set([
 const SUMMIT_PROMOTED_EXCLUSIVES = new Set([
   'water-sprite', 'alpine-mudpuppy', 'fairy-shrimp', 'rimefin-wisp'
 ]);
+const CROWN_VAULT_EXCLUSIVES = new Set(['alpine-mudpuppy', 'rimefin-wisp']);
 
 function speciesVariation(id) {
   const hash = [...id].reduce((value, character) => value + character.charCodeAt(0), 0);
@@ -223,14 +224,15 @@ function resolvedHabitatFor(id, authoredHabitat) {
     });
   }
   if (SUMMIT_PROMOTED_EXCLUSIVES.has(id)) {
+    const crownVault = CROWN_VAULT_EXCLUSIVES.has(id);
     return Object.freeze({
       ...habitat,
       tiers: Object.freeze(['summit']),
-      waterTypes: Object.freeze(['summit-pond']),
+      waterTypes: Object.freeze([crownVault ? 'cave-tarn' : 'summit-pond']),
       themes: Object.freeze(['sunwash', 'fernwood', 'blackstone']),
-      waterIds: Object.freeze(['crooked-peak-tarn']),
-      favoredWaterIds: Object.freeze(['crooked-peak-tarn']),
-      exclusiveWaterId: 'crooked-peak-tarn',
+      waterIds: Object.freeze([crownVault ? 'crown-vault' : 'crooked-peak-tarn']),
+      favoredWaterIds: Object.freeze([crownVault ? 'crown-vault' : 'crooked-peak-tarn']),
+      exclusiveWaterId: crownVault ? 'crown-vault' : 'crooked-peak-tarn',
       exclusive: true
     });
   }
@@ -240,7 +242,7 @@ function resolvedHabitatFor(id, authoredHabitat) {
   return Object.freeze({
     ...habitat,
     tiers: Object.freeze([...new Set([...(habitat.tiers ?? []), 'summit'])]),
-    waterTypes: Object.freeze([...new Set([...(habitat.waterTypes ?? []), 'summit-pond'])]),
+    waterTypes: Object.freeze([...new Set([...(habitat.waterTypes ?? []), 'summit-pond', 'cave-tarn'])]),
     themes: Object.freeze([...new Set(habitat.themes ?? ['sunwash', 'fernwood', 'blackstone'])]),
     exclusive: false
   });

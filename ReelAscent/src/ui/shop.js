@@ -7,7 +7,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 
 const CATEGORY_LABELS = Object.freeze({
   rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', guide: 'ECOLOGY GUIDES',
-  boots: 'BOOTS', gloves: 'GLOVES', climbing: 'CLIMBING EQUIPMENT'
+  boots: 'BOOTS', gloves: 'GLOVES', climbingTool: 'CLIMBING TOOLS', harness: 'HARNESSES & PACKS'
 });
 
 export class ShopMenu {
@@ -20,6 +20,7 @@ export class ShopMenu {
     this.content = document.querySelector('#shop-content');
     this.status = document.querySelector('#shop-status');
     this.isOpen = false;
+    this.activeMode = 'buy';
     this.renderedRevision = -1;
 
     this.onKeyDown = (event) => {
@@ -32,6 +33,15 @@ export class ShopMenu {
       }
     };
     this.onClick = (event) => {
+      const tab = event.target.closest('[data-shop-tab]');
+      if (tab) {
+        this.activeMode = tab.dataset.shopTab === 'sell' ? 'sell' : 'buy';
+        this.status.textContent = this.activeMode === 'sell'
+          ? 'Sell carried Inventory specimens. Aquarium residents are never included.'
+          : 'Purchase maps and gear, then equip one item in each category.';
+        this.render(true);
+        return;
+      }
       const sellAll = event.target.closest('[data-shop-sell-all]');
       if (sellAll) {
         const state = this.progression.getSnapshot();
@@ -70,7 +80,7 @@ export class ShopMenu {
       this.render(true);
     };
     this.onCloseClick = () => this.close();
-    this.onOpenRequest = () => this.open();
+    this.onOpenRequest = (event) => this.open(event.detail?.mode ?? 'buy');
     window.addEventListener('keydown', this.onKeyDown, true);
     window.addEventListener('reel-ascent:open-shop', this.onOpenRequest);
     this.screen?.addEventListener('click', this.onClick);
@@ -81,13 +91,16 @@ export class ShopMenu {
     if (this.isOpen) this.close(); else this.open();
   }
 
-  open() {
+  open(mode = 'buy') {
     if (!this.screen) return;
     document.exitPointerLock?.();
     this.isOpen = true;
+    this.activeMode = mode === 'sell' ? 'sell' : 'buy';
     this.screen.hidden = false;
     document.body.classList.add('shop-open');
-    this.status.textContent = 'Purchase gear and equip one item in each category.';
+    this.status.textContent = this.activeMode === 'sell'
+      ? 'Sell carried Inventory specimens. Aquarium residents are never included.'
+      : 'Purchase maps and gear, then equip one item in each category.';
     this.render(true);
     this.closeButton?.focus({ preventScroll: true });
   }
@@ -108,7 +121,12 @@ export class ShopMenu {
     if (!force && this.renderedRevision === this.progression.revision) return;
     const state = this.progression.getSnapshot();
     this.money.textContent = `$${state.money}`;
-    this.content.innerHTML = `${this.renderWorldItems(state)}${this.renderSales(state)}${this.renderEquipment(state)}`;
+    for (const tab of this.tabs?.querySelectorAll('[data-shop-tab]') ?? []) {
+      tab.setAttribute('aria-pressed', String(tab.dataset.shopTab === this.activeMode));
+    }
+    this.content.innerHTML = this.activeMode === 'sell'
+      ? this.renderSales(state)
+      : `${this.renderWorldItems(state)}${this.renderEquipment(state)}`;
     this.renderedRevision = this.progression.revision;
   }
 

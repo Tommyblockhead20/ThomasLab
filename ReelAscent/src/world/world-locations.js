@@ -3,6 +3,20 @@ export const WORLD_CENTER = Object.freeze({ x: 260, z: 0 });
 // This value is a GLOBAL chart extent; loaded areas may later use local frames without
 // changing any destination's stable position on maps/GPS/multiplayer.
 export const WORLD_MAP_RADIUS = 1700;
+export const WORLD_MAP_DISTANCE_SCALE = .58;
+export const WORLD_MAP_DISPLAY_RADIUS = WORLD_MAP_RADIUS * .68;
+export const WORLD_MAP_COMPRESSION_START_RADIUS = 360;
+
+// Cartography-only transform. Simulation, saves, travel, multiplayer, and load groups keep
+// the full global coordinates; every map and GPS marker uses this same compressed view.
+export function compressWorldMapPosition(point = WORLD_CENTER) {
+  const dx = (Number(point.x) || 0) - WORLD_CENTER.x;
+  const dz = (Number(point.z) || 0) - WORLD_CENTER.z;
+  const scale = Math.hypot(dx, dz) > WORLD_MAP_COMPRESSION_START_RADIUS
+    ? WORLD_MAP_DISTANCE_SCALE
+    : 1;
+  return { x: WORLD_CENTER.x + dx * scale, z: WORLD_CENTER.z + dz * scale };
+}
 
 const radians = (degrees) => degrees * Math.PI / 180;
 const freezePoints = (points) => Object.freeze(points.map(([x, z]) => Object.freeze({ x, z })));
@@ -94,29 +108,29 @@ function islandLocation({
 
 export const SMALL_ISLAND_LOCATIONS = Object.freeze([
   islandLocation({
-    id: 'home-island', displayName: 'Cabin / Home Island', type: 'home-island',
+    id: 'home-island', displayName: 'Hearthward Isle', type: 'home-island',
     angle: 222, radius: 980, radii: { x: 22, z: 18 }, elevation: .72,
     theme: 'cozy-woodland', functions: ['appearance', 'achievements', 'trophies', 'rest']
   }),
   islandLocation({
-    id: 'shop-island', displayName: 'Shop Island', type: 'shop-island',
+    id: 'shop-island', displayName: "Outfitter's Reach", type: 'shop-island',
     angle: 35, radius: 1120, radii: { x: 19, z: 15 }, elevation: .62,
     theme: 'developed-outpost', functions: ['buy', 'sell', 'gear', 'maps']
   }),
   islandLocation({
-    id: 'aquarium-island', displayName: 'Aquarium Island', type: 'aquarium-island',
+    id: 'aquarium-island', displayName: 'Glasswater Isle', type: 'aquarium-island',
     angle: 95, radius: 1320, radii: { x: 23, z: 18 }, elevation: .7,
     theme: 'landscaped-attraction', functions: ['aquarium-inspect', 'aquarium-manage']
   }),
   islandLocation({
-    id: 'cave-fishing-island', displayName: 'Cave Fishing Island', type: 'cave-island',
+    id: 'cave-fishing-island', displayName: 'Basalt Hollow', type: 'cave-island',
     angle: 150, radius: 1460, radii: { x: 20, z: 16 }, elevation: .82,
     theme: 'rocky-cave', functions: ['cave-fishing']
   }),
   islandLocation({
-    id: 'normal-fishing-island', displayName: 'Normal Fishing Island', type: 'fishing-island',
+    id: 'normal-fishing-island', displayName: 'Mangrove Cay', type: 'fishing-island',
     angle: 330, radius: 1460, radii: { x: 19, z: 16 }, elevation: .66,
-    theme: 'natural-reed-pond', functions: ['outdoor-fishing']
+    theme: 'warm-mangrove-lagoon', functions: ['outdoor-fishing']
   }),
   islandLocation({
     id: 'cold-island', displayName: 'Frosthook', type: 'cold-island',
@@ -129,7 +143,7 @@ export const SMALL_ISLAND_LOCATIONS = Object.freeze([
 export const MAIN_WORLD_LOCATION = Object.freeze({
   // Keep the durable id for old saves/server messages; only the destination name changes.
   id: 'main-mountain',
-  displayName: 'Mountain',
+  displayName: 'Crooked Peak',
   type: 'main-island',
   worldPosition: Object.freeze({ x: WORLD_CENTER.x, y: 0, z: WORLD_CENTER.z }),
   radii: Object.freeze({ x: 208, z: 208 }),
@@ -139,7 +153,7 @@ export const MAIN_WORLD_LOCATION = Object.freeze({
   loadGroup: 'main-mountain',
   alwaysLoaded: false,
   coordinateSpace: 'global-world',
-  mapRepresentation: Object.freeze({ className: 'main-island', label: 'Mountain' }),
+  mapRepresentation: Object.freeze({ className: 'main-island', label: 'Crooked Peak' }),
   destination: Object.freeze({ enabled: true, order: 0 })
 });
 

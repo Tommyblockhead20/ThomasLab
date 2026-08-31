@@ -79,6 +79,7 @@ export function setKeyBinding(action, code, bindings = loadKeyBindings()) {
 
 export function formatInputCode(code = '') {
   if (code === 'Space') return 'Space';
+  if (code === 'ShiftLeft' || code === 'ShiftRight') return 'Shift';
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
   if (code.startsWith('Arrow')) return code.slice(5);
@@ -270,7 +271,14 @@ export class PlayerInput {
       this.resetPrimary();
     };
     this.onPointerLockChange = () => {
-      if (document.pointerLockElement !== this.canvas) {
+      if (document.pointerLockElement === this.canvas) {
+        // Firefox can deliver the click which acquired pointer lock as a gameplay press.
+        // That press must never survive long enough to activate an interaction later.
+        this.gripInteractionQueued = false;
+        this.primaryPressed = false;
+        this.primarySuppressed = this.primaryHeld;
+        this.gripInteractionSuppressed = this.rawGripHeld;
+      } else {
         this.held.clear();
         this.rhythmLaneInput.clearActive();
         this.fishingHookPressed = false;

@@ -162,7 +162,7 @@ export class Hud {
     const gripKey = formatInputCode(bindings.grip ?? 'KeyG');
     const hintText = {
       move: `${formatInputCode(bindings.forward ?? 'KeyW')}/${formatInputCode(bindings.left ?? 'KeyA')}/${formatInputCode(bindings.backward ?? 'KeyS')}/${formatInputCode(bindings.right ?? 'KeyD')} / Arrows`,
-      sprint: `${formatInputCode(bindings.sprint ?? 'ShiftLeft')} / Shift R`,
+      sprint: formatInputCode(bindings.sprint ?? 'ShiftLeft'),
       jump: formatInputCode(bindings.jump ?? 'Space'),
       slide: formatInputCode(bindings.slide ?? 'KeyC'),
       grip: `Click / ${gripKey}`,

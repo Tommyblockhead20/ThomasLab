@@ -1,7 +1,7 @@
 import { FISH_SPECIES, getWeightedSpeciesTable } from './fish-data.js';
 
 export const ECOLOGY_TARGETS = Object.freeze({
-  waters: 24,
+  waters: 25,
   species: 300,
   // The v7.1 summit promotions and v8 replacement roster intentionally moved four
   // creatures from the shared pool into location-specific discoveries. Individual

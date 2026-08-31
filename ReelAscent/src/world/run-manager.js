@@ -22,13 +22,14 @@ function rarestCatch(catches) {
 }
 
 export class RunManager {
-  constructor(player, fishing, world, hud, camera, initialStart) {
+  constructor(player, fishing, world, hud, camera, initialStart, { onLocationChange = () => {} } = {}) {
     this.player = player;
     this.fishing = fishing;
     this.world = world;
     this.hud = hud;
     this.camera = camera;
     this.currentStart = initialStart;
+    this.onLocationChange = onLocationChange;
     this.pendingStart = null;
     this.status = 'active';
     this.elapsed = 0;
@@ -121,7 +122,9 @@ export class RunManager {
         const home = this.world.getHomeArrival?.() ?? this.currentStart;
         this.status = 'active';
         this.endedTime = 0;
-        this.fishing.cancel();
+        this.player.clearBenchSeat?.();
+        this.player.exitFishing({ releasePointerLock: true });
+        this.onLocationChange(home.locationId, home.coordinateSpace ?? 'global-world');
         this.player.teleport(home.position, home.facingYaw);
         this.camera.setYaw(home.facingYaw);
         this.world.setDeveloperCourseVisible(false);
@@ -161,6 +164,7 @@ export class RunManager {
     this.summary = null;
     this.endedTime = 0;
     this.fishing.resetRun();
+    this.onLocationChange(start.locationId, start.coordinateSpace ?? 'global-world');
     this.player.setSpawnPoint(start.position);
     this.player.teleport(start.position, start.facingYaw);
     this.camera.setYaw(start.facingYaw);

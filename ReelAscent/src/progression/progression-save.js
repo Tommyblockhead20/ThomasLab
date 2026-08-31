@@ -2,7 +2,7 @@ import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 8;
+export const PROGRESSION_SCHEMA_VERSION = 9;
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
@@ -10,7 +10,8 @@ export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'plain-spoon',
   'trail-boots',
   'trail-gloves',
-  'trail-kit'
+  'trail-kit',
+  'trail-harness'
 ]);
 
 export const DEFAULT_EQUIPPED = Object.freeze({
@@ -20,7 +21,8 @@ export const DEFAULT_EQUIPPED = Object.freeze({
   lure: 'plain-spoon',
   boots: 'trail-boots',
   gloves: 'trail-gloves',
-  climbing: 'trail-kit'
+  climbingTool: 'trail-kit',
+  harness: 'trail-harness'
 });
 
 const finite = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
@@ -121,12 +123,14 @@ export function normalizeProgressionState(value = {}) {
     const selected = value.equipped?.[category];
     if (typeof selected === 'string' && owned.has(selected)) equipped[category] = selected;
   }
-  // v6 stored every traversal item in one slot. Preserve the selected item in its new v9 slot.
-  const legacyTraversal = value.equipped?.traversal;
+  // v6–v8 stored traversal items in one traversal/climbing slot. Preserve each durable id
+  // in the correct v9 category without discarding purchases.
+  const legacyTraversal = value.equipped?.climbing ?? value.equipped?.traversal;
   if (typeof legacyTraversal === 'string' && owned.has(legacyTraversal)) {
-    if (['trail-runners', 'endurance-belt', 'springstep-boots'].includes(legacyTraversal)) equipped.boots = legacyTraversal;
+    if (['trail-runners', 'endurance-belt', 'springstep-boots', 'summit-vault-boots'].includes(legacyTraversal)) equipped.boots = legacyTraversal;
     else if (legacyTraversal === 'chalk-gloves') equipped.gloves = legacyTraversal;
-    else equipped.climbing = legacyTraversal;
+    else if (['alpine-harness', 'ultralight-kit', 'trail-harness'].includes(legacyTraversal)) equipped.harness = legacyTraversal;
+    else equipped.climbingTool = legacyTraversal;
   }
   if (typeof value.equipped?.guide === 'string' && owned.has(value.equipped.guide)) equipped.guide = value.equipped.guide;
   const validWorldItems = new Set(MAP_ITEMS.map((item) => item.id));

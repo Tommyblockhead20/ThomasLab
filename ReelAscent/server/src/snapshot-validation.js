@@ -1,6 +1,6 @@
 const MOVEMENT_STATES = new Set(['grounded', 'airborne', 'sliding', 'climbing', 'mantling', 'fishing']);
 const POSTURES = new Set(['standing', 'seated']);
-const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'sit', 'dance']);
+const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'clap', 'sit', 'dance']);
 const APPEARANCE_OPTIONS = Object.freeze({
   avatarType: new Set(['human', 'blob']),
   skinTone: new Set(['porcelain', 'light', 'warm', 'honey', 'golden', 'bronze', 'umber', 'deep']),

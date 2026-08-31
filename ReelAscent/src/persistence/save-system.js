@@ -1,7 +1,7 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 8;
+export const SAVE_SCHEMA_VERSION = 9;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -175,6 +175,12 @@ const MIGRATIONS = Object.freeze({
   7: (value) => ({
     ...value,
     version: 8,
+    progression: normalizeProgressionState(value.progression),
+    lifetime: value.lifetime ?? {}
+  }),
+  8: (value) => ({
+    ...value,
+    version: 9,
     progression: normalizeProgressionState(value.progression),
     lifetime: value.lifetime ?? {}
   })

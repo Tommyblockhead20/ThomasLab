@@ -1,6 +1,56 @@
-# Reel Ascent v9 major update handoff
+# Reel Ascent v9.4 update handoff
 
-Status: implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Islands remain deliberately always loaded. Validation was kept light as requested. The v9.2 appearance allowlist changes do require the multiplayer server to be redeployed with the client.
+Status: v9.4 is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Validation was deliberately light. Because the multiplayer emote allowlist changed, deploy the frontend and multiplayer server together.
+
+## v9.4 current-tree pass
+
+This section supersedes older descriptions below where they differ.
+
+### Input, menus, map, and emotes
+
+- Fixed the Firefox/pointer-lock auto-interaction root cause in two places. The click that acquires pointer lock is suppressed until release, and a Grip/click edge made with no nearby target is consumed that frame instead of remaining queued until the player walks into a shop, bench, wardrobe, aquarium, or boat trigger. Proximity still controls prompts; entering a trigger requires a fresh press.
+- Appearance is a fixed-height, non-scrolling desktop dialog with the live preview on the left and tabbed `BODY & COLORS` / `ACCESSORIES` controls on the right. Close, Randomize, and Reset remain in one stable header across human/blob switches and rerenders. Small screens retain a scrolling fallback.
+- Added Clap to the local emote menu, local humanoid animation, remote-avatar animation, shared emote definitions, and server snapshot allowlist. This is an additive protocol-v1 value; no envelope or protocol version changed.
+- The world map uses a cartographic-only `.58` compression for far-island vectors and a `.68` display radius. The simulation, saves, travel, load groups, multiplayer snapshots, and global coordinates are unchanged. Paper-map, boat-map, local GPS, remote GPS, island footprints, and docks use the same transform, preserving bearings and ordering.
+- The map dialog is larger and more zoomed. Duplicate Cabin/Trail Cabin, Shop/Shop Outpost, and Aquarium/Public Aquarium pins were removed; each place now has one location label.
+- Player-facing place names are Crooked Peak, Hearthward Isle, Outfitter's Reach, Glasswater Isle, Basalt Hollow, Mangrove Cay, and Frosthook. Durable location IDs remain unchanged.
+- Pause now has one top-level Settings screen containing both interface/gameplay and Accessibility controls. Save/Data shows Portable Progress export/import permanently instead of hiding it in a collapsed details row.
+- Visible Shift labels are normalized to `Shift`, including the HUD control card; duplicate `Shift L / Shift R` wording is gone.
+
+### World, caves, water, shop, aquarium, and spawning
+
+- Mangrove Cay replaces the generic normal fishing island presentation. Its central Mangrove Lagoon has greener clear shallows, a warm mud/sand shelf, wetland reeds, low roots, and ten broadleaf mangroves with climbable registered trunks.
+- Pond/lake footprints now have meaningful small/medium/large variation. Sheltered Mirror, Redbank, and Hidden Ridge are compact; Pineglass, Mossbell, Cloudstep, and Boulder Coast are notably larger. Basin carving and water-zone radii still use the same descriptors.
+- High Cirque Tarn remains the fixed-aperture Upper Alpine cave. New Crown Vault is a second fixed-aperture cave at the Crown base. The Crown shell is now locally subdivided so the established triangle/aperture filter removes only the mouth instead of a full base-to-summit wedge.
+- Existing repaired cave topology is preserved: literal core apertures, recessed descending floors/walls, rear cave water, no exterior facade/shell blocks, and no reopening of unrelated caves. Crown Vault uses the same system rather than introducing a cave facade.
+- Fishing topology is now 25 waters: ocean 1, lower 10, middle 7, upper 4, summit 2, waterfall 1. The 300-creature ecology remains intact. Alpine Mudpuppy and Rimefin Wisp are Crown Vault exclusives; the summit tarn retains its remaining exclusives.
+- Glasswater's separate pavilion and tank were enlarged to an 18 × 11 × 6.2 m display with a clearer dedicated water material. Foundation, posts, roof, glass, frames, habitat props, and sign derive from tank dimensions, removing the old undersized/janky hard-coded shell.
+- Aquarium rendering accepts up to the saved 300-fish maximum and now places each resident's actual species archetype at saved specimen length. Four widely separated front/rear/left/right management triggers make the large tank usable around its perimeter.
+- Aquarium `REMOVE → INVENTORY` is explicit and still moves ownership back to carried Inventory; it never destroys or sells the specimen. Capacity tiers remain 25/50/100/150/200/250/300.
+- Outfitter's Reach now has physically separate gear/map and fishmonger counters. The first opens Buy & Equip; the second opens Sell Fish. Accessible tabs allow switching inside the same dialog. Sell All still requires confirmation and sums only carried Inventory specimens, excluding aquarium residents.
+- Fresh local sessions start at the safe cabin/porch anchor on Hearthward Isle. Multiplayer authoritative run seeds can still override that start after joining.
+- Home now changes the active location/load group to Hearthward Isle, cancels fishing through the unified exit, clears seating, resets movement/camera state, and teleports to the cabin anchor instead of a random mountain shoreline.
+- Player teleports/spawn points now validate a shrunken Rapier capsule plus walkable support, try a deterministic set of nearby forward/back/side/diagonal/raised fallbacks, and retain a diagnostic resolution record. Boat arrivals and authored anchors remain the source positions.
+
+### Specimens and gear
+
+- Inventory thumbnails are cached lightweight SVGs selected from each species' actual archetype and authored colors. Sharks, rays, cephalopods, crustaceans, shells/snails, amphibians/turtles, echinoderms, mammals, serpents, and normal fish have distinct silhouettes.
+- The shared PlayCanvas specimen builder now has distinct 3D forms for those archetype families. Inventory-held and aquarium models use that same builder.
+- Specimen scale is calculated from saved length in inches → meters divided by the archetype model's native length. The former generic square-root scale and `.72/.74` display caps were removed. Held large specimens offset outward so they extend beside the player instead of being shrunk into a generic hand prop.
+- Traversal equipment slots are Boots, Gloves, Climbing Tool, and Harness/Pack. Old `climbing`/`traversal` saves migrate durable IDs into their correct v9 slot. Progression and outer save schemas are version 9; older saves and portable progress still normalize forward.
+- Trail Kit has no bonus. Endurance Boots make normal sprint drain zero. Springstep Boots are +25% jump; Summit Vault Boots are +50% at the higher tier/price. Climbing Gloves use `.80` grip/climb cost. Climber's Chalk is a stronger/pricier `.70` tool.
+- Ice Axe is terrain-specific: on registered ice/smooth surfaces it applies `.75` climb/grip stamina, `.55` slip, and `1.08` slide-entry/exit thresholds. It is not a universal Chalk replacement.
+- Ultralight Kit keeps its durable ID but is displayed as Ultralight Harness. Its single centralized `.60` normal-stamina multiplier applies multiplicatively to sprint, climbing/grip, jump, slide braking, and slide push-off. Specific gear multipliers then stack multiplicatively and are clamped nonnegative.
+- Owned gear remains equippable from Inventory → Gear as well as the outfitter.
+
+### Deployment and validation
+
+- Server redeploy is required with the frontend because `server/src/snapshot-validation.js` now accepts `clap`. There is no breaking network schema change.
+- Syntax/import checks passed for every changed JavaScript module. `git diff --check` reports only the repository's existing Windows line-ending notices.
+- Focused `node --test test/mountain.test.js` passed 7/7, covering traversal density, 25-water topology, cave water surfaces/descents, the complete 300-species ecology audit, and ocean ecology.
+- `npm run build` passed: Vite 8.2.2, 1,274 modules. The existing large PlayCanvas bundle warning remains; output was refreshed in `dist/`.
+- Multiplayer server startup passed on alternate smoke-test port `18788`; default `8787` was already occupied by another local process. The smoke process was stopped afterward.
+- Highest-value manual checks still recommended: Firefox click-to-lock then walk into/out of each interaction; Appearance at ordinary desktop heights; two-client Clap/GPS/appearance; Home from fishing and each island; all four aquarium sides with tiny/huge specimens; Outfitter/Fishmonger separation; Crown Vault and High Cirque mouth/floor/water joins; Mangrove Cay shore; and Ice Axe versus Chalk on ice/smooth/rough surfaces.
 
 ## v9.2 remaining-pass addendum
 

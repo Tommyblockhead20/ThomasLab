@@ -1,4 +1,9 @@
-import { WORLD_CENTER, WORLD_LOCATIONS, WORLD_MAP_RADIUS } from '../world/world-locations.js';
+import {
+  WORLD_CENTER,
+  WORLD_LOCATIONS,
+  WORLD_MAP_DISPLAY_RADIUS,
+  compressWorldMapPosition
+} from '../world/world-locations.js';
 
 export class BoatTravelMenu {
   constructor(onTravel) {
@@ -38,8 +43,9 @@ export class BoatTravelMenu {
       button.type = 'button';
       button.dataset.travelDestination = location.id;
       button.className = `boat-map-island boat-map-${location.type}`;
-      const x = 50 + (location.worldPosition.x - WORLD_CENTER.x) / WORLD_MAP_RADIUS * 42;
-      const y = 50 + (location.worldPosition.z - WORLD_CENTER.z) / WORLD_MAP_RADIUS * 42;
+      const mapped = compressWorldMapPosition(location.worldPosition);
+      const x = 50 + (mapped.x - WORLD_CENTER.x) / WORLD_MAP_DISPLAY_RADIUS * 42;
+      const y = 50 + (mapped.z - WORLD_CENTER.z) / WORLD_MAP_DISPLAY_RADIUS * 42;
       button.style.left = `${x}%`;
       button.style.top = `${y}%`;
       const footprint = document.createElement('span');

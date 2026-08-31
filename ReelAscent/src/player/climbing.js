@@ -219,7 +219,7 @@ export class ClimbingController {
     if (candidate.collider.handle !== this.blockedSurfaceHandle) this.reattachTimer = 0;
   }
 
-  update(dt, position, axes, cameraAxes, gripHeld, jumpPressed, stamina, gripDrainMultiplier = 1) {
+  update(dt, position, axes, cameraAxes, gripHeld, jumpPressed, stamina, gripDrainMultiplier = 1, slipMultiplier = 1) {
     this.output.type = 'climbing';
     this.output.movement.set(0, 0, 0);
     this.output.pushNormal.copy(this.surfaceNormal);
@@ -283,9 +283,9 @@ export class ClimbingController {
     const rightSpeed = axes.x * CLIMBING_CONFIG.sidewaysSpeed * material.speedMultiplier;
     // Smooth Rock and Ice are deliberately worse when the player hangs still. Active
     // movement still slips, but committing to a move partially counters the idle slide.
-    const slipSpeed = inputLength < 0.08
+    const slipSpeed = (inputLength < 0.08
       ? (material.idleSlipRate ?? material.slipRate)
-      : material.slipRate;
+      : material.slipRate) * Math.max(0, slipMultiplier);
     const verticalSpeed = axes.z * CLIMBING_CONFIG.climbSpeed * material.speedMultiplier
       - slipSpeed;
     this.lastClimbVelocity

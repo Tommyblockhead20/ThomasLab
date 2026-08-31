@@ -60,7 +60,7 @@
 
         <div id="currency-indicator" class="currency-indicator" aria-label="Current money">$0</div>
 
-        <button id="return-home" type="button" title="Return to your cabin on Home Island">⌂ HOME</button>
+        <button id="return-home" type="button" title="Return to your cabin on Hearthward Isle">⌂ HOME</button>
 
         <div class="controls-card">
           <span data-control-hint="move"><kbd>WASD / Arrows</kbd> Move</span>
@@ -200,7 +200,6 @@
           <button type="button" data-pause-tab="stats" aria-pressed="true">STATS</button>
           <button type="button" data-pause-tab="save-data" aria-pressed="false">SAVE / DATA</button>
           <button type="button" data-pause-tab="settings" aria-pressed="false">SETTINGS</button>
-          <button type="button" data-pause-tab="accessibility" aria-pressed="false">ACCESSIBILITY</button>
           <button type="button" data-pause-tab="keybinds" aria-pressed="false">KEY REBINDING</button>
         </nav>
         <p id="pause-status" class="pause-status" aria-live="polite"></p>
@@ -235,18 +234,22 @@
           <button type="button" data-collection-tab="catches" aria-pressed="true">CATCHES</button>
           <button type="button" data-collection-tab="gear" aria-pressed="false">GEAR</button>
         </nav>
-        <p id="inventory-status" class="shop-status" aria-live="polite">Every successful catch waits here until you sell it at Shop Island or move it at Aquarium Island.</p>
+        <p id="inventory-status" class="shop-status" aria-live="polite">Every successful catch waits here until you sell it at Outfitter's Reach or move it to Glasswater Isle.</p>
         <div id="inventory-content" class="inventory-content"></div>
       </section>
 
       <section id="progression-shop" class="progression-shop" role="dialog" aria-modal="true" hidden aria-labelledby="shop-title">
-        <header class="shop-header"><div><span class="eyebrow">SHOP ISLAND OUTFITTER</span><h2 id="shop-title">Gear, Maps & Fish Market</h2></div><strong id="shop-money">$0</strong><button id="close-shop" type="button">CLOSE <kbd>Esc</kbd></button></header>
+        <header class="shop-header"><div><span class="eyebrow">OUTFITTER'S REACH</span><h2 id="shop-title">Outfitter &amp; Fishmonger</h2></div><strong id="shop-money">$0</strong><button id="close-shop" type="button">CLOSE <kbd>Esc</kbd></button></header>
+        <nav id="shop-tabs" class="shop-tabs" aria-label="Shop sections">
+          <button type="button" data-shop-tab="buy" aria-pressed="true">BUY &amp; EQUIP</button>
+          <button type="button" data-shop-tab="sell" aria-pressed="false">SELL FISH</button>
+        </nav>
         <p id="shop-status" class="shop-status" aria-live="polite">Purchase gear and maps, equip gear, or sell carried specimens.</p>
         <div id="shop-content" class="shop-content"></div>
       </section>
 
       <section id="aquarium-menu" class="progression-shop aquarium-menu" role="dialog" aria-modal="true" hidden aria-labelledby="aquarium-title">
-        <header class="shop-header"><div><span class="eyebrow">AQUARIUM ISLAND</span><h2 id="aquarium-title">Public Aquarium Collection</h2></div><strong id="aquarium-count">0 retained</strong><button id="close-aquarium" type="button">CLOSE <kbd>Esc</kbd></button></header>
+        <header class="shop-header"><div><span class="eyebrow">GLASSWATER ISLE</span><h2 id="aquarium-title">Aquarium Collection</h2></div><strong id="aquarium-count">0 retained</strong><button id="close-aquarium" type="button">CLOSE <kbd>Esc</kbd></button></header>
         <p id="aquarium-status" class="shop-status">Add carried specimens to the swimming display or return displayed fish to Inventory.</p>
         <div id="aquarium-content" class="aquarium-content"></div>
       </section>
@@ -261,15 +264,19 @@
       <section id="appearance-menu" class="appearance-menu" role="dialog" aria-modal="true" hidden aria-labelledby="appearance-title">
         <header>
           <div><span class="eyebrow">CABIN WARDROBE • SAVED LOCALLY</span><h2 id="appearance-title">Character Appearance</h2></div>
-          <button id="close-appearance" type="button">CLOSE <kbd>Esc</kbd></button>
-        </header>
-        <div class="appearance-toolbar">
-          <p id="appearance-status" class="appearance-status" aria-live="polite">The classic orange-and-yellow climber is the default. Blue Blob remains an optional cosmetic.</p>
           <div class="appearance-toolbar-actions">
             <button id="randomize-appearance" type="button">RANDOMIZE LOOK</button>
             <button id="reset-appearance" type="button">RESET TO DEFAULT</button>
+            <button id="close-appearance" type="button">CLOSE <kbd>Esc</kbd></button>
           </div>
+        </header>
+        <div class="appearance-toolbar">
+          <p id="appearance-status" class="appearance-status" aria-live="polite">The classic orange-and-yellow climber is the default. Blue Blob remains an optional cosmetic.</p>
         </div>
+        <nav class="appearance-tabs" aria-label="Appearance sections">
+          <button type="button" data-appearance-tab="body" aria-pressed="true">BODY &amp; COLORS</button>
+          <button type="button" data-appearance-tab="accessories" aria-pressed="false">ACCESSORIES</button>
+        </nav>
         <div class="appearance-layout">
           <figure class="appearance-preview">
             <canvas id="appearance-preview-canvas" aria-label="Live rotating full-body character preview"></canvas>
@@ -296,6 +303,7 @@
           <button type="button" data-emote-id="wave">WAVE</button>
           <button type="button" data-emote-id="point">POINT</button>
           <button type="button" data-emote-id="cheer">CHEER</button>
+          <button type="button" data-emote-id="clap">CLAP</button>
           <button type="button" data-emote-id="sit">SIT / RELAX</button>
           <button type="button" data-emote-id="dance">DANCE</button>
         </div>

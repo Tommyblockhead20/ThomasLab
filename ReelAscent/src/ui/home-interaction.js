@@ -57,13 +57,13 @@ export class HomeInteractionController {
   }
 
   captureInteractionInput() {
-    // Never steal a Grip edge from active climbing. Only consume after confirming there is
-    // a real nearby generic interaction target.
+    // Never steal a Grip edge from active climbing. Outside climbing, consume the one-frame
+    // interaction edge unconditionally: a press made out of range must not be banked and
+    // replayed when the player later walks into a trigger.
     if (['climbing', 'mantling'].includes(this.player.movementState)) return false;
-    this.refreshCurrent();
-    if (!this.current) return false;
     const pressed = this.player.input.consumeGripInteraction?.();
-    if (!pressed) return false;
+    this.refreshCurrent();
+    if (!this.current || !pressed) return false;
     const handled = this.interact();
     if (handled) this.player.input.suppressGripUntilRelease?.();
     return handled;
@@ -88,7 +88,7 @@ export class HomeInteractionController {
     }
     if (this.current && this.label) {
       if (this.eyebrow) this.eyebrow.textContent = ({
-        boat: 'ISLAND FERRY', shop: 'SHOP ISLAND', aquarium: 'AQUARIUM ISLAND', appearance: 'CABIN / HOME ISLAND'
+        boat: 'ISLAND FERRY', shop: "OUTFITTER'S REACH", aquarium: 'GLASSWATER ISLE', appearance: 'HEARTHWARD ISLE'
       })[this.current.action] ?? 'WORLD INTERACTION';
       this.label.textContent = seatedInteraction
         ? (this.player.fishing?.active ? 'STOP FISHING & GET UP' : 'CLICK TO GET UP')
@@ -125,7 +125,9 @@ export class HomeInteractionController {
     if (interaction.action === 'shop') {
       this.player.cancelEmote();
       this.dismissPrompt();
-      window.dispatchEvent(new CustomEvent('reel-ascent:open-shop'));
+      window.dispatchEvent(new CustomEvent('reel-ascent:open-shop', {
+        detail: { mode: interaction.shopMode ?? 'buy' }
+      }));
       return true;
     }
     if (interaction.action === 'boat') {

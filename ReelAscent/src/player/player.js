@@ -134,6 +134,10 @@ export class Player {
         .setRestitution(0),
       this.body
     );
+    this.safeSpawnCapsuleShape = new RAPIER.Capsule(
+      PLAYER_CONFIG.capsuleHalfHeight * .92,
+      PLAYER_CONFIG.radius * .9
+    );
 
     this.controller = this.physicsWorld.createCharacterController(0.025);
     this.controller.setSlideEnabled(true);
@@ -470,10 +474,14 @@ export class Player {
     this.heldInventorySpecimen = specimen ? { ...specimen } : null;
     if (!specimen) return null;
     const model = createSpecimenModel(specimen, {
-      name: `Held inventory specimen ${specimen.specimenId}`,
-      maximumScale: .74
+      name: `Held inventory specimen ${specimen.specimenId}`
     });
-    model.root.setLocalPosition(.64, -.29, -.4);
+    model.heldOffset = {
+      x: .45 + Math.min(4, (model.physicalLengthMeters ?? .5) * .42),
+      y: -.29,
+      z: -.42
+    };
+    model.root.setLocalPosition(model.heldOffset.x, model.heldOffset.y, model.heldOffset.z);
     model.root.setLocalEulerAngles(-8, -18, -5);
     this.visualRoot.addChild(model.root);
     this.inventorySpecimenModel = model;
@@ -488,7 +496,8 @@ export class Player {
       && !this.currentEmote;
     model.root.enabled = visible;
     if (!visible) return;
-    model.root.setLocalPosition(.64, -.29 + Math.sin(this.motionTime * 1.4) * .012, -.4);
+    const offset = model.heldOffset ?? { x: .64, y: -.29, z: -.4 };
+    model.root.setLocalPosition(offset.x, offset.y + Math.sin(this.motionTime * 1.4) * .012, offset.z);
     if (model.tail) {
       const base = model.tailBaseEuler ?? model.tail.getLocalEulerAngles().clone();
       model.tailBaseEuler = base;
@@ -524,7 +533,9 @@ export class Player {
         normal.z * normal.y
       );
       if (slideDirection.lengthSq() > 0.0001) slideDirection.normalize();
-      return { normal, slopeDegrees, downhill, slideDirection, distance, nearFeet: true, kind };
+      const climbSurface = this.surfaceRegistry.getClimbSurface?.(hit.collider) ?? null;
+      const surfaceMaterialId = climbSurface?.material?.id ?? climbSurface?.type ?? null;
+      return { normal, slopeDegrees, downhill, slideDirection, distance, nearFeet: true, kind, surfaceMaterialId };
     };
 
     // Several downward samples stop a single triangle edge from deciding whether a slope
@@ -663,6 +674,10 @@ export class Player {
   updateSlideState(dt, groundSurface, manualRequested) {
     const surfaceNearFeet = Boolean(groundSurface?.nearFeet);
     const slopeDegrees = groundSurface?.slopeDegrees ?? 0;
+    const slipperySurface = ['ice', 'smooth'].includes(groundSurface?.surfaceMaterialId);
+    const iceStability = slipperySurface
+      ? Math.max(1, this.progression?.getModifier('iceSlideThresholdMultiplier') ?? 1)
+      : 1;
 
     // A jam-recovery window deliberately releases forced slide control so the player can
     // steer sideways around the obstruction. It does NOT make steep terrain legal ground:
@@ -676,9 +691,9 @@ export class Player {
     }
 
     const automaticCandidate = surfaceNearFeet
-      && slopeDegrees >= PLAYER_CONFIG.slideSlopeDegrees;
+      && slopeDegrees >= PLAYER_CONFIG.slideSlopeDegrees * iceStability;
     const keepCandidate = surfaceNearFeet
-      && slopeDegrees >= PLAYER_CONFIG.slideExitSlopeDegrees;
+      && slopeDegrees >= PLAYER_CONFIG.slideExitSlopeDegrees * iceStability;
 
     if (manualRequested) {
       this.slideActive = true;
@@ -977,7 +992,7 @@ export class Player {
 
     if (this.stamina.value > 0) {
       const slideCost = PLAYER_CONFIG.slidePushOffStaminaCost
-        * (this.progression?.getModifier('slideCostMultiplier') ?? 1);
+        * this.normalStaminaCostMultiplier('slideCostMultiplier');
       this.stamina.spend(Math.min(slideCost, this.stamina.value));
     }
     this.horizontalVelocity.set(push.x, 0, push.z);
@@ -991,6 +1006,27 @@ export class Player {
 
   setUnlimitedStamina(enabled) {
     return this.stamina.setUnlimited(enabled);
+  }
+
+  normalStaminaCostMultiplier(...specificModifiers) {
+    let multiplier = Math.max(0, this.progression?.getModifier('staminaCostMultiplier') ?? 1);
+    for (const name of specificModifiers) {
+      multiplier *= Math.max(0, this.progression?.getModifier(name) ?? 1);
+    }
+    return Math.max(0, multiplier);
+  }
+
+  getClimbingEquipmentModifiers() {
+    const materialId = this.climbing.getSurfaceMaterial?.()?.id ?? '';
+    const slippery = materialId === 'ice' || materialId === 'smooth';
+    return {
+      cost: this.normalStaminaCostMultiplier(
+        'gripDrain',
+        'climbCostMultiplier',
+        ...(slippery ? ['iceClimbCostMultiplier'] : [])
+      ),
+      slip: slippery ? Math.max(0, this.progression?.getModifier('iceSlipMultiplier') ?? 1) : 1
+    };
   }
 
   exitFishing(options = {}) {
@@ -1159,6 +1195,7 @@ export class Player {
     }
 
     if (this.movementState === 'climbing') {
+      const climbingGear = this.getClimbingEquipmentModifiers();
       const output = this.climbing.update(
         dt,
         this.body.translation(),
@@ -1167,8 +1204,8 @@ export class Player {
         this.input.gripHeld,
         jumpPressed,
         this.stamina,
-        (this.progression?.getModifier('gripDrain') ?? 1)
-          * (this.progression?.getModifier('climbCostMultiplier') ?? 1)
+        climbingGear.cost,
+        climbingGear.slip
       );
       this.handleClimbingOutput(output, dt);
       return;
@@ -1293,6 +1330,7 @@ export class Player {
       this.sprinting = false;
       this.horizontalVelocity.set(0, 0, 0);
       this.verticalVelocity = 0;
+      const climbingGear = this.getClimbingEquipmentModifiers();
       const output = this.climbing.update(
         dt,
         this.body.translation(),
@@ -1301,8 +1339,8 @@ export class Player {
         true,
         false,
         this.stamina,
-        (this.progression?.getModifier('gripDrain') ?? 1)
-          * (this.progression?.getModifier('climbCostMultiplier') ?? 1)
+        climbingGear.cost,
+        climbingGear.slip
       );
       this.handleClimbingOutput(output, dt);
       return;
@@ -1320,7 +1358,7 @@ export class Player {
       (slidingDownSlope || slideRecoveryActive) ? false : this.input.sprintHeld,
       slidingDownSlope || slideRecoveryActive || hasMoveInput,
       canRegenerateStamina,
-      this.progression?.getModifier('sprintDrain') ?? 1
+      this.normalStaminaCostMultiplier('sprintDrain')
     );
 
     let targetSpeed = this.sprinting
@@ -1380,7 +1418,7 @@ export class Player {
       const slideDirection = groundSurface.slideDirection.clone();
       if (slideBrake) {
         this.stamina.spend(PLAYER_CONFIG.slideBrakeDrainPerSecond * dt
-          * (this.progression?.getModifier('slideCostMultiplier') ?? 1));
+          * this.normalStaminaCostMultiplier('slideCostMultiplier'));
         targetSpeed *= PLAYER_CONFIG.slideBrakeSpeedMultiplier;
       }
       // Directional input while sliding is steering, never uphill propulsion. Project
@@ -1445,8 +1483,8 @@ export class Player {
     }
 
     if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0 && !onTooSteepSurface && !slidingDownSlope
-        && this.stamina.value >= PLAYER_CONFIG.jumpStaminaCost * (this.progression?.getModifier('jumpCostMultiplier') ?? 1)) {
-      this.stamina.spend(PLAYER_CONFIG.jumpStaminaCost * (this.progression?.getModifier('jumpCostMultiplier') ?? 1));
+        && this.stamina.value >= PLAYER_CONFIG.jumpStaminaCost * this.normalStaminaCostMultiplier('jumpCostMultiplier')) {
+      this.stamina.spend(PLAYER_CONFIG.jumpStaminaCost * this.normalStaminaCostMultiplier('jumpCostMultiplier'));
       this.verticalVelocity = PLAYER_CONFIG.jumpSpeed * (this.progression?.getModifier('jumpImpulseMultiplier') ?? 1);
       this.jumpBufferTimer = 0;
       this.coyoteTimer = 0;
@@ -1819,6 +1857,14 @@ export class Player {
         rightElbow = -18;
         leftArmRoll = -22;
         rightArmRoll = 22;
+      } else if (this.currentEmote.id === 'clap') {
+        const clap = Math.sin(phase * 9);
+        leftShoulder = 78 + clap * 5;
+        rightShoulder = 78 + clap * 5;
+        leftElbow = -72 - clap * 14;
+        rightElbow = -72 - clap * 14;
+        leftArmRoll = -52 + clap * 12;
+        rightArmRoll = 52 - clap * 12;
       } else if (this.currentEmote.id === 'sit') {
         leftShoulder = -8;
         rightShoulder = -8;
@@ -1973,7 +2019,7 @@ export class Player {
   teleport(position, facingYaw = this.facingYaw) {
     this.cancelEmote();
     this.benchSeat = null;
-    const spawn = { x: position.x, y: position.y, z: position.z };
+    const spawn = this.resolveSafeSpawn(position, facingYaw);
     this.body.setTranslation(spawn, true);
     this.body.setNextKinematicTranslation(spawn);
     this.horizontalVelocity.set(0, 0, 0);
@@ -2012,7 +2058,62 @@ export class Player {
   }
 
   setSpawnPoint(position) {
-    this.spawnPoint = { x: position.x, y: position.y, z: position.z };
+    this.spawnPoint = this.resolveSafeSpawn(position, this.facingYaw);
+  }
+
+  isSpawnCapsuleSafe(position) {
+    if (!this.safeSpawnCapsuleShape) return true;
+    let blocked = false;
+    this.physicsWorld.intersectionsWithShape(
+      position,
+      { x: 0, y: 0, z: 0, w: 1 },
+      this.safeSpawnCapsuleShape,
+      () => {
+        blocked = true;
+        return false;
+      },
+      undefined,
+      undefined,
+      this.collider
+    );
+    if (blocked) return false;
+    const ray = new this.RAPIER.Ray(
+      { x: position.x, y: position.y + .1, z: position.z },
+      { x: 0, y: -1, z: 0 }
+    );
+    const hit = this.physicsWorld.castRayAndGetNormal(
+      ray,
+      PLAYER_FOOT_OFFSET + .85,
+      true,
+      undefined,
+      undefined,
+      this.collider
+    );
+    return Boolean(hit && hit.normal.y >= Math.cos(PLAYER_CONFIG.maxSlopeDegrees * Math.PI / 180));
+  }
+
+  resolveSafeSpawn(position, facingYaw = 0) {
+    const anchor = { x: Number(position?.x) || 0, y: Number(position?.y) || 0, z: Number(position?.z) || 0 };
+    if (!this.safeSpawnCapsuleShape) return anchor;
+    const yaw = facingYaw * Math.PI / 180;
+    const offsets = [
+      [0, 0, 0], [0, .85, 0], [0, -.85, 0], [.85, 0, 0], [-.85, 0, 0],
+      [.9, .9, .12], [-.9, .9, .12], [.9, -.9, .12], [-.9, -.9, .12],
+      [0, 1.65, .25], [0, -1.65, .25], [1.65, 0, .25], [-1.65, 0, .25],
+      [0, 0, .4]
+    ];
+    for (const [right, forward, up] of offsets) {
+      const candidate = {
+        x: anchor.x + Math.cos(yaw) * right + Math.sin(yaw) * forward,
+        y: anchor.y + up,
+        z: anchor.z - Math.sin(yaw) * right + Math.cos(yaw) * forward
+      };
+      if (!this.isSpawnCapsuleSafe(candidate)) continue;
+      this.lastSafeSpawnResolution = { anchor, resolved: candidate };
+      return candidate;
+    }
+    this.lastSafeSpawnResolution = { anchor, resolved: anchor, fallbackExhausted: true };
+    return anchor;
   }
 
   getPosition() {

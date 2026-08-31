@@ -97,13 +97,13 @@ test('mountain v2 provides six unique safe starts and preserves traversal geomet
   }
 });
 
-test('the world exposes exactly 24 waters with one hollow annular ocean', () => {
+test('the world exposes exactly 25 waters with one hollow annular ocean', () => {
   assert.deepEqual(FISHING_WATER_COUNTS, {
-    ocean: 1, lower: 10, middle: 7, upper: 4, summit: 1, waterfall: 1, total: 24
+    ocean: 1, lower: 10, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 25
   });
-  assert.equal(MOUNTAIN_FISHING_LOCATIONS.length, 23);
-  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 24);
-  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 24);
+  assert.equal(MOUNTAIN_FISHING_LOCATIONS.length, 24);
+  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 25);
+  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 25);
   assert.equal(OCEAN_FISHING_DESCRIPTOR.id, 'outer-ocean');
   assert.ok(OCEAN_FISHING_DESCRIPTOR.innerRadius >= COASTAL_SHELF_RADIUS - 5);
   assert.ok(OCEAN_FISHING_DESCRIPTOR.outerRadius > OCEAN_FISHING_DESCRIPTOR.innerRadius);
@@ -147,12 +147,12 @@ test('every cave entrance descends to its water surface', () => {
   }
 });
 
-test('300-creature ecology audit preserves the active 24-water topology', () => {
+test('300-creature ecology audit preserves the active 25-water topology', () => {
   const zones = ecologyZones();
   const audit = auditFishingEcology(zones);
   assert.equal(FISH_SPECIES.length, 300);
-  assert.equal(audit.waterCount, 24);
-  assert.equal(audit.uniqueWaterCount, 24);
+  assert.equal(audit.waterCount, 25);
+  assert.equal(audit.uniqueWaterCount, 25);
   assert.deepEqual(audit.zeroWaterSpecies, []);
   assert.equal(audit.exclusiveCount, ECOLOGY_TARGETS.exclusiveSpecies);
   assert.equal(audit.sharedCount, ECOLOGY_TARGETS.sharedSpecies);

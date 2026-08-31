@@ -297,6 +297,10 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     } else if (emote?.id === 'cheer') {
       leftArm = 148 + Math.sin(phase * 3) * 9;
       rightArm = 148 - Math.sin(phase * 3) * 9;
+    } else if (emote?.id === 'clap') {
+      const clap = Math.sin(phase * 5);
+      leftArm = 76 + clap * 8;
+      rightArm = 76 + clap * 8;
     } else if (emote?.id === 'sit') {
       leftArm = -10;
       rightArm = -10;

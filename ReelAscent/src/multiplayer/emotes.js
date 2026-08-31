@@ -2,6 +2,7 @@ export const EMOTE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: 'wave', label: 'Wave', durationMs: 3200 }),
   Object.freeze({ id: 'point', label: 'Point', durationMs: 3000 }),
   Object.freeze({ id: 'cheer', label: 'Cheer', durationMs: 3300 }),
+  Object.freeze({ id: 'clap', label: 'Clap', durationMs: 3200 }),
   Object.freeze({ id: 'sit', label: 'Sit / Relax', durationMs: 8000 }),
   Object.freeze({ id: 'dance', label: 'Dance', durationMs: 4800 })
 ]);
