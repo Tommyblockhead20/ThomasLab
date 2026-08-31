@@ -3967,279 +3967,263 @@ export class MountainWorld extends TestWorld {
     const island = location.offshore
       ? SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === location.offshore)
       : null;
-    const yaw = inwardYaw(location.angle);
 
-    // Keep the offshore cave-island implementation unchanged in this mountain-core repair
-    // pass. v9.3 only replaces the entrance architecture for caves cut into gray Mountain.
-    if (island) {
-      const halfWidth = location.radii[1] * .72 + 1.15;
-      const entranceFloor = island.elevation + .05;
-      const throatFloor = entranceFloor - 2.45;
-      const rearFloor = location.y - 1.08;
-      const tunnelHeight = 5.25;
-      const segments = 10;
-      const segmentLength = caveDepth / segments;
-      const floorAt = (t) => {
-        if (t <= .22) return lerp(entranceFloor, throatFloor, smoothstep(0, .22, t));
-        return lerp(throatFloor, rearFloor, smoothstep(.22, 1, t));
-      };
-
-      for (let segment = 0; segment < segments; segment += 1) {
-        const outerT = segment / segments;
-        const innerT = (segment + 1) / segments;
-        const midpointT = (outerT + innerT) * .5;
-        const outerFloor = floorAt(outerT);
-        const innerFloor = floorAt(innerT);
-        const middleFloor = (outerFloor + innerFloor) * .5;
-        const entranceRecess = segment === 0 ? segmentLength * .18 : 0;
-        const radius = entranceRadius - midpointT * caveDepth - entranceRecess;
-        const pitch = -Math.atan2(outerFloor - innerFloor, segmentLength) * 180 / Math.PI;
-        const widthScale = 1 + Math.sin(midpointT * Math.PI) * .08;
-        const floorCenter = this.point(location.angle, radius, middleFloor - .48);
-        this.addBox(`${location.label} interior floor ${segment + 1}`, floorCenter,
-          { x: halfWidth * 2 * widthScale, y: .96, z: segmentLength * 1.16 },
-          this.materials.cave, { x: pitch, y: yaw, z: 0 });
-      }
-
-      const archVertices = [];
-      const archTriangles = [];
-      const archSides = 10;
-      for (let segment = 0; segment <= segments; segment += 1) {
-        const t = segment / segments;
-        const radius = entranceRadius - t * caveDepth - (segment === 0 ? .55 : 0);
-        const widthScale = 1 + Math.sin(t * Math.PI) * .08;
-        const floor = floorAt(t);
-        for (let side = 0; side <= archSides; side += 1) {
-          const phase = side / archSides * Math.PI;
-          const lateral = Math.cos(phase) * (halfWidth * widthScale + .42);
-          const y = floor + Math.sin(phase) * tunnelHeight;
-          const point = this.point(location.angle, radius, y, lateral);
-          archVertices.push([point.x, point.y, point.z]);
+    // Cave geometry in this repair is triangle-mesh only. The old cuboid tunnel/chamber
+    // construction is deleted, not disabled or pushed deeper into the mountain.
+    const addCaveMesh = (name, vertices, triangles, material, friction = .92) => {
+      if (!vertices.length || !triangles.length) return null;
+      const geometry = new pc.Geometry();
+      geometry.positions = [];
+      geometry.indices = [];
+      for (const triangle of triangles) {
+        for (const vertexIndex of triangle) {
+          geometry.positions.push(...vertices[vertexIndex]);
+          geometry.indices.push(geometry.indices.length);
         }
       }
-      for (let segment = 0; segment < segments; segment += 1) {
-        for (let side = 0; side < archSides; side += 1) {
-          const a = segment * (archSides + 1) + side;
-          const b = a + 1;
-          const c = (segment + 1) * (archSides + 1) + side;
-          const d = c + 1;
-          archTriangles.push([a, c, b], [b, c, d]);
-        }
-      }
-      const archGeometry = new pc.Geometry();
-      archGeometry.positions = [];
-      archGeometry.indices = [];
-      for (const triangle of archTriangles) for (const vertexIndex of triangle) {
-        archGeometry.positions.push(...archVertices[vertexIndex]);
-        archGeometry.indices.push(archGeometry.indices.length);
-      }
-      archGeometry.calculateNormals();
-      const archMesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, archGeometry);
-      const arch = new pc.Entity(`${location.label} rounded island tunnel`);
-      arch.addComponent('render');
-      arch.render.meshInstances = [new pc.MeshInstance(archMesh, this.materials.caveWall, arch)];
-      this.buildTarget.addChild(arch);
-      arch.physicsCollider = this.physicsWorld.createCollider(
-        this.RAPIER.ColliderDesc.trimesh(new Float32Array(archVertices.flat()), new Uint32Array(archTriangles.flat()))
-          .setFriction(.92).setRestitution(0)
+      geometry.calculateNormals();
+      const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+      const entity = new pc.Entity(name);
+      entity.addComponent('render');
+      entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+      this.buildTarget.addChild(entity);
+      entity.physicsCollider = this.physicsWorld.createCollider(
+        this.RAPIER.ColliderDesc.trimesh(
+          new Float32Array(vertices.flat()),
+          new Uint32Array(triangles.flat())
+        ).setFriction(friction).setRestitution(0)
       );
+      return entity;
+    };
 
-      const chamberHalfWidth = Math.max(halfWidth + 1.5, location.radii[1] + 2.1);
-      const chamberDepth = location.radii[0] * 2 + 5.2;
-      const chamberFloor = this.point(location.angle, location.radius, location.y - 1.18);
-      this.addBox(`${location.label} rear chamber floor`, chamberFloor,
-        { x: chamberHalfWidth * 2, y: 1.9, z: chamberDepth }, this.materials.cave, { y: yaw });
-      for (const side of [-1, 1]) {
-        const center = this.point(location.angle, location.radius, location.y + 2.05,
-          side * (chamberHalfWidth + .5));
-        this.addBox(`${location.label} rear chamber ${side < 0 ? 'left' : 'right'} wall`, center,
-          { x: 1.35, y: 7.1, z: chamberDepth + 1.4 }, this.materials.caveWall, { y: yaw });
+    const addRibbon = ({
+      name,
+      rows,
+      columns = 7,
+      pointAt,
+      material,
+      friction = .94
+    }) => {
+      const vertices = [];
+      const triangles = [];
+      for (let row = 0; row < rows; row += 1) {
+        const t = row / Math.max(1, rows - 1);
+        for (let column = 0; column < columns; column += 1) {
+          const side = lerp(-1, 1, column / Math.max(1, columns - 1));
+          const point = pointAt(t, side);
+          vertices.push([point.x, point.y, point.z]);
+        }
       }
-      this.addBox(`${location.label} rear chamber roof`,
-        this.point(location.angle, location.radius, location.y + 5.45),
-        { x: chamberHalfWidth * 2 + 2.2, y: 1.6, z: chamberDepth + 1.5 },
-        this.materials.caveWall, { y: yaw });
-      this.addBox(`${location.label} rear chamber back`,
-        this.point(location.angle, location.radius - location.radii[0] - 2.25, location.y + 2.1),
-        { x: chamberHalfWidth * 2 + 1.4, y: 7.0, z: 1.7 },
-        this.materials.caveWall, { y: yaw });
+      for (let row = 0; row < rows - 1; row += 1) {
+        for (let column = 0; column < columns - 1; column += 1) {
+          const a = row * columns + column;
+          const b = a + 1;
+          const c = (row + 1) * columns + column;
+          const d = c + 1;
+          triangles.push([a, c, b], [b, c, d]);
+        }
+      }
+      return addCaveMesh(name, vertices, triangles, material, friction);
+    };
+
+    const addOrganicShell = ({
+      name,
+      stations,
+      sides = 12,
+      stationAt,
+      material,
+      capBack = true
+    }) => {
+      const vertices = [];
+      const triangles = [];
+      for (let station = 0; station < stations; station += 1) {
+        const t = station / Math.max(1, stations - 1);
+        const profile = stationAt(t);
+        for (let side = 0; side <= sides; side += 1) {
+          const phase = side / sides * Math.PI;
+          const lateral = Math.cos(phase) * profile.halfWidth;
+          const point = this.point(location.angle, profile.radius, profile.floorY, lateral);
+          const shoulder = Math.pow(Math.sin(phase), .82);
+          point.y = profile.floorY + shoulder * profile.height;
+          if (profile.surfaceCap) {
+            const dx = point.x - MOUNTAIN_CENTER.x;
+            const dz = point.z - MOUNTAIN_CENTER.z;
+            let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+            if (localAngle < 0) localAngle += 360;
+            const localRadius = Math.hypot(dx, dz);
+            point.y = Math.max(profile.floorY + .12, Math.min(point.y,
+              terrainHeightAt(localAngle, localRadius) - CAVE_TOPOLOGY_CONFIG.roofClearance));
+          }
+          vertices.push([point.x, point.y, point.z]);
+        }
+      }
+      for (let station = 0; station < stations - 1; station += 1) {
+        for (let side = 0; side < sides; side += 1) {
+          const a = station * (sides + 1) + side;
+          const b = a + 1;
+          const c = (station + 1) * (sides + 1) + side;
+          const d = c + 1;
+          triangles.push([a, c, b], [b, c, d]);
+        }
+      }
+      if (capBack) {
+        const last = stationAt(1);
+        const center = this.point(location.angle, last.radius - .18, last.floorY + last.height * .38, 0);
+        const centerIndex = vertices.length;
+        vertices.push([center.x, center.y, center.z]);
+        const start = (stations - 1) * (sides + 1);
+        for (let side = 0; side < sides; side += 1) {
+          triangles.push([start + side, centerIndex, start + side + 1]);
+        }
+      }
+      return addCaveMesh(name, vertices, triangles, material, .92);
+    };
+
+    if (island) {
+      // The offshore cave follows the same rule: only faceted mesh surfaces, no cuboid
+      // cave floor, walls, ceiling, or rear room pieces.
+      const outerRadius = entranceRadius - .15;
+      const backRadius = location.radius - location.radii[0] - 2.4;
+      const floorOuter = island.elevation - .02;
+      const floorRear = location.y - 1.05;
+      const chamberHalfWidth = Math.max(location.radii[1] + 1.15, 4.4);
+      const widthAt = (t) => {
+        const chamber = smoothstep(.32, .58, t) * (1 - smoothstep(.82, 1, t));
+        return lerp(location.radii[1] * .72 + 1.05, chamberHalfWidth, chamber)
+          * lerp(1, .12, smoothstep(.88, 1, t));
+      };
+      const floorAt = (t) => lerp(floorOuter, floorRear,
+        t < .34 ? smoothstep(0, .34, t) : 1);
+
+      addRibbon({
+        name: `${location.label} faceted cave floor`,
+        rows: 18,
+        pointAt: (t, side) => {
+          const radius = lerp(outerRadius, backRadius, t);
+          const width = widthAt(t);
+          const bowl = (1 - Math.abs(side)) * .12;
+          return this.point(location.angle, radius, floorAt(t) - bowl, side * width);
+        },
+        material: this.materials.cave
+      });
+
+      addOrganicShell({
+        name: `${location.label} rounded cave shell`,
+        stations: 18,
+        stationAt: (t) => ({
+          radius: lerp(outerRadius - .7, backRadius, t),
+          floorY: floorAt(t),
+          halfWidth: widthAt(t) + .22,
+          height: lerp(3.3, 5.25, smoothstep(.15, .62, t))
+            * lerp(1, .18, smoothstep(.88, 1, t)),
+          surfaceCap: false
+        }),
+        material: this.materials.caveWall
+      });
       return;
     }
 
-    // MOUNTAIN CAVES — v9.3 topology repair.
-    // There is no entrance box, slab, roof, side wall, facade, or framing rock here. The
-    // doorway is the missing gray mountain triangles created in buildOceanAndContinuousTerrain().
-    // This interior starts behind those missing faces and widens only after it is underground.
+    // MOUNTAIN CAVES — no-box topology + fall-gap repair.
+    // The doorway remains a literal missing-face aperture in the gray mountain core. A
+    // visible natural-gray concave apron sits beneath the full deleted-triangle footprint,
+    // then transitions into an irregular cave floor and a rounded faceted interior shell.
     const mouthHalfWidth = caveMouthHalfWidthAt(location);
-    const tunnelHalfWidth = Math.max(mouthHalfWidth + .58, Math.min(3.15, location.radii[1] * .64));
-    const segments = CAVE_TOPOLOGY_CONFIG.tunnelSegments;
-    const startRadius = entranceRadius - CAVE_TOPOLOGY_CONFIG.throatStartInset;
-    const runDepth = startRadius - location.radius;
-    const entranceFloor = terrainHeightAt(location.angle, startRadius) - .48;
-    const throatFloor = entranceFloor - .92;
-    const rearFloor = location.y - 1.08;
-    const radiusAt = (t) => lerp(startRadius, location.radius, clamp(t, 0, 1));
-    const floorAt = (t) => {
-      if (t <= .24) return lerp(entranceFloor, throatFloor, smoothstep(0, .24, t));
-      return lerp(throatFloor, rearFloor, smoothstep(.24, 1, t));
-    };
-    const halfWidthAt = (t) => lerp(
-      mouthHalfWidth * .7,
-      tunnelHalfWidth,
-      smoothstep(.04, .56, t)
-    );
-    const floorPointAt = (t, lateral) => {
-      const radius = radiusAt(t);
-      const intendedFloor = floorAt(t);
-      const point = this.point(location.angle, radius, intendedFloor, lateral);
-      const dx = point.x - MOUNTAIN_CENTER.x;
-      const dz = point.z - MOUNTAIN_CENTER.z;
-      let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
-      if (localAngle < 0) localAngle += 360;
-      const localRadius = Math.hypot(dx, dz);
-      // Even the transition floor remains below the original uncut gray shell. This makes
-      // it impossible for the throat itself to create a new exterior silhouette.
-      point.y = Math.min(intendedFloor, terrainHeightAt(localAngle, localRadius) - .22);
-      return point;
-    };
+    const outerCutRadius = entranceRadius + CAVE_TOPOLOGY_CONFIG.entranceOuterPad;
+    const innerCutRadius = entranceRadius - CAVE_TOPOLOGY_CONFIG.entranceCutDepth;
+    const apronInnerRadius = innerCutRadius - 3.25;
 
-    // A single zero-thickness floor mesh replaces the old row of thick dark cuboids. The
-    // first edge sits inside the omitted aperture and just below the natural slope, so the
-    // player steps onto a traversable throat without seeing a rectangular slab front face.
-    const floorVertices = [];
-    const floorTriangles = [];
-    for (let segment = 0; segment <= segments; segment += 1) {
-      const t = segment / segments;
-      const halfWidth = halfWidthAt(t);
-      const left = floorPointAt(t, -halfWidth);
-      const right = floorPointAt(t, halfWidth);
-      floorVertices.push([left.x, left.y, left.z], [right.x, right.y, right.z]);
-    }
-    for (let segment = 0; segment < segments; segment += 1) {
-      const left = segment * 2;
-      const right = left + 1;
-      const nextLeft = left + 2;
-      const nextRight = left + 3;
-      floorTriangles.push([left, nextLeft, right], [right, nextLeft, nextRight]);
-    }
-    const floorGeometry = new pc.Geometry();
-    floorGeometry.positions = [];
-    floorGeometry.indices = [];
-    for (const triangle of floorTriangles) for (const vertexIndex of triangle) {
-      floorGeometry.positions.push(...floorVertices[vertexIndex]);
-      floorGeometry.indices.push(floorGeometry.indices.length);
-    }
-    floorGeometry.calculateNormals();
-    const floorMesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, floorGeometry);
-    const floorEntity = new pc.Entity(`${location.label} inset throat floor`);
-    floorEntity.addComponent('render');
-    floorEntity.render.meshInstances = [new pc.MeshInstance(floorMesh, this.materials.cave, floorEntity)];
-    this.buildTarget.addChild(floorEntity);
-    floorEntity.physicsCollider = this.physicsWorld.createCollider(
-      this.RAPIER.ColliderDesc.trimesh(
-        new Float32Array(floorVertices.flat()),
-        new Uint32Array(floorTriangles.flat())
-      ).setFriction(.94).setRestitution(0)
-    );
-
-    // Leave the first part of the hole as open transition space. Start the dark wall/roof
-    // shell only once the original mountain surface has risen enough above the descending
-    // throat to contain it. This is what prevents the tunnel from becoming an exterior hood.
-    let archStartT = .08;
-    for (let candidate = .08; candidate <= .34; candidate += .02) {
-      const radius = radiusAt(candidate);
-      const availableHeadroom = terrainHeightAt(location.angle, radius) - floorPointAt(candidate, 0).y;
-      if (availableHeadroom >= 3.25) {
-        archStartT = candidate;
-        break;
-      }
-      archStartT = candidate;
-    }
-    const minimumInsetT = CAVE_TOPOLOGY_CONFIG.archMinimumInset / Math.max(.001, runDepth);
-    archStartT = Math.max(archStartT, minimumInsetT);
-
-    const archVertices = [];
-    const archTriangles = [];
-    const archSides = 10;
-    const archRings = segments + 1;
-    for (let ring = 0; ring < archRings; ring += 1) {
-      const ringT = ring / Math.max(1, archRings - 1);
-      const t = lerp(archStartT, 1, ringT);
-      const halfWidth = halfWidthAt(t) + .24;
-      const desiredHeight = lerp(2.85, 4.8, smoothstep(archStartT, .62, t));
-      for (let side = 0; side <= archSides; side += 1) {
-        const phase = side / archSides * Math.PI;
-        const lateral = Math.cos(phase) * halfWidth;
-        const basePoint = floorPointAt(t, lateral);
-        const dx = basePoint.x - MOUNTAIN_CENTER.x;
-        const dz = basePoint.z - MOUNTAIN_CENTER.z;
+    addRibbon({
+      name: `${location.label} natural entrance catch apron`,
+      rows: 9,
+      columns: 9,
+      pointAt: (t, side) => {
+        const radius = lerp(outerCutRadius + 3.45, apronInnerRadius, t);
+        const depthT = clamp((outerCutRadius - radius)
+          / Math.max(.001, outerCutRadius - innerCutRadius), 0, 1);
+        const profile = caveApertureProfileAtDepth(location, depthT);
+        // The safety margin is larger than a complete local terrain grid cell, so every
+        // whole triangle deleted by the aperture filter has a solid visible surface below.
+        const halfWidth = profile.halfWidth + lerp(3.05, 2.45, t);
+        const lateral = profile.centerShift + side * halfWidth;
+        const p = this.point(location.angle, radius, 0, lateral);
+        const dx = p.x - MOUNTAIN_CENTER.x;
+        const dz = p.z - MOUNTAIN_CENTER.z;
         let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
         if (localAngle < 0) localAngle += 360;
         const localRadius = Math.hypot(dx, dz);
-        const originalSurfaceY = terrainHeightAt(localAngle, localRadius);
-        const desiredY = basePoint.y + Math.sin(phase) * desiredHeight;
-        const minimumWallY = basePoint.y + (side === 0 || side === archSides ? .04 : .12);
-        // Hard cap: no tunnel shell vertex may rise above the original Mountain silhouette.
-        const y = Math.min(Math.max(desiredY, minimumWallY),
-          originalSurfaceY - CAVE_TOPOLOGY_CONFIG.roofClearance);
-        archVertices.push([basePoint.x, y, basePoint.z]);
-      }
-    }
-    for (let ring = 0; ring < archRings - 1; ring += 1) {
-      for (let side = 0; side < archSides; side += 1) {
-        const a = ring * (archSides + 1) + side;
-        const b = a + 1;
-        const c = (ring + 1) * (archSides + 1) + side;
-        const d = c + 1;
-        archTriangles.push([a, c, b], [b, c, d]);
-      }
-    }
-    const archGeometry = new pc.Geometry();
-    archGeometry.positions = [];
-    archGeometry.indices = [];
-    for (const triangle of archTriangles) for (const vertexIndex of triangle) {
-      archGeometry.positions.push(...archVertices[vertexIndex]);
-      archGeometry.indices.push(archGeometry.indices.length);
-    }
-    archGeometry.calculateNormals();
-    const archMesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, archGeometry);
-    const arch = new pc.Entity(`${location.label} inset mountain tunnel shell`);
-    arch.addComponent('render');
-    arch.render.meshInstances = [new pc.MeshInstance(archMesh, this.materials.caveWall, arch)];
-    this.buildTarget.addChild(arch);
-    arch.physicsCollider = this.physicsWorld.createCollider(
-      this.RAPIER.ColliderDesc.trimesh(
-        new Float32Array(archVertices.flat()),
-        new Uint32Array(archTriangles.flat())
-      ).setFriction(.92).setRestitution(0)
-    );
+        const naturalY = terrainHeightAt(localAngle, localRadius);
+        const centerDip = (1 - Math.abs(side)) * lerp(.05, .32, t);
+        const inset = lerp(.06, .78, smoothstep(0, 1, t)) + centerDip;
+        p.y = naturalY - inset;
+        return p;
+      },
+      material: this.materials.alpine,
+      friction: .96
+    });
 
-    // The larger pool chamber stays deep behind the throat. These boxes are interior room
-    // surfaces, not mouth construction, and remain several meters below the uncut mountain.
-    const chamberHalfWidth = Math.max(tunnelHalfWidth + 1.35, location.radii[1] + 1.35);
-    const chamberDepth = location.radii[0] * 2 + 5.2;
-    const chamberFloor = this.point(location.angle, location.radius, location.y - 1.18);
-    this.addBox(`${location.label} rear chamber floor`, chamberFloor,
-      { x: chamberHalfWidth * 2, y: 1.9, z: chamberDepth }, this.materials.cave, { y: yaw });
-    for (const side of [-1, 1]) {
-      const center = this.point(location.angle, location.radius, location.y + 2.05,
-        side * (chamberHalfWidth + .5));
-      this.addBox(`${location.label} rear chamber ${side < 0 ? 'left' : 'right'} wall`, center,
-        { x: 1.35, y: 7.1, z: chamberDepth + 1.4 }, this.materials.caveWall, { y: yaw });
-    }
-    this.addBox(`${location.label} rear chamber roof`,
-      this.point(location.angle, location.radius, location.y + 5.45),
-      { x: chamberHalfWidth * 2 + 2.2, y: 1.6, z: chamberDepth + 1.5 },
-      this.materials.caveWall, { y: yaw });
-    this.addBox(`${location.label} rear chamber back`,
-      this.point(location.angle, location.radius - location.radii[0] - 2.25, location.y + 2.1),
-      { x: chamberHalfWidth * 2 + 1.4, y: 7.0, z: 1.7 },
-      this.materials.caveWall, { y: yaw });
+    const backRadius = location.radius - location.radii[0] - 3.0;
+    const runDepth = Math.max(1, apronInnerRadius - backRadius);
+    const rearFloor = location.y - 1.08;
+    const apronInnerFloor = terrainHeightAt(location.angle, apronInnerRadius) - .82;
+    const chamberHalfWidth = Math.max(mouthHalfWidth + 1.0, location.radii[1] + 1.15);
+    const floorAt = (t) => {
+      if (t < .34) return lerp(apronInnerFloor, rearFloor, smoothstep(0, .34, t));
+      return rearFloor + smoothstep(.84, 1, t) * .16;
+    };
+    const widthAt = (t) => {
+      const tunnelWidth = mouthHalfWidth + .62;
+      const chamberBlend = smoothstep(.28, .54, t) * (1 - smoothstep(.82, 1, t));
+      const width = lerp(tunnelWidth, chamberHalfWidth, chamberBlend);
+      return width * lerp(1, .09, smoothstep(.9, 1, t));
+    };
 
-    // Hard acceptance invariant for v9.3:
-    // - hide this floor/arch/chamber and the gray mountain still has a literal missing-face hole;
-    // - the mountain collider uses the exact same missing-face triangle list;
-    // - no exterior cave-mouth geometry exists to create the doorway.
+    addRibbon({
+      name: `${location.label} irregular cave floor`,
+      rows: 24,
+      columns: 9,
+      pointAt: (t, side) => {
+        const radius = lerp(apronInnerRadius + .18, backRadius, t);
+        const wobble = Math.sin(t * 10.7 + stableUnit(`cave-floor:${location.id}`) * 5.4) * .08;
+        const width = Math.max(.28, widthAt(t) * (1 + wobble));
+        const bowl = (1 - Math.abs(side)) * .14;
+        return this.point(location.angle, radius, floorAt(t) - bowl, side * width);
+      },
+      material: this.materials.cave,
+      friction: .95
+    });
+
+    // The dark interior does not begin at the exterior shell. It starts only where a real
+    // arch fits under the original terrain; from there it widens around the pool and then
+    // closes by tapering to a rounded end instead of terminating in a flat rectangular wall.
+    let shellStartT = .04;
+    for (let candidate = .04; candidate <= .36; candidate += .02) {
+      const radius = lerp(apronInnerRadius, backRadius, candidate);
+      const headroom = terrainHeightAt(location.angle, radius) - floorAt(candidate);
+      shellStartT = candidate;
+      if (headroom >= 3.35) break;
+    }
+    shellStartT = Math.max(shellStartT,
+      CAVE_TOPOLOGY_CONFIG.archMinimumInset / Math.max(.001, runDepth));
+
+    addOrganicShell({
+      name: `${location.label} faceted tunnel and rounded chamber`,
+      stations: 26,
+      sides: 14,
+      stationAt: (localT) => {
+        const t = lerp(shellStartT, 1, localT);
+        const chamberBlend = smoothstep(.3, .58, t) * (1 - smoothstep(.82, 1, t));
+        const taper = lerp(1, .12, smoothstep(.9, 1, t));
+        const desiredHeight = lerp(3.0, 5.35, chamberBlend) * taper;
+        return {
+          radius: lerp(apronInnerRadius, backRadius, t),
+          floorY: floorAt(t),
+          halfWidth: Math.max(.22, widthAt(t) + .26),
+          height: Math.max(.42, desiredHeight),
+          surfaceCap: true
+        };
+      },
+      material: this.materials.caveWall
+    });
   }
 
   addFishingLocation(location, index) {
