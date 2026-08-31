@@ -31,8 +31,8 @@
         outline-offset: 2px;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-DSZxvWoi.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DguvvRZ0.css">
+    <script type="module" crossorigin src="./assets/index-8MDd0oJ3.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C2vd0ypE.css">
   </head>
   <body>
     <main id="game-shell">
@@ -70,10 +70,11 @@
           <span data-control-hint="slide"><kbd>C</kbd> Slide</span>
           <span data-control-hint="grip"><kbd>Click / G</kbd> Grip</span>
           <span data-control-hint="fish"><kbd>F</kbd> Fish</span>
-          <span><kbd>J</kbd> Journal</span>
-          <span><kbd>I</kbd> Inventory</span>
-          <span><kbd>M</kbd> Multiplayer</span>
-          <span><kbd>E</kbd> Emotes</span>
+          <span data-control-hint="inventory"><kbd>I</kbd> Inventory</span>
+          <span data-control-hint="journal"><kbd>J</kbd> Journal</span>
+          <span data-control-hint="multiplayer"><kbd>M</kbd> Multiplayer</span>
+          <span data-control-hint="emotes"><kbd>E</kbd> Emotes</span>
+          <span data-control-hint="map"><kbd>V</kbd> Map</span>
         </div>
 
         <section id="multiplayer-catch-feed" class="multiplayer-catch-feed" hidden aria-live="polite" aria-label="Remote catches"></section>
@@ -95,7 +96,7 @@
             <span><b>CAST</b><output id="cast-value">0%</output></span>
             <div class="meter-track"><div id="cast-fill" class="meter-fill cast-fill"></div></div>
           </div>
-          <small><kbd>↑</kbd> Charge / cast • <kbd>↓</kbd> Hook • <kbd>F</kbd> / <kbd>Esc</kbd> Stop</small>
+          <small><kbd>↑</kbd> Charge / cast • <kbd>↓</kbd> Hook • <kbd data-control-key="fish">F</kbd> / <kbd>Esc</kbd> Stop</small>
         </div>
         <div id="bite-prompt" class="bite-prompt" hidden><strong>FISH BITING!</strong><span>Press <kbd>↓</kbd> to hook!</span></div>
         <section id="rhythm-panel" class="rhythm-panel" hidden aria-label="Fish rhythm challenge">
@@ -219,7 +220,7 @@
             <span><small>LIFETIME FISH</small><strong id="journal-total-fish">0</strong></span>
             <span><small>SUMMITS</small><strong id="journal-total-summits">0</strong></span>
           </div>
-          <button id="close-journal" type="button" aria-label="Close fish journal">CLOSE <kbd>J</kbd> / <kbd>Esc</kbd></button>
+          <button id="close-journal" type="button" aria-label="Close fish journal">CLOSE <kbd data-control-key="journal">J</kbd> / <kbd>Esc</kbd></button>
         </header>
         <div id="journal-grid" class="journal-grid" tabindex="0" aria-label="Fish journal entries"></div>
       </section>
@@ -229,7 +230,7 @@
         <header class="shop-header collection-header">
           <div><span class="eyebrow">FIELD PACK</span><h2 id="inventory-title">Inventory</h2></div>
           <strong id="collection-balance">$0</strong>
-          <button id="close-inventory" type="button">CLOSE <kbd>I</kbd> / <kbd>Esc</kbd></button>
+          <button id="close-inventory" type="button">CLOSE <kbd data-control-key="inventory">I</kbd> / <kbd>Esc</kbd></button>
         </header>
         <nav id="collection-tabs" class="shop-tabs collection-tabs" aria-label="Inventory sections">
           <button type="button" data-collection-tab="catches" aria-pressed="true">CATCHES</button>
@@ -247,7 +248,7 @@
 
       <section id="aquarium-menu" class="progression-shop aquarium-menu" role="dialog" aria-modal="true" hidden aria-labelledby="aquarium-title">
         <header class="shop-header"><div><span class="eyebrow">AQUARIUM ISLAND</span><h2 id="aquarium-title">Public Aquarium Collection</h2></div><strong id="aquarium-count">0 retained</strong><button id="close-aquarium" type="button">CLOSE <kbd>Esc</kbd></button></header>
-        <p class="shop-status">Add carried specimens to the swimming display or return displayed fish to Inventory.</p>
+        <p id="aquarium-status" class="shop-status">Add carried specimens to the swimming display or return displayed fish to Inventory.</p>
         <div id="aquarium-content" class="aquarium-content"></div>
       </section>
 
@@ -291,7 +292,7 @@
       </section>
 
       <section id="emote-menu" class="emote-menu" role="dialog" aria-modal="true" hidden aria-labelledby="emote-menu-title">
-        <header><div><span class="eyebrow">PLAYER ACTIONS</span><h2 id="emote-menu-title">Emotes</h2></div><button id="close-emote-menu" type="button">CLOSE <kbd>E</kbd> / <kbd>Esc</kbd></button></header>
+        <header><div><span class="eyebrow">PLAYER ACTIONS</span><h2 id="emote-menu-title">Emotes</h2></div><button id="close-emote-menu" type="button">CLOSE <kbd data-control-key="emotes">E</kbd> / <kbd>Esc</kbd></button></header>
         <div class="emote-grid">
           <button type="button" data-emote-id="wave">WAVE</button>
           <button type="button" data-emote-id="point">POINT</button>
@@ -305,7 +306,7 @@
       <section id="multiplayer-menu" class="multiplayer-menu" role="dialog" aria-modal="true" hidden aria-labelledby="multiplayer-title">
         <header>
           <div><span class="eyebrow">LOCAL MULTIPLAYER MVP</span><h2 id="multiplayer-title">Multiplayer</h2></div>
-          <button id="close-multiplayer" type="button">CLOSE <kbd>M</kbd> / <kbd>Esc</kbd></button>
+          <button id="close-multiplayer" type="button">CLOSE <kbd data-control-key="multiplayer">M</kbd> / <kbd>Esc</kbd></button>
         </header>
         <p id="multiplayer-status" class="multiplayer-status">Checking availability…</p>
         <p id="multiplayer-details">Solo play remains local and fully available.</p>

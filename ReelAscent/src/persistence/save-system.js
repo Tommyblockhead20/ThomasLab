@@ -263,6 +263,7 @@ function summarizeSlot(slot, activeSlotId) {
     discovered: save ? Object.values(save.collection).filter((entry) => entry.discovered).length : 0,
     fishCaught: save?.lifetime?.fishCaught ?? 0,
     summits: save?.lifetime?.summitCount ?? 0,
+    activePlaytimeSeconds: save?.lifetime?.activePlaytimeSeconds ?? 0,
     appearance: save?.progression?.appearance ?? null
   };
 }

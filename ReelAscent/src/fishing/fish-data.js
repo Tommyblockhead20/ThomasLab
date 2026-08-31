@@ -140,7 +140,7 @@ const LEGACY_RARITY_OVERRIDES = Object.freeze({
   "brook-trout": "Uncommon",
   "cutthroat-trout": "Rare",
   "mountain-whitefish": "Uncommon",
-  "alpine-char": "Legendary",
+  "alpine-char": "Rare",
   "stone-loach": "Uncommon",
   "mottled-sculpin": "Common",
   "cave-tetra": "Rare",
@@ -161,16 +161,47 @@ const LEGACY_RARITY_OVERRIDES = Object.freeze({
   "walleye": "Uncommon",
   "northern-pike": "Rare",
   "muskellunge": "Legendary",
-  "brown-trout": "Uncommon",
+  "brown-trout": "Common",
   "lake-trout": "Rare",
   "arctic-grayling": "Rare",
-  "golden-trout": "Legendary",
+  "golden-trout": "Rare",
   "splake": "Rare",
   "lake-sturgeon": "Legendary",
   "atlantic-cod": "Uncommon",
   "bluefish": "Uncommon",
   "red-snapper": "Rare",
   "needlefish": "Rare",
+  "cascade-goby": "Common",
+  "glacier-snail": "Common",
+  "rust-crayfish": "Uncommon",
+  "bowfin": "Uncommon",
+  "mudpuppy": "Uncommon",
+  "american-lobster": "Uncommon",
+  "red-river-gar": "Uncommon",
+  "emberless-tetra": "Uncommon",
+  "sailfish": "Legendary",
+  "hammerhead-shark": "Legendary",
+  "manta-ray": "Legendary",
+  "giant-pacific-octopus": "Legendary",
+  "japanese-spider-crab": "Legendary",
+  "coelacanth": "Legendary",
+  "electric-eel": "Legendary",
+  "ocean-sunfish": "Legendary",
+  "mantis-shrimp": "Legendary",
+  "axolotl": "Legendary",
+  "great_barracuda": "Rare",
+  "chambered-nautilus": "Rare",
+  "pufferfish": "Rare",
+  "summit-glassfish": "Uncommon",
+  "bluewater-bonnet-shark": "Rare",
+  "sandbar-shark": "Rare",
+  "blue-shark": "Rare",
+  "blue-ice-codling": "Rare",
+  "cirque-salamander": "Rare",
+  "pallid-cave-crab": "Rare",
+  "arctic-char": "Uncommon",
+  "dolly-varden": "Uncommon",
+  "snowmelt-loach": "Uncommon",
 });
 
 function legacyHabitatFor(id) {
@@ -179,6 +210,18 @@ function legacyHabitatFor(id) {
 
 function resolvedHabitatFor(id, authoredHabitat) {
   const habitat = authoredHabitat ?? legacyHabitatFor(id);
+  if (id === 'penguin') {
+    return Object.freeze({
+      ...habitat,
+      salinity: 'both',
+      tiers: Object.freeze(['upper']),
+      waterTypes: Object.freeze(['ice-pool']),
+      waterIds: Object.freeze(['blue-ice-melt']),
+      favoredWaterIds: Object.freeze(['blue-ice-melt']),
+      exclusiveWaterId: 'blue-ice-melt',
+      exclusive: true
+    });
+  }
   if (SUMMIT_PROMOTED_EXCLUSIVES.has(id)) {
     return Object.freeze({
       ...habitat,
@@ -359,7 +402,10 @@ SPECIES.push(...EXPANDED_SPECIES_DEFINITIONS.map((entry) => species(
 const RETIRED_SPECIES_IDS = new Set([
   'windscale-bream', 'blueglass-trout', 'veiled-char', 'whiteveil-crayfish',
   'icefin-char', 'crownwater-shrimp', 'cirrus-shrimp', 'dusk-mussel',
-  'mossfin-darter', 'bellwater-mussel'
+  'mossfin-darter', 'bellwater-mussel',
+  'ridge-pond-snail', 'tarn-snail', 'echo-crayfish', 'crevice-crayfish',
+  'rapids-crayfish', 'quietwater-shrimp', 'reed-shrimp', 'golden-pond-mussel',
+  'inlet-lobster', 'highcountry-eel'
 ]);
 
 const REAL_SPECIES_ADJUSTMENTS = Object.freeze({
@@ -388,8 +434,64 @@ const NEW_ACTIVE_SPECIES = [
   species('staghorn_coral', 'Staghorn Coral', 'Common', 10, [12, 48], [10, 250], 'bivalve', [[.7, .48, .32], [.9, .72, .48]], 'marimba', 62, [76, 88], ['A1 A2 W1 S1 - W2 A1'], .15, 'A branching Caribbean reef coral that builds dense thickets in clear, shallow water.', { salinity: 'salt', tiers: ['lower'], waterTypes: ['tidepool', 'lagoon', 'inlet'], themes: ['sunwash', 'fernwood'], strictWaterTypes: true, exclusiveWaterId: 'boulder-lagoon' })
 ];
 
+const V92_RHYTHMS = Object.freeze({
+  Common: Object.freeze({ weight: 11, bpm: [82, 94], difficulty: .18, motif: 'A1 W1 S1 D1 - A2 W2 S1' }),
+  Uncommon: Object.freeze({ weight: 7, bpm: [88, 102], difficulty: .42, motif: 'A1 W2 S1 D2 - W1 A2 S2 D1 W2' }),
+  Rare: Object.freeze({ weight: 3.5, bpm: [98, 116], difficulty: .68, motif: 'A1 W2 S1+D2 - A2 W1 D1 S2 -- W2 A1 D2 S1' }),
+  Legendary: Object.freeze({ weight: 1.25, bpm: [108, 128], difficulty: .9, motif: 'A1~~+D2 - W1 S2 A2~ - D1+S1 W2 -- A1 D2~~ W1+S2 A2' })
+});
+const v92Habitat = (salinity, tiers, waterTypes, favoredWaterIds = [], extra = {}) => ({
+  salinity, tiers, waterTypes, favoredWaterIds, themes: ['sunwash', 'fernwood', 'blackstone'],
+  strictWaterTypes: true, ...extra
+});
+function v92Species(id, name, rarity, archetype, length, weight, colors, flavor, habitat) {
+  const rhythm = V92_RHYTHMS[rarity];
+  const root = 42 + [...id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 24;
+  return species(id, name, rarity, rhythm.weight, length, weight, archetype, colors,
+    rarity === 'Legendary' ? 'cello_arco' : rarity === 'Rare' ? 'handpan' : 'marimba',
+    root, rhythm.bpm, [rhythm.motif], rhythm.difficulty, flavor, habitat);
+}
+
+// The supplied v9.2 roster says “30” but names 31 distinct creatures. Every named entry is
+// retained here so no explicit requested species is silently dropped.
+const V92_ACTIVE_SPECIES = [
+  v92Species('mermaid', 'Mermaid', 'Legendary', 'sirenian', [60, 84], [90, 260], [[.2, .62, .66], [.78, .62, .38]], 'A half-seen singer whose melody travels farther than the swell.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'lagoon'], ['boulder-lagoon', 'outer-ocean'])),
+  v92Species('scylla', 'Scylla', 'Legendary', 'lusca', [84, 180], [300, 2400], [[.23, .19, .34], [.72, .25, .31]], 'A many-limbed sea terror waiting beside black coastal stone.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'inlet'], ['blackstone-inlet'])),
+  v92Species('charybdis', 'Charybdis', 'Legendary', 'lusca', [96, 220], [500, 3600], [[.1, .24, .34], [.62, .72, .76]], 'A living maelstrom whose pull arrives before its silhouette.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'], { exclusiveWaterId: 'outer-ocean' })),
+  v92Species('jormungandr', 'Jormungandr', 'Legendary', 'serpent', [180, 480], [900, 9000], [[.14, .3, .28], [.62, .72, .42]], 'The world serpent, surfacing as a horizon-sized coil in cold open water.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'])),
+  v92Species('umibozu', 'Umibozu', 'Legendary', 'waterhorse', [90, 210], [600, 4200], [[.06, .08, .12], [.31, .45, .55]], 'A midnight ocean spirit rising soundlessly from calm water.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'inlet'], ['blackstone-inlet', 'outer-ocean'])),
+  v92Species('lernaean_hydra', 'Lernaean Hydra', 'Legendary', 'dragon', [96, 240], [500, 5000], [[.18, .38, .18], [.72, .58, .22]], 'A many-headed marsh dragon whose rhythm renews every time it seems beaten.', v92Habitat('fresh', ['middle', 'upper'], ['lake', 'cave-tarn'], ['high-cirque-tarn'])),
+  v92Species('oarfish', 'Oarfish', 'Legendary', 'eel', [96, 360], [40, 600], [[.72, .74, .78], [.82, .18, .2]], 'A silver ribbon from the deep, crowned with a crimson fin.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'])),
+  v92Species('megamouth_shark', 'Megamouth Shark', 'Legendary', 'shark', [150, 216], [750, 2700], [[.14, .17, .2], [.62, .54, .4]], 'A rare deep-sea filter feeder with a cavernous luminous mouth.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'])),
+  v92Species('smalltooth_sawfish', 'Smalltooth Sawfish', 'Legendary', 'shark', [120, 216], [400, 1300], [[.34, .44, .43], [.72, .66, .45]], 'A great ray with a toothed rostrum sweeping the coastal floor.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'lagoon', 'inlet'], ['boulder-lagoon'])),
+  v92Species('blue_ringed_octopus', 'Blue Ringed Octopus', 'Legendary', 'lusca', [3, 8], [.05, .25], [[.78, .64, .22], [.08, .48, .88]], 'A tiny octopus whose electric blue rings warn of extraordinary venom.', v92Habitat('salt', ['lower'], ['tidepool', 'lagoon'], ['sunwash-tidepool'])),
+  v92Species('portuguese_man_o_war', 'Portuguese Man o War', 'Legendary', 'softbody', [4, 20], [.2, 4], [[.35, .34, .82], [.78, .28, .72]], 'A drifting blue colony trailing a dangerous curtain beneath the surface.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'lagoon'], ['outer-ocean'])),
+
+  v92Species('taniwha', 'Taniwha', 'Rare', 'dragon', [54, 150], [80, 900], [[.16, .38, .32], [.52, .72, .34]], 'A powerful guardian moving beneath a remote mountain lake.', v92Habitat('fresh', ['upper'], ['lake', 'tarn'], ['cloudstep-lake'])),
+  v92Species('qallupilluk', 'Qallupilluk', 'Rare', 'mammal', [48, 84], [100, 360], [[.32, .66, .68], [.72, .86, .84]], 'A cold-water being said to wait beneath the Arctic ice.', v92Habitat('fresh', ['upper'], ['ice-pool'], ['blue-ice-melt'], { exclusiveWaterId: 'blue-ice-melt' })),
+  v92Species('ahuizotl', 'Ahuizotl', 'Rare', 'otter', [30, 60], [18, 80], [[.2, .3, .34], [.62, .44, .24]], 'A water guardian with a gripping tail-hand and a taste for quiet banks.', v92Habitat('fresh', ['lower', 'middle'], ['pond', 'pool', 'lake'], ['redbank-pool'])),
+  v92Species('kappa', 'Kappa', 'Rare', 'turtle', [24, 48], [25, 110], [[.24, .5, .28], [.72, .68, .24]], 'A mischievous river spirit with a shell and a water-filled crown.', v92Habitat('fresh', ['lower'], ['pond', 'pool'], ['amber-reed-pond'])),
+  v92Species('goblin_shark', 'Goblin Shark', 'Rare', 'shark', [84, 150], [150, 900], [[.58, .42, .42], [.72, .64, .58]], 'A deep-water shark with a long snout and startlingly extendable jaws.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'])),
+  v92Species('flowerhorn_cichlid', 'Flowerhorn Cichlid', 'Rare', 'panfish', [6, 16], [.4, 3.5], [[.72, .18, .22], [.28, .62, .74]], 'A brilliant ornamental cichlid with a bold forehead hump.', v92Habitat('fresh', ['lower'], ['pond', 'lake'], ['fernwater-pond'])),
+  v92Species('barreleye', 'Barreleye', 'Rare', 'panfish', [4, 8], [.1, .5], [[.18, .28, .27], [.62, .88, .72]], 'A deep-sea fish peering upward through a transparent shield.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'])),
+  v92Species('blue_dragon_sea_slug', 'Blue Dragon Sea Slug', 'Rare', 'softbody', [.8, 1.6], [.002, .02], [[.12, .42, .86], [.72, .86, .98]], 'A tiny pelagic sea slug shaped like a cobalt dragon.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'tidepool'], ['sunwash-tidepool'])),
+  v92Species('stonefish', 'Stonefish', 'Rare', 'sculpin', [10, 20], [2, 6], [[.36, .34, .22], [.62, .53, .3]], 'A venomous reef ambusher almost indistinguishable from rock.', v92Habitat('salt', ['lower'], ['lagoon', 'inlet', 'tidepool'], ['boulder-lagoon'])),
+
+  v92Species('nokken', 'Nokken', 'Uncommon', 'waterhorse', [42, 96], [45, 420], [[.12, .3, .28], [.48, .7, .58]], 'A lake spirit that changes shape when the shore grows quiet.', v92Habitat('fresh', ['middle', 'upper'], ['lake', 'tarn', 'cave-tarn'], ['high-cirque-tarn'])),
+  v92Species('leafy_seadragon', 'Leafy Seadragon', 'Uncommon', 'dragon', [8, 14], [.1, .35], [[.48, .55, .22], [.76, .64, .3]], 'A drifting relative of the seahorse disguised as seaweed.', v92Habitat('salt', ['lower', 'ocean'], ['lagoon', 'inlet', 'ocean'], ['boulder-lagoon'])),
+  v92Species('vampire_squid', 'Vampire Squid', 'Uncommon', 'lusca', [6, 12], [.2, 1], [[.3, .08, .12], [.68, .22, .26]], 'A deep-sea cephalopod that wraps itself in a dark webbed cloak.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'])),
+  v92Species('giant_isopod', 'Giant Isopod', 'Uncommon', 'sculpin', [8, 20], [1, 4], [[.42, .45, .5], [.7, .68, .6]], 'An armored deep-sea scavenger resembling an enormous pill bug.', v92Habitat('salt', ['ocean'], ['ocean'], ['outer-ocean'])),
+  v92Species('diving_bell_spider', 'Diving Bell Spider', 'Uncommon', 'arachnid', [.3, .7], [.001, .01], [[.32, .25, .18], [.7, .72, .62]], 'An aquatic spider living inside its own submerged bubble of air.', v92Habitat('fresh', ['lower', 'middle'], ['pond', 'lake'], ['fernwater-pond'])),
+  v92Species('oranda', 'Oranda', 'Uncommon', 'panfish', [5, 12], [.2, 2], [[.9, .42, .12], [.92, .84, .66]], 'A fancy goldfish with a flowing tail and a raspberry-like head growth.', v92Habitat('fresh', ['lower'], ['pond', 'lake'], ['sheltered-mirror'])),
+
+  v92Species('mudskipper', 'Mudskipper', 'Common', 'sculpin', [3, 10], [.05, .6], [[.36, .42, .3], [.68, .55, .3]], 'An amphibious goby that skips across warm mudflats.', v92Habitat('salt', ['lower'], ['lagoon', 'inlet', 'tidepool'], ['sunwash-tidepool'])),
+  v92Species('archerfish', 'Archerfish', 'Common', 'panfish', [4, 12], [.1, 1.5], [[.72, .66, .38], [.16, .22, .24]], 'A brackish-water hunter that knocks insects down with a jet of water.', v92Habitat('salt', ['lower'], ['lagoon', 'inlet'], ['boulder-lagoon'])),
+  v92Species('remora', 'Remora', 'Common', 'slender', [12, 36], [1, 8], [[.22, .31, .34], [.6, .66, .62]], 'A traveling fish with a suction disc for hitching rides on larger animals.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'inlet'], ['outer-ocean'])),
+  v92Species('flying_gurnard', 'Flying Gurnard', 'Common', 'sculpin', [10, 20], [1, 4], [[.38, .48, .54], [.26, .66, .82]], 'A bottom fish that opens enormous blue-edged pectoral fins like wings.', v92Habitat('salt', ['ocean', 'lower'], ['ocean', 'lagoon', 'inlet'], ['boulder-lagoon']))
+];
+
 const canonicalize = (value) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-const preparedSpecies = [...SPECIES, ...NEW_ACTIVE_SPECIES].map((fish) => {
+const preparedSpecies = [...SPECIES, ...NEW_ACTIVE_SPECIES, ...V92_ACTIVE_SPECIES].map((fish) => {
   const adjustment = REAL_SPECIES_ADJUSTMENTS[fish.id];
   const length = adjustment?.length ?? [fish.minLength, fish.maxLength];
   const weight = adjustment?.weight ?? [fish.minWeight, fish.maxWeight];

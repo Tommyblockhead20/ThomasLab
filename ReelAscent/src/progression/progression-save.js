@@ -2,7 +2,7 @@ import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 7;
+export const PROGRESSION_SCHEMA_VERSION = 8;
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
@@ -39,6 +39,8 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     money: 0,
     inventory: [],
     aquarium: [],
+    aquariumCapacityTier: 0,
+    aquariumIncome: { bankedActiveSeconds: 0, lastObservedActiveSeconds: null, lifetimePaid: 0 },
     heldSpecimenId: null,
     ownedItems: [],
     heldItemId: null,
@@ -142,6 +144,14 @@ export function normalizeProgressionState(value = {}) {
     money: Math.max(0, Math.floor(finite(value.money))),
     inventory,
     aquarium,
+    aquariumCapacityTier: Math.max(0, Math.min(6, Math.floor(finite(value.aquariumCapacityTier)))),
+    aquariumIncome: {
+      bankedActiveSeconds: Math.max(0, finite(value.aquariumIncome?.bankedActiveSeconds)),
+      lastObservedActiveSeconds: Number.isFinite(value.aquariumIncome?.lastObservedActiveSeconds)
+        ? Math.max(0, value.aquariumIncome.lastObservedActiveSeconds)
+        : null,
+      lifetimePaid: Math.max(0, Math.floor(finite(value.aquariumIncome?.lifetimePaid)))
+    },
     heldSpecimenId: typeof value.heldSpecimenId === 'string' && inventoryIds.has(value.heldSpecimenId)
       ? value.heldSpecimenId
       : null,

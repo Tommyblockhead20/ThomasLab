@@ -1,4 +1,5 @@
 import { EMOTE_DEFINITIONS } from '../multiplayer/emotes.js';
+import { isBoundActionCode } from '../player/movement.js';
 
 const BLOCKING_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'mountain-map-open', 'appearance-open'
@@ -16,7 +17,7 @@ export class EmoteMenu {
     this.onKeyDown = (event) => {
       const editable = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase?.()) || event.target?.isContentEditable;
       if (editable || event.repeat) return;
-      if (event.code === 'KeyE') {
+      if (isBoundActionCode('emotes', event.code)) {
         if (!this.isOpen && (BLOCKING_CLASSES.some((name) => document.body.classList.contains(name)) || !this.canOpen())) return;
         event.preventDefault();
         event.stopImmediatePropagation();

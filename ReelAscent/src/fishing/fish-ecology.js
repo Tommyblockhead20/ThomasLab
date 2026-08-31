@@ -2,14 +2,14 @@ import { FISH_SPECIES, getWeightedSpeciesTable } from './fish-data.js';
 
 export const ECOLOGY_TARGETS = Object.freeze({
   waters: 24,
-  species: 280,
+  species: 300,
   // The v7.1 summit promotions and v8 replacement roster intentionally moved four
   // creatures from the shared pool into location-specific discoveries. Individual
   // waters now vary modestly instead of all carrying exactly four exclusives.
-  exclusiveSpecies: 100,
-  sharedSpecies: 180,
+  exclusiveSpecies: 93,
+  sharedSpecies: 207,
   minimumExclusivePerWater: 2,
-  maximumExclusivePerWater: 8,
+  maximumExclusivePerWater: 9,
   maximumSpeciesShare: .25
 });
 
@@ -54,7 +54,8 @@ export function getZoneHabitat(zone, point = zone.center) {
     ? [...new Set(zone.ecologyThemes)]
     : [ecologyTheme];
   const tier = zone.tier ?? 'lower';
-  const rarityTier = isOcean ? 'ocean'
+  const rarityTier = zone.probabilityGroup === 'cloudstep-lake' ? 'cloudstep'
+    : isOcean ? 'ocean'
     : (zone.waterfall || waterType === 'waterfall-pool') ? 'waterfall'
       : tier;
   return Object.freeze({

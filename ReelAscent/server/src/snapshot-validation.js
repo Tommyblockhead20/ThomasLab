@@ -4,20 +4,23 @@ const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'sit', 'dance']);
 const APPEARANCE_OPTIONS = Object.freeze({
   avatarType: new Set(['human', 'blob']),
   skinTone: new Set(['porcelain', 'light', 'warm', 'honey', 'golden', 'bronze', 'umber', 'deep']),
-  shirtColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose']),
-  pantsColor: new Set(['classic-trail', 'pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand']),
+  shirtColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose', 'sky', 'lavender', 'coral', 'spruce', 'snow', 'sunbeam']),
+  pantsColor: new Set(['classic-trail', 'pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand', 'navy', 'slate', 'mulberry', 'olive', 'cloud', 'black']),
   hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'long', 'bun', 'braids', 'bald']),
-  hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink']),
-  accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'flower-crown', 'goggles']),
+  hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink', 'ash', 'white', 'blue', 'green', 'rose-gold', 'auburn']),
+  accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'bandana', 'neck-gaiter', 'necklace', 'flower-crown', 'goggles']),
   headwear: new Set(['none', 'beanie', 'trail-hat', 'fishing-cap', 'headlamp', 'flower-crown']),
   eyewear: new Set(['none', 'glasses', 'goggles']),
-  faceAccessory: new Set(['none', 'scarf']),
-  backAccessory: new Set(['none', 'backpack'])
+  faceAccessory: new Set(['none', 'scarf', 'bandana', 'neck-gaiter', 'necklace']),
+  backAccessory: new Set(['none', 'backpack']),
+  backpackColor: new Set(['classic-teal', 'pine', 'orange', 'yellow', 'red', 'blue', 'navy', 'violet', 'rose', 'sand', 'white', 'charcoal', 'mint', 'coral']),
+  blobColor: new Set(['classic-blue', 'aqua', 'lime', 'sunny', 'orange', 'coral', 'pink', 'violet', 'indigo', 'silver', 'charcoal', 'cream'])
 });
 const DEFAULT_APPEARANCE = Object.freeze({
   avatarType: 'human', skinTone: 'warm', shirtColor: 'classic-orange', pantsColor: 'classic-trail',
   hairStyle: 'tousled', hairColor: 'espresso', accessory: 'beanie', headwear: 'beanie',
-  eyewear: 'none', faceAccessory: 'none', backAccessory: 'backpack', shirtTint: null,
+  eyewear: 'none', faceAccessory: 'none', backAccessory: 'backpack', backpackColor: 'classic-teal',
+  blobColor: 'classic-blue', shirtTint: null,
   pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
 });
 const APPEARANCE_TINTS = new Set(['shirtTint', 'pantsTint', 'hairTint', 'accessoryTint', 'blobTint']);

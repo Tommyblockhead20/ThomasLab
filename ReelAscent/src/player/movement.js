@@ -13,13 +13,22 @@ export const KEY_BINDING_DEFINITIONS = Object.freeze({
   slide: Object.freeze({ label: 'Slide', defaultCode: 'KeyC', fixedCodes: Object.freeze([]) }),
   grip: Object.freeze({ label: 'Grip / World Grip-Interact', defaultCode: 'KeyG', fixedCodes: Object.freeze([]) }),
   fish: Object.freeze({ label: 'Fish', defaultCode: 'KeyF', fixedCodes: Object.freeze([]) }),
-  interact: Object.freeze({ label: 'World Interact', defaultCode: 'KeyX', fixedCodes: Object.freeze([]) })
+  interact: Object.freeze({ label: 'World Interact', defaultCode: 'KeyX', fixedCodes: Object.freeze([]) }),
+  inventory: Object.freeze({ label: 'Inventory', defaultCode: 'KeyI', fixedCodes: Object.freeze([]) }),
+  journal: Object.freeze({ label: 'Fish Journal', defaultCode: 'KeyJ', fixedCodes: Object.freeze([]) }),
+  multiplayer: Object.freeze({ label: 'Multiplayer', defaultCode: 'KeyM', fixedCodes: Object.freeze([]) }),
+  emotes: Object.freeze({ label: 'Emotes', defaultCode: 'KeyE', fixedCodes: Object.freeze([]) }),
+  map: Object.freeze({ label: 'Use Map / GPS', defaultCode: 'KeyV', fixedCodes: Object.freeze([]) })
 });
 
 export const DEFAULT_KEY_BINDINGS = Object.freeze(Object.fromEntries(
   Object.entries(KEY_BINDING_DEFINITIONS).map(([action, definition]) => [action, definition.defaultCode])
 ));
-const RESERVED_BINDING_CODES = new Set(['Escape', 'F1', 'KeyJ', 'KeyI', 'KeyM', 'KeyE']);
+// Pause and hidden playtest/debug controls remain intentionally unavailable here.
+const RESERVED_BINDING_CODES = new Set([
+  'Escape', 'Home', 'F1', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10',
+  'KeyB', 'KeyN', 'Digit0', 'Digit7', 'Digit8', 'Digit9'
+]);
 
 const bindingStorage = () => {
   try { return globalThis.localStorage ?? null; } catch { return null; }

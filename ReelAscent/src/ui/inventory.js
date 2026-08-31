@@ -1,6 +1,7 @@
 import { resolveSpecies } from '../fishing/fish-data.js';
 import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
 import { MAP_ITEM_BY_ID } from '../world/world-locations.js';
+import { isBoundActionCode } from '../player/movement.js';
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -55,11 +56,21 @@ export class InventoryMenu {
     this.onKeyDown = (event) => {
       const editable = ['input', 'textarea', 'select'].includes(event.target?.tagName?.toLowerCase?.()) || event.target?.isContentEditable;
       if (editable || event.repeat) return;
-      if (event.code === 'KeyI') {
+      if (isBoundActionCode('inventory', event.code)) {
         if (!this.isOpen && OTHER_MODAL_OPEN()) return;
         event.preventDefault();
         event.stopImmediatePropagation();
         this.toggle();
+      } else if (isBoundActionCode('map', event.code) && !this.isOpen && !OTHER_MODAL_OPEN()) {
+        const state = this.progression.getSnapshot();
+        const item = MAP_ITEM_BY_ID.get(state.heldItemId)
+          ?? (state.ownedItems ?? []).map((id) => MAP_ITEM_BY_ID.get(id)).find((entry) => entry?.mode === 'gps')
+          ?? (state.ownedItems ?? []).map((id) => MAP_ITEM_BY_ID.get(id)).find(Boolean);
+        if (!item) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.progression.setHeldWorldItem(item.id);
+        window.dispatchEvent(new CustomEvent('reel-ascent:open-map', { detail: { mode: item.mode } }));
       } else if (event.code === 'Escape' && this.isOpen) {
         event.preventDefault();
         event.stopImmediatePropagation();

@@ -150,17 +150,22 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   [-.2, 0, .2].forEach((x, index) => primitive(hairStyles.get('tousled'), `Remote hair lock ${index + 1}`,
     'cone', { x, y: 1.04 + (index % 2) * .035, z: -.01 }, { x: .12, y: .22, z: .12 }, hair, { z: (index - 1) * -12 }));
   const ponytailTop = primitive(hairStyles.get('ponytail'), 'Remote ponytail cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
-  primitive(hairStyles.get('ponytail'), 'Remote ponytail', 'sphere', { x: 0, y: .66, z: .39 }, { x: .2, y: .36, z: .19 }, hair);
+  primitive(hairStyles.get('ponytail'), 'Remote ponytail tie', 'sphere', { x: 0, y: .84, z: .32 }, { x: .15, y: .15, z: .15 }, accent);
+  primitive(hairStyles.get('ponytail'), 'Remote ponytail', 'sphere', { x: 0, y: .7, z: .35 }, { x: .22, y: .38, z: .2 }, hair);
   [-.18, 0, .18].forEach((z, index) => primitive(hairStyles.get('mohawk'), `Remote mohawk ${index + 1}`,
     'cone', { x: 0, y: 1.05, z }, { x: .15, y: .34 + (index === 1 ? .06 : 0), z: .15 }, hair));
   const longHairTop = primitive(hairStyles.get('long'), 'Remote long hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
-  primitive(hairStyles.get('long'), 'Remote long hair back', 'sphere', { x: 0, y: .64, z: .3 }, { x: .42, y: .56, z: .19 }, hair);
+  primitive(hairStyles.get('long'), 'Remote long hair back', 'sphere', { x: 0, y: .68, z: .24 }, { x: .43, y: .58, z: .21 }, hair);
+  for (const side of [-1, 1]) primitive(hairStyles.get('long'), `Remote long hair side ${side}`, 'sphere',
+    { x: side * .33, y: .7, z: .03 }, { x: .14, y: .46, z: .15 }, hair, { z: side * 5 });
   primitive(hairStyles.get('bun'), 'Remote bun hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
   primitive(hairStyles.get('bun'), 'Remote trail bun', 'sphere', { x: 0, y: 1, z: .36 }, { x: .26, y: .26, z: .26 }, hair);
   const braidsTop = primitive(hairStyles.get('braids'), 'Remote braids hair cap', 'sphere', { x: 0, y: .95, z: .02 }, { x: .46, y: .19, z: .44 }, hair);
   for (const side of [-1, 1]) {
     primitive(hairStyles.get('braids'), `Remote braid ${side}`, 'cylinder',
-      { x: side * .32, y: .62, z: .18 }, { x: .1, y: .48, z: .1 }, hair, { z: side * 5 });
+      { x: side * .29, y: .68, z: .14 }, { x: .11, y: .52, z: .11 }, hair, { z: side * 5 });
+    primitive(hairStyles.get('braids'), `Remote braid end ${side}`, 'sphere',
+      { x: side * .34, y: .39, z: .16 }, { x: .12, y: .16, z: .12 }, hair);
   }
   const hairTopParts = new Map([
     ['ponytail', [ponytailTop]], ['long', [longHairTop]], ['braids', [braidsTop]]
@@ -173,27 +178,35 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     ['fishing-cap', makeGroup('Remote fishing cap')],
     ['headlamp', makeGroup('Remote headlamp')],
     ['scarf', makeGroup('Remote scarf')],
+    ['bandana', makeGroup('Remote bandana')],
+    ['neck-gaiter', makeGroup('Remote neck gaiter')],
+    ['necklace', makeGroup('Remote necklace')],
     ['flower-crown', makeGroup('Remote flower crown')],
     ['goggles', makeGroup('Remote summit goggles')]
   ]);
   primitive(accessories.get('beanie'), 'Remote beanie crown', 'cone', { x: 0, y: 1.03, z: 0 }, { x: .49, y: .32, z: .49 }, accessory);
   primitive(accessories.get('beanie'), 'Remote beanie band', 'cylinder', { x: 0, y: .94, z: 0 }, { x: .5, y: .11, z: .5 }, accessory);
-  primitive(accessories.get('glasses'), 'Remote left glasses', 'box', { x: -.13, y: .78, z: -.42 }, { x: .19, y: .13, z: .03 }, accessory);
-  primitive(accessories.get('glasses'), 'Remote right glasses', 'box', { x: .13, y: .78, z: -.42 }, { x: .19, y: .13, z: .03 }, accessory);
-  primitive(accessories.get('glasses'), 'Remote glasses bridge', 'box', { x: 0, y: .78, z: -.43 }, { x: .08, y: .025, z: .02 }, accessory);
+  primitive(accessories.get('glasses'), 'Remote left glasses', 'box', { x: -.13, y: .78, z: -.235 }, { x: .19, y: .13, z: .03 }, accessory);
+  primitive(accessories.get('glasses'), 'Remote right glasses', 'box', { x: .13, y: .78, z: -.235 }, { x: .19, y: .13, z: .03 }, accessory);
+  primitive(accessories.get('glasses'), 'Remote glasses bridge', 'box', { x: 0, y: .78, z: -.245 }, { x: .08, y: .025, z: .02 }, accessory);
   primitive(accessories.get('trail-hat'), 'Remote trail hat brim', 'box', { x: 0, y: .99, z: -.05 }, { x: .7, y: .05, z: .6 }, accessory);
   primitive(accessories.get('trail-hat'), 'Remote trail hat crown', 'cylinder', { x: 0, y: 1.1, z: 0 }, { x: .44, y: .22, z: .44 }, accessory);
   primitive(accessories.get('fishing-cap'), 'Remote fishing cap crown', 'sphere', { x: 0, y: 1.01, z: .02 }, { x: .47, y: .2, z: .44 }, accessory);
   primitive(accessories.get('fishing-cap'), 'Remote fishing cap bill', 'box', { x: 0, y: .96, z: -.37 }, { x: .47, y: .05, z: .34 }, accessory, { x: -5 });
   primitive(accessories.get('headlamp'), 'Remote headlamp band', 'cylinder', { x: 0, y: .94, z: 0 }, { x: .48, y: .08, z: .48 }, accessory);
-  primitive(accessories.get('headlamp'), 'Remote headlamp light', 'sphere', { x: 0, y: .95, z: -.43 }, { x: .13, y: .12, z: .1 }, accessory);
+  primitive(accessories.get('headlamp'), 'Remote headlamp light', 'sphere', { x: 0, y: .95, z: -.25 }, { x: .13, y: .12, z: .1 }, accessory);
   primitive(accessories.get('scarf'), 'Remote scarf collar', 'cylinder', { x: 0, y: .52, z: 0 }, { x: .31, y: .16, z: .31 }, accessory);
   primitive(accessories.get('scarf'), 'Remote scarf tail', 'box', { x: .17, y: .25, z: .25 }, { x: .18, y: .52, z: .1 }, accessory, { x: -12, z: -8 });
+  primitive(accessories.get('bandana'), 'Remote bandana face cloth', 'box', { x: 0, y: .64, z: -.225 }, { x: .3, y: .18, z: .03 }, accessory, { x: 7 });
+  primitive(accessories.get('bandana'), 'Remote bandana knot', 'sphere', { x: 0, y: .62, z: .21 }, { x: .1, y: .09, z: .08 }, accessory);
+  primitive(accessories.get('neck-gaiter'), 'Remote neck gaiter', 'cylinder', { x: 0, y: .55, z: 0 }, { x: .29, y: .22, z: .29 }, accessory);
+  primitive(accessories.get('necklace'), 'Remote necklace cord', 'cylinder', { x: 0, y: .54, z: -.11 }, { x: .19, y: .035, z: .19 }, accessory);
+  primitive(accessories.get('necklace'), 'Remote necklace pendant', 'sphere', { x: 0, y: .46, z: -.195 }, { x: .07, y: .095, z: .03 }, accessory);
   primitive(accessories.get('flower-crown'), 'Remote flower crown band', 'cylinder', { x: 0, y: .97, z: 0 }, { x: .48, y: .055, z: .48 }, accessory);
   [-.28, -.14, 0, .14, .28].forEach((x, index) => primitive(accessories.get('flower-crown'), `Remote flower ${index + 1}`,
-    'sphere', { x, y: 1.04 + (index % 2) * .03, z: -.33 + Math.abs(x) * .2 }, { x: .095, y: .095, z: .075 }, accessory));
-  primitive(accessories.get('goggles'), 'Remote goggles left lens', 'sphere', { x: -.14, y: .8, z: -.42 }, { x: .17, y: .13, z: .04 }, dark);
-  primitive(accessories.get('goggles'), 'Remote goggles right lens', 'sphere', { x: .14, y: .8, z: -.42 }, { x: .17, y: .13, z: .04 }, dark);
+    'sphere', { x, y: 1.01 + (index % 2) * .028, z: -.21 + Math.abs(x) * .13 }, { x: .095, y: .095, z: .075 }, accessory));
+  primitive(accessories.get('goggles'), 'Remote goggles left lens', 'sphere', { x: -.14, y: .8, z: -.24 }, { x: .17, y: .13, z: .04 }, dark);
+  primitive(accessories.get('goggles'), 'Remote goggles right lens', 'sphere', { x: .14, y: .8, z: -.24 }, { x: .17, y: .13, z: .04 }, dark);
   primitive(accessories.get('goggles'), 'Remote goggles strap', 'cylinder', { x: 0, y: .81, z: 0 }, { x: .46, y: .05, z: .46 }, accessory);
 
   const limbs = {
@@ -235,6 +248,7 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     setMaterialColor(trousers, resolved.pantsColorValue.color);
     setMaterialColor(hair, resolved.hairColorValue.color);
     setMaterialColor(accessory, resolved.accessoryColor);
+    setMaterialColor(pack, resolved.backpackColorValue.color);
     setMaterialColor(blobBlue, resolved.blobColor, .03);
     humanRig.enabled = root.appearance.avatarType === 'human';
     blobRig.enabled = root.appearance.avatarType === 'blob';

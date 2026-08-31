@@ -1,12 +1,21 @@
 export const CATCH_RARITIES = Object.freeze(['Common', 'Uncommon', 'Rare', 'Legendary']);
 
+// These three physical landmark waters deliberately share one profile internally while
+// remaining distinct from one another.
+export const PHYSICAL_WATER_RARITY_PROFILES = Object.freeze({
+  cloudstep: Object.freeze({ Common: .08, Uncommon: .24, Rare: .55, Legendary: .13 }),
+  waterfall: Object.freeze({ Common: .41, Uncommon: .25, Rare: .28, Legendary: .06 }),
+  ocean: Object.freeze({ Common: .62, Uncommon: .20, Rare: .11, Legendary: .07 })
+});
+
 export const TIER_RARITY_PROFILES = Object.freeze({
   lower: Object.freeze({ Common: .60, Uncommon: .32, Rare: .06, Legendary: .02 }),
   middle: Object.freeze({ Common: .35, Uncommon: .26, Rare: .27, Legendary: .12 }),
   upper: Object.freeze({ Common: .05, Uncommon: .18, Rare: .64, Legendary: .13 }),
   summit: Object.freeze({ Common: 0, Uncommon: .20, Rare: .45, Legendary: .35 }),
-  waterfall: Object.freeze({ Common: .41, Uncommon: .25, Rare: .28, Legendary: .06 }),
-  ocean: Object.freeze({ Common: .62, Uncommon: .20, Rare: .11, Legendary: .07 })
+  cloudstep: PHYSICAL_WATER_RARITY_PROFILES.cloudstep,
+  waterfall: PHYSICAL_WATER_RARITY_PROFILES.waterfall,
+  ocean: PHYSICAL_WATER_RARITY_PROFILES.ocean
 });
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));

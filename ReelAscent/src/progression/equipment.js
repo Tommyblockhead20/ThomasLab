@@ -37,13 +37,14 @@ export const EQUIPMENT_CATALOG = Object.freeze([
   item('trail-boots', 'boots', 'Trail Boots', 0, 'Balanced starter boots.'),
   item('trail-gloves', 'gloves', 'Trail Gloves', 0, 'Balanced starter gloves.'),
   item('trail-kit', 'climbing', 'Trail Kit', 0, 'Balanced starter climbing equipment.'),
-  item('trail-runners', 'boots', 'Trail Runners', 1250, 'Sprint speed increases by 12%.', { sprintSpeedMultiplier: 1.12 }),
+  item('trail-runners', 'boots', 'Trail Runners', 1250, 'Sprint speed increases by 15%.', { sprintSpeedMultiplier: 1.15 }),
   // Keep the durable id so existing saves migrate cleanly, but this is the v9 replacement item.
   item('endurance-belt', 'boots', 'Endurance Boots', 1750, 'Normal sprinting consumes no stamina.', { sprintDrain: 0 }),
   item('chalk-gloves', 'gloves', 'Chalk Gloves', 2000, 'Grip stamina use decreases by 25%.', { gripDrain: .75 }),
   item('alpine-harness', 'climbing', 'Alpine Harness', 3000, 'Climbing and grip stamina costs decrease by 20%.', { climbCostMultiplier: .8 }),
-  item('springstep-boots', 'boots', 'Springstep Boots', 4000, 'Jump impulse increases by 15%.', { jumpImpulseMultiplier: 1.15 }),
-  item('ultralight-kit', 'climbing', 'Ultralight Kit', 6000, 'Reduces several normal traversal stamina costs by 14%.', { sprintDrain: .86, gripDrain: .86, climbCostMultiplier: .86, jumpCostMultiplier: .86, slideCostMultiplier: .86 })
+  item('springstep-boots', 'boots', 'Springstep Boots', 4000, 'Jump impulse increases by 25%.', { jumpImpulseMultiplier: 1.25 }),
+  item('summit-vault-boots', 'boots', 'Summit Vault Boots', 12000, 'Jump impulse increases by 50%.', { jumpImpulseMultiplier: 1.5 }),
+  item('ultralight-kit', 'climbing', 'Ultralight Kit', 6000, 'Reduces several normal traversal stamina costs by 18%.', { sprintDrain: .82, gripDrain: .82, climbCostMultiplier: .82, jumpCostMultiplier: .82, slideCostMultiplier: .82 })
 ]);
 
 export const EQUIPMENT_BY_ID = new Map(EQUIPMENT_CATALOG.map((entry) => [entry.id, entry]));

@@ -12,16 +12,17 @@ import { MockTransport } from '../src/multiplayer/transport.js';
 import { SaveSystem } from '../src/persistence/save-system.js';
 import { serializeProgress, validateProgressImport } from '../src/progression/progress-transfer.js';
 
-test('v8 active roster stays 280/70 with stable catalog and legacy identity resolution', () => {
-  assert.equal(FISH_SPECIES.length, 280);
+test('v9.2 active roster has stable rarity pages, catalog IDs, and legacy identity resolution', () => {
+  assert.equal(FISH_SPECIES.length, 300);
+  const expectedCounts = { Common: 77, Uncommon: 78, Rare: 70, Legendary: 75 };
   for (const [rarity, prefix] of [['Common', 'C'], ['Uncommon', 'U'], ['Rare', 'R'], ['Legendary', 'L']]) {
     const page = FISH_SPECIES.filter((fish) => fish.rarity === rarity);
-    assert.equal(page.length, 70);
+    assert.equal(page.length, expectedCounts[rarity]);
     assert.deepEqual(page.map((fish) => fish.name), [...page].map((fish) => fish.name).sort((a, b) => a.localeCompare(b)));
     assert.equal(page[0].catalogId, `${prefix}001`);
-    assert.equal(page.at(-1).catalogId, `${prefix}070`);
+    assert.equal(page.at(-1).catalogId, `${prefix}${String(expectedCounts[rarity]).padStart(3, '0')}`);
   }
-  assert.equal(ALL_FISH_SPECIES.filter((fish) => fish.retired).length, 10);
+  assert.equal(ALL_FISH_SPECIES.filter((fish) => fish.retired).length, 20);
   assert.equal(canonicalSpeciesId('bluewater-bonnet-shark'), 'bonnethead_shark');
   assert.equal(ALL_FISH_SPECIES.find((fish) => fish.id === 'windscale-bream').retired, true);
   for (const name of ['Great Barracuda', 'Polar Bear', 'Saltwater Crocodile', 'American Alligator', 'Hippopotamus', 'Yellowfin Tuna', 'Swordfish', 'Sailfish', 'Giant Caribbean Anemone', 'Staghorn Coral']) {

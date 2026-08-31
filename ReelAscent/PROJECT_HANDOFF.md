@@ -1,6 +1,27 @@
 # Reel Ascent v9 major update handoff
 
-Status: implemented in the current project tree. No commit, push, deployment, multiplayer-server change, or production mutation was performed. Islands remain deliberately always loaded. Validation was kept light as requested.
+Status: implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Islands remain deliberately always loaded. Validation was kept light as requested. The v9.2 appearance allowlist changes do require the multiplayer server to be redeployed with the client.
+
+## v9.2 remaining-pass addendum
+
+This section supersedes older statements below where the two differ.
+
+- `src/game.js` and `src/world/mountain-v2.js` were owned by a separate coordinated pass. This pass deliberately did not edit or replace either file.
+- Pause now has Stats, Save/Data, Settings, Accessibility, and Key Rebinding screens. Accessibility preferences are global browser settings, separate from save slots: compact/normal/large UI, reduced UI motion, high-contrast rhythm notes, large contextual prompts, and control-card visibility.
+- Key binding schema now includes movement, jump, sprint, slide, grip, fish, interact, Inventory, Journal, Multiplayer, Emotes, and Map/Use. Duplicate bindings are rejected, hidden cheat/debug inputs stay reserved, reset is available, and the HUD plus modal keycaps show the active bindings.
+- Save Slot cards show last played, money, Journal count, active playtime, fish, and summits. Four-slot storage and legacy Slot 1 migration remain unchanged.
+- Inventory is exactly `CATCHES` and `GEAR`. Save/Data lives in Pause; buying/selling lives at Shop Island; aquarium management lives at Aquarium Island; appearance lives at Cabin Island.
+- Shop Island now has confirmed `SELL ALL`. It sells only specimens currently carried in Inventory and explicitly excludes aquarium residents.
+- Traversal equipment keeps one Boots, Gloves, and Climbing Equipment slot. Springstep Boots are +25% jump; Summit Vault Boots cost $12,000 for +50%; Endurance Boots make ordinary sprint stamina cost zero; Trail Runners increased 12%→15%; Ultralight Kit increased 14%→18%.
+- Aquarium progression schema now stores capacity tier and active-play income state. Capacity tiers are 25/50/100/150/200/250/300 with centralized prices. Every five minutes of persisted active, unpaused play awards floor(1% of displayed sale value); no wall-clock/offline catch-up is used. The existing world renderer remains capped to a lightweight visible subset/shared update path rather than simulating all 300 residents at full cost.
+- Appearance uses expanded curated palettes and no longer renders arbitrary color inputs. Backpack model and a 14-choice backpack color are independent; blobs have a 12-choice palette. Legacy tint fields remain readable only for save/network compatibility.
+- Randomize Look is 96% human, 2% classic-blue blob, and 2% random non-blue blob. Reset still restores the verified orange-shirt/yellow-beanie legacy look and does not overwrite existing customized saves automatically.
+- Local, preview, and remote avatars share the same appearance data. Ponytail, long-hair, and braid joins were tightened; glasses, headlamp, and flower crown were pulled onto the head; Bandana, Neck Gaiter, and Summit Necklace were added. Hat-compatible lower hair remains visible.
+- Multiplayer snapshot appearance validation now accepts backpack/blob palette IDs and the three new face/neck accessories. The snapshot envelope and location protocol did not change, but the server allowlist did, so frontend and multiplayer server should be deployed together.
+- Fish ecology now has 300 active species and 20 resolvable retired species. The v9.2 source list is labeled “30” but contains 31 distinct names; all 31 were added, while the exact ten newly requested legacy creatures were retired.
+- All requested rarity promotions/demotions are applied at species construction, preserving stable specimen IDs. Penguin, Polar Bear, Qallupilluk, Blue-Ice Codling, Glacier Snail, and Frostglass Shrimp are concentrated/exclusive at Frosthook as authored.
+- Cloudstep, Fallglass Waterfall, and Outer Ocean use three explicitly named rarity profiles. Uniform-zone anchors remain owned by the coordinated mountain pass; no upper/middle/lower waterfall subtable exists.
+- Save compatibility is retained through canonical and legacy alias resolution. Progression schema is now version 8 for aquarium capacity/income and curated appearance fields; outer save schema remains version 8, export format 2, and slot-container schema 1.
 
 1. **Fishing waters moved** — Amber Reed Pond moved offshore and became Reedwater Pond on Normal Fishing Island; Basalt Grotto moved to Cave Fishing Island; Blue-Ice Melt moved to Cold Island and is presented as Frosthook Melt. The total remains 24 fishing zones.
 
@@ -30,7 +51,7 @@ Status: implemented in the current project tree. No commit, push, deployment, mu
 
 14. **Cold Island** — Frosthook uses pale snow terrain, cold rock/ice materials, sparse large ice formations, and Frosthook Melt as its dedicated cold water.
 
-15. **Cold species concentration** — Polar Bear remains exclusive to `blue-ice-melt` (now Frosthook); Penguin can use Frosthook and ocean but strongly favors Frosthook; Arctic Char and Arctic Grayling now favor Frosthook; Dolly Varden and existing Fairy Shrimp already favor that same water. Logical nonexclusive cold fish can still occur elsewhere.
+15. **Cold species concentration** — Polar Bear and Penguin are now exclusive to `blue-ice-melt` (Frosthook), joined by the new Qallupilluk; Arctic Char, Arctic Grayling, Dolly Varden, and existing Fairy Shrimp favor that water. Logical nonexclusive cold fish can still occur elsewhere.
 
 16. **Normal water moved offshore** — Amber Reed Pond was chosen because removing it reduces lower-main clustering; its canonical ID remains `amber-reed-pond` for saves/species references.
 
@@ -64,13 +85,13 @@ Status: implemented in the current project tree. No commit, push, deployment, mu
 
 31. **Map prices/ownership** — Paper Map costs `$75`; GPS Map costs `$900`. Both are bought only at Shop Island, persist in `ownedItems`, appear as actual Inventory cards, can be held/used there, and GPS is intentionally much more expensive.
 
-32. **Inventory structure** — Inventory now has exactly `INVENTORY` and `SAVE / DATA` tabs. Global Appearance, Aquarium, Gear Shop, selling, purchasing, and free Trail Map buttons were removed.
+32. **Inventory structure** — Inventory now has exactly `CATCHES` and `GEAR` tabs. Save/Data, Appearance, Aquarium management, Shop, selling, and purchasing are not Inventory tabs.
 
 33. **Hold in Hand** — Carried specimen hold/put-away remains. Map inventory actions select the durable map item and immediately read/use the corresponding Paper or GPS display.
 
 34. **Specimen previews** — Each specimen card renders a lightweight SVG silhouette using that species' actual model archetype proportions/category and authored primary/accent colors, plus rarity, quality, shiny mark, length, weight, value, and provenance.
 
-35. **Appearance relocation** — Appearance is opened only from the Cabin Island wardrobe. The live preview, skin/cosmetics/tints, hair/hat rules, Randomize, classic Reset Default, save compatibility, and multiplayer appearance snapshots remain intact.
+35. **Appearance relocation** — Appearance is opened only from the Cabin Island wardrobe. The live preview, expanded curated palettes, hair/hat rules, 96/2/2 Randomize, classic Reset Default, save compatibility, and multiplayer appearance snapshots remain intact; arbitrary color pickers were removed.
 
 36. **Aquarium management relocation** — Adding to and removing from the aquarium now happens only in the physical Aquarium Island menu. Inventory still records carried ownership but has no aquarium-management buttons.
 
@@ -106,14 +127,14 @@ Status: implemented in the current project tree. No commit, push, deployment, mu
 
 52. **Future second main island** — `WorldLocation` records now own ID, display/type, world position, radii, theme/functions, load group, map representation, destination order, and dock/arrival metadata. Boat and map iterate this registry; a future location can be added without duplicating UI switch statements.
 
-53. **Multiplayer protocol changes** — None. Existing position/appearance snapshots are sufficient.
+53. **Multiplayer protocol changes** — No new message/envelope was added. Existing snapshots remain sufficient, but their appearance allowlist gained `backpackColor`, `blobColor`, Bandana, Neck Gaiter, and Summit Necklace.
 
-54. **Render redeployment** — No multiplayer server/Render service code changed, so the server does not need redeployment for v9. Publishing the client still requires normal frontend hosting/deployment.
+54. **Render redeployment** — Yes for v9.2: `server/src/snapshot-validation.js` changed, so the multiplayer server/Render service and frontend should be deployed together.
 
 55. **Files changed** — `PROJECT_HANDOFF.md`, `index.html`, `src/styles.css`, fishing data/ecology/zone/controller files, `src/game.js`, persistence/progression files, `src/player/movement.js`, Home/HUD/Inventory/Map/Shop/Aquarium/Fishing Performance UI files, `src/world/mountain-v2.js`, `src/world/world.js`, `src/world/run-manager.js`; new `src/world/world-locations.js`, `src/ui/boat-travel.js`, `src/debug/cheat-gate.js`, and `test/v9-major.test.js`; refreshed `dist/index.html` and hashed JS/CSS assets.
 
-56. **Save schema changes** — Durable save schema `6→7`; progression schema `5→6`; progress export format `1→2`; new slot-container schema `1` with four slots; new durable `ownedItems`/`heldItemId`; old schemas and version-1 exports migrate forward.
+56. **Save schema changes** — Current durable save schema is `8`; progression schema is now `8`; progress export format is `2`; slot-container schema is `1` with four slots. Aquarium capacity/income and curated appearance fields normalize forward while old schemas and version-1 exports remain importable.
 
-57. **Frontend build** — Yes. `npm run build` is required for source changes and was run successfully (1,273 modules; only the existing large-chunk warning). `node --test test/v9-major.test.js` passes all focused boat/map/save/watershed/cheat checks, syntax checks pass, Vite startup succeeds, and `git diff --check` reports only Windows line-ending notices.
+57. **Frontend build** — Yes. The v9.2 `npm run build` completed successfully (1,274 modules; only the existing large-chunk warning). Focused roster/ecology, binding, aquarium/Sell All, appearance, and server-allowlist checks pass; changed JavaScript passes syntax checks; the multiplayer server started successfully on the alternate smoke-test port 18787 because the normal local port 8787 was already occupied; `git diff --check` reports only Windows line-ending notices.
 
 58. **Highest-value manual tests** — Sail once to any small island and return to verify a random main dock; inspect the six island shore/dock joins and Cave Island entrance; walk Cloudstep→Fallglass→ocean looking for clipping; buy/use both maps and check GPS with a second player; exercise Shop/Aquarium/Cabin interactions; migrate/switch/import/reset a nonprimary save; tap then hold F1 and try F3/F7/F9.

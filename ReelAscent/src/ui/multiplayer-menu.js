@@ -1,3 +1,5 @@
+import { isBoundActionCode } from '../player/movement.js';
+
 const OTHER_MODAL_OPEN = () => [
   'fish-gallery', 'journal-open', 'inventory-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open'
 ]
@@ -27,7 +29,7 @@ export class MultiplayerMenu {
         void this.client.join(this.codeInput?.value);
         return;
       }
-      if (event.code === 'KeyM' && !editable) {
+      if (isBoundActionCode('multiplayer', event.code) && !editable) {
         if (!this.isOpen && OTHER_MODAL_OPEN()) return;
         event.preventDefault();
         event.stopImmediatePropagation();

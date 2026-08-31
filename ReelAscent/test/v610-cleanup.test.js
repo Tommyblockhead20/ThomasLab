@@ -111,18 +111,18 @@ test('radius-derived eye attachment overlaps the head without burying most of th
   }
 });
 
-test('Kraken is dramatically larger than an ordinary giant octopus without changing roster counts', () => {
+test('Kraken is dramatically larger than an ordinary giant octopus in the v9.2 roster', () => {
   const kraken = FISH_SPECIES.find((entry) => entry.name === 'Kraken');
   const octopus = FISH_SPECIES.find((entry) => entry.name === 'Giant Pacific Octopus');
   assert.ok(kraken.sizeModel.typicalLength[0] > octopus.sizeModel.typicalLength[1] * 6);
   assert.ok(kraken.sizeModel.typicalWeight[0] > octopus.sizeModel.typicalWeight[1] * 80);
-  assert.equal(FISH_SPECIES.length, 280);
+  assert.equal(FISH_SPECIES.length, 300);
   assert.deepEqual(
     Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
       rarity,
       FISH_SPECIES.filter((entry) => entry.rarity === rarity).length
     ])),
-    { Common: 70, Uncommon: 70, Rare: 70, Legendary: 70 }
+    { Common: 77, Uncommon: 78, Rare: 70, Legendary: 75 }
   );
 });
 

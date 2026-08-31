@@ -25,7 +25,8 @@ test('v8.8 exact legacy appearance remains the new-save and reset target', async
     avatarType: 'human', skinTone: 'warm', shirtColor: 'classic-orange',
     pantsColor: 'classic-trail', hairStyle: 'tousled', hairColor: 'espresso',
     accessory: 'beanie', headwear: 'beanie', eyewear: 'none',
-    faceAccessory: 'none', backAccessory: 'backpack', shirtTint: null,
+    faceAccessory: 'none', backAccessory: 'backpack', backpackColor: 'classic-teal',
+    blobColor: 'classic-blue', shirtTint: null,
     pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
   });
   const resolved = resolveAppearance(DEFAULT_APPEARANCE);

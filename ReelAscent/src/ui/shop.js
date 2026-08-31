@@ -32,6 +32,18 @@ export class ShopMenu {
       }
     };
     this.onClick = (event) => {
+      const sellAll = event.target.closest('[data-shop-sell-all]');
+      if (sellAll) {
+        const state = this.progression.getSnapshot();
+        const count = state.inventory.length;
+        const amount = state.inventory.reduce((total, specimen) => total + specimen.value, 0);
+        if (!count) return;
+        if (!globalThis.confirm?.(`Sell ${count} carried specimen${count === 1 ? '' : 's'} for $${amount}? Aquarium specimens are not included.`)) return;
+        const result = this.progression.sellAllInventorySpecimens();
+        this.status.textContent = result.ok ? `${result.count} carried specimens sold for $${result.amount}.` : result.reason;
+        this.render(true);
+        return;
+      }
       const specimen = event.target.closest('[data-shop-sell]');
       if (specimen) {
         const result = this.progression.sellInventorySpecimen(specimen.dataset.shopSell);
@@ -128,10 +140,11 @@ export class ShopMenu {
   }
 
   renderSales(state) {
+    const total = state.inventory.reduce((sum, specimen) => sum + specimen.value, 0);
     const cards = [...state.inventory].reverse().map((specimen) => (
       `<article class="shop-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)}</small></div><p>${specimen.length.toFixed(1)} in • ${specimen.weight.toFixed(2)} lb</p><button type="button" data-shop-sell="${escapeHtml(specimen.specimenId)}">SELL $${specimen.value}</button></article>`
     )).join('');
-    return `<section class="shop-category"><h3>SELL CARRIED SPECIMENS</h3><div class="shop-card-row">${cards || '<p class="shop-empty">No carried specimens to sell.</p>'}</div></section>`;
+    return `<section class="shop-category"><div class="shop-category-heading"><h3>SELL CARRIED SPECIMENS</h3><button type="button" data-shop-sell-all ${state.inventory.length ? '' : 'disabled'}>SELL ALL ${state.inventory.length} • $${total}</button></div><p class="shop-note">Sell All affects carried Inventory specimens only. Aquarium specimens stay on display.</p><div class="shop-card-row">${cards || '<p class="shop-empty">No carried specimens to sell.</p>'}</div></section>`;
   }
 
   destroy() {

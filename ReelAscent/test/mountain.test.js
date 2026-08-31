@@ -112,10 +112,10 @@ test('the world exposes exactly 24 waters with one hollow annular ocean', () => 
   assert.equal(ocean.contains(pointAt(0, ocean.innerRadius + 2)), true);
 });
 
-test('280-creature ecology audit preserves the active 24-water topology', () => {
+test('300-creature ecology audit preserves the active 24-water topology', () => {
   const zones = ecologyZones();
   const audit = auditFishingEcology(zones);
-  assert.equal(FISH_SPECIES.length, 280);
+  assert.equal(FISH_SPECIES.length, 300);
   assert.equal(audit.waterCount, 24);
   assert.equal(audit.uniqueWaterCount, 24);
   assert.deepEqual(audit.zeroWaterSpecies, []);

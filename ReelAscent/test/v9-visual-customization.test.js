@@ -42,6 +42,8 @@ const customAppearance = Object.freeze({
   eyewear: 'glasses',
   faceAccessory: 'none',
   backAccessory: 'backpack',
+  backpackColor: 'coral',
+  blobColor: 'violet',
   shirtTint: '#123456',
   pantsTint: '#654321',
   hairTint: '#abcdef',

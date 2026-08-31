@@ -332,21 +332,21 @@ export class Player {
       { x, y: .995 + (index % 2) * .045, z: -.02 }, { x: .13, y: .25, z: .13 }, hair,
       { z: (index - 1) * -12 }, tousledHair));
     const ponytailTop = this.addVisual('Ponytail hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, ponytailHair);
-    this.addVisual('Ponytail tie', 'sphere', { x: 0, y: .77, z: .4 }, { x: .17, y: .17, z: .17 }, accent, {}, ponytailHair);
-    this.addVisual('Ponytail', 'sphere', { x: 0, y: .58, z: .45 }, { x: .22, y: .38, z: .2 }, hair, { x: -8 }, ponytailHair);
+    this.addVisual('Ponytail tie', 'sphere', { x: 0, y: .79, z: .34 }, { x: .17, y: .17, z: .17 }, accent, {}, ponytailHair);
+    this.addVisual('Ponytail', 'sphere', { x: 0, y: .62, z: .39 }, { x: .23, y: .4, z: .21 }, hair, { x: -8 }, ponytailHair);
     [-.2, 0, .2].forEach((z, index) => this.addVisual(`Mohawk crest ${index + 1}`, 'cone',
       { x: 0, y: 1.02, z }, { x: .16, y: .35 + (index === 1 ? .08 : 0), z: .16 }, hair, {}, mohawkHair));
     const longHairTop = this.addVisual('Long hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .48, y: .2, z: .46 }, hair, {}, longHair);
-    this.addVisual('Long hair back', 'sphere', { x: 0, y: .58, z: .3 }, { x: .43, y: .58, z: .2 }, hair, { x: -5 }, longHair);
+    this.addVisual('Long hair back', 'sphere', { x: 0, y: .62, z: .25 }, { x: .44, y: .6, z: .22 }, hair, { x: -5 }, longHair);
     for (const side of [-1, 1]) this.addVisual(`Long hair side ${side}`, 'sphere',
-      { x: side * .37, y: .62, z: .05 }, { x: .13, y: .46, z: .15 }, hair, { z: side * 5 }, longHair);
+      { x: side * .34, y: .65, z: .04 }, { x: .15, y: .48, z: .16 }, hair, { z: side * 5 }, longHair);
     this.addVisual('Trail bun hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, bunHair);
     this.addVisual('Trail bun', 'sphere', { x: 0, y: .96, z: .36 }, { x: .27, y: .27, z: .27 }, hair, {}, bunHair);
     const braidsTop = this.addVisual('Braids hair cap', 'sphere', { x: 0, y: .9, z: .03 }, { x: .47, y: .2, z: .45 }, hair, {}, braidsHair);
     for (const side of [-1, 1]) {
-      this.addVisual(`Braid ${side} upper`, 'cylinder', { x: side * .33, y: .57, z: .18 },
-        { x: .11, y: .48, z: .11 }, hair, { z: side * 5 }, braidsHair);
-      this.addVisual(`Braid ${side} end`, 'sphere', { x: side * .37, y: .31, z: .19 },
+      this.addVisual(`Braid ${side} upper`, 'cylinder', { x: side * .3, y: .62, z: .15 },
+        { x: .12, y: .52, z: .12 }, hair, { z: side * 5 }, braidsHair);
+      this.addVisual(`Braid ${side} end`, 'sphere', { x: side * .35, y: .33, z: .17 },
         { x: .13, y: .17, z: .13 }, hair, {}, braidsHair);
     }
     this.hairStyles = new Map([
@@ -363,32 +363,41 @@ export class Player {
     const fishingCap = new pc.Entity('Fishing cap accessory');
     const headlamp = new pc.Entity('Headlamp accessory');
     const scarf = new pc.Entity('Trail scarf accessory');
+    const bandana = new pc.Entity('Bandana accessory');
+    const neckGaiter = new pc.Entity('Neck gaiter accessory');
+    const necklace = new pc.Entity('Summit necklace accessory');
     const flowerCrown = new pc.Entity('Flower crown accessory');
     const goggles = new pc.Entity('Summit goggles accessory');
-    [beanie, glasses, trailHat, fishingCap, headlamp, scarf, flowerCrown, goggles]
+    [beanie, glasses, trailHat, fishingCap, headlamp, scarf, bandana, neckGaiter, necklace, flowerCrown, goggles]
       .forEach((root) => this.humanRig.addChild(root));
     this.addVisual('Beanie crown', 'cone', { x: 0, y: 1.0, z: 0 }, { x: .5, y: .34, z: .5 }, accessory, {}, beanie);
     this.addVisual('Beanie band', 'cylinder', { x: 0, y: .89, z: 0 }, { x: .51, y: .12, z: .51 }, accessory, {}, beanie);
-    this.addVisual('Left glasses frame', 'box', { x: -.13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, accessory, {}, glasses);
-    this.addVisual('Right glasses frame', 'box', { x: .13, y: .73, z: -.274 }, { x: .19, y: .14, z: .035 }, accessory, {}, glasses);
-    this.addVisual('Glasses bridge', 'box', { x: 0, y: .73, z: -.285 }, { x: .08, y: .025, z: .025 }, accessory, {}, glasses);
+    this.addVisual('Left glasses frame', 'box', { x: -.13, y: .73, z: -.252 }, { x: .19, y: .14, z: .035 }, accessory, {}, glasses);
+    this.addVisual('Right glasses frame', 'box', { x: .13, y: .73, z: -.252 }, { x: .19, y: .14, z: .035 }, accessory, {}, glasses);
+    this.addVisual('Glasses bridge', 'box', { x: 0, y: .73, z: -.262 }, { x: .08, y: .025, z: .025 }, accessory, {}, glasses);
     this.addVisual('Trail hat brim', 'box', { x: 0, y: .94, z: -.05 }, { x: .72, y: .055, z: .62 }, accessory, {}, trailHat);
     this.addVisual('Trail hat crown', 'cylinder', { x: 0, y: 1.06, z: .02 }, { x: .46, y: .24, z: .46 }, accessory, {}, trailHat);
     this.addVisual('Fishing cap crown', 'sphere', { x: 0, y: .96, z: .03 }, { x: .48, y: .21, z: .45 }, accessory, {}, fishingCap);
     this.addVisual('Fishing cap bill', 'box', { x: 0, y: .91, z: -.38 }, { x: .48, y: .055, z: .35 }, accessory, { x: -5 }, fishingCap);
     this.addVisual('Headlamp band', 'cylinder', { x: 0, y: .88, z: 0 }, { x: .49, y: .09, z: .49 }, accessory, {}, headlamp);
-    this.addVisual('Headlamp light', 'sphere', { x: 0, y: .89, z: -.46 }, { x: .14, y: .13, z: .11 }, accessory, {}, headlamp);
+    this.addVisual('Headlamp light', 'sphere', { x: 0, y: .89, z: -.27 }, { x: .14, y: .13, z: .11 }, accessory, {}, headlamp);
     this.addVisual('Scarf collar', 'cylinder', { x: 0, y: .44, z: 0 }, { x: .32, y: .17, z: .32 }, accessory, {}, scarf);
     this.addVisual('Scarf tail', 'box', { x: .17, y: .17, z: .25 }, { x: .18, y: .55, z: .1 }, accessory, { x: -12, z: -8 }, scarf);
+    this.addVisual('Bandana face cloth', 'box', { x: 0, y: .57, z: -.245 }, { x: .31, y: .18, z: .035 }, accessory, { x: 7 }, bandana);
+    this.addVisual('Bandana knot', 'sphere', { x: 0, y: .56, z: .23 }, { x: .11, y: .1, z: .09 }, accessory, {}, bandana);
+    this.addVisual('Neck gaiter', 'cylinder', { x: 0, y: .48, z: 0 }, { x: .3, y: .23, z: .3 }, accessory, {}, neckGaiter);
+    this.addVisual('Necklace cord', 'cylinder', { x: 0, y: .47, z: -.12 }, { x: .2, y: .035, z: .2 }, accessory, {}, necklace);
+    this.addVisual('Necklace pendant', 'sphere', { x: 0, y: .39, z: -.205 }, { x: .075, y: .1, z: .035 }, accessory, {}, necklace);
     this.addVisual('Flower crown band', 'cylinder', { x: 0, y: .91, z: 0 }, { x: .49, y: .06, z: .49 }, accessory, {}, flowerCrown);
     [-.3, -.15, 0, .15, .3].forEach((x, index) => this.addVisual(`Flower crown bloom ${index + 1}`, 'sphere',
-      { x, y: .98 + (index % 2) * .035, z: -.34 + Math.abs(x) * .2 }, { x: .1, y: .1, z: .08 }, accessory, {}, flowerCrown));
+      { x, y: .96 + (index % 2) * .03, z: -.23 + Math.abs(x) * .14 }, { x: .1, y: .1, z: .08 }, accessory, {}, flowerCrown));
     this.addVisual('Goggles left lens', 'sphere', { x: -.14, y: .75, z: -.285 }, { x: .17, y: .13, z: .045 }, dark, {}, goggles);
     this.addVisual('Goggles right lens', 'sphere', { x: .14, y: .75, z: -.285 }, { x: .17, y: .13, z: .045 }, dark, {}, goggles);
     this.addVisual('Goggles strap', 'cylinder', { x: 0, y: .76, z: 0 }, { x: .47, y: .055, z: .47 }, accessory, {}, goggles);
     this.accessories = new Map([
       ['beanie', beanie], ['glasses', glasses], ['trail-hat', trailHat], ['fishing-cap', fishingCap],
-      ['headlamp', headlamp], ['scarf', scarf], ['flower-crown', flowerCrown], ['goggles', goggles]
+      ['headlamp', headlamp], ['scarf', scarf], ['bandana', bandana], ['neck-gaiter', neckGaiter],
+      ['necklace', necklace], ['flower-crown', flowerCrown], ['goggles', goggles]
     ]);
 
     const backpackBody = this.addVisual(
@@ -398,7 +407,7 @@ export class Player {
       pack,
       { x: -7, y: 0, z: 0 }, this.humanRig
     );
-    const backpackFlap = this.addVisual('Backpack flap', 'box', { x: 0, y: 0.15, z: 0.495 }, { x: 0.45, y: 0.18, z: 0.05 }, accent, { x: -7 }, this.humanRig);
+    const backpackFlap = this.addVisual('Backpack flap', 'box', { x: 0, y: 0.15, z: 0.495 }, { x: 0.45, y: 0.18, z: 0.05 }, pack, { x: -7 }, this.humanRig);
     this.backAccessoryRoots = new Map([['backpack', [backpackBody, backpackFlap]]]);
 
     this.leftLimb = this.buildLimb('Left', jacket, skin, trousers, boots, this.humanRig);
@@ -431,6 +440,7 @@ export class Player {
     setMaterialColor(this.appearanceMaterials.trousers, resolved.pantsColorValue.color);
     setMaterialColor(this.appearanceMaterials.hair, resolved.hairColorValue.color);
     setMaterialColor(this.appearanceMaterials.accessory, resolved.accessoryColor);
+    setMaterialColor(this.appearanceMaterials.pack, resolved.backpackColorValue.color);
     setMaterialColor(this.appearanceMaterials.blobBlue, resolved.blobColor);
     this.humanRig.enabled = this.appearance.avatarType === 'human';
     this.blobRig.enabled = this.appearance.avatarType === 'blob';

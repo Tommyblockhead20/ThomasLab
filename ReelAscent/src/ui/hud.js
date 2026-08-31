@@ -18,8 +18,8 @@ export class Hud {
     this.debugPanel = document.querySelector('#debug-panel');
     this.gripPrompt = document.querySelector('#grip-prompt');
     this.fishPrompt = document.querySelector('#fish-prompt');
-    this.controlHints = Object.fromEntries(['move', 'sprint', 'jump', 'slide', 'grip', 'fish'].map((id) => [
-      id, document.querySelector(`[data-control-hint="${id}"] kbd`)
+    this.controlHints = Object.fromEntries(['move', 'sprint', 'jump', 'slide', 'grip', 'fish', 'inventory', 'journal', 'multiplayer', 'emotes', 'map'].map((id) => [
+      id, [...document.querySelectorAll(`[data-control-hint="${id}"] kbd, [data-control-key="${id}"]`)]
     ]));
     this.fishingPanel = document.querySelector('#fishing-panel');
     this.fishingZone = document.querySelector('#fishing-zone');
@@ -166,9 +166,16 @@ export class Hud {
       jump: formatInputCode(bindings.jump ?? 'Space'),
       slide: formatInputCode(bindings.slide ?? 'KeyC'),
       grip: `Click / ${gripKey}`,
-      fish: formatInputCode(bindings.fish ?? 'KeyF')
+      fish: formatInputCode(bindings.fish ?? 'KeyF'),
+      inventory: formatInputCode(bindings.inventory ?? 'KeyI'),
+      journal: formatInputCode(bindings.journal ?? 'KeyJ'),
+      multiplayer: formatInputCode(bindings.multiplayer ?? 'KeyM'),
+      emotes: formatInputCode(bindings.emotes ?? 'KeyE'),
+      map: formatInputCode(bindings.map ?? 'KeyV')
     };
-    for (const [id, keycap] of Object.entries(this.controlHints ?? {})) if (keycap) keycap.textContent = hintText[id];
+    for (const [id, keycaps] of Object.entries(this.controlHints ?? {})) {
+      for (const keycap of keycaps) keycap.textContent = hintText[id];
+    }
     this.gripPrompt.hidden = contextualAction !== 'grip';
     this.gripPrompt.innerHTML = playerState.movementState === 'climbing'
       ? `${playerState.climbMaterial ?? 'Rock'} • Release <kbd>Click / ${gripKey}</kbd> — Drop`

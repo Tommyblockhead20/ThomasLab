@@ -2137,6 +2137,17 @@ body.shop-open #game-shell::after,
 body.aquarium-open #game-shell::after,
 body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inset: 0; content: ""; background: rgb(2 13 15 / 64%); }
 .aquarium-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .5rem; }
+.shop-category-heading { display: flex; gap: .75rem; align-items: center; justify-content: space-between; }
+.shop-category-heading h3 { margin: 0; }
+.shop-category-heading button,
+.aquarium-economy button { padding: .5rem .65rem; color: #153a36; font-size: .56rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .42rem; cursor: pointer; }
+.shop-category-heading button:disabled,
+.aquarium-economy button:disabled { opacity: .45; cursor: default; }
+.shop-note { margin: .32rem 0 .55rem; color: rgb(234 244 231 / 58%); font-size: .52rem; }
+.aquarium-economy { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .48rem; margin-bottom: .8rem; }
+.aquarium-economy > div { display: grid; gap: .18rem; align-content: center; min-height: 3.4rem; padding: .55rem; background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .48rem; }
+.aquarium-economy small { color: #efd98b; font-size: .47rem; font-weight: 950; letter-spacing: .07em; }
+.aquarium-economy strong { font-size: .66rem; }
 .aquarium-content { display: grid; gap: 1rem; }
 .aquarium-content h3 { color: #efd98b; font-size: .64rem; letter-spacing: .08em; }
 
@@ -2449,6 +2460,8 @@ body.pause-open #game-shell::after {
 .pause-setting-list { display: grid; gap: .5rem; }
 .pause-setting-list label { display: flex; gap: .55rem; align-items: center; padding: .7rem; color: #edf6e9; font-size: .68rem; font-weight: 800; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 9%); border-radius: .48rem; cursor: pointer; }
 .pause-setting-list input { accent-color: #efd98b; }
+.pause-setting-list label > span { flex: 1; }
+.pause-setting-list select { padding: .38rem .48rem; color: #edf6e9; font: inherit; background: #153a36; border: 1px solid rgb(239 217 139 / 42%); border-radius: .38rem; }
 .keybind-list { display: grid; gap: .35rem; }
 .keybind-row { display: grid; grid-template-columns: minmax(9rem, 1fr) auto auto; gap: .65rem; align-items: center; padding: .55rem .62rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 9%); border-radius: .46rem; }
 .keybind-row.is-waiting { background: rgb(239 217 139 / 12%); border-color: rgb(239 217 139 / 58%); }
@@ -2458,6 +2471,7 @@ body.pause-open #game-shell::after {
 .keybind-row kbd { min-width: 4.4rem; text-align: center; }
 .pause-secondary-action { margin-top: .55rem; }
 body.hide-control-hints .controls-card { display: none; }
+body[data-ui-scale="compact"] :is(.pause-menu, .progression-shop, .mountain-map, .appearance-menu, .multiplayer-menu, .emote-menu) { font-size: .9em; }
 body.large-ui .pause-menu,
 body.large-ui .progression-shop,
 body.large-ui .mountain-map,
@@ -2465,6 +2479,10 @@ body.large-ui .appearance-menu,
 body.large-ui .multiplayer-menu,
 body.large-ui .emote-menu { font-size: 1.14em; }
 body.reduce-motion :is(.pause-menu, .progression-shop, .mountain-map, .appearance-menu, .multiplayer-menu, .emote-menu, .boat-travel, .catch-banner, .bite-prompt, .home-interaction-prompt, .grip-prompt, .fish-prompt) * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+body.large-context-prompts :is(.home-interaction-prompt, .grip-prompt, .fish-prompt, .bite-prompt) { font-size: 1.18em; transform-origin: center; }
+body.rhythm-high-contrast .rhythm-lane { background: rgb(0 0 0 / 72%); border-color: rgb(255 255 255 / 78%); }
+body.rhythm-high-contrast .rhythm-receptor { color: #071312; background: #fff; border-color: #fff; box-shadow: 0 0 0 3px #071312, 0 0 18px rgb(255 255 255 / 72%); }
+body.rhythm-high-contrast .rhythm-note { filter: saturate(1.4) contrast(1.45); outline: 2px solid #fff; }
 
 /* X/Interact now shares the same contextual-prompt footprint as Fish and Grip. */
 .home-interaction-prompt {

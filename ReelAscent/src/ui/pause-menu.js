@@ -48,6 +48,7 @@ export class PauseMenu {
     this.applyPreferences();
 
     this.onClick = (event) => this.handleClick(event);
+    this.onChange = (event) => this.handlePreferenceChange(event);
     this.onResumeClick = () => this.onResume();
     this.onKeyDown = (event) => {
       if (!this.isOpen || !this.awaitingBinding) return;
@@ -80,6 +81,7 @@ export class PauseMenu {
       this.fileInput.value = '';
     };
     this.screen?.addEventListener('click', this.onClick);
+    this.screen?.addEventListener('change', this.onChange);
     this.resumeButton?.addEventListener('click', this.onResumeClick);
     this.fileInput?.addEventListener('change', this.onFileChange);
     window.addEventListener('keydown', this.onKeyDown, true);
@@ -91,9 +93,13 @@ export class PauseMenu {
       return {
         showControlHints: saved.showControlHints !== false,
         reduceMotion: Boolean(saved.reduceMotion),
-        largeUi: Boolean(saved.largeUi)
+        uiScale: ['compact', 'normal', 'large'].includes(saved.uiScale)
+          ? saved.uiScale
+          : (saved.largeUi ? 'large' : 'normal'),
+        rhythmHighContrast: Boolean(saved.rhythmHighContrast),
+        largeContextPrompts: Boolean(saved.largeContextPrompts)
       };
-    } catch { return { showControlHints: true, reduceMotion: false, largeUi: false }; }
+    } catch { return { showControlHints: true, reduceMotion: false, uiScale: 'normal', rhythmHighContrast: false, largeContextPrompts: false }; }
   }
 
   savePreferences() {
@@ -104,7 +110,10 @@ export class PauseMenu {
   applyPreferences() {
     document.body.classList.toggle('hide-control-hints', !this.preferences.showControlHints);
     document.body.classList.toggle('reduce-motion', this.preferences.reduceMotion);
-    document.body.classList.toggle('large-ui', this.preferences.largeUi);
+    document.body.classList.toggle('large-ui', this.preferences.uiScale === 'large');
+    document.body.classList.toggle('rhythm-high-contrast', this.preferences.rhythmHighContrast);
+    document.body.classList.toggle('large-context-prompts', this.preferences.largeContextPrompts);
+    document.body.dataset.uiScale = this.preferences.uiScale;
   }
 
   setOpen(active) {
@@ -139,7 +148,7 @@ export class PauseMenu {
     const transfer = event.target.closest('[data-pause-progress-action]');
     if (transfer) return void this.handleProgressTransfer(transfer.dataset.pauseProgressAction);
     const preference = event.target.closest('[data-pause-preference]');
-    if (preference) {
+    if (preference?.type === 'checkbox') {
       this.preferences[preference.dataset.pausePreference] = Boolean(preference.checked);
       this.savePreferences();
       return;
@@ -157,6 +166,13 @@ export class PauseMenu {
       this.status.textContent = 'Gameplay bindings reset to defaults.';
       this.render();
     }
+  }
+
+  handlePreferenceChange(event) {
+    const preference = event.target.closest?.('[data-pause-preference]');
+    if (!preference || preference.type === 'checkbox') return;
+    this.preferences[preference.dataset.pausePreference] = preference.value;
+    this.savePreferences();
   }
 
   render() {
@@ -195,7 +211,7 @@ export class PauseMenu {
     const slotCards = this.progression.saveSystem.getSlotSummaries().map((slot) => {
       const date = slot.updatedAt ? new Date(slot.updatedAt).toLocaleString() : 'Unused';
       if (slot.empty) return `<article class="save-slot-card"><header><strong>${slot.label}</strong><span>EMPTY</span></header><button data-pause-slot-action="create" data-slot-id="${slot.id}">CREATE SAVE</button></article>`;
-      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'CURRENT' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} discovered</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} fish • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions">${slot.active ? '' : `<button data-pause-slot-action="select" data-slot-id="${slot.id}">LOAD</button>`}<button data-pause-slot-action="${slot.active ? 'reset' : 'delete'}" data-slot-id="${slot.id}">${slot.active ? 'RESET CURRENT SAVE' : 'DELETE'}</button></div></article>`;
+      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'CURRENT' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} discovered</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} fish • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions">${slot.active ? '' : `<button data-pause-slot-action="select" data-slot-id="${slot.id}">LOAD</button>`}<button data-pause-slot-action="${slot.active ? 'reset' : 'delete'}" data-slot-id="${slot.id}">${slot.active ? 'RESET CURRENT SAVE' : 'DELETE'}</button></div></article>`;
     }).join('');
     const options = this.progression.saveSystem.getSlotSummaries().map((slot) => `<option value="${slot.id}" ${slot.active ? 'selected' : ''}>${slot.label}${slot.empty ? ' (empty)' : slot.active ? ' (current)' : ''}</option>`).join('');
     return `<div class="save-data-content">${slotCards}</div><details class="progress-transfer"><summary>PORTABLE PROGRESS</summary><p>Export durable progress or import it into a chosen local slot.</p><textarea id="pause-progress-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste progress JSON here."></textarea><div class="progress-transfer-actions"><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="download">DOWNLOAD PROGRESS</button><button data-pause-progress-action="file">LOAD FILE</button><button data-pause-progress-action="import">IMPORT PROGRESS</button></div></details>`;
@@ -206,7 +222,12 @@ export class PauseMenu {
   }
 
   renderAccessibility() {
-    return `<div class="pause-setting-list"><label><input type="checkbox" data-pause-preference="reduceMotion" ${this.preferences.reduceMotion ? 'checked' : ''}> Reduce non-gameplay UI animation</label><label><input type="checkbox" data-pause-preference="largeUi" ${this.preferences.largeUi ? 'checked' : ''}> Larger menu/interface text</label></div>`;
+    return `<div class="pause-setting-list">
+      <label><span>Interface scale</span><select data-pause-preference="uiScale"><option value="compact" ${this.preferences.uiScale === 'compact' ? 'selected' : ''}>Compact</option><option value="normal" ${this.preferences.uiScale === 'normal' ? 'selected' : ''}>Normal</option><option value="large" ${this.preferences.uiScale === 'large' ? 'selected' : ''}>Large</option></select></label>
+      <label><input type="checkbox" data-pause-preference="reduceMotion" ${this.preferences.reduceMotion ? 'checked' : ''}> Reduce non-gameplay UI animation</label>
+      <label><input type="checkbox" data-pause-preference="rhythmHighContrast" ${this.preferences.rhythmHighContrast ? 'checked' : ''}> High-contrast rhythm lanes and notes</label>
+      <label><input type="checkbox" data-pause-preference="largeContextPrompts" ${this.preferences.largeContextPrompts ? 'checked' : ''}> Larger contextual action prompts</label>
+    </div>`;
   }
 
   renderKeybinds() {
@@ -258,6 +279,7 @@ export class PauseMenu {
 
   destroy() {
     this.screen?.removeEventListener('click', this.onClick);
+    this.screen?.removeEventListener('change', this.onChange);
     this.resumeButton?.removeEventListener('click', this.onResumeClick);
     this.fileInput?.removeEventListener('change', this.onFileChange);
     window.removeEventListener('keydown', this.onKeyDown, true);

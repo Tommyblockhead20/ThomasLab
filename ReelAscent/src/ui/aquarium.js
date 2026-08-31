@@ -8,6 +8,7 @@ export class AquariumMenu {
     this.screen = document.querySelector('#aquarium-menu');
     this.content = document.querySelector('#aquarium-content');
     this.count = document.querySelector('#aquarium-count');
+    this.status = document.querySelector('#aquarium-status');
     this.closeButton = document.querySelector('#close-aquarium');
     this.isOpen = false;
     this.renderedRevision = -1;
@@ -22,9 +23,13 @@ export class AquariumMenu {
     this.onClick = (event) => {
       const action = event.target.closest('[data-aquarium-action]');
       if (!action) return;
-      const result = action.dataset.aquariumAction === 'add'
-        ? this.progression.moveInventorySpecimenToAquarium(action.dataset.specimenId)
-        : this.progression.moveAquariumSpecimenToInventory(action.dataset.specimenId);
+      let result;
+      if (action.dataset.aquariumAction === 'upgrade') result = this.progression.purchaseAquariumCapacityUpgrade();
+      else if (action.dataset.aquariumAction === 'add') result = this.progression.moveInventorySpecimenToAquarium(action.dataset.specimenId);
+      else result = this.progression.moveAquariumSpecimenToInventory(action.dataset.specimenId);
+      this.status.textContent = result.ok
+        ? (result.capacity ? `Aquarium expanded to ${result.capacity} fish.` : 'Aquarium collection updated.')
+        : result.reason;
       if (result.ok) this.render(true);
     };
     this.onCloseClick = () => this.close();
@@ -51,12 +56,17 @@ export class AquariumMenu {
     this.screen.hidden = true;
     document.body.classList.remove('aquarium-open');
   }
-  update() { if (this.isOpen && this.renderedRevision !== this.progression.revision) this.render(); }
+  update() {
+    const income = this.progression.processAquariumIncome();
+    if (income.paid && this.status) this.status.textContent = `Aquarium visitors contributed $${income.paid}.`;
+    if (this.isOpen && this.renderedRevision !== this.progression.revision) this.render();
+  }
   render(force = false) {
     if (!this.isOpen || !this.content || (!force && this.renderedRevision === this.progression.revision)) return;
     const state = this.progression.getSnapshot();
     const specimens = state.aquarium ?? [];
-    this.count.textContent = `${specimens.length} retained`;
+    const economy = this.progression.getAquariumEconomy();
+    this.count.textContent = `${specimens.length} / ${economy.capacity} retained`;
     const displayed = specimens.length ? [...specimens].reverse().map((specimen) => (
       `<article class="aquarium-card" data-rarity="${escapeHtml(specimen.rarity.toLowerCase())}">
         <div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)} • ${escapeHtml(specimen.quality)}</small></div>
@@ -65,9 +75,13 @@ export class AquariumMenu {
       </article>`
     )).join('') : '<p class="shop-empty">No specimens displayed yet.</p>';
     const carried = state.inventory.length ? [...state.inventory].reverse().map((specimen) => (
-      `<article class="aquarium-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)}</small></div><button data-aquarium-action="add" data-specimen-id="${escapeHtml(specimen.specimenId)}">ADD TO AQUARIUM</button></article>`
+      `<article class="aquarium-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)}</small></div><button data-aquarium-action="add" data-specimen-id="${escapeHtml(specimen.specimenId)}" ${specimens.length >= economy.capacity ? 'disabled' : ''}>ADD TO AQUARIUM</button></article>`
     )).join('') : '<p class="shop-empty">No carried specimens available.</p>';
-    this.content.innerHTML = `<section><h3>SWIMMING DISPLAY</h3><div class="aquarium-card-grid">${displayed}</div></section><section><h3>CARRIED SPECIMENS</h3><div class="aquarium-card-grid">${carried}</div></section>`;
+    const nextUpgrade = economy.nextTier
+      ? `<button data-aquarium-action="upgrade" ${state.money < economy.nextTier.price ? 'disabled' : ''}>EXPAND TO ${economy.nextTier.capacity} • $${economy.nextTier.price}</button>`
+      : '<strong>MAXIMUM 300-FISH CAPACITY</strong>';
+    const remaining = Math.max(0, economy.intervalSeconds - economy.bankedActiveSeconds);
+    this.content.innerHTML = `<section class="aquarium-economy"><div><small>DISPLAY VALUE</small><strong>$${economy.exhibitedValue}</strong></div><div><small>VISITOR INCOME</small><strong>$${economy.payout} / 5 active min</strong></div><div><small>NEXT PAYOUT</small><strong>${Math.ceil(remaining)}s active play</strong></div><div>${nextUpgrade}</div></section><section><h3>SWIMMING DISPLAY</h3><div class="aquarium-card-grid">${displayed}</div></section><section><h3>CARRIED SPECIMENS</h3><div class="aquarium-card-grid">${carried}</div></section>`;
     this.renderedRevision = this.progression.revision;
   }
   destroy() {

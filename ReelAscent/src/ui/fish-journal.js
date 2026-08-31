@@ -1,3 +1,5 @@
+import { isBoundActionCode } from '../player/movement.js';
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -48,7 +50,7 @@ export class FishJournal {
         this.close();
         return;
       }
-      if (event.code !== 'KeyJ' || (!this.isOpen && OTHER_MODAL_OPEN())) return;
+      if (!isBoundActionCode('journal', event.code) || (!this.isOpen && OTHER_MODAL_OPEN())) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       this.toggle();

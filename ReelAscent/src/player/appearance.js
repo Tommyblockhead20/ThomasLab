@@ -1,6 +1,6 @@
 export const AVATAR_TYPES = Object.freeze([
   Object.freeze({ id: 'human', label: 'Human' }),
-  Object.freeze({ id: 'blob', label: 'Blue Blob' })
+  Object.freeze({ id: 'blob', label: 'Trail Blob' })
 ]);
 
 export const LEGACY_CHARACTER_PALETTE = Object.freeze({
@@ -35,7 +35,13 @@ export const SHIRT_COLORS = Object.freeze([
   Object.freeze({ id: 'cream', label: 'Trail Cream', color: [0.78, 0.72, 0.55] }),
   Object.freeze({ id: 'frost', label: 'Glacier Frost', color: [0.48, 0.72, 0.78] }),
   Object.freeze({ id: 'midnight', label: 'Midnight', color: [0.12, 0.16, 0.31] }),
-  Object.freeze({ id: 'rose', label: 'Alpine Rose', color: [0.68, 0.27, 0.38] })
+  Object.freeze({ id: 'rose', label: 'Alpine Rose', color: [0.68, 0.27, 0.38] }),
+  Object.freeze({ id: 'sky', label: 'Open Sky', color: [0.29, 0.61, 0.86] }),
+  Object.freeze({ id: 'lavender', label: 'Lavender', color: [0.58, 0.44, 0.72] }),
+  Object.freeze({ id: 'coral', label: 'Coral', color: [0.92, 0.39, 0.31] }),
+  Object.freeze({ id: 'spruce', label: 'Spruce', color: [0.08, 0.31, 0.25] }),
+  Object.freeze({ id: 'snow', label: 'Snow', color: [0.9, 0.91, 0.86] }),
+  Object.freeze({ id: 'sunbeam', label: 'Sunbeam', color: [0.96, 0.72, 0.16] })
 ]);
 
 export const PANTS_COLORS = Object.freeze([
@@ -46,7 +52,13 @@ export const PANTS_COLORS = Object.freeze([
   Object.freeze({ id: 'clay', label: 'Clay', color: [0.39, 0.25, 0.18] }),
   Object.freeze({ id: 'sage', label: 'Sage', color: [0.34, 0.4, 0.29] }),
   Object.freeze({ id: 'rust', label: 'Rust', color: [0.45, 0.2, 0.12] }),
-  Object.freeze({ id: 'sand', label: 'Trail Sand', color: [0.58, 0.49, 0.34] })
+  Object.freeze({ id: 'sand', label: 'Trail Sand', color: [0.58, 0.49, 0.34] }),
+  Object.freeze({ id: 'navy', label: 'Navy', color: [0.08, 0.15, 0.3] }),
+  Object.freeze({ id: 'slate', label: 'Slate', color: [0.3, 0.36, 0.4] }),
+  Object.freeze({ id: 'mulberry', label: 'Mulberry', color: [0.35, 0.16, 0.3] }),
+  Object.freeze({ id: 'olive', label: 'Olive', color: [0.35, 0.37, 0.16] }),
+  Object.freeze({ id: 'cloud', label: 'Cloud', color: [0.72, 0.75, 0.72] }),
+  Object.freeze({ id: 'black', label: 'Night Black', color: [0.045, 0.05, 0.055] })
 ]);
 
 export const HAIR_STYLES = Object.freeze([
@@ -69,7 +81,13 @@ export const HAIR_COLORS = Object.freeze([
   Object.freeze({ id: 'teal', label: 'Lake Teal', color: [0.05, 0.38, 0.4] }),
   Object.freeze({ id: 'black', label: 'Raven', color: [0.025, 0.03, 0.035] }),
   Object.freeze({ id: 'violet', label: 'Violet', color: [0.38, 0.18, 0.52] }),
-  Object.freeze({ id: 'pink', label: 'Wildflower', color: [0.72, 0.3, 0.48] })
+  Object.freeze({ id: 'pink', label: 'Wildflower', color: [0.72, 0.3, 0.48] }),
+  Object.freeze({ id: 'ash', label: 'Ash Brown', color: [0.33, 0.28, 0.23] }),
+  Object.freeze({ id: 'white', label: 'Snow White', color: [0.86, 0.87, 0.84] }),
+  Object.freeze({ id: 'blue', label: 'Deep Blue', color: [0.11, 0.23, 0.55] }),
+  Object.freeze({ id: 'green', label: 'Forest Green', color: [0.12, 0.36, 0.2] }),
+  Object.freeze({ id: 'rose-gold', label: 'Rose Gold', color: [0.72, 0.43, 0.37] }),
+  Object.freeze({ id: 'auburn', label: 'Auburn', color: [0.42, 0.12, 0.055] })
 ]);
 
 export const ACCESSORIES = Object.freeze([
@@ -80,6 +98,9 @@ export const ACCESSORIES = Object.freeze([
   Object.freeze({ id: 'fishing-cap', label: 'Fishing Cap' }),
   Object.freeze({ id: 'headlamp', label: 'Headlamp' }),
   Object.freeze({ id: 'scarf', label: 'Trail Scarf' }),
+  Object.freeze({ id: 'bandana', label: 'Bandana' }),
+  Object.freeze({ id: 'neck-gaiter', label: 'Neck Gaiter' }),
+  Object.freeze({ id: 'necklace', label: 'Summit Necklace' }),
   Object.freeze({ id: 'flower-crown', label: 'Flower Crown' }),
   Object.freeze({ id: 'goggles', label: 'Summit Goggles' })
 ]);
@@ -88,10 +109,42 @@ export const HEADWEAR = Object.freeze(ACCESSORIES.filter((entry) => (
   ['none', 'beanie', 'trail-hat', 'fishing-cap', 'headlamp', 'flower-crown'].includes(entry.id)
 )));
 export const EYEWEAR = Object.freeze(ACCESSORIES.filter((entry) => ['none', 'glasses', 'goggles'].includes(entry.id)));
-export const FACE_ACCESSORIES = Object.freeze(ACCESSORIES.filter((entry) => ['none', 'scarf'].includes(entry.id)));
+export const FACE_ACCESSORIES = Object.freeze(ACCESSORIES.filter((entry) => ['none', 'scarf', 'bandana', 'neck-gaiter', 'necklace'].includes(entry.id)));
 export const BACK_ACCESSORIES = Object.freeze([
   Object.freeze({ id: 'backpack', label: 'Trail Backpack' }),
   Object.freeze({ id: 'none', label: 'None' })
+]);
+
+export const BACKPACK_COLORS = Object.freeze([
+  Object.freeze({ id: 'classic-teal', label: 'Classic Teal', color: [0.18, 0.39, 0.34] }),
+  Object.freeze({ id: 'pine', label: 'Pine', color: [0.12, 0.29, 0.2] }),
+  Object.freeze({ id: 'orange', label: 'Expedition Orange', color: [0.82, 0.31, 0.12] }),
+  Object.freeze({ id: 'yellow', label: 'Rescue Yellow', color: [0.92, 0.68, 0.12] }),
+  Object.freeze({ id: 'red', label: 'Trail Red', color: [0.59, 0.12, 0.12] }),
+  Object.freeze({ id: 'blue', label: 'Lake Blue', color: [0.12, 0.32, 0.56] }),
+  Object.freeze({ id: 'navy', label: 'Navy', color: [0.07, 0.14, 0.27] }),
+  Object.freeze({ id: 'violet', label: 'Violet', color: [0.38, 0.2, 0.52] }),
+  Object.freeze({ id: 'rose', label: 'Rose', color: [0.64, 0.25, 0.37] }),
+  Object.freeze({ id: 'sand', label: 'Sand', color: [0.55, 0.46, 0.3] }),
+  Object.freeze({ id: 'white', label: 'Snow', color: [0.82, 0.84, 0.79] }),
+  Object.freeze({ id: 'charcoal', label: 'Charcoal', color: [0.13, 0.15, 0.16] }),
+  Object.freeze({ id: 'mint', label: 'Mint', color: [0.3, 0.66, 0.52] }),
+  Object.freeze({ id: 'coral', label: 'Coral', color: [0.86, 0.35, 0.3] })
+]);
+
+export const BLOB_COLORS = Object.freeze([
+  Object.freeze({ id: 'classic-blue', label: 'Classic Blue', color: [0.28, 0.72, 0.95] }),
+  Object.freeze({ id: 'aqua', label: 'Aqua', color: [0.18, 0.88, 0.78] }),
+  Object.freeze({ id: 'lime', label: 'Lime', color: [0.48, 0.86, 0.25] }),
+  Object.freeze({ id: 'sunny', label: 'Sunny', color: [0.96, 0.75, 0.18] }),
+  Object.freeze({ id: 'orange', label: 'Orange', color: [0.95, 0.43, 0.16] }),
+  Object.freeze({ id: 'coral', label: 'Coral', color: [0.94, 0.34, 0.38] }),
+  Object.freeze({ id: 'pink', label: 'Pink', color: [0.9, 0.4, 0.72] }),
+  Object.freeze({ id: 'violet', label: 'Violet', color: [0.58, 0.36, 0.9] }),
+  Object.freeze({ id: 'indigo', label: 'Indigo', color: [0.3, 0.35, 0.82] }),
+  Object.freeze({ id: 'silver', label: 'Silver', color: [0.7, 0.75, 0.78] }),
+  Object.freeze({ id: 'charcoal', label: 'Charcoal', color: [0.2, 0.25, 0.28] }),
+  Object.freeze({ id: 'cream', label: 'Cream', color: [0.9, 0.84, 0.63] })
 ]);
 
 // Full-crown hats replace the hair cap instead of occupying the same volume. Face and
@@ -128,6 +181,8 @@ export const DEFAULT_APPEARANCE = Object.freeze({
   eyewear: 'none',
   faceAccessory: 'none',
   backAccessory: 'backpack',
+  backpackColor: 'classic-teal',
+  blobColor: 'classic-blue',
   shirtTint: null,
   pantsTint: null,
   hairTint: null,
@@ -146,14 +201,18 @@ const OPTION_SETS = Object.freeze({
   headwear: new Set(HEADWEAR.map((entry) => entry.id)),
   eyewear: new Set(EYEWEAR.map((entry) => entry.id)),
   faceAccessory: new Set(FACE_ACCESSORIES.map((entry) => entry.id)),
-  backAccessory: new Set(BACK_ACCESSORIES.map((entry) => entry.id))
+  backAccessory: new Set(BACK_ACCESSORIES.map((entry) => entry.id)),
+  backpackColor: new Set(BACKPACK_COLORS.map((entry) => entry.id)),
+  blobColor: new Set(BLOB_COLORS.map((entry) => entry.id))
 });
 
 const CATALOGS = Object.freeze({
   skinTone: SKIN_TONES,
   shirtColor: SHIRT_COLORS,
   pantsColor: PANTS_COLORS,
-  hairColor: HAIR_COLORS
+  hairColor: HAIR_COLORS,
+  backpackColor: BACKPACK_COLORS,
+  blobColor: BLOB_COLORS
 });
 
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -213,6 +272,7 @@ export function resolveAppearance(value = {}) {
   const accessoryPreset = accessoryOption?.color
     ?? resolved.shirtColorValue.color.map((component) => Math.min(1, component * .72 + .08));
   resolved.accessoryColor = hexToColor(appearance.accessoryTint, accessoryPreset);
+  resolved.backpackColorValue = resolved.backpackColorValue ?? BACKPACK_COLORS[0];
   const classicTrailLook = appearance.shirtColor === 'classic-orange'
     && appearance.pantsColor === 'classic-trail'
     && appearance.headwear === 'beanie'
@@ -220,7 +280,7 @@ export function resolveAppearance(value = {}) {
   resolved.shirtAccentColor = classicTrailLook
     ? [...resolved.accessoryColor]
     : resolved.shirtColorValue.color.map((component) => Math.min(1, component * .72 + .08));
-  resolved.blobColor = hexToColor(appearance.blobTint, [0.28, 0.72, 0.95]);
+  resolved.blobColor = hexToColor(appearance.blobTint, resolved.blobColorValue.color);
   return resolved;
 }
 
@@ -230,8 +290,12 @@ const randomEntry = (catalog, random) => {
 };
 
 export function randomizeAppearance(random = Math.random) {
+  const avatarRoll = Math.max(0, Math.min(.999999, Number(random()) || 0));
+  const avatarType = avatarRoll < .96 ? 'human' : 'blob';
+  const colorfulBlob = avatarRoll >= .98;
+  const nonBlueBlobColors = BLOB_COLORS.filter((entry) => entry.id !== 'classic-blue');
   return normalizeAppearance({
-    avatarType: randomEntry(AVATAR_TYPES, random).id,
+    avatarType,
     skinTone: randomEntry(SKIN_TONES, random).id,
     shirtColor: randomEntry(SHIRT_COLORS, random).id,
     pantsColor: randomEntry(PANTS_COLORS, random).id,
@@ -242,6 +306,8 @@ export function randomizeAppearance(random = Math.random) {
     eyewear: randomEntry(EYEWEAR, random).id,
     faceAccessory: randomEntry(FACE_ACCESSORIES, random).id,
     backAccessory: randomEntry(BACK_ACCESSORIES, random).id,
+    backpackColor: randomEntry(BACKPACK_COLORS, random).id,
+    blobColor: colorfulBlob ? randomEntry(nonBlueBlobColors, random).id : 'classic-blue',
     shirtTint: null,
     pantsTint: null,
     hairTint: null,
