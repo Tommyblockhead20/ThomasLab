@@ -124,6 +124,7 @@ export class Game {
     this.fishingPerformance = new FishingPerformanceMenu(this.fishing);
     this.inventory = new InventoryMenu(this.progression, this.player);
     this.player.showInventorySpecimen(this.progression.getHeldInventorySpecimen());
+    this.player.showHeldEquipment(this.progression.getHeldEquipmentItem());
     this.appearanceMenu = new AppearanceMenu(this.progression, this.player);
     this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud, this.camera);
     this.shopMenu = new ShopMenu(this.progression);
@@ -138,7 +139,9 @@ export class Game {
           id: id.slice(-6).toUpperCase(),
           locationId: remote.locationId,
           position: remote.globalPosition ?? remote.lastSample
-        }))
+        })),
+      getHeldItemId: () => this.progression.getHeldWorldItemId(),
+      getCurrentLocationId: () => this.currentLocationId
     });
     this.boatTravel = new BoatTravelMenu((destinationId) => this.travelByBoat(destinationId));
     this.onOpenBoat = (event) => this.boatTravel.open(event.detail?.currentLocationId);
@@ -326,6 +329,10 @@ export class Game {
     const heldSpecimen = this.progression.getHeldInventorySpecimen();
     if ((this.player.heldInventorySpecimen?.specimenId ?? null) !== (heldSpecimen?.specimenId ?? null)) {
       this.player.showInventorySpecimen(heldSpecimen);
+    }
+    const heldEquipment = this.progression.getHeldEquipmentItem();
+    if ((this.player.heldEquipmentItem?.id ?? null) !== (heldEquipment?.id ?? null)) {
+      this.player.showHeldEquipment(heldEquipment);
     }
     this.inventory.update();
     this.shopMenu.update();

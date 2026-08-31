@@ -14,7 +14,9 @@ import { createContactRecovery, sampleContactRecovery } from './contact-recovery
 import { moveToward, PlayerInput, StaminaResource } from './movement.js';
 import { emoteDurationMs, EMOTE_IDS, normalizeEmote } from '../multiplayer/emotes.js';
 import { LEGACY_CHARACTER_PALETTE, hairVisibilityForHeadwear, normalizeAppearance, resolveAppearance } from './appearance.js';
-import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
+import { createSpecimenModel, destroySpecimenModel, positionSpecimenModel } from '../fishing/specimen-model.js';
+import { createCharacterModel } from './character-model.js';
+import { createHeldEquipmentModel, destroyHeldEquipmentModel } from './held-item-model.js';
 
 function makeMaterial(values, gloss = 0.12) {
   const material = new pc.StandardMaterial();
@@ -54,7 +56,6 @@ export function isPartialFootRestEligible(footSupport, state = {}) {
     && !state.hasMoveInput
     && !state.sprintHeld
     && !state.slideHeld
-    && !state.gripHeld
     && state.actualSpeed <= PLAYER_CONFIG.staminaPartialSupportMaximumSpeed);
 }
 
@@ -160,6 +161,8 @@ export class Player {
     this.appearance = normalizeAppearance(this.progression?.getAppearance?.());
     this.heldInventorySpecimen = null;
     this.inventorySpecimenModel = null;
+    this.heldEquipmentItem = null;
+    this.heldEquipmentModel = null;
     this.buildCharacter();
     this.buildMantleDebugMarkers();
     // The authored mascot mesh was a little over two meters tall. Keep its silhouette,
@@ -273,6 +276,24 @@ export class Player {
   }
 
   buildCharacter() {
+    // Local play, multiplayer, and the wardrobe preview all instantiate this same complete
+    // hierarchy. The legacy authored implementation remains below temporarily as a readable
+    // migration reference, but is no longer constructed.
+    this.characterModel = createCharacterModel(this.visualRoot, { name: 'Local player' });
+    this.humanRig = this.characterModel.humanRig;
+    this.blobRig = this.characterModel.blobRig;
+    this.appearanceMaterials = this.characterModel.materials;
+    this.hairStyles = this.characterModel.hairStyles;
+    this.hairTopParts = this.characterModel.hairTopParts;
+    this.accessories = this.characterModel.accessories;
+    this.backAccessoryRoots = this.characterModel.backAccessoryRoots;
+    this.leftLimb = this.characterModel.leftLimb;
+    this.rightLimb = this.characterModel.rightLimb;
+    this.leftHandAnchor = this.characterModel.leftHandAnchor;
+    this.rightHandAnchor = this.characterModel.rightHandAnchor;
+    this.applyAppearance(this.appearance);
+    return;
+
     const jacket = makeMaterial(COLORS.player);
     const accent = makeMaterial(COLORS.playerAccent);
     const skin = makeMaterial(LEGACY_CHARACTER_PALETTE.skin);
@@ -437,6 +458,10 @@ export class Player {
   }
 
   applyAppearance(value) {
+    if (this.characterModel) {
+      this.appearance = this.characterModel.setAppearance(value);
+      return this.getAppearance();
+    }
     this.appearance = normalizeAppearance(value);
     const resolved = resolveAppearance(this.appearance);
     setMaterialColor(this.appearanceMaterials.jacket, resolved.shirtColorValue.color);
@@ -477,16 +502,24 @@ export class Player {
     const model = createSpecimenModel(specimen, {
       name: `Held inventory specimen ${specimen.specimenId}`
     });
-    model.heldOffset = {
-      x: .45 + Math.min(4, (model.physicalLengthMeters ?? .5) * .42),
-      y: -.29,
-      z: -.42
-    };
-    model.root.setLocalPosition(model.heldOffset.x, model.heldOffset.y, model.heldOffset.z);
-    model.root.setLocalEulerAngles(-8, -18, -5);
-    this.visualRoot.addChild(model.root);
+    (this.rightHandAnchor ?? this.visualRoot).addChild(model.root);
+    model.heldOffset = positionSpecimenModel(model, 'held');
     this.inventorySpecimenModel = model;
     return this.heldInventorySpecimen;
+  }
+
+  showHeldEquipment(item = null) {
+    if (this.heldEquipmentItem?.id === item?.id && this.heldEquipmentModel) return this.heldEquipmentItem;
+    destroyHeldEquipmentModel(this.heldEquipmentModel);
+    this.heldEquipmentModel = null;
+    this.heldEquipmentItem = item?.usesHand ? { ...item } : null;
+    if (!this.heldEquipmentItem) return null;
+    this.heldEquipmentModel = createHeldEquipmentModel(
+      this.rightHandAnchor ?? this.visualRoot,
+      this.heldEquipmentItem.id,
+      { name: 'Local Hand slot' }
+    );
+    return this.heldEquipmentItem;
   }
 
   updateInventorySpecimenPose() {
@@ -504,6 +537,13 @@ export class Player {
       model.tailBaseEuler = base;
       model.tail.setLocalEulerAngles(base.x, base.y + Math.sin(this.motionTime * 4.8) * 9, base.z);
     }
+  }
+
+  updateHeldEquipmentPose() {
+    if (!this.heldEquipmentModel) return;
+    this.heldEquipmentModel.root.enabled = !this.fishing?.active
+      && !['fishing', 'climbing', 'mantling', 'sliding'].includes(this.movementState)
+      && !this.currentEmote;
   }
 
   getGroundSurfaceInfo() {
@@ -830,9 +870,12 @@ export class Player {
   updateStationaryContactRecovery(dt, footSupport, hasMoveInput) {
     const position = this.body.translation();
     const dx = position.x - this.stationaryProbePosition.x;
-    const dy = position.y - this.stationaryProbePosition.y;
     const dz = position.z - this.stationaryProbePosition.z;
-    const actualSpeed = dt > 0 ? Math.hypot(dx, dy, dz) / dt : 0;
+    // Rest eligibility uses planar drift. The kinematic capsule is continually nudged down
+    // into its support surface, so counting that tiny vertical correction made valid ledges
+    // look like movement; holding Grip happened to suppress the jitter and appeared to
+    // "enable" regeneration. Upward-facing foot probes still prevent airborne recovery.
+    const actualSpeed = dt > 0 ? Math.hypot(dx, dz) / dt : 0;
     this.stationaryProbePosition.set(position.x, position.y, position.z);
 
     const bodyContacts = this.getBodyContactInfo();
@@ -841,8 +884,7 @@ export class Player {
       && totalSamples >= PLAYER_CONFIG.stationaryContactMinimumSamples;
     const restingIntent = !hasMoveInput
       && !this.input.sprintHeld
-      && !this.input.slideHeld
-      && !this.input.gripHeld;
+      && !this.input.slideHeld;
     const physicallyStationary = actualSpeed <= PLAYER_CONFIG.stationaryContactMaximumSpeed;
     const eligible = hasMultipleContacts && restingIntent && physicallyStationary
       && this.movementState !== 'climbing'
@@ -1123,6 +1165,10 @@ export class Player {
     const legalGroundSupport = Boolean(this.grounded
       && surfaceNearFeet
       && groundSurface?.slopeDegrees <= PLAYER_CONFIG.staminaMaximumSupportSlopeDegrees);
+    if (!this.climbing.active && ['climbing', 'mantling'].includes(this.movementState)
+      && (legalGroundSupport || footSupport.stable) && !hasMoveInput) {
+      this.movementState = 'grounded';
+    }
     const normalFootRecovery = Boolean(this.grounded
       && !slidingDownSlope
       && !slideRecoveryActive
@@ -1133,7 +1179,6 @@ export class Player {
       hasMoveInput,
       sprintHeld: this.input.sprintHeld,
       slideHeld: this.input.slideHeld,
-      gripHeld: this.input.gripHeld,
       slidingDownSlope,
       slideRecoveryActive
     });
@@ -1830,6 +1875,7 @@ export class Player {
 
     this.applyCharacterPose(groundedMotion, slidingPose);
     this.updateInventorySpecimenPose();
+    this.updateHeldEquipmentPose();
   }
 
   applyCharacterPose(groundedMotion, slidingPose = false) {
@@ -1968,7 +2014,7 @@ export class Player {
       rightKnee = -12;
       leftArmRoll = -22;
       rightArmRoll = 22;
-    } else if (this.heldInventorySpecimen) {
+    } else if (this.heldInventorySpecimen || this.heldEquipmentItem) {
       leftShoulder = stride * 12;
       rightShoulder = 52;
       leftElbow = -8;
@@ -2228,6 +2274,10 @@ export class Player {
         length: Number(this.heldInventorySpecimen.length) || 0,
         weight: Number(this.heldInventorySpecimen.weight) || 0,
         shiny: Boolean(this.heldInventorySpecimen.shiny)
+      } : this.heldEquipmentItem ? {
+        type: 'equipment',
+        itemId: this.heldEquipmentItem.id,
+        name: this.heldEquipmentItem.name
       } : null,
       emote: this.currentEmote ? { ...this.currentEmote } : null,
       slideBraking: this.slideBraking,
@@ -2279,6 +2329,8 @@ export class Player {
   destroy() {
     destroySpecimenModel(this.inventorySpecimenModel);
     this.inventorySpecimenModel = null;
+    destroyHeldEquipmentModel(this.heldEquipmentModel);
+    this.heldEquipmentModel = null;
     this.mantleDebugMarkers?.root?.destroy();
     this.input.destroy();
   }

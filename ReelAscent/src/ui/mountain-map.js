@@ -1,5 +1,5 @@
 import {
-  WORLD_MAP_DISPLAY_RADIUS,
+  MAP_ITEM_BY_ID,
   compressWorldMapPosition
 } from '../world/world-locations.js';
 
@@ -9,18 +9,32 @@ const BLOCKING_CLASSES = Object.freeze([
 ]);
 
 export class MountainMapMenu {
-  constructor(mapData, { getLocalPlayer = () => null, getRemotePlayers = () => [] } = {}) {
+  constructor(mapData, {
+    getLocalPlayer = () => null,
+    getRemotePlayers = () => [],
+    getHeldItemId = () => null,
+    getCurrentLocationId = () => 'main-mountain'
+  } = {}) {
     this.screen = document.querySelector('#mountain-map');
     this.closeButton = document.querySelector('#close-mountain-map');
     this.svg = this.screen?.querySelector('.mountain-map-graphic') ?? null;
     this.legend = this.screen?.querySelector('[data-mountain-map-legend]') ?? null;
+    this.minimap = document.querySelector('#held-minimap');
+    this.minimapSvg = this.minimap?.querySelector('svg') ?? null;
+    this.minimapTitle = document.querySelector('#held-minimap-title');
+    this.minimapMode = document.querySelector('#held-minimap-mode');
     this.mapData = mapData;
     this.getLocalPlayer = getLocalPlayer;
     this.getRemotePlayers = getRemotePlayers;
+    this.getHeldItemId = getHeldItemId;
+    this.getCurrentLocationId = getCurrentLocationId;
     this.mode = 'paper';
     this.lastGpsRender = 0;
+    this.lastMinimapRender = 0;
+    this.minimapSignature = '';
     this.isOpen = false;
     this.previousFocus = null;
+    this.view = this.computeView();
     this.onOpenRequest = (event) => this.open(event.detail?.mode ?? 'paper');
     this.onCloseClick = () => this.close();
     this.onKeyDown = (event) => {
@@ -33,15 +47,42 @@ export class MountainMapMenu {
     window.addEventListener('keydown', this.onKeyDown, true);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.renderMap();
+    this.updateMinimap();
   }
 
   project(point) {
     const mapped = compressWorldMapPosition(point);
-    const scale = 220 / Math.max(1, WORLD_MAP_DISPLAY_RADIUS);
     return {
-      x: 260 + (mapped.x - this.mapData.center.x) * scale,
-      y: 260 + (mapped.z - this.mapData.center.z) * scale,
-      scale
+      x: 260 + (mapped.x - this.view.center.x) * this.view.scale,
+      y: 260 + (mapped.z - this.view.center.z) * this.view.scale,
+      scale: this.view.scale
+    };
+  }
+
+  computeView() {
+    const points = [];
+    const add = (point) => {
+      if (Number.isFinite(point?.x) && Number.isFinite(point?.z)) points.push(compressWorldMapPosition(point));
+    };
+    for (const contour of this.mapData?.contours ?? []) for (const point of contour.points ?? []) add(point);
+    for (const location of this.mapData?.locations ?? []) {
+      add(location.position);
+      for (const point of location.outline ?? []) add(point);
+      add(location.dock);
+      add(location.arrival);
+    }
+    for (const item of this.mapData?.docks ?? []) add(item.position);
+    for (const item of this.mapData?.caves ?? []) add(item.position);
+    for (const point of this.mapData?.cascade ?? []) add(point);
+    if (!points.length) return { center: { ...this.mapData.center }, scale: 1 };
+    const minX = Math.min(...points.map((point) => point.x));
+    const maxX = Math.max(...points.map((point) => point.x));
+    const minZ = Math.min(...points.map((point) => point.z));
+    const maxZ = Math.max(...points.map((point) => point.z));
+    const usableSize = 452;
+    return {
+      center: { x: (minX + maxX) * .5, z: (minZ + maxZ) * .5 },
+      scale: Math.min(usableSize / Math.max(1, maxX - minX), usableSize / Math.max(1, maxZ - minZ))
     };
   }
 
@@ -97,7 +138,8 @@ export class MountainMapMenu {
     const svg = this.svg;
     svg.replaceChildren();
     svg.appendChild(this.createSvg('rect', { width: 520, height: 520, rx: 18, class: 'map-paper' }));
-    const { scale } = this.project(this.mapData.center);
+    const mapCenter = this.project(this.mapData.center);
+    const { scale } = mapCenter;
     const outerMountain = this.mapData.contours[0];
 
     const defs = this.createSvg('defs');
@@ -107,11 +149,13 @@ export class MountainMapMenu {
     svg.appendChild(defs);
 
     const ocean = this.mapData.waters.find((water) => water.tier === 'ocean');
+    const oceanEdge = this.project({ x: this.mapData.center.x + ocean.outerRadius, z: this.mapData.center.z });
     svg.appendChild(this.createSvg('circle', {
-      cx: 260, cy: 260, r: (Math.min(ocean.outerRadius, WORLD_MAP_DISPLAY_RADIUS) * scale).toFixed(1), class: 'map-ocean'
+      cx: mapCenter.x.toFixed(1), cy: mapCenter.y.toFixed(1),
+      r: Math.abs(oceanEdge.x - mapCenter.x).toFixed(1), class: 'map-ocean'
     }));
     svg.appendChild(this.createSvg('circle', {
-      cx: 260, cy: 260, r: (ocean.innerRadius * scale).toFixed(1), class: 'map-shore'
+      cx: mapCenter.x.toFixed(1), cy: mapCenter.y.toFixed(1), r: (ocean.innerRadius * scale).toFixed(1), class: 'map-shore'
     }));
 
     const islandGroup = this.createSvg('g', { class: 'map-islands' });
@@ -254,6 +298,105 @@ export class MountainMapMenu {
     this.legend.replaceChildren(intro, elevationTitle, elevations, biomeTitle, biomes, symbolTitle, symbols, waterTitle, waters);
   }
 
+  minimapProject(point, location, range) {
+    const center = location.position;
+    const scale = 92 / Math.max(1, range);
+    return {
+      x: 110 + (point.x - center.x) * scale,
+      y: 110 + (point.z - center.z) * scale,
+      scale
+    };
+  }
+
+  renderMinimapBase(item, location) {
+    if (!this.minimapSvg) return;
+    const svg = this.minimapSvg;
+    const main = location.type === 'main-island';
+    const localWaters = this.mapData.waters.filter((water) => {
+      if (water.tier === 'ocean') return false;
+      const maximum = main ? 235 : 72;
+      return Math.hypot(water.center.x - location.position.x, water.center.z - location.position.z) <= maximum;
+    });
+    const range = main ? 218 : Math.max(
+      location.radii.x * 1.55,
+      location.radii.z * 1.55,
+      ...localWaters.map((water) => Math.max(...(water.radii ?? [0])) + 5)
+    );
+    this.minimapView = { item, location, range };
+    svg.replaceChildren(this.createSvg('rect', { width: 220, height: 220, rx: 14, class: 'minimap-paper' }));
+    if (main) {
+      const elevationClasses = ['map-elevation-coast', 'map-elevation-lower', 'map-elevation-middle', 'map-elevation-alpine', 'map-elevation-summit'];
+      this.mapData.contours.forEach((contour, index) => {
+        const points = contour.points.map((point) => {
+          const projected = this.minimapProject(point, location, range);
+          return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
+        }).join(' ');
+        svg.appendChild(this.createSvg('polygon', { points, class: `map-elevation ${elevationClasses[index]}` }));
+      });
+    } else if (location.outline?.length) {
+      const points = location.outline.map((point) => {
+        const projected = this.minimapProject(point, location, range);
+        return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
+      }).join(' ');
+      svg.appendChild(this.createSvg('polygon', { points, class: `minimap-island minimap-${location.type}` }));
+    }
+    for (const water of localWaters) {
+      const point = this.minimapProject(water.center, location, range);
+      svg.appendChild(this.createSvg('ellipse', {
+        cx: point.x.toFixed(1), cy: point.y.toFixed(1),
+        rx: Math.max(2.5, water.radii[0] * point.scale).toFixed(1),
+        ry: Math.max(2.2, water.radii[1] * point.scale).toFixed(1),
+        class: water.waterType === 'cold-ocean' ? 'minimap-water is-cold' : 'minimap-water'
+      }));
+    }
+    const dock = location.dock ? this.minimapProject(location.dock, location, range) : null;
+    if (dock) svg.appendChild(this.createSvg('circle', { cx: dock.x.toFixed(1), cy: dock.y.toFixed(1), r: 3, class: 'minimap-dock' }));
+    this.minimapGpsGroup = this.createSvg('g', { class: 'minimap-gps' });
+    svg.appendChild(this.minimapGpsGroup);
+    if (this.minimapTitle) this.minimapTitle.textContent = location.label;
+    if (this.minimapMode) this.minimapMode.textContent = item.mode === 'gps' ? 'GPS • SAME AREA' : 'PAPER • LOCAL';
+  }
+
+  renderMinimapGps() {
+    if (!this.minimapGpsGroup || this.minimapView?.item.mode !== 'gps') return;
+    this.minimapGpsGroup.replaceChildren();
+    const { location, range } = this.minimapView;
+    const locationId = location.id;
+    const players = [this.getLocalPlayer(), ...this.getRemotePlayers()]
+      .filter((player, index) => player?.position && (index === 0 || player.locationId === locationId));
+    players.forEach((player, index) => {
+      const point = this.minimapProject(player.position, location, range);
+      this.minimapGpsGroup.appendChild(this.createSvg('circle', {
+        cx: Math.min(214, Math.max(6, point.x)).toFixed(1),
+        cy: Math.min(214, Math.max(6, point.y)).toFixed(1),
+        r: index === 0 ? 4.2 : 3.2,
+        class: index === 0 ? 'is-local' : 'is-remote'
+      }));
+    });
+  }
+
+  updateMinimap(now = performance.now()) {
+    if (!this.minimap) return;
+    const item = MAP_ITEM_BY_ID.get(this.getHeldItemId());
+    const locationId = this.getCurrentLocationId();
+    const location = this.mapData.locations.find((entry) => entry.id === locationId);
+    const visible = Boolean(item && location && !this.isOpen);
+    this.minimap.hidden = !visible;
+    if (!visible) return;
+    const signature = `${item.id}:${location.id}`;
+    if (signature !== this.minimapSignature) {
+      this.minimapSignature = signature;
+      this.renderMinimapBase(item, location);
+      this.renderMinimapGps();
+      this.lastMinimapRender = now;
+      return;
+    }
+    if (item.mode === 'gps' && now - this.lastMinimapRender >= 180) {
+      this.lastMinimapRender = now;
+      this.renderMinimapGps();
+    }
+  }
+
   open(mode = 'paper') {
     if (!this.screen || this.isOpen || BLOCKING_CLASSES.some((name) => document.body.classList.contains(name))) return;
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -263,17 +406,23 @@ export class MountainMapMenu {
     const eyebrow = this.screen.querySelector('.eyebrow');
     const title = this.screen.querySelector('#mountain-map-title');
     if (eyebrow) eyebrow.textContent = this.mode === 'gps' ? 'RUGGED RECEIVER • LIVE GPS' : 'FOLD-OUT PAPER MAP • NO GPS';
-    if (title) title.textContent = this.mode === 'gps' ? 'Crooked Peak GPS Map' : 'Crooked Peak Paper Map';
-    this.renderMap();
+    if (title) title.textContent = this.mode === 'gps' ? 'Stoneveil Peak GPS Map' : 'Stoneveil Peak Paper Map';
     this.screen.hidden = false;
     document.body.classList.add('mountain-map-open');
     this.closeButton?.focus({ preventScroll: true });
+    requestAnimationFrame(() => {
+      if (!this.isOpen) return;
+      this.renderGpsPlayers();
+      this.renderLegend();
+    });
   }
 
   update(now = performance.now()) {
-    if (!this.isOpen || this.mode !== 'gps' || now - this.lastGpsRender < 180) return;
-    this.lastGpsRender = now;
-    this.renderGpsPlayers();
+    this.updateMinimap(now);
+    if (this.isOpen && this.mode === 'gps' && now - this.lastGpsRender >= 180) {
+      this.lastGpsRender = now;
+      this.renderGpsPlayers();
+    }
   }
 
   close() {
@@ -291,5 +440,6 @@ export class MountainMapMenu {
     window.removeEventListener('keydown', this.onKeyDown, true);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     document.body.classList.remove('mountain-map-open');
+    if (this.minimap) this.minimap.hidden = true;
   }
 }

@@ -9,6 +9,7 @@ export class AppearancePreview {
     this.canvas = canvas;
     this.app = null;
     this.avatar = null;
+    this.spinning = true;
     if (!canvas) return;
     try {
       this.app = new pc.Application(canvas, {
@@ -43,7 +44,7 @@ export class AppearancePreview {
       this.avatar.setLocalEulerAngles(0, -22, 0);
       this.app.on('update', () => {
         if (!this.avatar?.enabled) return;
-        this.avatar.rotateLocal(0, 7 / 60, 0);
+        if (this.spinning) this.avatar.rotateLocal(0, 7 / 60, 0);
         this.avatar.setMovementState?.('grounded', Date.now(), 0);
       });
       this.app.start();
@@ -59,6 +60,11 @@ export class AppearancePreview {
 
   setVisible(visible) {
     if (this.avatar) this.avatar.enabled = Boolean(visible);
+  }
+
+  setSpinning(spinning) {
+    this.spinning = Boolean(spinning);
+    return this.spinning;
   }
 
   destroy() {

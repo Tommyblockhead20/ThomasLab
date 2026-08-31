@@ -37,13 +37,14 @@ export const EQUIPMENT_CATALOG = Object.freeze([
   item('trail-boots', 'boots', 'Trail Boots', 0, 'Balanced starter boots.'),
   item('trail-gloves', 'gloves', 'Trail Gloves', 0, 'Balanced starter gloves.'),
   item('trail-kit', 'climbingTool', 'Trail Kit', 0, 'Standard climbing tool with no traversal bonus.'),
+  item('empty-chalk-loop', 'chalk', 'Empty Chalk Loop', 0, 'Starter belt loop with no stamina bonus.'),
   item('trail-harness', 'harness', 'Trail Harness', 0, 'Balanced starter harness and pack.'),
   item('trail-runners', 'boots', 'Trail Runners', 1250, 'Sprint speed increases by 15%.', { sprintSpeedMultiplier: 1.15 }),
   // Keep the durable id so existing saves migrate cleanly, but this is the v9 replacement item.
   item('endurance-belt', 'boots', 'Endurance Boots', 1750, 'Normal sprinting consumes no stamina.', { sprintDrain: 0 }),
   item('chalk-gloves', 'gloves', 'Climbing Gloves', 2000, 'Climbing and grip stamina costs decrease by 20%.', { gripDrain: .8 }),
-  item('climber-chalk', 'climbingTool', "Climber's Chalk", 5000, 'Climbing and grip stamina costs decrease by 30%.', { gripDrain: .7 }),
-  item('ice-axe', 'climbingTool', 'Ice Axe', 8500, 'On ice and smooth slippery rock: 25% less climb/grip stamina, reduced slip, and better slide stability.', { iceClimbCostMultiplier: .75, iceSlipMultiplier: .55, iceSlideThresholdMultiplier: 1.08 }),
+  item('climber-chalk', 'chalk', 'Chalk Bag', 5000, 'Climbing and grip stamina costs decrease by 30%.', { gripDrain: .7 }),
+  item('ice-axe', 'climbingTool', 'Ice Axe', 8500, 'Uses the Hand slot. On ice and smooth slippery rock: 25% less climb/grip stamina, reduced slip, and better slide stability.', { iceClimbCostMultiplier: .75, iceSlipMultiplier: .55, iceSlideThresholdMultiplier: 1.08 }, { usesHand: true }),
   item('alpine-harness', 'harness', 'Alpine Harness', 3500, 'Climbing and grip stamina costs decrease by 20%.', { climbCostMultiplier: .8 }),
   item('springstep-boots', 'boots', 'Springstep Boots', 4000, 'Jump impulse increases by 25%.', { jumpImpulseMultiplier: 1.25 }),
   item('summit-vault-boots', 'boots', 'Summit Vault Boots', 12000, 'Jump impulse increases by 50%.', { jumpImpulseMultiplier: 1.5 }),
@@ -65,7 +66,9 @@ export class EquipmentManager {
     const result = {};
     const state = this.getState();
     for (const itemId of Object.values(state.equipped)) {
-      const modifiers = EQUIPMENT_BY_ID.get(itemId)?.modifiers ?? {};
+      const equippedItem = EQUIPMENT_BY_ID.get(itemId);
+      if (equippedItem?.usesHand && state.heldItemId !== itemId) continue;
+      const modifiers = equippedItem?.modifiers ?? {};
       for (const [name, value] of Object.entries(modifiers)) {
         if (name === 'minimumSuccessfulQuality') {
           if ((QUALITY_RANK[value] ?? 0) > (QUALITY_RANK[result[name]] ?? 0)) result[name] = value;
@@ -99,7 +102,13 @@ export class EquipmentManager {
     const state = this.getState();
     const selected = EQUIPMENT_BY_ID.get(itemId);
     if (!selected || !state.ownedEquipment.includes(itemId)) return { ok: false, reason: 'Item not owned' };
+    const previous = EQUIPMENT_BY_ID.get(state.equipped[selected.category]);
     state.equipped[selected.category] = itemId;
+    if (previous?.usesHand && state.heldItemId === previous.id) state.heldItemId = null;
+    if (selected.usesHand) {
+      state.heldItemId = selected.id;
+      state.heldSpecimenId = null;
+    }
     this.commit();
     return { ok: true, item: selected };
   }

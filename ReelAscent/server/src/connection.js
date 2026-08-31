@@ -3,6 +3,7 @@ import { PlayerSession } from './player-session.js';
 import { validateSnapshot } from './snapshot-validation.js';
 
 const safeString = (value, max = 100) => typeof value === 'string' ? value.slice(0, max) : '';
+const safeDisplayName = (value) => safeString(value, 18).replace(/\s+/g, ' ').trim();
 
 export class ClientConnection {
   constructor(socket, roomManager) {
@@ -48,7 +49,7 @@ export class ClientConnection {
 
     switch (message.type) {
       case MESSAGE_TYPES.HOST_ROOM:
-        this.handleHost();
+        this.handleHost(message.payload);
         break;
       case MESSAGE_TYPES.JOIN_ROOM:
         this.handleJoin(message.payload);
@@ -86,6 +87,8 @@ export class ClientConnection {
         return;
       }
       this.session = restored;
+      restored.displayName = safeDisplayName(payload.displayName) || restored.displayName;
+      restored.room?.broadcastState();
       return;
     }
 
@@ -95,16 +98,19 @@ export class ClientConnection {
       return;
     }
     this.session = new PlayerSession(playerId, this.socket);
+    this.session.displayName = safeDisplayName(payload.displayName);
   }
 
-  handleHost() {
+  handleHost(payload = {}) {
     if (!this.rateLimit('room', 8, 10_000)) return;
+    this.session.displayName = safeDisplayName(payload.displayName) || this.session.displayName || 'Player';
     const result = this.roomManager.host(this.session);
     if (!result.ok) sendError(this.socket, result.code, result.message);
   }
 
   handleJoin(payload) {
     if (!this.rateLimit('room', 8, 10_000)) return;
+    this.session.displayName = safeDisplayName(payload.displayName) || this.session.displayName || 'Player';
     const result = this.roomManager.join(this.session, payload.roomCode);
     if (!result.ok) sendError(this.socket, result.code, result.message);
   }

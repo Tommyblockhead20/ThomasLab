@@ -41,16 +41,20 @@ export function createPlayerSnapshot(playerId, state, sequence) {
     startedAt: Number(state.emote.startedAt) || now,
     elapsedMs: Math.max(0, now - (Number(state.emote.startedAt) || now))
   } : null;
-  const heldItem = state.heldItem?.type === 'specimen' && state.heldItem.speciesId ? {
-    type: 'specimen',
-    specimenId: String(state.heldItem.specimenId ?? '').slice(0, 140),
-    speciesId: String(state.heldItem.speciesId).slice(0, 100),
-    name: String(state.heldItem.name ?? '').slice(0, 100),
-    rarity: String(state.heldItem.rarity ?? 'Common').slice(0, 24),
-    length: Number(state.heldItem.length) || 0,
-    weight: Number(state.heldItem.weight) || 0,
-    shiny: Boolean(state.heldItem.shiny)
-  } : null;
+  const heldItem = state.heldItem?.type === 'specimen' && state.heldItem.speciesId
+    ? {
+        type: 'specimen',
+        specimenId: String(state.heldItem.specimenId ?? '').slice(0, 140),
+        speciesId: String(state.heldItem.speciesId).slice(0, 100),
+        name: String(state.heldItem.name ?? '').slice(0, 100),
+        rarity: String(state.heldItem.rarity ?? 'Common').slice(0, 24),
+        length: Number(state.heldItem.length) || 0,
+        weight: Number(state.heldItem.weight) || 0,
+        shiny: Boolean(state.heldItem.shiny)
+      }
+    : state.heldItem?.type === 'equipment' && state.heldItem.itemId === 'ice-axe'
+      ? { type: 'equipment', itemId: 'ice-axe', name: 'Ice Axe' }
+      : null;
   return createProtocolMessage(MESSAGE_TYPES.PLAYER_SNAPSHOT, {
     playerId,
     sequence,

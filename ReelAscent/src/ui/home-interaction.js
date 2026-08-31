@@ -167,7 +167,7 @@ export class HomeInteractionController {
       this.player.setBenchSeat(interaction);
       this.camera?.setYaw?.(interaction.facingYaw);
       this.pendingSeat = { expiresAt: performance.now() + 1800 };
-      this.hud.showToast?.('Seated facing Crooked Peak Tarn • press F to fish • click the prompt to get up.');
+      this.hud.showToast?.('Seated facing Stoneveil Tarn • press F to fish • click the prompt to get up.');
       return true;
     }
     return false;

@@ -52,7 +52,7 @@ function specimenPreview(specimen) {
 
 const CATEGORY_LABELS = Object.freeze({
   rod: 'Rod', reel: 'Reel', line: 'Line', lure: 'Lure', guide: 'Ecology Guide',
-  boots: 'Boots', gloves: 'Gloves', climbingTool: 'Climbing Tool', harness: 'Harness / Pack'
+  boots: 'Boots', gloves: 'Gloves', climbingTool: 'Climbing Tool', chalk: 'Chalk Bag', harness: 'Harness / Pack'
 });
 
 export class InventoryMenu {
@@ -88,7 +88,6 @@ export class InventoryMenu {
         if (!item) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        this.progression.setHeldWorldItem(item.id);
         window.dispatchEvent(new CustomEvent('reel-ascent:open-map', { detail: { mode: item.mode } }));
       } else if (event.code === 'Escape' && this.isOpen) {
         event.preventDefault();
@@ -97,10 +96,18 @@ export class InventoryMenu {
       }
     };
     this.onClick = (event) => this.handleClick(event);
+    this.onChange = (event) => {
+      const select = event.target.closest?.('[data-inventory-equip-select]');
+      if (!select) return;
+      const result = this.progression.equip(select.value);
+      this.status.textContent = result.ok ? `${result.item.name} equipped in ${CATEGORY_LABELS[result.item.category]}.` : result.reason;
+      this.render(true, true);
+    };
     this.onCloseClick = () => this.close();
     this.onOpenClick = () => { if (!OTHER_MODAL_OPEN()) this.open(); };
     window.addEventListener('keydown', this.onKeyDown, true);
     this.screen?.addEventListener('click', this.onClick);
+    this.screen?.addEventListener('change', this.onChange);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.mobileButton?.addEventListener('click', this.onOpenClick);
   }
@@ -115,15 +122,33 @@ export class InventoryMenu {
       this.status.textContent = result.specimen ? `${result.specimen.name} is now displayed in your hand.` : 'Held specimen put away.';
       return this.render(true, true);
     }
+    const mapOpenButton = event.target.closest('[data-world-map-open]');
+    if (mapOpenButton) {
+      const item = MAP_ITEM_BY_ID.get(mapOpenButton.dataset.worldMapOpen);
+      if (!item) return;
+      this.close();
+      window.dispatchEvent(new CustomEvent('reel-ascent:open-map', { detail: { mode: item.mode } }));
+      return;
+    }
     const itemButton = event.target.closest('[data-world-item-action]');
     if (itemButton) {
       const item = MAP_ITEM_BY_ID.get(itemButton.dataset.worldItemAction);
-      const result = this.progression.setHeldWorldItem(item?.id);
-      if (result.ok && item) {
-        this.close();
-        window.dispatchEvent(new CustomEvent('reel-ascent:open-map', { detail: { mode: item.mode } }));
-      }
-      return;
+      const currentlyHeld = this.progression.getSnapshot().heldItemId === item?.id;
+      const result = this.progression.setHeldWorldItem(currentlyHeld ? null : item?.id);
+      this.status.textContent = result.ok && item
+        ? (currentlyHeld ? `${item.name} put away.` : `${item.name} equipped in the one Hand slot; local minimap enabled.`)
+        : result.reason;
+      return this.render(true, true);
+    }
+    const handEquipmentButton = event.target.closest('[data-hand-equipment]');
+    if (handEquipmentButton) {
+      const itemId = handEquipmentButton.dataset.handEquipment;
+      const currentlyHeld = this.progression.getSnapshot().heldItemId === itemId;
+      const result = this.progression.setHeldEquipmentItem(currentlyHeld ? null : itemId);
+      this.status.textContent = result.ok
+        ? (currentlyHeld ? 'Ice Axe put away; its terrain bonus is inactive.' : 'Ice Axe equipped in the one Hand slot.')
+        : result.reason;
+      return this.render(true, true);
     }
     const equipButton = event.target.closest('[data-inventory-equip]');
     if (equipButton) {
@@ -187,24 +212,38 @@ export class InventoryMenu {
 
   renderGear(state) {
     const maps = (state.ownedItems ?? []).map((id) => MAP_ITEM_BY_ID.get(id)).filter(Boolean).map((item) => (
-      `<article class="inventory-card inventory-item-card" data-held="${state.heldItemId === item.id}"><div class="inventory-item-icon">${item.mode === 'gps' ? '⌖' : '⌁'}</div><div><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.description)}</p></div><button type="button" data-world-item-action="${item.id}">${item.mode === 'gps' ? 'USE GPS MAP' : 'HOLD / READ MAP'}</button></article>`
+      `<article class="inventory-card inventory-item-card" data-held="${state.heldItemId === item.id}"><div class="inventory-item-icon">${item.mode === 'gps' ? '⌖' : '⌁'}</div><div><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.description)}</p></div><div class="inventory-item-actions"><button type="button" data-world-map-open="${item.id}">OPEN FULL MAP</button><button type="button" data-world-item-action="${item.id}">${state.heldItemId === item.id ? 'PUT AWAY' : 'EQUIP IN HAND'}</button></div></article>`
     )).join('');
     const equipment = Object.entries(CATEGORY_LABELS).map(([category, label]) => {
       const owned = EQUIPMENT_CATALOG.filter((item) => item.category === category && state.ownedEquipment.includes(item.id));
       if (!owned.length) return '';
-      const cards = owned.map((item) => {
-        const equipped = state.equipped[category] === item.id;
-        return `<article class="inventory-card gear-card ${equipped ? 'is-equipped' : ''}"><div class="inventory-card-heading"><strong>${escapeHtml(item.name)}</strong><small>${equipped ? 'EQUIPPED' : 'OWNED'}</small></div><p>${escapeHtml(item.effect)}</p><button type="button" data-inventory-equip="${item.id}" ${equipped ? 'disabled' : ''}>${equipped ? 'EQUIPPED' : 'EQUIP'}</button></article>`;
-      }).join('');
-      return `<section class="inventory-gear-group"><h3>${label}</h3><div class="inventory-gear-row">${cards}</div></section>`;
+      const equipped = owned.find((item) => item.id === state.equipped[category]) ?? owned[0];
+      const options = owned.map((item) => `<option value="${item.id}" ${item.id === equipped.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
+      const worn = ['boots', 'gloves', 'chalk', 'harness'].includes(category) ? 'WORN' : 'EQUIPPED';
+      return `<section class="inventory-gear-group inventory-equipment-slot"><h3>${label}<small>${worn}</small></h3><label><span>${escapeHtml(equipped.name)}</span><select data-inventory-equip-select="${category}" aria-label="Equip ${escapeHtml(label)}">${options}</select><p>${escapeHtml(equipped.effect)}</p></label></section>`;
     }).join('');
-    return `${maps ? `<section class="inventory-gear-group"><h3>Maps</h3><div class="inventory-gear-row">${maps}</div></section>` : ''}${equipment}`
+    const heldSpecimen = (state.inventory ?? []).find((entry) => entry.specimenId === state.heldSpecimenId);
+    const heldMap = MAP_ITEM_BY_ID.get(state.heldItemId);
+    const equippedHandTool = EQUIPMENT_CATALOG.find((item) => item.usesHand && item.id === state.equipped.climbingTool);
+    const heldTool = EQUIPMENT_CATALOG.find((item) => item.usesHand && item.id === state.heldItemId);
+    const handLabel = heldSpecimen?.name ?? heldMap?.name ?? heldTool?.name ?? 'Empty';
+    const handDetail = heldSpecimen
+      ? `${heldSpecimen.length.toFixed(1)} in specimen`
+      : heldMap ? 'Hand map • corner minimap active'
+        : heldTool ? 'Handheld climbing tool • terrain bonus active'
+          : 'Equip one specimen, map, or handheld tool';
+    const toolAction = equippedHandTool
+      ? `<button type="button" data-hand-equipment="${equippedHandTool.id}">${heldTool ? 'PUT TOOL AWAY' : 'EQUIP TOOL IN HAND'}</button>`
+      : '';
+    const hand = `<section class="inventory-gear-group inventory-hand-group"><h3>Hand • exactly one slot</h3><div class="inventory-hand-slot"><strong>${escapeHtml(handLabel)}</strong><small>${escapeHtml(handDetail)}</small>${toolAction}</div></section>`;
+    return `${hand}${maps ? `<section class="inventory-gear-group"><h3>Maps</h3><div class="inventory-gear-row">${maps}</div></section>` : ''}${equipment}`
       || "<p class=\"shop-empty\">No gear yet. Visit Outfitter's Reach.</p>";
   }
 
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown, true);
     this.screen?.removeEventListener('click', this.onClick);
+    this.screen?.removeEventListener('change', this.onChange);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.mobileButton?.removeEventListener('click', this.onOpenClick);
     document.body.classList.remove('inventory-open');

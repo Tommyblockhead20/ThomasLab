@@ -31,8 +31,8 @@
         outline-offset: 2px;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-DtPWNiPM.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BuxYsX0O.css">
+    <script type="module" crossorigin src="./assets/index-DuK10GFJ.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DBDjJWu_.css">
   </head>
   <body>
     <main id="game-shell">
@@ -190,6 +190,11 @@
         <output id="cheat-activation" class="cheat-activation" hidden aria-live="polite"></output>
       </section>
 
+      <section id="held-minimap" class="held-minimap" hidden aria-label="Held map minimap">
+        <header><strong id="held-minimap-title">LOCAL MAP</strong><span id="held-minimap-mode">PAPER</span></header>
+        <svg viewBox="0 0 220 220" role="img" aria-label="Map of the current loaded location only"></svg>
+      </section>
+
 
       <section id="pause-menu" class="pause-menu" role="dialog" aria-modal="true" hidden aria-labelledby="pause-title">
         <header class="pause-header">
@@ -199,8 +204,7 @@
         <nav id="pause-tabs" class="pause-tabs" aria-label="Pause sections">
           <button type="button" data-pause-tab="stats" aria-pressed="true">STATS</button>
           <button type="button" data-pause-tab="save-data" aria-pressed="false">SAVE / DATA</button>
-          <button type="button" data-pause-tab="settings" aria-pressed="false">SETTINGS</button>
-          <button type="button" data-pause-tab="accessibility" aria-pressed="false">ACCESSIBILITY</button>
+          <button type="button" data-pause-tab="settings" aria-pressed="false">SETTINGS / ACCESSIBILITY</button>
           <button type="button" data-pause-tab="keybinds" aria-pressed="false">KEY REBINDING</button>
           <button type="button" data-pause-open-multiplayer>MULTIPLAYER</button>
         </nav>
@@ -248,7 +252,7 @@
 
       <section id="aquarium-menu" class="progression-shop aquarium-menu" role="dialog" aria-modal="true" hidden aria-labelledby="aquarium-title">
         <header class="shop-header"><div><span class="eyebrow">AQUARIUM ISLAND</span><h2 id="aquarium-title">Public Aquarium Collection</h2></div><strong id="aquarium-count">0 retained</strong><button id="close-aquarium" type="button">CLOSE <kbd>Esc</kbd></button></header>
-        <p class="shop-status">Add carried specimens to the swimming display or return displayed fish to Inventory.</p>
+        <p id="aquarium-status" class="shop-status" aria-live="polite">Add carried specimens to the swimming display or return displayed fish to Inventory.</p>
         <div id="aquarium-content" class="aquarium-content"></div>
       </section>
 
@@ -262,19 +266,23 @@
       <section id="appearance-menu" class="appearance-menu" role="dialog" aria-modal="true" hidden aria-labelledby="appearance-title">
         <header>
           <div><span class="eyebrow">CABIN WARDROBE • SAVED LOCALLY</span><h2 id="appearance-title">Character Appearance</h2></div>
-          <button id="close-appearance" type="button">CLOSE <kbd>Esc</kbd></button>
+          <div class="appearance-header-actions">
+            <button id="randomize-appearance" type="button">RANDOMIZE LOOK</button>
+            <button id="reset-appearance" type="button">RESET TO DEFAULT</button>
+            <button id="close-appearance" type="button">CLOSE <kbd>Esc</kbd></button>
+          </div>
         </header>
         <div class="appearance-toolbar">
           <p id="appearance-status" class="appearance-status" aria-live="polite">The classic orange-and-yellow climber is the default. Blue Blob remains an optional cosmetic.</p>
-          <div class="appearance-toolbar-actions">
-            <button id="randomize-appearance" type="button">RANDOMIZE LOOK</button>
-            <button id="reset-appearance" type="button">RESET TO DEFAULT</button>
-          </div>
         </div>
+        <nav class="appearance-tabs" aria-label="Appearance sections">
+          <button type="button" data-appearance-tab="body" aria-pressed="true">BODY &amp; COLORS</button>
+          <button type="button" data-appearance-tab="accessories" aria-pressed="false">ACCESSORIES</button>
+        </nav>
         <div class="appearance-layout">
           <figure class="appearance-preview">
             <canvas id="appearance-preview-canvas" aria-label="Live rotating full-body character preview"></canvas>
-            <figcaption>LIVE MODEL • YOUR MULTIPLAYER LOOK</figcaption>
+            <button id="toggle-preview-spin" class="appearance-spin-toggle" type="button" aria-pressed="false">PAUSE ROTATION</button>
           </figure>
           <div id="appearance-content" class="appearance-content"></div>
         </div>
@@ -282,11 +290,11 @@
 
       <section id="mountain-map" class="mountain-map" role="dialog" aria-modal="true" hidden aria-labelledby="mountain-map-title">
         <header>
-          <div><span class="eyebrow">FIELD PACK • NO GPS</span><h2 id="mountain-map-title">Crooked Peak Trail Map</h2></div>
+          <div><span class="eyebrow">FIELD PACK • NO GPS</span><h2 id="mountain-map-title">Stoneveil Peak Trail Map</h2></div>
           <button id="close-mountain-map" type="button">CLOSE <kbd>Esc</kbd></button>
         </header>
         <div class="mountain-map-layout">
-          <svg class="mountain-map-graphic" viewBox="0 0 520 520" role="img" aria-label="Data-derived topographic map of the actual Crooked Peak mountain, waters, caves, biomes, and landmarks"></svg>
+          <svg class="mountain-map-graphic" viewBox="0 0 520 520" role="img" aria-label="Data-derived topographic map of Stoneveil Peak, waters, caves, biomes, and landmarks"></svg>
           <aside data-mountain-map-legend></aside>
         </div>
       </section>

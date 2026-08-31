@@ -1,5 +1,5 @@
 import { getCatchValue } from './economy.js';
-import { EQUIPMENT_CATALOG, EquipmentManager } from './equipment.js';
+import { EQUIPMENT_BY_ID, EQUIPMENT_CATALOG, EquipmentManager } from './equipment.js';
 import {
   AQUARIUM_CAPACITY_TIERS,
   AQUARIUM_PAYOUT_INTERVAL_SECONDS,
@@ -210,6 +210,15 @@ export class ProgressionSystem {
     return this.state.ownedItems.includes(itemId);
   }
 
+  getHeldWorldItemId() {
+    return this.state.heldItemId ?? null;
+  }
+
+  getHeldEquipmentItem() {
+    const item = EQUIPMENT_BY_ID.get(this.state.heldItemId);
+    return item?.usesHand ? item : null;
+  }
+
   getPurchaseProgress() {
     const purchasableEquipment = EQUIPMENT_CATALOG.filter((item) => item.price > 0);
     const purchasableWorldItems = MAP_ITEMS.filter((item) => item.price > 0);
@@ -230,6 +239,24 @@ export class ProgressionSystem {
     if (!item || !this.ownsWorldItem(itemId)) return { ok: false, reason: 'Item not owned' };
     if (itemId === this.state.heldItemId) return { ok: true, item };
     this.state.heldItemId = itemId;
+    this.state.heldSpecimenId = null;
+    this.commit();
+    return { ok: true, item };
+  }
+
+  setHeldEquipmentItem(itemId = null) {
+    if (itemId === null) {
+      if (!this.getHeldEquipmentItem()) return { ok: true, item: null };
+      this.state.heldItemId = null;
+      this.commit();
+      return { ok: true, item: null };
+    }
+    const item = EQUIPMENT_BY_ID.get(itemId);
+    if (!item?.usesHand || !this.state.ownedEquipment.includes(itemId)) {
+      return { ok: false, reason: 'Handheld equipment not owned' };
+    }
+    this.state.equipped[item.category] = item.id;
+    this.state.heldItemId = item.id;
     this.state.heldSpecimenId = null;
     this.commit();
     return { ok: true, item };

@@ -10,7 +10,10 @@ import { calculateEyeAttachment } from './creature-presentation.js';
 import { calculateCatchGroundLift, catchGroundSamplePoints } from './presentation-grounding.js';
 import { createFishingPerformanceSnapshot, FishingPerformanceHistory } from './fishing-performance.js';
 import { RHYTHM_SCALE_SEMITONES, RhythmSession } from './rhythm-session.js';
+import { getAudioGain } from '../audio/settings.js';
 import { hasSeenHookTutorial, markHookTutorialSeen } from './tutorial-state.js';
+import { createFishingRodModel } from './rod-model.js';
+import { createSpecimenModel, destroySpecimenModel, positionSpecimenModel } from './specimen-model.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -348,7 +351,10 @@ class FishingAudio {
       const gain = context.createGain();
       source.buffer = buffer;
       source.playbackRate.setValueAtTime(options.playbackRate ?? 1, context.currentTime);
-      gain.gain.setValueAtTime(Math.max(.0001, options.volume ?? .18), context.currentTime);
+      gain.gain.setValueAtTime(
+        Math.max(.0001, (options.volume ?? .18) * getAudioGain(options.category ?? 'sfx')),
+        context.currentTime
+      );
       source.connect(gain).connect(this.getSampleOutput(context));
       source.start(context.currentTime + (options.offset ?? 0));
       return true;
@@ -429,7 +435,7 @@ class FishingAudio {
         soft: { engine: 'breath', partials: [[1, 1], [2, .035], [3, .012]], cutoff: 1550, volume: .043, attack: .02, noise: .025, noiseHz: 1000 }
       };
       const profile = profiles[preset] ?? profiles.soft;
-      const peak = options.volume ?? profile.volume;
+      const peak = (options.volume ?? profile.volume) * getAudioGain(options.category ?? 'sfx');
 
       if (profile.engine === 'string') {
         const source = context.createBufferSource();
@@ -546,11 +552,11 @@ class FishingAudio {
     // Keep the beat understated so the species instrument remains the musical focus.
     const buffer = this.accentBuffers.get('woodblock');
     if (buffer) {
-      this.playBuffer(buffer, { volume: accent ? .055 : .032 });
+      this.playBuffer(buffer, { volume: accent ? .055 : .032, category: 'rhythm' });
       return;
     }
     void this.prepareAccents();
-    this.tone(accent ? 260 : 210, 0.045, 0, accent ? 'wood' : 'muted', { volume: accent ? .018 : .01 });
+    this.tone(accent ? 260 : 210, 0.045, 0, accent ? 'wood' : 'muted', { volume: accent ? .018 : .01, category: 'rhythm' });
   }
 
   rhythmHit(fish, degree, perfect) {
@@ -559,7 +565,7 @@ class FishingAudio {
     // RhythmSession, not the sample pitch, so every species retains its recognizable scale tune.
     const scheduleLead = .014;
     if (instrument !== 'handpan'
-      && this.playRecordedNote(instrument, degree, { volume: perfect ? .25 : .21, offset: scheduleLead })) return;
+      && this.playRecordedNote(instrument, degree, { volume: perfect ? .25 : .21, offset: scheduleLead, category: 'rhythm' })) return;
 
     // First-note/network fallback only: preserve playability if a sample has not decoded yet.
     const root = fish?.rhythm.root ?? 55;
@@ -570,18 +576,18 @@ class FishingAudio {
       instrument === 'handpan' ? (perfect ? .18 : .15) : (perfect ? .13 : .1),
       scheduleLead,
       instrument === 'handpan' ? 'handpan' : 'soft',
-      { volume: perfect ? .045 : .035 }
+      { volume: perfect ? .045 : .035, category: 'rhythm' }
     );
   }
 
   rhythmMiss() {
-    this.tone(120, 0.09, 0, 'muted', { volume: .045 });
-    this.tone(88, .13, .025, 'bass', { volume: .035 });
+    this.tone(120, 0.09, 0, 'muted', { volume: .045, category: 'rhythm' });
+    this.tone(88, .13, .025, 'bass', { volume: .035, category: 'rhythm' });
   }
 
   danger() {
-    this.tone(105, .18, 0, 'bass');
-    this.tone(155, .14, .18, 'muted');
+    this.tone(105, .18, 0, 'bass', { category: 'rhythm' });
+    this.tone(155, .14, .18, 'muted', { category: 'rhythm' });
   }
 }
 
@@ -728,29 +734,12 @@ export class FishingController {
   }
 
   buildVisuals() {
-    this.rodRoot = new pc.Entity('Fishing rod');
+    this.rodModel = createFishingRodModel(this.player.rightHandAnchor ?? this.player.visualRoot, { name: 'Fishing rod' });
+    this.rodRoot = this.rodModel.root;
     this.rodRoot.enabled = false;
-    this.rodRoot.setLocalPosition(0.42, 0.22, -0.26);
+    this.rodRoot.setLocalPosition(.02, -.02, -.08);
     this.rodRoot.setLocalEulerAngles(-32, 0, 8);
-    this.player.visualRoot.addChild(this.rodRoot);
-    const rodLength = 1.56;
-    addPrimitive(
-      this.rodRoot, 'Rod shaft', 'cylinder',
-      { x: 0, y: rodLength * .5, z: 0 }, { x: 0.055, y: rodLength, z: 0.055 },
-      makeMaterial([0.17, 0.12, 0.08], { gloss: 0.45 })
-    );
-    // Keep the line anchor literally on the visible guide at the end of the shaft. The old
-    // guide sat well beyond the cylinder's actual end, creating the 1–2 ft visual gap.
-    this.rodTipAnchor = addPrimitive(
-      this.rodRoot, 'Rod tip line guide', 'cylinder',
-      { x: 0, y: rodLength, z: 0 }, { x: .052, y: .018, z: .052 },
-      makeMaterial([.22, .24, .22], { gloss: .72 }), { x: 90 }
-    );
-    addPrimitive(
-      this.rodRoot, 'Rod reel', 'cylinder',
-      { x: 0.09, y: 0.1, z: 0 }, { x: 0.18, y: 0.08, z: 0.18 },
-      makeMaterial([0.85, 0.62, 0.2], { gloss: 0.65 }), { z: 90 }
-    );
+    this.rodTipAnchor = this.rodModel.tipAnchor;
 
     this.bobberRoot = new pc.Entity('Fishing bobber');
     this.bobberRoot.enabled = false;
@@ -2876,7 +2865,14 @@ export class FishingController {
     const girth = displayedLength * .24 * fish.visual.depth * displayMetrics.girthMultiplier;
     const width = displayedLength * .24 * fish.visual.depth * fish.visual.width
       * displayMetrics.widthMultiplier;
-    this.configureCaughtCreature(fish, displayedLength, girth, width, bodyLength);
+    // Catch, Inventory Hand, remote Hand/catch, and Aquarium all use this canonical factory.
+    // Keep the older authored rigs available to the developer gallery, but never substitute
+    // one of them for an actual caught specimen.
+    for (const root of Object.values(this.catchCreatureRigs ?? {})) root.enabled = false;
+    destroySpecimenModel(this.catchSpecimenModel);
+    this.catchSpecimenModel = createSpecimenModel(fish, { name: `Caught ${fish.speciesId}` });
+    this.catchFish.addChild(this.catchSpecimenModel.root);
+    positionSpecimenModel(this.catchSpecimenModel, 'catch');
 
     this.catchFishSparkles.forEach((sparkle, index) => {
       sparkle.enabled = shiny;
@@ -3184,5 +3180,7 @@ export class FishingController {
     window.removeEventListener('keydown', this.onDebugKeyDown);
     delete window.REEL_ASCENT_CREATURE_GALLERY;
     document.body.classList.remove('fish-gallery');
+    destroySpecimenModel(this.catchSpecimenModel);
+    this.catchSpecimenModel = null;
   }
 }

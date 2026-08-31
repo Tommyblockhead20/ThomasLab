@@ -13,6 +13,7 @@ export class PlayerSession {
     this.lastSequence = -1;
     this.lastSnapshot = null;
     this.fishingState = null;
+    this.displayName = '';
     this.rateLimiter = new RateLimiter();
   }
 

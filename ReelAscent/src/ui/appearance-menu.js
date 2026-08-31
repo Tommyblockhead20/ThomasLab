@@ -58,6 +58,7 @@ export class AppearanceMenu {
     this.closeButton = document.querySelector('#close-appearance');
     this.randomizeButton = document.querySelector('#randomize-appearance');
     this.resetButton = document.querySelector('#reset-appearance');
+    this.spinButton = document.querySelector('#toggle-preview-spin');
     this.preview = new AppearancePreview(document.querySelector('#appearance-preview-canvas'), this.progression.getAppearance());
     this.preview.setVisible(false);
     this.isOpen = false;
@@ -81,6 +82,13 @@ export class AppearanceMenu {
       this.preview.setAppearance(appearance);
       if (this.status) this.status.textContent = 'Classic v1–v7 trail look restored and saved locally.';
       this.render(true);
+    };
+    this.onSpinClick = () => {
+      const spinning = this.preview.setSpinning(!this.preview.spinning);
+      if (this.spinButton) {
+        this.spinButton.textContent = spinning ? 'PAUSE ROTATION' : 'RESUME ROTATION';
+        this.spinButton.setAttribute('aria-pressed', String(!spinning));
+      }
     };
     this.onKeyDown = (event) => {
       if (event.code !== 'Escape' || !this.isOpen) return;
@@ -133,6 +141,7 @@ export class AppearanceMenu {
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.randomizeButton?.addEventListener('click', this.onRandomizeClick);
     this.resetButton?.addEventListener('click', this.onResetClick);
+    this.spinButton?.addEventListener('click', this.onSpinClick);
   }
 
   open() {
@@ -235,6 +244,7 @@ export class AppearanceMenu {
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.randomizeButton?.removeEventListener('click', this.onRandomizeClick);
     this.resetButton?.removeEventListener('click', this.onResetClick);
+    this.spinButton?.removeEventListener('click', this.onSpinClick);
     document.body.classList.remove('appearance-open');
     this.preview.destroy();
   }

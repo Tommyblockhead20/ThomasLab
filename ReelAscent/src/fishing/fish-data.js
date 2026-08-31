@@ -54,8 +54,8 @@ const SUMMIT_COMPATIBLE_SPECIES = new Set([
   'lake-sturgeon', 'rimefin-wisp', 'abaia', 'beluga-sturgeon'
 ]);
 
-// Four formerly shared high-country creatures become true Crooked Peak discoveries in v7.1.
-// Together with the four authored Crooked Peak species this produces eight summit exclusives.
+// Four formerly shared high-country creatures became true Stoneveil discoveries in v7.1.
+// Together with the four authored summit species this produces eight summit exclusives.
 const SUMMIT_PROMOTED_EXCLUSIVES = new Set([
   'water-sprite', 'alpine-mudpuppy', 'fairy-shrimp', 'rimefin-wisp'
 ]);

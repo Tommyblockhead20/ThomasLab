@@ -12,6 +12,7 @@ export class AquariumMenu {
     this.closeButton = document.querySelector('#close-aquarium');
     this.isOpen = false;
     this.renderedRevision = -1;
+    this.lastClockSecond = -1;
     this.onKeyDown = (event) => {
       if (event.repeat || ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase?.())) return;
       if (event.code === 'Escape' && this.isOpen) {
@@ -59,7 +60,12 @@ export class AquariumMenu {
   update() {
     const income = this.progression.processAquariumIncome();
     if (income.paid && this.status) this.status.textContent = `Aquarium visitors contributed $${income.paid}.`;
-    if (this.isOpen && this.renderedRevision !== this.progression.revision) this.render();
+    const economy = this.isOpen ? this.progression.getAquariumEconomy() : null;
+    const clockSecond = economy ? Math.floor(economy.bankedActiveSeconds) : -1;
+    if (this.isOpen && (this.renderedRevision !== this.progression.revision || clockSecond !== this.lastClockSecond)) {
+      this.lastClockSecond = clockSecond;
+      this.render(true);
+    }
   }
   render(force = false) {
     if (!this.isOpen || !this.content || (!force && this.renderedRevision === this.progression.revision)) return;
@@ -78,10 +84,13 @@ export class AquariumMenu {
       `<article class="aquarium-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)}</small></div><button data-aquarium-action="add" data-specimen-id="${escapeHtml(specimen.specimenId)}" ${specimens.length >= economy.capacity ? 'disabled' : ''}>ADD TO AQUARIUM</button></article>`
     )).join('') : '<p class="shop-empty">No carried specimens available.</p>';
     const nextUpgrade = economy.nextTier
-      ? `<button data-aquarium-action="upgrade" ${state.money < economy.nextTier.price ? 'disabled' : ''}>EXPAND TO ${economy.nextTier.capacity} • $${economy.nextTier.price}</button>`
-      : '<strong>MAXIMUM 300-FISH CAPACITY</strong>';
+      ? `<section class="aquarium-expansion"><div><small>NEXT EXPANSION • TIER ${economy.capacityTier + 2}</small><strong>${economy.capacity} → ${economy.nextTier.capacity} fish</strong><span>Cost: $${economy.nextTier.price}</span></div><button data-aquarium-action="upgrade" ${state.money < economy.nextTier.price ? 'disabled' : ''}>UPGRADE / EXPAND</button></section>`
+      : '<section class="aquarium-expansion is-max"><div><small>EXPANSION</small><strong>MAXIMUM TIER</strong><span>300-fish capacity unlocked</span></div></section>';
     const remaining = Math.max(0, economy.intervalSeconds - economy.bankedActiveSeconds);
-    this.content.innerHTML = `<section class="aquarium-economy"><div><small>DISPLAY VALUE</small><strong>$${economy.exhibitedValue}</strong></div><div><small>VISITOR INCOME</small><strong>$${economy.payout} / 5 active min</strong></div><div><small>NEXT PAYOUT</small><strong>${Math.ceil(remaining)}s active play</strong></div><div>${nextUpgrade}</div></section><section><h3>SWIMMING DISPLAY</h3><div class="aquarium-card-grid">${displayed}</div></section><section><h3>CARRIED SPECIMENS</h3><div class="aquarium-card-grid">${carried}</div></section>`;
+    const remainingSeconds = Math.ceil(remaining);
+    const minutes = Math.floor(remainingSeconds / 60);
+    const seconds = (remainingSeconds % 60).toString().padStart(2, '0');
+    this.content.innerHTML = `<section class="aquarium-economy"><div><small>DISPLAY VALUE</small><strong>$${economy.exhibitedValue}</strong></div><div><small>VISITOR INCOME</small><strong>$${economy.payout} / 5 active min</strong></div><div><small>NEXT PAYOUT</small><strong>${minutes}:${seconds}</strong><span>$${economy.payout} expected</span></div><div><small>CAPACITY • TIER ${economy.capacityTier + 1}</small><strong>${specimens.length} / ${economy.capacity}</strong><span>${Math.max(0, economy.capacity - specimens.length)} slots open</span></div></section>${nextUpgrade}<section><h3>SWIMMING DISPLAY</h3><div class="aquarium-card-grid">${displayed}</div></section><section><h3>CARRIED SPECIMENS</h3><div class="aquarium-card-grid">${carried}</div></section>`;
     this.renderedRevision = this.progression.revision;
   }
   destroy() {

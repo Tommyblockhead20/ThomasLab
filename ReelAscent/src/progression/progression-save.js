@@ -2,7 +2,8 @@ import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 9;
+export const PROGRESSION_SCHEMA_VERSION = 10;
+export const HAND_EQUIPMENT_IDS = Object.freeze(['ice-axe']);
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
@@ -11,6 +12,7 @@ export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-boots',
   'trail-gloves',
   'trail-kit',
+  'empty-chalk-loop',
   'trail-harness'
 ]);
 
@@ -22,6 +24,7 @@ export const DEFAULT_EQUIPPED = Object.freeze({
   boots: 'trail-boots',
   gloves: 'trail-gloves',
   climbingTool: 'trail-kit',
+  chalk: 'empty-chalk-loop',
   harness: 'trail-harness'
 });
 
@@ -130,7 +133,12 @@ export function normalizeProgressionState(value = {}) {
     if (['trail-runners', 'endurance-belt', 'springstep-boots', 'summit-vault-boots'].includes(legacyTraversal)) equipped.boots = legacyTraversal;
     else if (legacyTraversal === 'chalk-gloves') equipped.gloves = legacyTraversal;
     else if (['alpine-harness', 'ultralight-kit', 'trail-harness'].includes(legacyTraversal)) equipped.harness = legacyTraversal;
+    else if (legacyTraversal === 'climber-chalk') equipped.chalk = legacyTraversal;
     else equipped.climbingTool = legacyTraversal;
+  }
+  if (value.equipped?.climbingTool === 'climber-chalk' && owned.has('climber-chalk')) {
+    equipped.climbingTool = DEFAULT_EQUIPPED.climbingTool;
+    equipped.chalk = 'climber-chalk';
   }
   if (typeof value.equipped?.guide === 'string' && owned.has(value.equipped.guide)) equipped.guide = value.equipped.guide;
   const validWorldItems = new Set(MAP_ITEMS.map((item) => item.id));
@@ -138,6 +146,14 @@ export function normalizeProgressionState(value = {}) {
     (Array.isArray(value.ownedItems) ? value.ownedItems : [])
       .filter((id) => typeof id === 'string' && validWorldItems.has(id))
   )];
+  const heldSpecimenId = typeof value.heldSpecimenId === 'string' && inventoryIds.has(value.heldSpecimenId)
+    ? value.heldSpecimenId
+    : null;
+  const heldItemId = !heldSpecimenId && typeof value.heldItemId === 'string'
+    && (ownedItems.includes(value.heldItemId)
+      || (HAND_EQUIPMENT_IDS.includes(value.heldItemId) && owned.has(value.heldItemId)))
+    ? value.heldItemId
+    : null;
   return {
     ...defaults,
     schemaVersion: PROGRESSION_SCHEMA_VERSION,
@@ -156,13 +172,9 @@ export function normalizeProgressionState(value = {}) {
         : null,
       lifetimePaid: Math.max(0, Math.floor(finite(value.aquariumIncome?.lifetimePaid)))
     },
-    heldSpecimenId: typeof value.heldSpecimenId === 'string' && inventoryIds.has(value.heldSpecimenId)
-      ? value.heldSpecimenId
-      : null,
+    heldSpecimenId,
     ownedItems,
-    heldItemId: typeof value.heldItemId === 'string' && ownedItems.includes(value.heldItemId)
-      ? value.heldItemId
-      : null,
+    heldItemId,
     // Only genuinely absent appearance data receives the legacy v1-v7 default. Existing
     // selections are normalized/migrated but never guessed to be an "old default" and reset.
     appearance: !value.appearance

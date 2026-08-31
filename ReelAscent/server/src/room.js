@@ -41,9 +41,14 @@ export class Room {
         id: player.playerId,
         connected: player.connected,
         host: player.playerId === this.hostId,
+        displayName: player.displayName || 'Player',
         appearance: player.lastSnapshot?.appearance ?? null,
         posture: player.lastSnapshot?.posture ?? 'standing',
-        fishingState: player.lastSnapshot?.fishingState ?? null
+        fishingState: player.lastSnapshot?.fishingState ?? player.fishingState ?? null,
+        heldItem: player.lastSnapshot?.heldItem ?? null,
+        locationId: player.lastSnapshot?.locationId ?? 'main-mountain',
+        coordinateSpace: player.lastSnapshot?.coordinateSpace ?? 'global-world',
+        globalPosition: player.lastSnapshot?.globalPosition ?? player.lastSnapshot?.position ?? null
       }))
     };
   }

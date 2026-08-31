@@ -94,6 +94,11 @@ export const ACCESSORIES = Object.freeze([
   Object.freeze({ id: 'none', label: 'None' }),
   Object.freeze({ id: 'beanie', label: 'Beanie', color: [0.99, 0.82, 0.33] }),
   Object.freeze({ id: 'glasses', label: 'Trail Glasses' }),
+  Object.freeze({ id: 'round-glasses', label: 'Round Glasses' }),
+  Object.freeze({ id: 'aviators', label: 'Aviator Sunglasses' }),
+  Object.freeze({ id: 'sport-shades', label: 'Sport Shades' }),
+  Object.freeze({ id: 'clear-spectacles', label: 'Clear Spectacles' }),
+  Object.freeze({ id: 'snow-glasses', label: 'Snow Glasses' }),
   Object.freeze({ id: 'trail-hat', label: 'Trail Hat' }),
   Object.freeze({ id: 'fishing-cap', label: 'Fishing Cap' }),
   Object.freeze({ id: 'headlamp', label: 'Headlamp' }),
@@ -108,7 +113,9 @@ export const ACCESSORIES = Object.freeze([
 export const HEADWEAR = Object.freeze(ACCESSORIES.filter((entry) => (
   ['none', 'beanie', 'trail-hat', 'fishing-cap', 'headlamp', 'flower-crown'].includes(entry.id)
 )));
-export const EYEWEAR = Object.freeze(ACCESSORIES.filter((entry) => ['none', 'glasses', 'goggles'].includes(entry.id)));
+export const EYEWEAR = Object.freeze(ACCESSORIES.filter((entry) => (
+  ['none', 'glasses', 'goggles', 'round-glasses', 'aviators', 'sport-shades', 'clear-spectacles', 'snow-glasses'].includes(entry.id)
+)));
 export const FACE_ACCESSORIES = Object.freeze(ACCESSORIES.filter((entry) => ['none', 'scarf', 'bandana', 'neck-gaiter', 'necklace'].includes(entry.id)));
 export const BACK_ACCESSORIES = Object.freeze([
   Object.freeze({ id: 'backpack', label: 'Trail Backpack' }),

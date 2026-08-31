@@ -10,7 +10,7 @@ const APPEARANCE_OPTIONS = Object.freeze({
   hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink', 'ash', 'white', 'blue', 'green', 'rose-gold', 'auburn']),
   accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'bandana', 'neck-gaiter', 'necklace', 'flower-crown', 'goggles']),
   headwear: new Set(['none', 'beanie', 'trail-hat', 'fishing-cap', 'headlamp', 'flower-crown']),
-  eyewear: new Set(['none', 'glasses', 'goggles']),
+  eyewear: new Set(['none', 'glasses', 'goggles', 'round-glasses', 'aviators', 'sport-shades', 'clear-spectacles', 'snow-glasses']),
   faceAccessory: new Set(['none', 'scarf', 'bandana', 'neck-gaiter', 'necklace']),
   backAccessory: new Set(['none', 'backpack']),
   backpackColor: new Set(['classic-teal', 'pine', 'orange', 'yellow', 'red', 'blue', 'navy', 'violet', 'rose', 'sand', 'white', 'charcoal', 'mint', 'coral']),
@@ -26,6 +26,26 @@ const DEFAULT_APPEARANCE = Object.freeze({
 const APPEARANCE_TINTS = new Set(['shirtTint', 'pantsTint', 'hairTint', 'accessoryTint', 'blobTint']);
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const finite = (value) => Number.isFinite(Number(value));
+const cleanString = (value, maximum) => typeof value === 'string' ? value.slice(0, maximum) : '';
+
+function sanitizeHeldItem(value) {
+  if (value?.type === 'equipment' && value.itemId === 'ice-axe') {
+    return { type: 'equipment', itemId: 'ice-axe', name: 'Ice Axe' };
+  }
+  if (value?.type !== 'specimen') return null;
+  const speciesId = cleanString(value.speciesId, 100);
+  if (!speciesId) return null;
+  return {
+    type: 'specimen',
+    specimenId: cleanString(value.specimenId, 140),
+    speciesId,
+    name: cleanString(value.name, 100),
+    rarity: cleanString(value.rarity, 24) || 'Common',
+    length: Math.max(.01, Math.min(20_000, Number(value.length) || 0)),
+    weight: Math.max(0, Math.min(10_000_000, Number(value.weight) || 0)),
+    shiny: Boolean(value.shiny)
+  };
+}
 
 export function sanitizeAppearance(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -61,7 +81,14 @@ export function validateSnapshot(payload, session, now = Date.now()) {
   if (!finite(yaw)) return { ok: false, reason: 'invalid_yaw' };
   const movement = MOVEMENT_STATES.has(payload.movement) ? payload.movement : 'airborne';
 
-  if (session.lastSnapshot) {
+  const locationId = cleanString(payload.locationId, 100) || 'main-mountain';
+  const coordinateSpace = cleanString(payload.coordinateSpace, 40) || 'global-world';
+  const rawGlobalPosition = payload.globalPosition;
+  const globalPosition = rawGlobalPosition && ['x', 'y', 'z'].every((axis) => finite(rawGlobalPosition[axis]))
+    ? { x: Number(rawGlobalPosition.x), y: Number(rawGlobalPosition.y), z: Number(rawGlobalPosition.z) }
+    : { ...normalizedPosition };
+
+  if (session.lastSnapshot && session.lastSnapshot.locationId === locationId) {
     const dt = Math.max(0.05, Math.min(5, (now - session.lastSnapshot.serverTime) / 1000));
     const previous = session.lastSnapshot.position;
     const distance = Math.hypot(
@@ -84,6 +111,9 @@ export function validateSnapshot(payload, session, now = Date.now()) {
       yaw: ((yaw % 360) + 360) % 360,
       movement,
       posture: POSTURES.has(payload.posture) ? payload.posture : 'standing',
+      locationId,
+      coordinateSpace,
+      globalPosition,
       appearance: sanitizeAppearance(payload.appearance),
       emote: EMOTE_IDS.has(payload.emote?.id) ? {
         id: payload.emote.id,
@@ -92,6 +122,7 @@ export function validateSnapshot(payload, session, now = Date.now()) {
           : now
       } : null,
       fishingState: payload.fishingState ?? null,
+      heldItem: sanitizeHeldItem(payload.heldItem),
       serverTime: now
     }
   };

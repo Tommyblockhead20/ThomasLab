@@ -7,7 +7,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 
 const CATEGORY_LABELS = Object.freeze({
   rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', guide: 'ECOLOGY GUIDES',
-  boots: 'BOOTS', gloves: 'GLOVES', climbingTool: 'CLIMBING TOOLS', harness: 'HARNESSES & PACKS'
+  boots: 'BOOTS', gloves: 'GLOVES', climbingTool: 'CLIMBING TOOLS', chalk: 'CHALK BAGS', harness: 'HARNESSES & PACKS'
 });
 
 export class ShopMenu {
@@ -15,6 +15,8 @@ export class ShopMenu {
     this.progression = progression;
     this.screen = document.querySelector('#progression-shop');
     this.closeButton = document.querySelector('#close-shop');
+    this.eyebrow = this.screen?.querySelector('.eyebrow');
+    this.title = document.querySelector('#shop-title');
     this.money = document.querySelector('#shop-money');
     this.tabs = document.querySelector('#shop-tabs');
     this.content = document.querySelector('#shop-content');
@@ -36,6 +38,7 @@ export class ShopMenu {
       const tab = event.target.closest('[data-shop-tab]');
       if (tab) {
         this.activeMode = tab.dataset.shopTab === 'sell' ? 'sell' : 'buy';
+        this.updateModeHeading();
         this.status.textContent = this.activeMode === 'sell'
           ? 'Sell carried Inventory specimens. Aquarium residents are never included.'
           : 'Purchase maps and gear, then equip one item in each category.';
@@ -98,6 +101,7 @@ export class ShopMenu {
     this.activeMode = mode === 'sell' ? 'sell' : 'buy';
     this.screen.hidden = false;
     document.body.classList.add('shop-open');
+    this.updateModeHeading();
     this.status.textContent = this.activeMode === 'sell'
       ? 'Sell carried Inventory specimens. Aquarium residents are never included.'
       : 'Purchase maps and gear, then equip one item in each category.';
@@ -114,6 +118,16 @@ export class ShopMenu {
 
   update() {
     if (this.isOpen && this.renderedRevision !== this.progression.revision) this.render();
+  }
+
+  updateModeHeading() {
+    const selling = this.activeMode === 'sell';
+    if (this.eyebrow) this.eyebrow.textContent = selling
+      ? "OUTFITTER'S REACH • FISH BUYER"
+      : "OUTFITTER'S REACH • GEAR COUNTER";
+    if (this.title) this.title.textContent = selling
+      ? 'Fishmonger & Specimen Sales'
+      : 'Outfitter Gear & Maps';
   }
 
   render(force = false) {

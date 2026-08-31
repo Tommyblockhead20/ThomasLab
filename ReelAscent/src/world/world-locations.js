@@ -4,7 +4,7 @@ export const WORLD_CENTER = Object.freeze({ x: 260, z: 0 });
 // changing any destination's stable position on maps/GPS/multiplayer.
 export const WORLD_MAP_RADIUS = 1700;
 export const WORLD_MAP_DISTANCE_SCALE = .58;
-export const WORLD_MAP_DISPLAY_RADIUS = WORLD_MAP_RADIUS * .68;
+export const WORLD_MAP_DISPLAY_RADIUS = WORLD_MAP_RADIUS * WORLD_MAP_DISTANCE_SCALE * 1.04;
 export const WORLD_MAP_COMPRESSION_START_RADIUS = 360;
 
 // Cartography-only transform. Simulation, saves, travel, multiplayer, and load groups keep
@@ -56,7 +56,7 @@ function outlineScaleAt(locationId, angleDegrees) {
 
 function islandLocation({
   id, displayName, type, angle, radius, radii, elevation, theme, functions = [],
-  mapClass = type, dockLength = 12.5
+  mapClass = type, dockLength = 12.5, dockSide = 'mountain'
 }) {
   const direction = { x: Math.cos(radians(angle)), z: Math.sin(radians(angle)) };
   const center = {
@@ -65,7 +65,9 @@ function islandLocation({
     z: WORLD_CENTER.z + direction.z * radius
   };
   const towardMountain = { x: -direction.x, z: -direction.z };
-  const shorelineDistance = ellipseRadiusAlong(radii, towardMountain) * outlineScaleAt(id, angle + 180);
+  const dockDirection = dockSide === 'outward' ? direction : towardMountain;
+  const dockBearing = dockSide === 'outward' ? angle : angle + 180;
+  const shorelineDistance = ellipseRadiusAlong(radii, dockDirection) * outlineScaleAt(id, dockBearing);
   const dockCenterDistance = shorelineDistance + dockLength * .34;
   const arrivalDistance = Math.max(2.8, shorelineDistance - 3.1);
   return Object.freeze({
@@ -90,14 +92,14 @@ function islandLocation({
     dock: Object.freeze({
       id: `${id}-dock`,
       worldPosition: Object.freeze({
-        x: center.x + towardMountain.x * dockCenterDistance,
+        x: center.x + dockDirection.x * dockCenterDistance,
         y: .12,
-        z: center.z + towardMountain.z * dockCenterDistance
+        z: center.z + dockDirection.z * dockCenterDistance
       }),
       arrivalPosition: Object.freeze({
-        x: center.x + towardMountain.x * arrivalDistance,
+        x: center.x + dockDirection.x * arrivalDistance,
         y: elevation + 1.08,
-        z: center.z + towardMountain.z * arrivalDistance
+        z: center.z + dockDirection.z * arrivalDistance
       }),
       facingYaw: 90 - angle,
       length: dockLength,
@@ -110,7 +112,10 @@ export const SMALL_ISLAND_LOCATIONS = Object.freeze([
   islandLocation({
     id: 'home-island', displayName: 'Hearthward Isle', type: 'home-island',
     angle: 222, radius: 980, radii: { x: 22, z: 18 }, elevation: .72,
-    theme: 'cozy-woodland', functions: ['appearance', 'achievements', 'trophies', 'rest']
+    theme: 'cozy-woodland', functions: ['appearance', 'achievements', 'trophies', 'rest'],
+    // The cabin front faces away from Mountain. Arrive on that same side for a short,
+    // obvious walk from boat to porch instead of approaching the rear wall.
+    dockSide: 'outward'
   }),
   islandLocation({
     id: 'shop-island', displayName: "Outfitter's Reach", type: 'shop-island',
@@ -143,17 +148,17 @@ export const SMALL_ISLAND_LOCATIONS = Object.freeze([
 export const MAIN_WORLD_LOCATION = Object.freeze({
   // Keep the durable id for old saves/server messages; only the destination name changes.
   id: 'main-mountain',
-  displayName: 'Crooked Peak',
+  displayName: 'Stoneveil Peak',
   type: 'main-island',
   worldPosition: Object.freeze({ x: WORLD_CENTER.x, y: 0, z: WORLD_CENTER.z }),
   radii: Object.freeze({ x: 208, z: 208 }),
   outline: null,
-  theme: 'crooked-peak',
+  theme: 'stoneveil-peak',
   functions: Object.freeze(['climbing', 'watershed', 'summit']),
   loadGroup: 'main-mountain',
   alwaysLoaded: false,
   coordinateSpace: 'global-world',
-  mapRepresentation: Object.freeze({ className: 'main-island', label: 'Crooked Peak' }),
+  mapRepresentation: Object.freeze({ className: 'main-island', label: 'Stoneveil Peak' }),
   destination: Object.freeze({ enabled: true, order: 0 })
 });
 

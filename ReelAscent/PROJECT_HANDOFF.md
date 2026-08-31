@@ -1,4 +1,98 @@
-# Reel Ascent v9.4 update handoff
+# Reel Ascent v10 update handoff
+
+Status: the requested v10 remaining-polish pass is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Testing stayed intentionally light: changed-module syntax checks, two focused state/protocol checks, a production build, and a multiplayer-server startup smoke test.
+
+## v10 current-tree pass
+
+This section supersedes older descriptions below wherever they differ.
+
+1. **Shared local/remote avatar model** — `src/player/character-model.js` is now the single complete character builder used by the local player and remote player; the Appearance preview uses the remote-avatar path and therefore the same builder too. Human/blob body, head, eyes, nose, hair, clothing, all accessory groups, backpack, nested limbs, and left/right hand anchors now come from one model hierarchy and compact appearance state.
+
+2. **Shared creature-model work** — Catch, Inventory Hand, remote Hand, remote catch presentation, and Aquarium residents all resolve canonical species data through `createSpecimenModel`. They retain species ID, actual archetype, saved dimensions, and shiny state instead of constructing separate generic multiplayer/aquarium fish.
+
+3. **Remote missing-detail fix** — Remote specimens now attach the complete factory result rather than copying only a base primitive. The shared factory was also extended with more shark fins, eyes across archetype families, secondary markings, and appendage/detail children.
+
+4. **Hand model consistency fix** — Re-equipping a caught specimen from Inventory uses the exact same canonical species/archetype and positioning system as catch presentation. There is no Hand-only generic fallback, and saved length/shiny data follow the specimen.
+
+5. **Durable remote held-item state** — Held presentation is part of each validated player snapshot and the server's reconstructed `room_state`. Room entries now carry `heldItem`, so a late/reconnected client reconstructs the current Hand object rather than waiting for a transient visual event.
+
+6. **Tab-out held-item fix** — A remote Hand model no longer expires or clears when browser snapshots pause. The server retains the owner's last accepted held state, and clients clear it only when a later authoritative snapshot actually reports an unequip/replacement/removal.
+
+7. **Remote fishing rod fix** — `src/fishing/rod-model.js` builds one detailed handle/shaft/reel/spool/crank/guide/leader hierarchy for local and remote players. Both rods attach to the shared avatar's right-hand anchor, so yaw, interpolation, character proportions, sitting, and fishing pose all move the rod with the body.
+
+8. **Remote catch presentation** — Catch events reconstruct the canonical complete specimen at actual size/shiny state, hold it for the presentation window, suppress conflicting rod/Hand visuals, and destroy it cleanly when the event ends. Rhythm inputs and catch ownership still never cross clients.
+
+9. **Display-name root cause/fix** — The client already sent the entered name, but the server `PlayerSession` had no display-name field and `room_state` did not include it, so the remote fallback remained `Player`. The server now sanitizes and stores the name during hello/host/join, preserves it through reconnect, emits it in the roster, and rebroadcasts restored sessions.
+
+10. **Nameplate anchoring** — Remote nameplates now sample the highest visible render bounds in the actual avatar hierarchy and place the DOM plate just above that point. Hats/accessories, sit/fish poses, and avatar height changes no longer rely on a fixed arbitrary Y offset.
+
+11. **Remote location/despawn fix** — Snapshots and room state now carry `locationId`, `coordinateSpace`, and `globalPosition`. A remote 3D avatar is enabled only when its location matches the local player's active location; it remains in the roster/GPS and reappears with retained state on return.
+
+12. **Cave seam follow-up** — The repaired aperture architecture stays intact. Main-mountain cave throats now overlap another 5.5 m radially, 3.4 m sideways, and 2.6 m below the transition, with broad hidden ceiling/floor ribbons behind the mountain cut; island cave floor/walls also extend farther under the shore. No exterior slab, dark shell, or facade was reintroduced.
+
+13. **Boat double-click** — A valid destination double-click selects and immediately sails. Empty ocean and disabled/current destinations do nothing, `travelInProgress` prevents a double initiation, and the existing single-click plus Set Sail flow remains available.
+
+14. **Map crop/compression** — Simulation coordinates remain untouched. The full map uses the existing `.58` far-distance transform, then calculates a tight bounding box over compressed mountain contours, real island outlines, docks, caves, and the cascade with modest padding; the 520 px map therefore retains its large display while filling it with useful geography. GPS dots use the identical projection, and all registered islands pass the focused containment check.
+
+15. **Mangrove Cay changes** — The cay now has 20 climbable mangroves plus substantially denser broadleaf vegetation, ferns, roots, reeds, groundcover, tropical shoreline mounds, and fallen logs. The greener shallow lagoon and warm terrain make it read as a distinct tropical/wetland biome.
+
+16. **Mangrove z-fighting fix** — The cause was verified geometry: the top of the lagoon mud cylinder was exactly coplanar with the transparent lagoon water at Y `.88`. The mud shelf is now deliberately submerged at roughly `.68–.74`, removing the competing surface instead of scattering arbitrary render offsets.
+
+17. **Outfitter's Reach polish** — The outpost gained separate outfitter and fish-buyer NPCs/counters, counter-specific signs and window headings, hanging destination signage, gear racks and rods, ropes/supports, lanterns/hooks, barrels, crates, and dock cargo. Buy and Sell remain separate physical interaction volumes; Sell All still confirms and excludes aquarium residents.
+
+18. **Frosthook Cold Ocean** — A dedicated 24–44 m cold-ocean fishing annulus now surrounds Frosthook, takes priority over generic Outer Ocean, and keeps the existing marine species set rather than beginning the postponed species pass. It has a pale separated surface, shoreline ice, and lightweight floes while the original Frosthook pond remains.
+
+19. **Stamina-regen root cause** — The capsule receives continual tiny downward/vertical physics corrections while standing, and the old stationary test treated that jitter as movement; gripping happened to stabilize it and appeared to enable recovery. Stationary recovery now measures planar motion, clears stale climbing/mantling state on real support, and uses upward-facing partial-foot support without reading Grip. Airborne, wall-side, sliding, and non-walkable contacts remain ineligible.
+
+20. **Sound settings** — The combined Settings/Accessibility screen now contains persisted global Master, Music/Rhythm, SFX, and Ambient sliders. Fishing rhythm/tone playback reads the appropriate master/category gain; ambient gain is persisted and ready for ambient sources without creating a separate Accessibility modal.
+
+21. **UI-opening delay root cause** — The main offender was `MountainMapMenu.open()` synchronously rebuilding the complete static SVG and long legend before un-hiding the dialog. Static geography is now built once, the shell is revealed immediately, and live GPS/legend work is deferred to the next animation frame; other audited dialogs already reveal their shells before dynamic content work.
+
+22. **One Hand slot** — Progression normalization enforces mutual exclusion between `heldSpecimenId` and `heldItemId`, with a specimen winning only when repairing an inconsistent legacy save. Maps and specimens replace each other. Ice Axe now genuinely occupies Hand, uses a shared local/remote visible model, and its terrain modifiers are active only while held; boots, gloves, Chalk Bag, and harness stay worn independently.
+
+23. **Map minimap behavior** — Opening Paper/GPS from Inventory always opens the full world map and no longer auto-equips it. Equipping either map in Hand shows a compact corner minimap of only the current loaded location: Paper is static, GPS adds local and same-location remote dots, and neither includes the world legend, distant islands, or long text.
+
+24. **Appearance Accessories UI fix** — The JavaScript already queried `[data-appearance-tab]`, but the HTML had no matching Body/Accessories controls, making every accessory group unreachable. Stable `BODY & COLORS` and `ACCESSORIES` tabs are now present and preserve all saved choices.
+
+25. **Appearance layout fixes** — Desktop Appearance uses a fixed-height, overflow-hidden two-column layout with compact per-tab grids. Randomize, Reset, and Close live in a stable header independent of avatar/tab content; the preview subtitle is removed and a small Pause/Resume Rotation overlay controls automatic spin. Small screens retain an intentional responsive scroll fallback.
+
+26. **Eyewear** — Added round glasses, aviators, sport shades, clear spectacles, and snow glasses to appearance data, server validation, and the shared character hierarchy, with separate fitted frames/lenses.
+
+27. **Cabin dock/door** — Hearthward Isle's registry dock now uses the outward/cabin-front side of the island. Arrival faces the intended short approach to the porch/front door rather than landing behind the cabin.
+
+28. **New Mountain name** — Player-facing `Crooked Peak` references are now **Stoneveil Peak**; its tarn is Stoneveil Tarn and summit landmark is Stoneveil Crown. Durable IDs such as `main-mountain` and `crooked-peak-tarn` remain unchanged for save/species/protocol compatibility.
+
+29. **Beach/foothill decoration** — The beach-to-first-incline belt gained 144 deterministic, visual-only pieces across multiple routes: driftwood/logs, low rocks, grass, shrubs, and flowers. Protected starts, waters, and route clearances prevent the detail pass from closing traversal lanes.
+
+30. **Gear layout/equipment balance** — Inventory Gear now uses compact logical slot selects for Boots, Gloves, Climbing Tool, Chalk Bag, Harness/Pack, plus exactly one Hand summary; responsive 3/2/1-column layouts avoid normal desktop scrolling. Separate compatible slots equip simultaneously. Springstep is `1.25`, Summit Vault `1.50`, Endurance sprint drain `0`, Ultralight Harness `.60`, Climbing Gloves `.80`, Chalk Bag `.70`, and Ice Axe remains slippery-terrain-only at `.75` climb cost plus slip/stability benefits, all multiplicatively clamped nonnegative.
+
+31. **Water aesthetic/size changes** — Existing waters now have a clearer small/medium/large hierarchy (for example compact Sheltered Mirror/Hidden Ridge versus much larger Pineglass/Mossbell/Cloudstep). Main waters receive climate-specific reeds/grass/flowers/ferns/rocks/logs or snow/ice rather than one repeated decoration set, while keeping fishable banks accessible.
+
+32. **Cabin polish** — The existing cozy cabin layout was retained and augmented with shutters, roof fascia, porch planters/foliage, a welcome mat, kitchen shelf/mugs, and alignment cleanup around the already detailed hearth, chimney, rug, rafters, furniture, and lanterns.
+
+33. **Aquarium species-model fix** — Saved aquarium residents now use the same canonical specimen factory as catches and Hand presentation, including saved dimensions/shiny state and all child/detail meshes. There is no aquarium-specific generic fish path.
+
+34. **Aquarium enlargement** — The public display increased from 18 × 11 × 6.2 m to 21 × 13.5 × 7 m. Habitat placement and resident swim ranges derive from the enlarged tank while the local-client resident root remains active only at Glasswater Isle.
+
+35. **Aquarium economy/expansion UI fix** — Management now clearly exposes Display Value, Visitor Income per interval, a live `mm:ss` Next Payout plus expected amount, used/max Capacity and tier, and an explicit current→next expansion card with price and Upgrade button/max state. The existing add/remove/capacity/income backend is preserved; the missing `aquarium-status` DOM ID that could break management feedback was repaired.
+
+36. **Aquarium water clarity** — Aquarium-water opacity was reduced modestly from `.40` to `.30`, keeping a visible water volume while making residents easier to inspect.
+
+37. **Higher-elevation caves** — Verified and retained the proper inset `High Cirque Tarn` cave in Upper Alpine and `Crown Vault` cave at the summit/Crown. Both use the repaired mountain-core aperture/throat/floor/water system and no exterior facade geometry.
+
+38. **Files changed** — `PROJECT_HANDOFF.md`, `index.html`, `src/styles.css`, `src/game.js`, `src/audio/settings.js`; player/appearance files including new `src/player/character-model.js` and `src/player/held-item-model.js`; fishing files including new `src/fishing/rod-model.js`; multiplayer client/protocol/remote-avatar files; progression/equipment/save files; Appearance, Aquarium, Boat, Home, Inventory, Map, Pause, and Shop UI files; `src/world/mountain-v2.js` and `src/world/world-locations.js`; server connection/session/room/snapshot validation; and rebuilt `dist/index.html` plus hashed JS/CSS assets.
+
+39. **Save-schema changes** — Progression schema advanced `9 → 10` for the separate Chalk Bag slot and strict one-Hand normalization. The existing `heldItemId` now also accepts the owned Ice Axe, preserving older map values; legacy chalk-in-climbing saves migrate into `chalk`. Outer save schema remains `9`, export format remains compatible, and old saves/imports still normalize forward.
+
+40. **Multiplayer protocol changes** — The protocol envelope/version remains `1`. Existing snapshots add validated `locationId`, `coordinateSpace`, `globalPosition`, and durable held-item presentation data (canonical specimen or Ice Axe), while room state adds display name and reconstructs those last accepted fields. Server appearance validation also accepts the five new eyewear IDs. Deploy client/server together.
+
+41. **Render redeployment** — **Yes.** Server session, room-state, and snapshot validation changed, so the Render multiplayer service must be redeployed with the frontend.
+
+42. **Frontend rebuild** — **Yes, and it has been rebuilt locally.** `npm run build` passed with Vite 8.2.2 and 1,278 transformed modules; only the existing large PlayCanvas bundle warning remains. Changed JavaScript syntax checks passed, focused save/Hand/protocol/location/map checks passed, and the finalized server started successfully on alternate port `18789` because local port `8787` was already occupied.
+
+43. **Short manual test list** — Use two browsers: verify entered names, matching cosmetics, hand fish details/tab-out persistence, catch/rod/axe presentation, same-location despawn/reappearance after boat travel, and GPS. Then check Escape-less fast-opening Map/Appearance, Body/Accessories and preview pause, full-map versus Hand minimap, stamina recovery on a ledge without Grip, cave mouth seams, Mangrove lagoon flicker, both Outfitter counters, Frosthook cold ocean, Cabin dock/front door, Aquarium model/economy countdown/upgrade, and one representative small/medium/large water.
+
+## Previous v9.4 handoff
 
 Status: v9.4 is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Validation was deliberately light. Because the multiplayer emote allowlist changed, deploy the frontend and multiplayer server together.
 

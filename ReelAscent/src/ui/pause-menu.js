@@ -5,6 +5,7 @@ import {
   resetKeyBindings,
   setKeyBinding
 } from '../player/movement.js';
+import { getAudioSettings, setAudioSettings } from '../audio/settings.js';
 
 const SETTINGS_KEY = 'reel-ascent-ui-settings-v1';
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -54,6 +55,7 @@ export class PauseMenu {
     this.awaitingBinding = null;
     this.previousFocus = null;
     this.preferences = this.loadPreferences();
+    this.audioSettings = getAudioSettings();
     this.applyPreferences();
 
     this.onClick = (event) => this.handleClick(event);
@@ -91,6 +93,7 @@ export class PauseMenu {
     };
     this.screen?.addEventListener('click', this.onClick);
     this.screen?.addEventListener('change', this.onChange);
+    this.screen?.addEventListener('input', this.onChange);
     this.resumeButton?.addEventListener('click', this.onResumeClick);
     this.fileInput?.addEventListener('change', this.onFileChange);
     window.addEventListener('keydown', this.onKeyDown, true);
@@ -182,6 +185,14 @@ export class PauseMenu {
   }
 
   handlePreferenceChange(event) {
+    const audio = event.target.closest?.('[data-audio-setting]');
+    if (audio) {
+      const key = audio.dataset.audioSetting;
+      this.audioSettings = setAudioSettings({ [key]: Number(audio.value) / 100 });
+      const output = audio.parentElement?.querySelector('output');
+      if (output) output.textContent = `${Math.round(this.audioSettings[key] * 100)}%`;
+      return;
+    }
     const preference = event.target.closest?.('[data-pause-preference]');
     if (!preference || preference.type === 'checkbox') return;
     this.preferences[preference.dataset.pausePreference] = preference.value;
@@ -230,9 +241,15 @@ export class PauseMenu {
   }
 
   renderSettings() {
+    const audioSlider = (key, label) => `<label class="pause-volume"><span>${label}</span><input type="range" min="0" max="100" step="1" value="${Math.round(this.audioSettings[key] * 100)}" data-audio-setting="${key}"><output>${Math.round(this.audioSettings[key] * 100)}%</output></label>`;
     return `<div class="pause-setting-list">
       <h3>GAMEPLAY &amp; INTERFACE</h3>
       <label><input type="checkbox" data-pause-preference="showControlHints" ${this.preferences.showControlHints ? 'checked' : ''}> Show the always-on control hint card</label>
+      <h3>SOUND</h3>
+      ${audioSlider('master', 'Master Volume')}
+      ${audioSlider('rhythm', 'Music / Rhythm Volume')}
+      ${audioSlider('sfx', 'SFX Volume')}
+      ${audioSlider('ambient', 'Ambient Volume')}
       <h3>ACCESSIBILITY</h3>
       <label><span>Interface scale</span><select data-pause-preference="uiScale"><option value="compact" ${this.preferences.uiScale === 'compact' ? 'selected' : ''}>Compact</option><option value="normal" ${this.preferences.uiScale === 'normal' ? 'selected' : ''}>Normal</option><option value="large" ${this.preferences.uiScale === 'large' ? 'selected' : ''}>Large</option></select></label>
       <label><input type="checkbox" data-pause-preference="reduceMotion" ${this.preferences.reduceMotion ? 'checked' : ''}> Reduce non-gameplay UI animation</label>
@@ -296,6 +313,7 @@ export class PauseMenu {
   destroy() {
     this.screen?.removeEventListener('click', this.onClick);
     this.screen?.removeEventListener('change', this.onChange);
+    this.screen?.removeEventListener('input', this.onChange);
     this.resumeButton?.removeEventListener('click', this.onResumeClick);
     this.fileInput?.removeEventListener('change', this.onFileChange);
     window.removeEventListener('keydown', this.onKeyDown, true);

@@ -65,6 +65,9 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
       { x: .28, y: .5, z: .08 }, accent, { z: 90 });
     primitive(root, `${name} shark dorsal`, 'cone', { x: -.08, y: .27, z: 0 },
       { x: .2, y: .38, z: .07 }, accent);
+    for (const side of [-1, 1]) primitive(root, `${name} shark pectoral ${side}`, 'cone',
+      { x: .12, y: -.12, z: side * .2 }, { x: .2, y: .34, z: .07 }, accent,
+      { x: side * 18, y: side * 62, z: 18 });
   } else if (['ray', 'skate', 'flatfish'].includes(archetype)) {
     primitive(root, `${name} ray disc`, 'sphere', { x: .1, y: 0, z: 0 },
       { x: .58, y: .09, z: .68 }, base);
@@ -173,14 +176,56 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
       { x: .28, y: .38 * depth, z: .09 }, accent, { z: 90 });
     primitive(root, `${name} dorsal fin`, 'cone', { x: -.05, y: .22 * depth, z: 0 },
       { x: .16, y: .25, z: .06 }, accent);
-    primitive(root, `${name} eye`, 'sphere', { x: .53 * lengthScale, y: .08, z: .2 * width },
-      { x: .045, y: .045, z: .035 }, dark);
+  }
+
+  // Every presentation path receives the same complete hierarchy. Eyes and small identity
+  // markings live in this canonical factory rather than in catch-, Hand-, remote-, or
+  // aquarium-specific fallbacks.
+  const eyeProfiles = {
+    shark: [.57, .09, .19], dogfish: [.57, .09, .19],
+    ray: [.55, .09, .16], skate: [.55, .09, .16], flatfish: [.5, .1, .17],
+    cetacean: [.68, .13, .17], pinniped: [.68, .13, .17], sirenian: [.68, .13, .17],
+    otter: [.68, .13, .17], beaver: [.68, .13, .17], rodent: [.68, .13, .17],
+    platypus: [.68, .13, .17], mammal: [.68, .13, .17],
+    octopus: [.43, .2, .26], squid: [.48, .2, .24], cuttlefish: [.43, .2, .26],
+    jellyfish: [.4, .15, .24], lusca: [.43, .2, .26], softbody: [.43, .2, .26],
+    shrimp: [.58, .13, .17], insect: [.58, .13, .17], arachnid: [.58, .13, .17], horseshoe: [.58, .13, .17],
+    crab: [.38, .16, .28], lobster: [.38, .16, .28], crayfish: [.38, .16, .28],
+    snail: [.66, .06, .13], turtle: [.57, .1, .15], frog: [.57, .1, .15], salamander: [.57, .1, .15],
+    serpent: [.69, .14, .15], dragon: [.69, .14, .15], plesiosaur: [.69, .14, .15], waterhorse: [.69, .14, .15], eel: [.69, .14, .15]
+  };
+  const eye = eyeProfiles[archetype] ?? [.53 * clamp(visual.lengthScale ?? 1, .58, 1.55), .08, .2 * clamp(visual.width ?? 1, .5, 1.5)];
+  if (!['clam', 'oyster', 'mussel', 'scallop', 'bivalve', 'nautilus', 'starfish', 'urchin', 'anemone', 'wisp'].includes(archetype)) {
+    for (const side of [-1, 1]) primitive(root, `${name} ${side < 0 ? 'far' : 'near'} eye`, 'sphere',
+      { x: eye[0], y: eye[1], z: side * eye[2] }, { x: .046, y: .046, z: .035 }, dark);
+  }
+  if (['panfish', 'slender', 'bass', 'carp', 'catfish', 'trout', 'sculpin', 'shark', 'dogfish'].includes(archetype)) {
+    for (let index = 0; index < 3; index += 1) primitive(root, `${name} species marking ${index + 1}`, 'box',
+      { x: .2 - index * .22, y: .03, z: .225 }, { x: .07, y: .16, z: .012 }, accent,
+      { z: -10 + index * 10 });
   }
 
   const scale = specimenDisplayScale(specimen, maximumScale);
   const physicalLengthMeters = clamp((Number(specimen?.length) || 8) * .0254, .04, 30);
   root.setLocalScale(scale, scale, scale);
   return { root, tail, materials, species, scale, archetype, physicalLengthMeters };
+}
+
+export function positionSpecimenModel(model, mode = 'held') {
+  if (!model?.root) return null;
+  if (mode === 'catch') {
+    model.root.setLocalPosition(0, 0, 0);
+    model.root.setLocalEulerAngles(-6, -8, -4);
+    return { x: 0, y: 0, z: 0 };
+  }
+  const position = {
+    x: .15 + Math.min(2.2, (model.physicalLengthMeters ?? .5) * .28),
+    y: -.04,
+    z: -.28
+  };
+  model.root.setLocalPosition(position.x, position.y, position.z);
+  model.root.setLocalEulerAngles(-8, -18, -5);
+  return position;
 }
 
 export function destroySpecimenModel(model) {
