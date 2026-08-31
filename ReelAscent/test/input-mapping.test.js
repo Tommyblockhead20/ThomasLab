@@ -20,11 +20,11 @@ test('desktop WASD and arrow keys share the four canonical rhythm lanes', () => 
   assert.equal(RHYTHM_LANES.KeyD, RHYTHM_LANES.ArrowRight);
 });
 
-test('multiplayer room codes use the same five-digit format on client and server', () => {
-  assert.equal(ROOM_CODE_LENGTH, 5);
-  assert.equal(normalizeRoomCode(' 12-A3 456 '), '12345');
+test('multiplayer room codes use the same four-digit format on client and server', () => {
+  assert.equal(ROOM_CODE_LENGTH, 4);
+  assert.equal(normalizeRoomCode(' 12-A3 456 '), '1234');
   const manager = new RoomManager();
-  for (let index = 0; index < 30; index += 1) assert.match(manager.createCode(), /^\d{5}$/);
+  for (let index = 0; index < 30; index += 1) assert.match(manager.createCode(), /^\d{4}$/);
 });
 
 test('gameplay input yields to editable controls', () => {

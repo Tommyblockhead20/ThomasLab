@@ -128,7 +128,9 @@ export class Game {
     this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud, this.camera);
     this.shopMenu = new ShopMenu(this.progression);
     this.aquariumMenu = new AquariumMenu(this.progression);
-    this.mapMenu = new MountainMapMenu(this.world.getMapData(), {
+    const mountainMapData = this.world.getMapData();
+    this.totalMapWaters = mountainMapData.waters?.length ?? 0;
+    this.mapMenu = new MountainMapMenu(mountainMapData, {
       getLocalPlayer: () => ({ id: 'YOU', position: this.getLocalGlobalPosition() }),
       getRemotePlayers: () => [...(this.multiplayer?.room?.members ?? new Map()).entries()]
         .filter(([, remote]) => remote.globalPosition || remote.lastSample)
@@ -486,9 +488,9 @@ export class Game {
   getLifetimeStats() {
     // Include the current unflushed seconds so Pause → Stats always looks live without
     // forcing localStorage writes every frame.
-    const lifetime = this.saveSystem.getSnapshot().lifetime ?? {};
+    const lifetime = this.saveSystem.getLifetimeSnapshot();
     const purchase = this.progression.getPurchaseProgress?.() ?? { purchased: 0, total: 0, percent: 0 };
-    const totalWaters = this.world.getMapData?.().waters?.length ?? 0;
+    const totalWaters = this.totalMapWaters;
     const watersCaught = Array.isArray(lifetime.fishingWatersCaught) ? lifetime.fishingWatersCaught.length : 0;
     return {
       activePlaytimeSeconds: (Number(lifetime.activePlaytimeSeconds) || 0) + this.pendingPersistentPlaytime,

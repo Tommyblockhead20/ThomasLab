@@ -464,6 +464,10 @@ export class SaveSystem {
     return copy(this.data);
   }
 
+  getLifetimeSnapshot() {
+    return copy(this.data.lifetime ?? {});
+  }
+
   getSlotSummaries() {
     return this.slotStore.slots.map((slot) => summarizeSlot(slot, this.activeSlotId));
   }

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { Room } from './room.js';
 
 const ROOM_ALPHABET = '0123456789';
-const ROOM_CODE_LENGTH = 5;
+const ROOM_CODE_LENGTH = 4;
 
 export class RoomManager {
   constructor({ roomCapacity = 6, reconnectWindowMs = 25_000 } = {}) {
@@ -35,7 +35,7 @@ export class RoomManager {
     if (session.room) return { ok: false, code: 'already_in_room', message: 'You are already in a room.' };
     const code = String(rawCode ?? '').replace(/\D/g, '').slice(0, ROOM_CODE_LENGTH);
     if (code.length !== ROOM_CODE_LENGTH) {
-      return { ok: false, code: 'invalid_room_code', message: 'Enter the five-digit room code.' };
+      return { ok: false, code: 'invalid_room_code', message: 'Enter the four-digit room code.' };
     }
     const room = this.rooms.get(code);
     if (!room) return { ok: false, code: 'room_not_found', message: 'That room does not exist.' };
