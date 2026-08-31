@@ -17,7 +17,8 @@ import {
   START_LOCATIONS,
   SUMMIT_HEIGHT,
   TERRAIN_ANGLE_PROFILE,
-  createEllipseSurfaceMeshData
+  createEllipseSurfaceMeshData,
+  createMountainMapData
 } from '../src/world/mountain-v2.js';
 
 test('Crown traversal density supplies supported routes, branches, rests, and upper belts', () => {
@@ -132,6 +133,17 @@ test('cave water surface geometry has no side wall or underside shell', () => {
     const upwardNormal = (a[2] - center.z) * (b[0] - center.x)
       - (a[0] - center.x) * (b[2] - center.z);
     assert.ok(upwardNormal > 0);
+  }
+});
+
+test('every cave entrance descends to its water surface', () => {
+  const caveMap = new Map(createMountainMapData().caves.map((cave) => [cave.id, cave]));
+  for (const location of MOUNTAIN_FISHING_LOCATIONS.filter((water) => water.cave)) {
+    const entrance = caveMap.get(location.id)?.position;
+    assert.ok(entrance);
+    const minimumDrop = location.offshore ? .6 : 3.3;
+    assert.ok(entrance.y - location.y >= minimumDrop,
+      `${location.label} water is recessed below its entrance`);
   }
 });
 

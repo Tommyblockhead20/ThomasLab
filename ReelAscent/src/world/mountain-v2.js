@@ -501,8 +501,14 @@ export function terrainHeightAt(angle, radius) {
 function waterSurfaceY(location) {
   if (Number.isFinite(location.waterY)) return location.waterY;
   if (location.summit) return SUMMIT_HEIGHT - .12;
-  if (location.cave) return rawTerrainHeightAt(location.angle, location.radius)
-    - Math.max(9, location.basinDepth + 6.5);
+  if (location.cave) {
+    // Cave pools are authored relative to their mouth, not the much higher terrain at the
+    // pool's inward radius. This guarantees that the lined entrance descends to water even
+    // on the steep middle and Alpine faces instead of climbing dozens of meters underground.
+    const entranceRadius = location.radius + caveDepthAt(location);
+    const entranceY = rawTerrainHeightAt(location.angle, entranceRadius);
+    return entranceY - Math.max(3.35, location.basinDepth + 1.25);
+  }
   return rawTerrainHeightAt(location.angle, location.radius) - location.basinDepth + .45;
 }
 
@@ -4057,6 +4063,19 @@ export class MountainWorld extends TestWorld {
     }) => {
       const vertices = [];
       const triangles = [];
+      const capBelowHostSurface = (point, profile) => {
+        let ceilingY = Number.isFinite(profile.ceilingY) ? profile.ceilingY : null;
+        if (profile.surfaceCap) {
+          const dx = point.x - MOUNTAIN_CENTER.x;
+          const dz = point.z - MOUNTAIN_CENTER.z;
+          let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+          if (localAngle < 0) localAngle += 360;
+          const localRadius = Math.hypot(dx, dz);
+          ceilingY = terrainHeightAt(localAngle, localRadius) - CAVE_TOPOLOGY_CONFIG.roofClearance;
+        }
+        if (Number.isFinite(ceilingY)) point.y = Math.min(point.y, ceilingY);
+        return point;
+      };
       for (let station = 0; station < stations; station += 1) {
         const t = station / Math.max(1, stations - 1);
         const profile = stationAt(t);
@@ -4066,15 +4085,7 @@ export class MountainWorld extends TestWorld {
           const point = this.point(location.angle, profile.radius, profile.floorY, lateral);
           const shoulder = Math.pow(Math.sin(phase), .82);
           point.y = profile.floorY + shoulder * profile.height;
-          if (profile.surfaceCap) {
-            const dx = point.x - MOUNTAIN_CENTER.x;
-            const dz = point.z - MOUNTAIN_CENTER.z;
-            let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
-            if (localAngle < 0) localAngle += 360;
-            const localRadius = Math.hypot(dx, dz);
-            point.y = Math.max(profile.floorY + .12, Math.min(point.y,
-              terrainHeightAt(localAngle, localRadius) - CAVE_TOPOLOGY_CONFIG.roofClearance));
-          }
+          capBelowHostSurface(point, profile);
           vertices.push([point.x, point.y, point.z]);
         }
       }
@@ -4090,6 +4101,7 @@ export class MountainWorld extends TestWorld {
       if (capBack) {
         const last = stationAt(1);
         const center = this.point(location.angle, last.radius - .18, last.floorY + last.height * .38, 0);
+        capBelowHostSurface(center, last);
         const centerIndex = vertices.length;
         vertices.push([center.x, center.y, center.z]);
         const start = (stations - 1) * (sides + 1);
@@ -4101,13 +4113,32 @@ export class MountainWorld extends TestWorld {
     };
 
     if (island) {
-      // The offshore cave follows the same rule: only faceted mesh surfaces, no cuboid
-      // cave floor, walls, ceiling, or rear room pieces.
+      // The shallow offshore island needs an open, lined descent before its roof begins.
+      // Every ceiling vertex stays below the lowest surrounding top ring, so the lining can
+      // never become an exterior hood even though this island has little overburden.
       const outerRadius = entranceRadius - .15;
       const backRadius = location.radius - location.radii[0] - 2.4;
       const floorOuter = island.elevation - .02;
-      const floorRear = location.y - 1.05;
+      const floorRear = location.y - 1.3;
+      const islandCeilingY = island.elevation + .02;
+      const shellStartT = .34;
       const chamberHalfWidth = Math.max(location.radii[1] + 1.15, 4.4);
+      const islandSurfaceYAt = (point) => {
+        const dx = point.x - island.worldPosition.x;
+        const dz = point.z - island.worldPosition.z;
+        let parameterAngle = Math.atan2(dz / island.radii.z, dx / island.radii.x) * 180 / Math.PI;
+        if (parameterAngle < 0) parameterAngle += 360;
+        const outlineScale = islandFootprintScale(island.id, parameterAngle);
+        const normalizedRadius = Math.hypot(dx / island.radii.x, dz / island.radii.z)
+          / Math.max(.001, outlineScale);
+        if (normalizedRadius >= 1) return lerp(OCEAN_SURFACE_Y - .08, OCEAN_SURFACE_Y - 1.6,
+          smoothstep(1, 1.2, normalizedRadius));
+        if (normalizedRadius >= .68) return lerp(island.elevation + .06, OCEAN_SURFACE_Y - .08,
+          smoothstep(.68, 1, normalizedRadius));
+        if (normalizedRadius >= .2) return lerp(island.elevation + .16, island.elevation + .06,
+          smoothstep(.2, .68, normalizedRadius));
+        return island.elevation + .18;
+      };
       const widthAt = (t) => {
         const chamber = smoothstep(.32, .58, t) * (1 - smoothstep(.82, 1, t));
         return lerp(location.radii[1] * .72 + 1.05, chamberHalfWidth, chamber)
@@ -4115,6 +4146,34 @@ export class MountainWorld extends TestWorld {
       };
       const floorAt = (t) => lerp(floorOuter, floorRear,
         t < .34 ? smoothstep(0, .34, t) : 1);
+
+      // The island terrain omits two complete shoreline/top-ring strips to form its mouth.
+      // Reconstruct only their lower walking surface as a recessed apron; the volume above
+      // stays open, while players can no longer fall through the unlined outer half of the cut.
+      const centerRadians = degreesToRadians(location.angle);
+      const localShoreRadius = Math.hypot(
+        Math.cos(centerRadians) * island.radii.x,
+        Math.sin(centerRadians) * island.radii.z
+      ) * islandFootprintScale(island.id, location.angle);
+      const shoreRadius = location.radius + localShoreRadius;
+      addRibbon({
+        name: `${location.label} natural island entrance apron`,
+        rows: 14,
+        columns: 9,
+        pointAt: (t, side) => {
+          const radius = lerp(shoreRadius - .12, outerRadius, t);
+          const outerHalfWidth = Math.tan(degreesToRadians(13.5)) * shoreRadius;
+          const halfWidth = lerp(outerHalfWidth, widthAt(0), smoothstep(0, 1, t));
+          const point = this.point(location.angle, radius, 0, side * halfWidth);
+          const hostY = islandSurfaceYAt(point) - .08;
+          const centerDip = (1 - Math.abs(side)) * lerp(.03, .12, t);
+          point.y = Math.min(hostY,
+            lerp(hostY, floorOuter - centerDip, smoothstep(.72, 1, t)));
+          return point;
+        },
+        material: this.materials.islandRock,
+        friction: .96
+      });
 
       addRibbon({
         name: `${location.label} faceted cave floor`,
@@ -4128,20 +4187,39 @@ export class MountainWorld extends TestWorld {
         material: this.materials.cave
       });
 
-      //addOrganicShell({
-      //  name: `${location.label} rounded cave shell`,
-      //  stations: 18,
-      //  stationAt: (t) => ({
-      //    radius: lerp(outerRadius - .7, backRadius, t),
-      //    floorY: floorAt(t),
-      //    halfWidth: widthAt(t) + .22,
-      //    height: lerp(3.3, 5.25, smoothstep(.15, .62, t))
-      //      * lerp(1, .18, smoothstep(.88, 1, t)),
-      //    surfaceCap: false
-      //  }),
-      //  material: this.materials.caveWall
-      //});
-      //return;
+      for (const wallSide of [-1, 1]) addRibbon({
+        name: `${location.label} recessed entrance ${wallSide < 0 ? 'left' : 'right'} wall`,
+        rows: 9,
+        columns: 2,
+        pointAt: (t, verticalSide) => {
+          const pathT = lerp(0, shellStartT, t);
+          const radius = lerp(outerRadius, backRadius, pathT);
+          const point = this.point(location.angle, radius, 0,
+            wallSide * (widthAt(pathT) + .22));
+          point.y = lerp(floorAt(pathT), islandCeilingY, (verticalSide + 1) * .5);
+          return point;
+        },
+        material: this.materials.caveWall
+      });
+
+      addOrganicShell({
+        name: `${location.label} recessed tunnel lining`,
+        stations: 20,
+        sides: 14,
+        stationAt: (localT) => {
+          const t = lerp(shellStartT, 1, localT);
+          return {
+            radius: lerp(outerRadius, backRadius, t),
+            floorY: floorAt(t),
+            halfWidth: widthAt(t) + .22,
+            height: lerp(3.3, 5.25, smoothstep(.15, .62, t))
+              * lerp(1, .18, smoothstep(.88, 1, t)),
+            ceilingY: islandCeilingY
+          };
+        },
+        material: this.materials.caveWall
+      });
+      return;
     }
 
     // MOUNTAIN CAVES — no-box topology + fall-gap repair.
@@ -4226,25 +4304,69 @@ export class MountainWorld extends TestWorld {
     shellStartT = Math.max(shellStartT,
       CAVE_TOPOLOGY_CONFIG.archMinimumInset / Math.max(.001, runDepth));
 
-    //addOrganicShell({
-    //  name: `${location.label} faceted tunnel and rounded chamber`,
-    //  stations: 26,
-    //  sides: 14,
-     // stationAt: (localT) => {
-    //    const t = lerp(shellStartT, 1, localT);
-    //    const chamberBlend = smoothstep(.3, .58, t) * (1 - smoothstep(.82, 1, t));
-    //    const taper = lerp(1, .12, smoothstep(.9, 1, t));
-    //    const desiredHeight = lerp(3.0, 5.35, chamberBlend) * taper;
-    //    return {
-    //      radius: lerp(apronInnerRadius, backRadius, t),
-    //      floorY: floorAt(t),
-    //      halfWidth: Math.max(.22, widthAt(t) + .26),
-    //      height: Math.max(.42, desiredHeight),
-          //surfaceCap: true
-        //};
-      //},
-      //material: this.materials.caveWall
-    //});
+    // Two open-topped wall ribbons attach to the exact omitted-terrain footprint and descend
+    // until there is enough overburden for a full arch. Their top vertices are sampled from
+    // the host mountain and inset, making protrusion outside the gray core impossible.
+    const wallOuterRadius = outerCutRadius - .06;
+    const wallInnerRadius = lerp(apronInnerRadius, backRadius, shellStartT);
+    const innerMouthProfile = caveApertureProfileAtDepth(location, 1);
+    for (const wallSide of [-1, 1]) addRibbon({
+      name: `${location.label} recessed entrance ${wallSide < 0 ? 'left' : 'right'} wall`,
+      rows: 15,
+      columns: 2,
+      pointAt: (t, verticalSide) => {
+        const radius = lerp(wallOuterRadius, wallInnerRadius, t);
+        const depthT = clamp((outerCutRadius - radius)
+          / Math.max(.001, outerCutRadius - innerCutRadius), 0, 1);
+        const apertureProfile = caveApertureProfileAtDepth(location, depthT);
+        const tunnelT = clamp((apronInnerRadius - radius) / Math.max(.001, runDepth), 0, 1);
+        const belowCutT = clamp((innerCutRadius - radius)
+          / Math.max(.001, innerCutRadius - apronInnerRadius), 0, 1);
+        const halfWidth = radius >= innerCutRadius
+          ? apertureProfile.halfWidth + .1
+          : lerp(innerMouthProfile.halfWidth + .1, widthAt(tunnelT) + .26,
+            smoothstep(0, 1, belowCutT));
+        const centerShift = radius >= innerCutRadius
+          ? apertureProfile.centerShift
+          : lerp(innerMouthProfile.centerShift, 0, smoothstep(0, 1, belowCutT));
+        const point = this.point(location.angle, radius, 0,
+          centerShift + wallSide * halfWidth);
+        const dx = point.x - MOUNTAIN_CENTER.x;
+        const dz = point.z - MOUNTAIN_CENTER.z;
+        let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+        if (localAngle < 0) localAngle += 360;
+        const localRadius = Math.hypot(dx, dz);
+        const hostSurfaceY = terrainHeightAt(localAngle, localRadius);
+        const apronT = clamp((outerCutRadius - radius)
+          / Math.max(.001, outerCutRadius - apronInnerRadius), 0, 1);
+        const bottomY = radius >= apronInnerRadius
+          ? hostSurfaceY - lerp(.16, .82, smoothstep(0, 1, apronT))
+          : floorAt(tunnelT);
+        point.y = lerp(bottomY, hostSurfaceY - .08, (verticalSide + 1) * .5);
+        return point;
+      },
+      material: this.materials.caveWall
+    });
+
+    addOrganicShell({
+      name: `${location.label} recessed tunnel and pool lining`,
+      stations: 26,
+      sides: 14,
+      stationAt: (localT) => {
+        const t = lerp(shellStartT, 1, localT);
+        const chamberBlend = smoothstep(.3, .58, t) * (1 - smoothstep(.82, 1, t));
+        const taper = lerp(1, .12, smoothstep(.9, 1, t));
+        const desiredHeight = lerp(3.0, 5.35, chamberBlend) * taper;
+        return {
+          radius: lerp(apronInnerRadius, backRadius, t),
+          floorY: floorAt(t),
+          halfWidth: Math.max(.22, widthAt(t) + .26),
+          height: Math.max(.42, desiredHeight),
+          surfaceCap: true
+        };
+      },
+      material: this.materials.caveWall
+    });
   }
 
   addFishingWaterSurface(name, center, radii, material) {
@@ -4329,7 +4451,7 @@ export class MountainWorld extends TestWorld {
 
     if (location.summit) return;
     if (location.cave) {
-      //this.buildCaveInteriorShell(location);
+      this.buildCaveInteriorShell(location);
       return;
     }
     for (let stone = 0; stone < 4; stone += 1) {
