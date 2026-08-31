@@ -16,7 +16,8 @@ import {
   OCEAN_FISHING_DESCRIPTOR,
   START_LOCATIONS,
   SUMMIT_HEIGHT,
-  TERRAIN_ANGLE_PROFILE
+  TERRAIN_ANGLE_PROFILE,
+  createEllipseSurfaceMeshData
 } from '../src/world/mountain-v2.js';
 
 test('Crown traversal density supplies supported routes, branches, rests, and upper belts', () => {
@@ -110,6 +111,28 @@ test('the world exposes exactly 24 waters with one hollow annular ocean', () => 
   assert.equal(ocean.shape, 'annulus');
   assert.equal(ocean.contains(MOUNTAIN_CENTER), false);
   assert.equal(ocean.contains(pointAt(0, ocean.innerRadius + 2)), true);
+});
+
+test('cave water surface geometry has no side wall or underside shell', () => {
+  const center = { x: 12, y: 4.5, z: -8 };
+  const radii = { x: 5.4, z: 3.6 };
+  const { vertices, triangles } = createEllipseSurfaceMeshData(center, radii, 16);
+  assert.equal(vertices.length, 17);
+  assert.equal(triangles.length, 16);
+  assert.ok(vertices.every((vertex) => vertex[1] === center.y));
+  assert.equal(Math.min(...vertices.map((vertex) => vertex[0])), center.x - radii.x);
+  assert.equal(Math.max(...vertices.map((vertex) => vertex[0])), center.x + radii.x);
+  assert.equal(Math.min(...vertices.map((vertex) => vertex[2])), center.z - radii.z);
+  assert.equal(Math.max(...vertices.map((vertex) => vertex[2])), center.z + radii.z);
+
+  for (const triangle of triangles) {
+    assert.equal(triangle[0], 0);
+    const a = vertices[triangle[1]];
+    const b = vertices[triangle[2]];
+    const upwardNormal = (a[2] - center.z) * (b[0] - center.x)
+      - (a[0] - center.x) * (b[2] - center.z);
+    assert.ok(upwardNormal > 0);
+  }
 });
 
 test('300-creature ecology audit preserves the active 24-water topology', () => {

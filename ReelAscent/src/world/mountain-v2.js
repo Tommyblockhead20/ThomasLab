@@ -868,6 +868,27 @@ function makeMaterial(values, options = {}) {
   return material;
 }
 
+export function createEllipseSurfaceMeshData(center, radii, segments = 40) {
+  const segmentCount = Math.max(12, Math.floor(segments));
+  const vertices = [[center.x, center.y, center.z]];
+  for (let index = 0; index < segmentCount; index += 1) {
+    const phase = index / segmentCount * Math.PI * 2;
+    vertices.push([
+      center.x + Math.cos(phase) * radii.x,
+      center.y,
+      center.z + Math.sin(phase) * radii.z
+    ]);
+  }
+  const triangles = [];
+  for (let index = 0; index < segmentCount; index += 1) {
+    const current = index + 1;
+    const next = (index + 1) % segmentCount + 1;
+    // Counter-clockwise from above, giving the visible water surface an upward normal.
+    triangles.push([0, next, current]);
+  }
+  return { vertices, triangles };
+}
+
 export class MountainWorld extends TestWorld {
   constructor(app, RAPIER, physicsWorld) {
     super(app, RAPIER, physicsWorld);
@@ -4226,6 +4247,21 @@ export class MountainWorld extends TestWorld {
     //});
   }
 
+  addFishingWaterSurface(name, center, radii, material) {
+    const { vertices, triangles } = createEllipseSurfaceMeshData(center, radii);
+    const geometry = new pc.Geometry();
+    geometry.positions = vertices.flat();
+    geometry.indices = triangles.flat();
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity(name);
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+    entity.render.castShadows = false;
+    this.buildTarget.addChild(entity);
+    return entity;
+  }
+
   addFishingLocation(location, index) {
     const center = this.point(location.angle, location.radius, location.y);
     const tierBiteRate = ({ lower: .94, middle: 1.03, upper: 1.11, summit: 1.18, waterfall: 1.06 })[location.tier] ?? 1;
@@ -4272,9 +4308,18 @@ export class MountainWorld extends TestWorld {
     if (location.waterfall) return;
     const waterThickness = .08;
     const waterCenter = { x: center.x, y: location.y - waterThickness * .5, z: center.z };
-    const water = this.addCylinder(`${location.label} water`, waterCenter,
-      { x: visibleRadii.x * 2, y: waterThickness, z: visibleRadii.z * 2 },
-      location.depth === 'deep' ? this.materials.deepWater : this.materials.shallowWater, {}, false);
+    const waterMaterial = location.depth === 'deep' ? this.materials.deepWater : this.materials.shallowWater;
+    // Cave pools must not use the primitive cylinder used by open-air ponds. A cylinder
+    // includes a double-sided wall and underside; seen through an entrance, that extra shell
+    // becomes a large dark rectangular slab. The top-only ellipse preserves the exact water
+    // footprint and fishing surface without generating any surrounding cave-mouth geometry.
+    const water = location.cave
+      ? this.addFishingWaterSurface(`${location.label} water`, {
+        x: center.x, y: location.y, z: center.z
+      }, visibleRadii, waterMaterial)
+      : this.addCylinder(`${location.label} water`, waterCenter,
+        { x: visibleRadii.x * 2, y: waterThickness, z: visibleRadii.z * 2 },
+        waterMaterial, {}, false);
     water.render.castShadows = false;
     this.mountainWaters.push({
       entity: water,
