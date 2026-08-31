@@ -4106,6 +4106,21 @@ export class MountainWorld extends TestWorld {
         },
         material: this.materials.cave
       });
+
+      //addOrganicShell({
+      //  name: `${location.label} rounded cave shell`,
+      //  stations: 18,
+      //  stationAt: (t) => ({
+      //    radius: lerp(outerRadius - .7, backRadius, t),
+      //    floorY: floorAt(t),
+      //    halfWidth: widthAt(t) + .22,
+      //    height: lerp(3.3, 5.25, smoothstep(.15, .62, t))
+      //      * lerp(1, .18, smoothstep(.88, 1, t)),
+      //    surfaceCap: false
+      //  }),
+      //  material: this.materials.caveWall
+      //});
+      //return;
     }
 
     // MOUNTAIN CAVES — no-box topology + fall-gap repair.
@@ -4190,6 +4205,25 @@ export class MountainWorld extends TestWorld {
     shellStartT = Math.max(shellStartT,
       CAVE_TOPOLOGY_CONFIG.archMinimumInset / Math.max(.001, runDepth));
 
+    //addOrganicShell({
+    //  name: `${location.label} faceted tunnel and rounded chamber`,
+    //  stations: 26,
+    //  sides: 14,
+     // stationAt: (localT) => {
+    //    const t = lerp(shellStartT, 1, localT);
+    //    const chamberBlend = smoothstep(.3, .58, t) * (1 - smoothstep(.82, 1, t));
+    //    const taper = lerp(1, .12, smoothstep(.9, 1, t));
+    //    const desiredHeight = lerp(3.0, 5.35, chamberBlend) * taper;
+    //    return {
+    //      radius: lerp(apronInnerRadius, backRadius, t),
+    //      floorY: floorAt(t),
+    //      halfWidth: Math.max(.22, widthAt(t) + .26),
+    //      height: Math.max(.42, desiredHeight),
+          //surfaceCap: true
+        //};
+      //},
+      //material: this.materials.caveWall
+    //});
   }
 
   addFishingLocation(location, index) {
@@ -4250,7 +4284,7 @@ export class MountainWorld extends TestWorld {
 
     if (location.summit) return;
     if (location.cave) {
-      this.buildCaveInteriorShell(location);
+      //this.buildCaveInteriorShell(location);
       return;
     }
     for (let stone = 0; stone < 4; stone += 1) {
