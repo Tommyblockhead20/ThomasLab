@@ -6,7 +6,8 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 })[character]);
 
 const CATEGORY_LABELS = Object.freeze({
-  rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', guide: 'ECOLOGY GUIDES', traversal: 'TRAVERSAL'
+  rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', guide: 'ECOLOGY GUIDES',
+  boots: 'BOOTS', gloves: 'GLOVES', climbing: 'CLIMBING EQUIPMENT'
 });
 
 export class ShopMenu {

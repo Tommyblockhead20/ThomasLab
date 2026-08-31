@@ -7,6 +7,7 @@ import { FISH_SPECIES } from './fishing/fish-data.js';
 import { SaveSystem } from './persistence/save-system.js';
 import { ProgressionSystem } from './progression/progression.js';
 import { Player } from './player/player.js';
+import { loadKeyBindings } from './player/movement.js';
 import { FishJournal } from './ui/fish-journal.js';
 import { EcologyGuidePanel } from './ui/ecology-guide.js';
 import { FishingPerformanceMenu } from './ui/fishing-performance.js';
@@ -27,6 +28,8 @@ import { cheatGate, isCheatsEnabled } from './debug/cheat-gate.js';
 import { ShopMenu } from './ui/shop.js';
 import { AquariumMenu } from './ui/aquarium.js';
 import { BoatTravelMenu } from './ui/boat-travel.js';
+import { PauseMenu } from './ui/pause-menu.js';
+import { resolveGlobalWorldPosition } from './world/world-locations.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -65,6 +68,31 @@ export class Game {
     this.createLighting();
     this.world = new MountainWorld(this.app, physics, this.physicsWorld);
     const initialStart = this.world.chooseStart();
+    const initialWorldLocation = this.world.getWorldLocations?.().find((location) => location.id === initialStart.locationId)
+      ?? this.world.getWorldLocations?.().find((location) => location.type === 'main-island')
+      ?? null;
+    this.currentLocationId = initialStart.locationId ?? initialWorldLocation?.id ?? null;
+    this.currentCoordinateSpace = initialStart.coordinateSpace ?? 'global-world';
+    this.mainWorldLocationId = initialWorldLocation?.id ?? this.currentLocationId;
+    this.world.setActiveLocation?.(this.currentLocationId);
+    this.localPause = { active: false, openedAt: null, totalPausedSeconds: 0 };
+    this.sessionStats = {
+      activePlaytimeSeconds: 0,
+      fishCaught: 0,
+      catchesByRarity: {},
+      shinyCaught: 0,
+      bestCatch: null,
+      ascents: 0,
+      watersCaught: new Set(),
+      boatTrips: 0,
+      fastestAscentSeconds: null,
+      ascentStartActiveSeconds: null,
+      ascentCheatContaminated: false,
+      ascentCompleted: false,
+      events: []
+    };
+    this.pendingPersistentPlaytime = 0;
+    this.contextualAction = null;
     this.hud = new Hud();
     this.saveSystem = new SaveSystem();
     this.progression = new ProgressionSystem(this.saveSystem);
@@ -99,10 +127,14 @@ export class Game {
     this.shopMenu = new ShopMenu(this.progression);
     this.aquariumMenu = new AquariumMenu(this.progression);
     this.mapMenu = new MountainMapMenu(this.world.getMapData(), {
-      getLocalPlayer: () => ({ id: 'YOU', position: this.player.getPosition() }),
+      getLocalPlayer: () => ({ id: 'YOU', position: this.getLocalGlobalPosition() }),
       getRemotePlayers: () => [...(this.multiplayer?.room?.members ?? new Map()).entries()]
-        .filter(([, remote]) => remote.lastSample)
-        .map(([id, remote]) => ({ id: id.slice(-6).toUpperCase(), position: remote.lastSample }))
+        .filter(([, remote]) => remote.globalPosition || remote.lastSample)
+        .map(([id, remote]) => ({
+          id: id.slice(-6).toUpperCase(),
+          locationId: remote.locationId,
+          position: remote.globalPosition ?? remote.lastSample
+        }))
     });
     this.boatTravel = new BoatTravelMenu((destinationId) => this.travelByBoat(destinationId));
     this.onOpenBoat = (event) => this.boatTravel.open(event.detail?.currentLocationId);
@@ -122,6 +154,7 @@ export class Game {
       ),
       onAuthoritativeRunSeed: (runSeed) => this.applyAuthoritativeRunSeed(runSeed)
     });
+    this.multiplayer.room.setLocalLocationId?.(this.currentLocationId);
     this.onMultiplayerMessage = (event) => this.handleMultiplayerMessage(event.detail);
     this.multiplayer.addEventListener('message', this.onMultiplayerMessage);
     this.multiplayerMenu = new MultiplayerMenu(this.multiplayer);
@@ -140,18 +173,41 @@ export class Game {
     this.lastSummitReached = false;
     this.lastRunStatus = this.runManager.status;
     this.camera.update(1 / 60, true);
+    this.pauseMenu = new PauseMenu(this.progression, {
+      getStats: () => this.getLifetimeStats(),
+      onResume: () => this.setLocalPause(false)
+    });
 
     this.onResize = () => this.app.resizeCanvas();
+    this.onPauseKeyDown = (event) => {
+      if (event.code !== 'Escape' || event.repeat || this.isEditableTarget(event.target)) return;
+
+      // Existing modal/interaction owners get first refusal. Their own Escape handlers run
+      // after this capture listener and close/cancel the active state without opening Pause.
+      if (!this.localPause.active && this.hasEscapePriorityState()) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.setLocalPause(!this.localPause.active);
+    };
+    this.onPausedGameplayKeyDown = (event) => {
+      if (!this.localPause.active || event.code === 'Escape' || this.isEditableTarget(event.target)) return;
+      if (!this.isGameplayInputCode(event.code)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
     this.onDebugKeyDown = (event) => {
       if (event.repeat || event.code !== 'F9' || !isCheatsEnabled()) return;
-      const editable = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase?.()) || event.target?.isContentEditable;
-      if (editable) return;
+      if (this.isEditableTarget(event.target)) return;
       event.preventDefault();
-      const money = this.progression.addMoney(1000);
+      const money = this.progression.addMoney(1000, { legitimate: false });
+      this.recordStatEvent('debug-money', { amount: 1000 }, false);
       this.hud.showToast?.(`+$1,000 • $${money}`);
       this.inventory.update();
     };
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('keydown', this.onPauseKeyDown, true);
+    window.addEventListener('keydown', this.onPausedGameplayKeyDown, true);
     window.addEventListener('keydown', this.onDebugKeyDown, true);
 
     this.app.on('update', (rawDt) => this.update(Math.min(rawDt, 0.05)));
@@ -166,12 +222,22 @@ export class Game {
       purchase: (itemId) => this.progression.purchase(itemId),
       equip: (itemId) => this.progression.equip(itemId),
       sell: (specimenId) => this.progression.sellSpecimen(specimenId),
-      addMoney: (amount = 1000) => this.progression.addMoney(amount),
+      addMoney: (amount = 1000) => {
+        const money = this.progression.addMoney(amount, { legitimate: false });
+        this.recordStatEvent('debug-money', { amount }, false);
+        return money;
+      },
       respawn: () => this.player.respawn(),
-      newRun: () => this.runManager.startRun(this.world.chooseStart(this.runManager.currentStart.id), true),
+      newRun: () => {
+        const start = this.world.chooseStart(this.runManager.currentStart.id);
+        this.setCurrentLocation(start.locationId ?? this.currentLocationId, start.coordinateSpace ?? 'global-world');
+        return this.runManager.startRun(start, true);
+      },
       teleport: (code) => {
         const target = this.world.getDebugTarget(code);
         if (target) {
+          this.markCheatAction('teleport');
+          this.setCurrentLocation(target.locationId ?? this.currentLocationId, target.coordinateSpace ?? 'global-world');
           this.player.teleport(target.position, target.facingYaw);
           this.camera.setYaw(target.facingYaw);
           this.world.setDeveloperCourseVisible(['KeyT', 'KeyV'].includes(code));
@@ -179,6 +245,8 @@ export class Game {
         return Boolean(target);
       },
       starts: START_LOCATIONS.map((start) => ({ id: start.id, label: start.label, ...start.position })),
+      getSessionStats: () => this.getSessionStats(),
+      getCurrentLocationId: () => this.currentLocationId,
       getTransientSession: () => describeTransientSession(this)
     });
   }
@@ -201,13 +269,13 @@ export class Game {
 
   update(dt) {
     if (this.destroyed) return;
-    if (!this.journal.isOpen && !this.inventory.isOpen && !this.multiplayerMenu.isOpen
-      && !this.mapMenu.isOpen && !this.emoteMenu.isOpen && !this.appearanceMenu.isOpen
-      && !this.shopMenu.isOpen && !this.aquariumMenu.isOpen && !this.boatTravel.isOpen) {
+    const modalOpen = this.isGameplayModalOpen();
+    const localGameplayPaused = this.localPause.active;
+    if (!modalOpen && !localGameplayPaused) {
       this.runManager.update(dt);
       if (!this.runManager.paused) {
-        // Sample the shared X/Grip interaction target before climbing consumes a held Grip.
-        // With no nearby target, Grip remains completely untouched for traversal.
+        // Generic world interaction only consumes Grip when a real nearby target exists;
+        // otherwise Grip remains available to climbing exactly as before.
         this.homeInteraction.captureInteractionInput();
         this.player.update(dt, this.camera.getPlanarAxes());
         this.physicsWorld.timestep = dt;
@@ -215,6 +283,7 @@ export class Game {
         this.player.afterPhysics(dt);
       }
     }
+    if (!localGameplayPaused) this.updateSessionStats(dt);
     this.syncPersistentProgress();
     if (this.lastHomeProgressRevision !== this.saveSystem.revision) {
       this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
@@ -222,10 +291,16 @@ export class Game {
       this.lastHomeProgressRevision = this.saveSystem.revision;
     }
     this.world.update(dt);
-    this.homeInteraction.update();
     const multiplayerPlayerState = this.player.getState();
+    this.contextualAction = this.resolveContextualAction(multiplayerPlayerState);
+    this.homeInteraction.setPromptAllowed(this.contextualAction?.kind === 'interact');
+    this.homeInteraction.update();
+    const globalPosition = this.getLocalGlobalPosition(multiplayerPlayerState.position);
     this.multiplayer.update(Date.now(), {
       position: multiplayerPlayerState.position,
+      globalPosition,
+      locationId: this.currentLocationId,
+      coordinateSpace: this.currentCoordinateSpace,
       yaw: this.player.facingYaw,
       movement: multiplayerPlayerState.movementState,
       posture: multiplayerPlayerState.posture,
@@ -252,17 +327,214 @@ export class Game {
     this.hud.update(dt, this.getState());
   }
 
+  isEditableTarget(target) {
+    const tagName = target?.tagName?.toLowerCase?.();
+    return ['input', 'textarea', 'select'].includes(tagName) || Boolean(target?.isContentEditable);
+  }
+
+  isGameplayInputCode(code) {
+    return Boolean(this.player?.input?.matchesAnyGameplayCode?.(code))
+      || ['KeyJ', 'KeyI', 'KeyM', 'KeyE'].includes(code);
+  }
+
+  isGameplayModalOpen() {
+    return this.journal.isOpen || this.inventory.isOpen || this.multiplayerMenu.isOpen
+      || this.mapMenu.isOpen || this.emoteMenu.isOpen || this.appearanceMenu.isOpen
+      || this.shopMenu.isOpen || this.aquariumMenu.isOpen || this.boatTravel.isOpen;
+  }
+
+  hasEscapePriorityState() {
+    return this.isGameplayModalOpen() || this.fishing.active || Boolean(this.player?.benchSeat);
+  }
+
+  setLocalPause(active) {
+    const next = Boolean(active);
+    if (next === this.localPause.active) return;
+    if (next) {
+      this.localPause.active = true;
+      this.localPause.openedAt = performance.now();
+      this.pauseMenu?.setOpen(true);
+      document.exitPointerLock?.();
+      return;
+    }
+
+    if (this.localPause.openedAt !== null) {
+      this.localPause.totalPausedSeconds += Math.max(0, performance.now() - this.localPause.openedAt) / 1000;
+    }
+    this.localPause.active = false;
+    this.localPause.openedAt = null;
+    this.pauseMenu?.setOpen(false);
+  }
+
+  setCurrentLocation(locationId, coordinateSpace = 'global-world') {
+    if (!locationId) return this.currentLocationId;
+    this.currentLocationId = locationId;
+    this.currentCoordinateSpace = coordinateSpace || 'global-world';
+    this.world.setActiveLocation?.(locationId);
+    this.multiplayer?.room?.setLocalLocationId?.(locationId);
+    return this.currentLocationId;
+  }
+
+  getLocalGlobalPosition(position = this.player?.getPosition?.() ?? { x: 0, y: 0, z: 0 }) {
+    return resolveGlobalWorldPosition(this.currentLocationId, position, this.currentCoordinateSpace);
+  }
+
+  resolveContextualAction(playerState = this.player.getState()) {
+    if (this.localPause.active || this.isGameplayModalOpen() || this.fishing.active) return null;
+    if (['climbing', 'mantling'].includes(playerState.movementState)) return { kind: 'grip', priority: 100 };
+    const interaction = this.homeInteraction.refreshCurrent().current;
+    if (interaction) return { kind: 'interact', id: interaction.id, label: interaction.label, priority: 80 };
+    if (playerState.canFish) return { kind: 'fish', zoneId: this.fishing.findNearbyZone?.()?.id ?? null, priority: 60 };
+    if (playerState.canGrip) return { kind: 'grip', priority: 40 };
+    return null;
+  }
+
+  recordStatEvent(type, detail = {}, legitimate = true) {
+    this.sessionStats.events.push({
+      type,
+      detail: { ...detail },
+      legitimate: Boolean(legitimate),
+      activePlaytimeSeconds: this.sessionStats.activePlaytimeSeconds
+    });
+    if (this.sessionStats.events.length > 160) this.sessionStats.events.splice(0, this.sessionStats.events.length - 160);
+  }
+
+  markCheatAction(kind) {
+    if (kind === 'teleport') this.sessionStats.ascentCheatContaminated = true;
+    this.recordStatEvent(`cheat:${kind}`, {}, false);
+  }
+
+  isLegitimateCatch(catchData) {
+    const source = String(catchData?.source ?? catchData?.origin ?? '').toLowerCase();
+    return !catchData?.cheatGenerated && !catchData?.debugGenerated && !catchData?.debugSpawned
+      && !catchData?.spawnedByCheat && !source.includes('debug') && !source.includes('cheat');
+  }
+
+  recordCatchStats(catchData) {
+    const legitimate = this.isLegitimateCatch(catchData);
+    const rarity = String(catchData?.rarity ?? 'unknown').toLowerCase();
+    const zoneId = catchData?.zoneId ?? catchData?.fishingZoneId ?? this.fishing.zone?.id ?? null;
+
+    this.recordStatEvent('fish-caught', {
+      speciesId: catchData?.speciesId ?? null, rarity, zoneId, shiny: Boolean(catchData?.shiny)
+    }, legitimate);
+    if (!legitimate) return;
+
+    this.sessionStats.fishCaught += 1;
+    this.sessionStats.catchesByRarity[rarity] = (this.sessionStats.catchesByRarity[rarity] ?? 0) + 1;
+    if (catchData?.shiny) this.sessionStats.shinyCaught += 1;
+    if (zoneId) this.sessionStats.watersCaught.add(zoneId);
+
+    const weight = Number(catchData?.weight) || 0;
+    const length = Number(catchData?.length) || 0;
+    const currentBest = this.sessionStats.bestCatch;
+    if (!currentBest || weight > currentBest.weight || (weight === currentBest.weight && length > currentBest.length)) {
+      this.sessionStats.bestCatch = {
+        speciesId: catchData?.speciesId ?? null,
+        name: catchData?.name ?? null,
+        rarity, shiny: Boolean(catchData?.shiny),
+        weight, length
+      };
+    }
+  }
+
+  updateSessionStats(dt) {
+    this.sessionStats.activePlaytimeSeconds += dt;
+    this.pendingPersistentPlaytime += dt;
+    if (this.pendingPersistentPlaytime >= 15) this.flushActivePlaytime();
+    const playerState = this.player.getState();
+    const worldInfo = this.world.getWorldInfo(playerState.position, playerState.climbMaterial);
+    const elevationMeters = Number(worldInfo?.elevation) || 0;
+    if (this.currentLocationId !== this.mainWorldLocationId) return;
+
+    if (elevationMeters <= 1.0) {
+      this.sessionStats.ascentStartActiveSeconds = this.sessionStats.activePlaytimeSeconds;
+      this.sessionStats.ascentCheatContaminated = false;
+      this.sessionStats.ascentCompleted = false;
+      return;
+    }
+
+    if (elevationMeters < 304.8 || this.sessionStats.ascentCompleted
+      || this.sessionStats.ascentStartActiveSeconds === null) return;
+
+    this.sessionStats.ascentCompleted = true;
+    const elapsed = Math.max(0, this.sessionStats.activePlaytimeSeconds - this.sessionStats.ascentStartActiveSeconds);
+    const legitimate = !this.sessionStats.ascentCheatContaminated;
+    this.recordStatEvent('ascent-1000ft', { seconds: elapsed }, legitimate);
+    if (legitimate && (this.sessionStats.fastestAscentSeconds === null || elapsed < this.sessionStats.fastestAscentSeconds)) {
+      this.sessionStats.fastestAscentSeconds = elapsed;
+      this.saveSystem.recordFastestAscent(elapsed, { legitimate: true });
+    }
+  }
+
+  flushActivePlaytime() {
+    const seconds = this.pendingPersistentPlaytime;
+    if (!(seconds > 0)) return 0;
+    this.pendingPersistentPlaytime = 0;
+    this.saveSystem.recordActivePlaytime(seconds);
+    return seconds;
+  }
+
+  getLifetimeStats() {
+    // Include the current unflushed seconds so Pause → Stats always looks live without
+    // forcing localStorage writes every frame.
+    const lifetime = this.saveSystem.getSnapshot().lifetime ?? {};
+    const purchase = this.progression.getPurchaseProgress?.() ?? { purchased: 0, total: 0, percent: 0 };
+    const totalWaters = this.world.getMapData?.().waters?.length ?? 0;
+    const watersCaught = Array.isArray(lifetime.fishingWatersCaught) ? lifetime.fishingWatersCaught.length : 0;
+    return {
+      activePlaytimeSeconds: (Number(lifetime.activePlaytimeSeconds) || 0) + this.pendingPersistentPlaytime,
+      fishCaught: Number(lifetime.fishCaught) || 0,
+      catchesByRarity: { ...(lifetime.catchesByRarity ?? {}) },
+      shinyCaught: Number(lifetime.shinyCaught) || 0,
+      bestCatch: lifetime.bestCatch ? { ...lifetime.bestCatch } : null,
+      ascents: Number(lifetime.summitCount) || 0,
+      boatTrips: Number(lifetime.boatTrips) || 0,
+      fastestAscentSeconds: lifetime.fastestAscentSeconds ?? null,
+      watersCaught,
+      totalWaters,
+      waterPercent: totalWaters ? watersCaught / totalWaters * 100 : 0,
+      itemsPurchased: purchase.purchased,
+      totalPurchasableItems: purchase.total,
+      purchasePercent: purchase.percent,
+      legitimateEarnings: Number(lifetime.legitimateEarnings) || 0
+    };
+  }
+
+  getSessionStats() {
+    const pausedNow = this.localPause.openedAt === null
+      ? 0
+      : Math.max(0, performance.now() - this.localPause.openedAt) / 1000;
+    return {
+      activePlaytimeSeconds: this.sessionStats.activePlaytimeSeconds,
+      fishCaught: this.sessionStats.fishCaught,
+      catchesByRarity: { ...this.sessionStats.catchesByRarity },
+      shinyCaught: this.sessionStats.shinyCaught,
+      bestCatch: this.sessionStats.bestCatch ? { ...this.sessionStats.bestCatch } : null,
+      ascents: this.sessionStats.ascents,
+      watersCaught: [...this.sessionStats.watersCaught],
+      boatTrips: this.sessionStats.boatTrips,
+      fastestAscentSeconds: this.sessionStats.fastestAscentSeconds,
+      pausedSeconds: this.localPause.totalPausedSeconds + pausedNow,
+      recentEvents: this.sessionStats.events.slice(-24).map((event) => ({ ...event, detail: { ...event.detail } }))
+    };
+  }
+
   createRemotePlayerRepresentation(playerId, colorIndex = 0, appearance = null) {
     return createRemoteAvatar(this.app, playerId, colorIndex, appearance);
   }
 
   travelByBoat(destinationId) {
     const arrival = this.world.chooseTravelArrival(destinationId);
-    if (!arrival) return false;
+    if (!arrival || arrival.safe === false) return false;
     if (this.fishing.active) this.fishing.cancel();
     this.player.clearBenchSeat?.();
     this.player.teleport(arrival.position, arrival.facingYaw);
     this.camera.setYaw(arrival.facingYaw);
+    this.setCurrentLocation(arrival.locationId ?? arrival.location?.id ?? destinationId, arrival.coordinateSpace ?? 'global-world');
+    this.sessionStats.boatTrips += 1;
+    this.saveSystem.recordBoatTrip({ legitimate: true });
+    this.recordStatEvent('boat-trip', { destinationId: this.currentLocationId, dockId: arrival.dockId ?? null }, true);
     this.hud.showToast?.(`Arrived at ${arrival.location.displayName} • ${arrival.dockId}`);
     return true;
   }
@@ -282,6 +554,7 @@ export class Game {
     if (runSeed === null || runSeed === undefined) return;
     this.activeMultiplayerSeed = runSeed;
     const sharedStart = this.world.chooseStart(null, this.seededRandom(runSeed));
+    this.setCurrentLocation(sharedStart.locationId ?? this.currentLocationId, sharedStart.coordinateSpace ?? 'global-world');
     this.runManager.startRun(sharedStart, true);
     this.hud.showToast?.(`Joined shared run • ${sharedStart.label}`);
   }
@@ -357,7 +630,10 @@ export class Game {
     for (const catchData of this.fishing.catchHistory) {
       if (this.persistedCatches.has(catchData)) continue;
       this.persistedCatches.add(catchData);
-      this.saveSystem.recordCatch(catchData);
+      const legitimateCatch = this.isLegitimateCatch(catchData);
+      const zoneId = catchData?.zoneId ?? catchData?.fishingZoneId ?? this.fishing.zone?.id ?? null;
+      this.recordCatchStats(catchData);
+      this.saveSystem.recordCatch({ ...catchData, fishingZoneId: zoneId }, { legitimate: legitimateCatch });
       const presentation = {
         ...catchData,
         presentationId: `${catchData.speciesId}:${catchData.caughtAt}`,
@@ -368,7 +644,10 @@ export class Game {
     }
 
     if (this.runManager.summitReached && !this.lastSummitReached) {
-      this.saveSystem.recordSummit();
+      const legitimateAscent = !this.sessionStats.ascentCheatContaminated;
+      this.recordStatEvent('summit', {}, legitimateAscent);
+      if (legitimateAscent) this.sessionStats.ascents += 1;
+      this.saveSystem.recordSummit({ legitimate: legitimateAscent });
       this.journal.refresh();
     }
     this.lastSummitReached = this.runManager.summitReached;
@@ -391,6 +670,18 @@ export class Game {
       world: this.world.getWorldInfo(playerState.position, playerState.climbMaterial),
       run: this.runManager.getState(),
       progression: this.progression.getHudState(),
+      location: {
+        locationId: this.currentLocationId,
+        coordinateSpace: this.currentCoordinateSpace,
+        globalPosition: this.getLocalGlobalPosition(playerState.position)
+      },
+      contextualAction: this.contextualAction ? { ...this.contextualAction } : null,
+      keyBindings: loadKeyBindings(),
+      pause: {
+        active: this.localPause.active,
+        multiplayerContinues: true
+      },
+      statsFoundation: this.getSessionStats(),
       performance: {
         drawCalls: this.app.stats.drawCalls?.total ?? 0,
         triangles: this.app.stats.scene?.triangles ?? 0,
@@ -401,6 +692,7 @@ export class Game {
 
   destroy() {
     this.destroyed = true;
+    this.flushActivePlaytime();
     this.player.destroy();
     this.fishing.destroy();
     this.fishingPerformance.destroy();
@@ -408,6 +700,7 @@ export class Game {
     this.shopMenu.destroy();
     this.aquariumMenu.destroy();
     this.boatTravel.destroy();
+    this.pauseMenu?.destroy();
     window.removeEventListener('reel-ascent:open-boat', this.onOpenBoat);
     this.appearanceMenu.destroy();
     this.homeInteraction.destroy();
@@ -421,6 +714,8 @@ export class Game {
     this.journal.destroy();
     this.hud.destroy();
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('keydown', this.onPauseKeyDown, true);
+    window.removeEventListener('keydown', this.onPausedGameplayKeyDown, true);
     window.removeEventListener('keydown', this.onDebugKeyDown, true);
     cheatGate.destroy();
     delete window.__reelAscent;

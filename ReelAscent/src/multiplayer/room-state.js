@@ -15,6 +15,7 @@ export class RoomState {
     this.localPlayerId = localPlayerId;
     this.roomCode = '';
     this.runSeed = null;
+    this.localLocationId = 'main-mountain';
     this.members = new Map();
     this.roster = new Map();
     this.colorAssignments = new Map([[localPlayerId, REMOTE_PLAYER_COLORS.findIndex((color) => color.name === 'ORANGE')]]);
@@ -48,12 +49,18 @@ export class RoomState {
       const presentation = this.roster.get(playerId);
       if (!this.members.has(playerId)) {
         const colorIndex = this.colorAssignments.get(playerId) ?? this.assignColor(playerId);
-        this.members.set(playerId, new RemotePlayer(playerId,
-          createRepresentation(playerId, colorIndex, presentation?.appearance)));
+        const remote = new RemotePlayer(playerId,
+          createRepresentation(playerId, colorIndex, presentation?.appearance));
+        remote.setLocalLocationId(this.localLocationId);
+        this.members.set(playerId, remote);
       }
       this.members.get(playerId)?.representation?.setAppearance?.(presentation?.appearance);
       this.members.get(playerId)?.representation?.setPosture?.(presentation?.posture);
-      this.members.get(playerId)?.representation?.setFishingState?.(presentation?.fishingState);
+      const remote = this.members.get(playerId);
+      remote?.representation?.setFishingState?.(presentation?.fishingState);
+      if (typeof presentation?.locationId === 'string') remote.locationId = presentation.locationId;
+      if (presentation?.globalPosition) remote.globalPosition = { ...presentation.globalPosition };
+      remote?.syncVisibility?.();
     }
     for (const [playerId, player] of this.members) {
       if (activeIds.has(playerId)) continue;
@@ -63,8 +70,24 @@ export class RoomState {
     }
   }
 
+
+  setLocalLocationId(locationId) {
+    this.localLocationId = locationId || 'main-mountain';
+    for (const player of this.members.values()) player.setLocalLocationId(this.localLocationId);
+  }
+
   consumeSnapshot(payload) {
-    return this.members.get(payload?.playerId)?.consumeSnapshot(payload) ?? false;
+    const remote = this.members.get(payload?.playerId);
+    const consumed = remote?.consumeSnapshot(payload) ?? false;
+    if (consumed && this.roster.has(payload.playerId)) {
+      this.roster.set(payload.playerId, {
+        ...this.roster.get(payload.playerId),
+        locationId: remote.locationId,
+        coordinateSpace: remote.coordinateSpace,
+        globalPosition: remote.globalPosition ? { ...remote.globalPosition } : null
+      });
+    }
+    return consumed;
   }
 
   consumeFishingState(payload) {

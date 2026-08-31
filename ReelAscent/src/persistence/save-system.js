@@ -1,7 +1,7 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 7;
+export const SAVE_SCHEMA_VERSION = 8;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -24,7 +24,15 @@ export function defaultSave() {
       fishCaught: 0,
       summitCount: 0,
       runsCompleted: 0,
-      highestElevation: 0
+      highestElevation: 0,
+      catchesByRarity: { Common: 0, Uncommon: 0, Rare: 0, Legendary: 0 },
+      shinyCaught: 0,
+      bestCatch: null,
+      fishingWatersCaught: [],
+      boatTrips: 0,
+      fastestAscentSeconds: null,
+      activePlaytimeSeconds: 0,
+      legitimateEarnings: 0
     },
     runHistory: [],
     progression: defaultProgressionState()
@@ -97,6 +105,25 @@ export function normalizeSave(value = {}) {
   normalized.lifetime.summitCount = Math.max(0, Math.floor(finiteNumber(lifetime.summitCount)));
   normalized.lifetime.runsCompleted = Math.max(0, Math.floor(finiteNumber(lifetime.runsCompleted)));
   normalized.lifetime.highestElevation = Math.max(0, finiteNumber(lifetime.highestElevation));
+  const rarityCounts = lifetime.catchesByRarity && typeof lifetime.catchesByRarity === 'object' ? lifetime.catchesByRarity : {};
+  for (const rarity of CANONICAL_RARITIES) normalized.lifetime.catchesByRarity[rarity] = Math.max(0, Math.floor(finiteNumber(rarityCounts[rarity])));
+  normalized.lifetime.shinyCaught = Math.max(0, Math.floor(finiteNumber(lifetime.shinyCaught)));
+  const bestCatch = lifetime.bestCatch && typeof lifetime.bestCatch === 'object' ? lifetime.bestCatch : null;
+  normalized.lifetime.bestCatch = bestCatch ? {
+    speciesId: canonicalSpeciesId(bestCatch.speciesId ?? ''),
+    name: typeof bestCatch.name === 'string' ? bestCatch.name.slice(0, 120) : '',
+    rarity: normalizeRarity(bestCatch.rarity),
+    shiny: Boolean(bestCatch.shiny),
+    weight: Math.max(0, finiteNumber(bestCatch.weight)),
+    length: Math.max(0, finiteNumber(bestCatch.length))
+  } : null;
+  normalized.lifetime.fishingWatersCaught = [...new Set((Array.isArray(lifetime.fishingWatersCaught) ? lifetime.fishingWatersCaught : [])
+    .filter((id) => typeof id === 'string' && id).map((id) => id.slice(0, 160)))];
+  normalized.lifetime.boatTrips = Math.max(0, Math.floor(finiteNumber(lifetime.boatTrips)));
+  normalized.lifetime.fastestAscentSeconds = Number.isFinite(lifetime.fastestAscentSeconds) && lifetime.fastestAscentSeconds > 0
+    ? lifetime.fastestAscentSeconds : null;
+  normalized.lifetime.activePlaytimeSeconds = Math.max(0, finiteNumber(lifetime.activePlaytimeSeconds));
+  normalized.lifetime.legitimateEarnings = Math.max(0, Math.floor(finiteNumber(lifetime.legitimateEarnings)));
   normalized.runHistory = Array.isArray(value.runHistory)
     ? value.runHistory.slice(0, 12).filter((entry) => entry && typeof entry === 'object').map((entry) => ({
       ...entry,
@@ -144,6 +171,12 @@ const MIGRATIONS = Object.freeze({
     ...value,
     version: 7,
     progression: normalizeProgressionState(value.progression)
+  }),
+  7: (value) => ({
+    ...value,
+    version: 8,
+    progression: normalizeProgressionState(value.progression),
+    lifetime: value.lifetime ?? {}
   })
 });
 
@@ -302,10 +335,28 @@ export class SaveSystem {
     }
   }
 
-  recordCatch(catchData) {
+  recordCatch(catchData, { legitimate = true } = {}) {
     if (!catchData?.speciesId) return false;
     const speciesId = canonicalSpeciesId(catchData.speciesId);
     const previous = normalizeEntry(this.data.collection[speciesId]);
+    const rarity = normalizeRarity(catchData.rarityLabel ?? catchData.rarity ?? previous.rarity);
+    const now = finiteNumber(catchData.caughtAt, Date.now());
+
+    // Cheat/debug catches may still reveal the creature in the journal, but they cannot
+    // inflate catch counts, records, quality records, shinies, best catch, or water coverage.
+    if (!legitimate) {
+      this.data.collection[speciesId] = {
+        ...previous,
+        discovered: true,
+        name: catchData.name ?? previous.name,
+        rarity,
+        firstLocation: previous.firstLocation || catchData.locationLabel || '',
+        firstCaughtAt: previous.firstCaughtAt || now,
+        lastCaughtAt: Math.max(previous.lastCaughtAt, now)
+      };
+      return this.save();
+    }
+
     const lengthCategoryIndex = Math.max(0, finiteNumber(catchData.lengthCategoryIndex));
     const sizeCategoryIndex = Math.max(0, finiteNumber(catchData.sizeCategoryIndex));
     const quality = QUALITY_RANK[catchData.quality] ? catchData.quality : 'GOOD';
@@ -313,37 +364,74 @@ export class SaveSystem {
       ...previous,
       discovered: true,
       name: catchData.name ?? previous.name,
-      rarity: normalizeRarity(catchData.rarityLabel ?? catchData.rarity ?? previous.rarity),
+      rarity,
       catches: previous.catches + 1,
       bestLength: Math.max(previous.bestLength, finiteNumber(catchData.length)),
       bestWeight: Math.max(previous.bestWeight, finiteNumber(catchData.weight)),
       bestLengthCategory: lengthCategoryIndex >= previous.bestLengthCategoryIndex
-        ? catchData.lengthCategory ?? previous.bestLengthCategory
-        : previous.bestLengthCategory,
+        ? catchData.lengthCategory ?? previous.bestLengthCategory : previous.bestLengthCategory,
       bestLengthCategoryIndex: Math.max(previous.bestLengthCategoryIndex, lengthCategoryIndex),
       bestSizeCategory: sizeCategoryIndex >= previous.bestSizeCategoryIndex
-        ? catchData.sizeCategory ?? catchData.sizeLabel ?? previous.bestSizeCategory
-        : previous.bestSizeCategory,
+        ? catchData.sizeCategory ?? catchData.sizeLabel ?? previous.bestSizeCategory : previous.bestSizeCategory,
       bestSizeCategoryIndex: Math.max(previous.bestSizeCategoryIndex, sizeCategoryIndex),
-      bestQuality: (QUALITY_RANK[quality] ?? 0) >= (QUALITY_RANK[previous.bestQuality] ?? 0)
-        ? quality
-        : previous.bestQuality,
+      bestQuality: (QUALITY_RANK[quality] ?? 0) >= (QUALITY_RANK[previous.bestQuality] ?? 0) ? quality : previous.bestQuality,
       shinyCount: previous.shinyCount + Number(Boolean(catchData.shiny)),
       firstLocation: previous.firstLocation || catchData.locationLabel || '',
-      bestLocation: finiteNumber(catchData.weight) >= previous.bestWeight
-        ? catchData.locationLabel || previous.bestLocation
-        : previous.bestLocation,
+      bestLocation: finiteNumber(catchData.weight) >= previous.bestWeight ? catchData.locationLabel || previous.bestLocation : previous.bestLocation,
       highestCatchElevation: Math.max(previous.highestCatchElevation, finiteNumber(catchData.elevation)),
-      firstCaughtAt: previous.firstCaughtAt || finiteNumber(catchData.caughtAt, Date.now()),
-      lastCaughtAt: finiteNumber(catchData.caughtAt, Date.now())
+      firstCaughtAt: previous.firstCaughtAt || now,
+      lastCaughtAt: now
     };
     this.data.collection[speciesId] = record;
-    this.data.lifetime.fishCaught += 1;
+    const lifetime = this.data.lifetime;
+    lifetime.fishCaught += 1;
+    lifetime.catchesByRarity[rarity] = (lifetime.catchesByRarity[rarity] ?? 0) + 1;
+    if (catchData.shiny) lifetime.shinyCaught += 1;
+    const zoneId = catchData.fishingZoneId ?? catchData.zoneId;
+    if (typeof zoneId === 'string' && zoneId && !lifetime.fishingWatersCaught.includes(zoneId)) lifetime.fishingWatersCaught.push(zoneId.slice(0, 160));
+    const candidate = {
+      speciesId, name: catchData.name ?? speciesId, rarity, shiny: Boolean(catchData.shiny),
+      weight: Math.max(0, finiteNumber(catchData.weight)), length: Math.max(0, finiteNumber(catchData.length))
+    };
+    if (!lifetime.bestCatch || candidate.weight > lifetime.bestCatch.weight
+      || (candidate.weight === lifetime.bestCatch.weight && candidate.length > lifetime.bestCatch.length)) lifetime.bestCatch = candidate;
     return this.save();
   }
 
-  recordSummit() {
+  recordSummit({ legitimate = true } = {}) {
+    if (!legitimate) return false;
     this.data.lifetime.summitCount += 1;
+    return this.save();
+  }
+
+  recordBoatTrip({ legitimate = true } = {}) {
+    if (!legitimate) return false;
+    this.data.lifetime.boatTrips += 1;
+    return this.save();
+  }
+
+  recordFastestAscent(seconds, { legitimate = true } = {}) {
+    const value = finiteNumber(seconds);
+    if (!legitimate || value <= 0) return false;
+    const current = this.data.lifetime.fastestAscentSeconds;
+    if (current === null || value < current) {
+      this.data.lifetime.fastestAscentSeconds = value;
+      return this.save();
+    }
+    return false;
+  }
+
+  recordActivePlaytime(seconds) {
+    const value = Math.max(0, finiteNumber(seconds));
+    if (!value) return false;
+    this.data.lifetime.activePlaytimeSeconds += value;
+    return this.save();
+  }
+
+  recordLegitimateEarnings(amount) {
+    const value = Math.max(0, Math.floor(finiteNumber(amount)));
+    if (!value) return false;
+    this.data.lifetime.legitimateEarnings += value;
     return this.save();
   }
 

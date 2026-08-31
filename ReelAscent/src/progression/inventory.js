@@ -3,6 +3,9 @@ import { createDurableId } from './progression-save.js';
 
 export function createSpecimenRecord(catchData, value, ownerId) {
   const caughtAt = Number.isFinite(catchData.caughtAt) ? catchData.caughtAt : Date.now();
+  const source = String(catchData?.source ?? catchData?.origin ?? '').toLowerCase();
+  const legitimate = !catchData?.cheatGenerated && !catchData?.debugGenerated && !catchData?.debugSpawned
+    && !catchData?.spawnedByCheat && !source.includes('debug') && !source.includes('cheat');
   const sourceId = catchData.id ?? `${catchData.speciesId}-${caughtAt}`;
   const speciesId = canonicalSpeciesId(catchData.speciesId);
   const species = resolveSpecies(speciesId, true);
@@ -29,6 +32,7 @@ export function createSpecimenRecord(catchData, value, ownerId) {
     value: Math.max(1, Math.floor(value)),
     provenance: Object.freeze({
       origin: 'caught',
+      legitimate,
       caughtAt,
       locationId: catchData.location ?? '',
       locationLabel: catchData.locationLabel ?? '',

@@ -2388,3 +2388,150 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .multiplayer-roster li[data-connected="false"] {
   opacity: .62;
 }
+
+/* v9 pause / accessibility / contextual interaction integration */
+.pause-menu {
+  position: absolute;
+  z-index: 82;
+  inset: 50% auto auto 50%;
+  display: grid;
+  width: min(58rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: .72rem;
+  padding: 1rem;
+  overflow: hidden;
+  color: #edf6e9;
+  text-shadow: none;
+  background: linear-gradient(145deg, rgb(8 35 34 / 98%), rgb(18 48 41 / 98%));
+  border: 1px solid rgb(239 217 139 / 48%);
+  border-radius: .95rem;
+  box-shadow: 0 26px 82px rgb(2 13 14 / 68%);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+.pause-menu[hidden] { display: none; }
+body.pause-open #game-shell::after {
+  position: absolute;
+  z-index: 81;
+  inset: 0;
+  content: "";
+  background: rgb(2 13 15 / 66%);
+  pointer-events: none;
+}
+.pause-header { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
+.pause-header h2 { margin: .08rem 0 0; color: #f4dda0; font-size: 1.6rem; }
+.pause-header button,
+.pause-tabs button,
+.pause-menu button {
+  padding: .55rem .72rem;
+  color: #153a36;
+  font-size: .62rem;
+  font-weight: 950;
+  background: #edd58c;
+  border: 0;
+  border-radius: .45rem;
+  cursor: pointer;
+}
+.pause-tabs { display: flex; gap: .38rem; flex-wrap: wrap; }
+.pause-tabs button { color: #e8f1e9; background: rgb(255 255 255 / 8%); border: 1px solid rgb(255 255 255 / 8%); }
+.pause-tabs button[aria-pressed="true"] { color: #153a36; background: #edd58c; border-color: #edd58c; }
+.pause-status { min-height: 1rem; margin: 0; color: rgb(234 244 231 / 64%); font-size: .6rem; font-weight: 750; }
+.pause-content { min-height: 0; overflow: auto; padding: .08rem .2rem .25rem .05rem; scrollbar-color: #d9bb66 rgb(255 255 255 / 8%); }
+.pause-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+.pause-stats-grid article { display: grid; gap: .2rem; min-height: 4.1rem; align-content: center; padding: .62rem; background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .52rem; }
+.pause-stats-grid small,
+.pause-stat-detail h3 { color: #efd98b; font-size: .49rem; font-weight: 950; letter-spacing: .09em; }
+.pause-stats-grid strong { font-size: .82rem; }
+.pause-stat-detail { margin-top: .55rem; padding: .65rem; background: rgb(0 0 0 / 12%); border-radius: .48rem; }
+.pause-stat-detail h3 { margin: 0 0 .28rem; }
+.pause-stat-detail p { margin: 0; color: rgb(234 244 231 / 76%); font-size: .61rem; line-height: 1.45; }
+.pause-setting-list { display: grid; gap: .5rem; }
+.pause-setting-list label { display: flex; gap: .55rem; align-items: center; padding: .7rem; color: #edf6e9; font-size: .68rem; font-weight: 800; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 9%); border-radius: .48rem; cursor: pointer; }
+.pause-setting-list input { accent-color: #efd98b; }
+.keybind-list { display: grid; gap: .35rem; }
+.keybind-row { display: grid; grid-template-columns: minmax(9rem, 1fr) auto auto; gap: .65rem; align-items: center; padding: .55rem .62rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 9%); border-radius: .46rem; }
+.keybind-row.is-waiting { background: rgb(239 217 139 / 12%); border-color: rgb(239 217 139 / 58%); }
+.keybind-row > div { display: grid; gap: .12rem; }
+.keybind-row strong { font-size: .68rem; }
+.keybind-row small { color: rgb(234 244 231 / 53%); font-size: .49rem; }
+.keybind-row kbd { min-width: 4.4rem; text-align: center; }
+.pause-secondary-action { margin-top: .55rem; }
+body.hide-control-hints .controls-card { display: none; }
+body.large-ui .pause-menu,
+body.large-ui .progression-shop,
+body.large-ui .mountain-map,
+body.large-ui .appearance-menu,
+body.large-ui .multiplayer-menu,
+body.large-ui .emote-menu { font-size: 1.14em; }
+body.reduce-motion :is(.pause-menu, .progression-shop, .mountain-map, .appearance-menu, .multiplayer-menu, .emote-menu, .boat-travel, .catch-banner, .bite-prompt, .home-interaction-prompt, .grip-prompt, .fish-prompt) * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+
+/* X/Interact now shares the same contextual-prompt footprint as Fish and Grip. */
+.home-interaction-prompt {
+  z-index: 34;
+  left: 50%;
+  right: auto;
+  bottom: 10.3rem;
+  display: flex;
+  min-width: 0;
+  width: auto;
+  gap: .45rem;
+  align-items: center;
+  padding: .5rem .72rem;
+  translate: -50% 0;
+  color: #fff8d8;
+  background: rgb(17 53 50 / 82%);
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 999px;
+  box-shadow: 0 7px 20px rgb(24 49 46 / 20%);
+  backdrop-filter: blur(8px);
+}
+.home-interaction-prompt .eyebrow { display: none; }
+.home-interaction-prompt strong { color: #fff8d8; font-size: .68rem; white-space: nowrap; }
+.home-interaction-prompt button { padding: .33rem .5rem; border-radius: 999px; white-space: nowrap; }
+
+/* Real destination footprints: button hit areas stay usable, but the visible land is the registry outline. */
+.boat-map-island {
+  min-width: 4.6rem;
+  min-height: 3.2rem;
+  gap: .18rem;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: .55rem !important;
+}
+.boat-map-footprint {
+  display: grid;
+  width: 2.65rem;
+  height: 1.85rem;
+  place-content: center;
+  background: #77a95a;
+  border: 2px solid #3b643b;
+  border-radius: 12%;
+  box-shadow: 0 2px 4px rgb(20 45 36 / 24%);
+}
+.boat-map-main-island .boat-map-footprint { width: 3.75rem; height: 2.55rem; color: #f2e4b0; font-size: 1.45rem; background: #789264; border-radius: 42% 52% 40% 55%; }
+.boat-map-cold-island .boat-map-footprint { background: #e8f4ec; border-color: #9fd0df; }
+.boat-map-cave-island .boat-map-footprint { background: #777a70; border-color: #4e544d; }
+.boat-map-developed-island .boat-map-footprint { background: #9ca66b; }
+.boat-map-aquarium-island .boat-map-footprint { background: #82ae79; }
+.boat-map-fishing-island .boat-map-footprint { background: #76a667; }
+.boat-map-island.is-current { box-shadow: 0 0 0 3px #fff5b6; }
+.boat-map-island.is-selected { outline: 3px solid #f2bd45; outline-offset: 1px; }
+
+.map-islands :is(ellipse, polygon) { fill: #6f9958; stroke: #2d5c45; stroke-width: 1.4; }
+.map-island-cold-island :is(ellipse, polygon) { fill: #e4efea; stroke: #78aeb9; }
+.map-island-cave-island :is(ellipse, polygon) { fill: #777a70; }
+
+/* Secret cheat activation has no pre-activation progress state. */
+.cheat-activation { --cheat-progress: 100%; background: rgb(6 35 38 / 94%); }
+
+@media (max-width: 760px) {
+  .pause-menu { width: calc(100vw - 1rem); max-height: calc(100vh - 1rem); padding: .75rem; }
+  .pause-header { align-items: stretch; }
+  .pause-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pause-tabs button:last-child { grid-column: 1 / -1; }
+  .pause-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .keybind-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .keybind-row button { grid-column: 1 / -1; }
+  .home-interaction-prompt { bottom: 10.8rem; max-width: calc(100vw - 1rem); }
+}

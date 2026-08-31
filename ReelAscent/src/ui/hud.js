@@ -1,4 +1,5 @@
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
+import { formatInputCode } from '../player/movement.js';
 
 function formatRunTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
@@ -17,6 +18,9 @@ export class Hud {
     this.debugPanel = document.querySelector('#debug-panel');
     this.gripPrompt = document.querySelector('#grip-prompt');
     this.fishPrompt = document.querySelector('#fish-prompt');
+    this.controlHints = Object.fromEntries(['move', 'sprint', 'jump', 'slide', 'grip', 'fish'].map((id) => [
+      id, document.querySelector(`[data-control-hint="${id}"] kbd`)
+    ]));
     this.fishingPanel = document.querySelector('#fishing-panel');
     this.fishingZone = document.querySelector('#fishing-zone');
     this.fishingMessage = document.querySelector('#fishing-message');
@@ -153,11 +157,25 @@ export class Hud {
       this.runEndRarest.textContent = playerState.run.summary.rarest;
       this.runEndStart.textContent = playerState.run.summary.start;
     }
-    this.gripPrompt.hidden = !playerState.canGrip && playerState.movementState !== 'climbing';
+    const contextualAction = playerState.contextualAction?.kind ?? null;
+    const bindings = playerState.keyBindings ?? {};
+    const gripKey = formatInputCode(bindings.grip ?? 'KeyG');
+    const hintText = {
+      move: `${formatInputCode(bindings.forward ?? 'KeyW')}/${formatInputCode(bindings.left ?? 'KeyA')}/${formatInputCode(bindings.backward ?? 'KeyS')}/${formatInputCode(bindings.right ?? 'KeyD')} / Arrows`,
+      sprint: `${formatInputCode(bindings.sprint ?? 'ShiftLeft')} / Shift R`,
+      jump: formatInputCode(bindings.jump ?? 'Space'),
+      slide: formatInputCode(bindings.slide ?? 'KeyC'),
+      grip: `Click / ${gripKey}`,
+      fish: formatInputCode(bindings.fish ?? 'KeyF')
+    };
+    for (const [id, keycap] of Object.entries(this.controlHints ?? {})) if (keycap) keycap.textContent = hintText[id];
+    this.gripPrompt.hidden = contextualAction !== 'grip';
     this.gripPrompt.innerHTML = playerState.movementState === 'climbing'
-      ? `${playerState.climbMaterial ?? 'Rock'} • Release <kbd>Click / G</kbd> — Drop`
-      : `Hold <kbd>Click / G</kbd> — Grip ${playerState.climbMaterial ?? ''}`;
-    this.fishPrompt.hidden = !playerState.canFish;
+      ? `${playerState.climbMaterial ?? 'Rock'} • Release <kbd>Click / ${gripKey}</kbd> — Drop`
+      : `Hold <kbd>Click / ${gripKey}</kbd> — Grip ${playerState.climbMaterial ?? ''}`;
+    const fishKey = formatInputCode(bindings.fish ?? 'KeyF');
+    this.fishPrompt.hidden = contextualAction !== 'fish';
+    this.fishPrompt.innerHTML = `Press <kbd>${fishKey}</kbd> — Fish`;
     this.fishingPanel.hidden = playerState.fishing.state === 'inactive'
       || playerState.fishing.state === 'rhythm'
       || playerState.fishing.state === 'caught';

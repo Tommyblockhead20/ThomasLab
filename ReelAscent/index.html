@@ -63,12 +63,12 @@
         <button id="return-home" type="button" title="Return to your cabin on Home Island">⌂ HOME</button>
 
         <div class="controls-card">
-          <span><kbd>WASD / Arrows</kbd> Move</span>
-          <span><kbd>Shift</kbd> Sprint</span>
-          <span><kbd>Space</kbd> Jump / Push off</span>
-          <span><kbd>C</kbd> Slide</span>
-          <span><kbd>Click / G</kbd> Grip</span>
-          <span><kbd>F</kbd> Fish</span>
+          <span data-control-hint="move"><kbd>WASD / Arrows</kbd> Move</span>
+          <span data-control-hint="sprint"><kbd>Shift</kbd> Sprint</span>
+          <span data-control-hint="jump"><kbd>Space</kbd> Jump / Push off</span>
+          <span data-control-hint="slide"><kbd>C</kbd> Slide</span>
+          <span data-control-hint="grip"><kbd>Click / G</kbd> Grip</span>
+          <span data-control-hint="fish"><kbd>F</kbd> Fish</span>
           <span><kbd>J</kbd> Journal</span>
           <span><kbd>I</kbd> Inventory</span>
           <span><kbd>M</kbd> Multiplayer</span>
@@ -189,6 +189,24 @@
         <output id="cheat-activation" class="cheat-activation" hidden aria-live="polite"></output>
       </section>
 
+
+      <section id="pause-menu" class="pause-menu" role="dialog" aria-modal="true" hidden aria-labelledby="pause-title">
+        <header class="pause-header">
+          <div><span class="eyebrow">REEL ASCENT</span><h2 id="pause-title">Paused</h2></div>
+          <button id="pause-resume" type="button">RESUME <kbd>Esc</kbd></button>
+        </header>
+        <nav id="pause-tabs" class="pause-tabs" aria-label="Pause sections">
+          <button type="button" data-pause-tab="stats" aria-pressed="true">STATS</button>
+          <button type="button" data-pause-tab="save-data" aria-pressed="false">SAVE / DATA</button>
+          <button type="button" data-pause-tab="settings" aria-pressed="false">SETTINGS</button>
+          <button type="button" data-pause-tab="accessibility" aria-pressed="false">ACCESSIBILITY</button>
+          <button type="button" data-pause-tab="keybinds" aria-pressed="false">KEY REBINDING</button>
+        </nav>
+        <p id="pause-status" class="pause-status" aria-live="polite"></p>
+        <div id="pause-content" class="pause-content"></div>
+        <input id="pause-progress-file" type="file" accept="application/json,.json" hidden />
+      </section>
+
       <section id="fish-journal" class="fish-journal" role="dialog" aria-modal="true" hidden aria-labelledby="journal-title" tabindex="-1">
         <header class="journal-header">
           <div>
@@ -213,24 +231,11 @@
           <button id="close-inventory" type="button">CLOSE <kbd>I</kbd> / <kbd>Esc</kbd></button>
         </header>
         <nav id="collection-tabs" class="shop-tabs collection-tabs" aria-label="Inventory sections">
-          <button type="button" data-collection-tab="inventory" aria-pressed="true">INVENTORY</button>
-          <button type="button" data-collection-tab="save-data" aria-pressed="false">SAVE / DATA</button>
+          <button type="button" data-collection-tab="catches" aria-pressed="true">CATCHES</button>
+          <button type="button" data-collection-tab="gear" aria-pressed="false">GEAR</button>
         </nav>
-        <p id="inventory-status" class="shop-status" aria-live="polite">Every successful catch waits here until you sell it or send it to Aquarium.</p>
+        <p id="inventory-status" class="shop-status" aria-live="polite">Every successful catch waits here until you sell it at Shop Island or move it at Aquarium Island.</p>
         <div id="inventory-content" class="inventory-content"></div>
-        <details id="progress-transfer" class="progress-transfer" hidden>
-          <summary>PORTABLE PROGRESS</summary>
-          <p>Export only durable progress. Session position, active fishing, and transient run state are intentionally excluded.</p>
-          <textarea id="progress-transfer-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste a Reel Ascent progress file here to import."></textarea>
-          <div class="progress-transfer-actions">
-            <label>IMPORT DESTINATION<select id="progress-import-slot"></select></label>
-            <button type="button" data-progress-action="download">DOWNLOAD PROGRESS</button>
-            <button type="button" data-progress-action="file">LOAD FILE</button>
-            <button type="button" data-progress-action="import">IMPORT PROGRESS</button>
-            <input id="progress-transfer-file" type="file" accept="application/json,.json" hidden />
-          </div>
-          <small id="progress-transfer-status" aria-live="polite"></small>
-        </details>
       </section>
 
       <section id="progression-shop" class="progression-shop" role="dialog" aria-modal="true" hidden aria-labelledby="shop-title">

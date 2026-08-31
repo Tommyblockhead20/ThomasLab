@@ -1,53 +1,106 @@
 import { STAMINA_CONFIG } from '../config.js';
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 
-const MOVEMENT_KEYS = new Set([
-  'KeyW',
-  'KeyA',
-  'KeyS',
-  'KeyD',
-  'ArrowUp',
-  'ArrowDown',
-  'ArrowLeft',
-  'ArrowRight',
-  'ShiftLeft',
-  'ShiftRight',
-  'KeyC',
-  'Space',
-  'KeyG',
-  'KeyF',
-  'KeyB',
-  'KeyN',
-  'F10',
-  'Escape'
-]);
+export const KEY_BINDINGS_STORAGE_KEY = 'reel-ascent-key-bindings-v1';
+
+export const KEY_BINDING_DEFINITIONS = Object.freeze({
+  forward: Object.freeze({ label: 'Move Forward / Rhythm Up', defaultCode: 'KeyW', fixedCodes: Object.freeze(['ArrowUp']) }),
+  backward: Object.freeze({ label: 'Move Backward / Rhythm Down', defaultCode: 'KeyS', fixedCodes: Object.freeze(['ArrowDown']) }),
+  left: Object.freeze({ label: 'Move Left / Rhythm Left', defaultCode: 'KeyA', fixedCodes: Object.freeze(['ArrowLeft']) }),
+  right: Object.freeze({ label: 'Move Right / Rhythm Right', defaultCode: 'KeyD', fixedCodes: Object.freeze(['ArrowRight']) }),
+  sprint: Object.freeze({ label: 'Sprint', defaultCode: 'ShiftLeft', fixedCodes: Object.freeze(['ShiftRight']) }),
+  jump: Object.freeze({ label: 'Jump / Push Off', defaultCode: 'Space', fixedCodes: Object.freeze([]) }),
+  slide: Object.freeze({ label: 'Slide', defaultCode: 'KeyC', fixedCodes: Object.freeze([]) }),
+  grip: Object.freeze({ label: 'Grip / World Grip-Interact', defaultCode: 'KeyG', fixedCodes: Object.freeze([]) }),
+  fish: Object.freeze({ label: 'Fish', defaultCode: 'KeyF', fixedCodes: Object.freeze([]) }),
+  interact: Object.freeze({ label: 'World Interact', defaultCode: 'KeyX', fixedCodes: Object.freeze([]) })
+});
+
+export const DEFAULT_KEY_BINDINGS = Object.freeze(Object.fromEntries(
+  Object.entries(KEY_BINDING_DEFINITIONS).map(([action, definition]) => [action, definition.defaultCode])
+));
+const RESERVED_BINDING_CODES = new Set(['Escape', 'F1', 'KeyJ', 'KeyI', 'KeyM', 'KeyE']);
+
+const bindingStorage = () => {
+  try { return globalThis.localStorage ?? null; } catch { return null; }
+};
+
+export function normalizeKeyBindings(value = {}) {
+  const result = { ...DEFAULT_KEY_BINDINGS };
+  for (const [action, definition] of Object.entries(KEY_BINDING_DEFINITIONS)) {
+    const code = value?.[action];
+    if (typeof code === 'string' && code && !RESERVED_BINDING_CODES.has(code)) result[action] = code.slice(0, 40);
+    else result[action] = definition.defaultCode;
+  }
+  return result;
+}
+
+export function loadKeyBindings() {
+  try {
+    const raw = bindingStorage()?.getItem(KEY_BINDINGS_STORAGE_KEY);
+    return normalizeKeyBindings(raw ? JSON.parse(raw) : {});
+  } catch { return { ...DEFAULT_KEY_BINDINGS }; }
+}
+
+export function saveKeyBindings(bindings) {
+  const normalized = normalizeKeyBindings(bindings);
+  try { bindingStorage()?.setItem(KEY_BINDINGS_STORAGE_KEY, JSON.stringify(normalized)); } catch {}
+  globalThis.window?.dispatchEvent?.(new CustomEvent('reel-ascent:key-bindings-changed', { detail: normalized }));
+  return normalized;
+}
+
+export function resetKeyBindings() { return saveKeyBindings(DEFAULT_KEY_BINDINGS); }
+
+export function setKeyBinding(action, code, bindings = loadKeyBindings()) {
+  if (!KEY_BINDING_DEFINITIONS[action]) return { ok: false, reason: 'Unknown action', bindings };
+  if (typeof code !== 'string' || !code || RESERVED_BINDING_CODES.has(code)) {
+    return { ok: false, reason: 'That key is reserved by the game.', bindings };
+  }
+  for (const [otherAction, otherCode] of Object.entries(bindings)) {
+    const definition = KEY_BINDING_DEFINITIONS[otherAction];
+    const occupiedCodes = new Set([otherCode, ...(definition?.fixedCodes ?? [])]);
+    if (otherAction !== action && occupiedCodes.has(code)) return {
+      ok: false,
+      reason: `${formatInputCode(code)} is already used by ${definition?.label ?? otherAction}.`,
+      bindings
+    };
+  }
+  return { ok: true, bindings: saveKeyBindings({ ...bindings, [action]: code }) };
+}
+
+export function formatInputCode(code = '') {
+  if (code === 'Space') return 'Space';
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Arrow')) return code.slice(5);
+  return code.replace(/Left$/, ' L').replace(/Right$/, ' R');
+}
+
+export function bindingCodes(action, bindings = loadKeyBindings()) {
+  const definition = KEY_BINDING_DEFINITIONS[action];
+  if (!definition) return [];
+  return [...new Set([bindings[action] ?? definition.defaultCode, ...definition.fixedCodes])];
+}
+
+export function isBoundActionCode(action, code, bindings = loadKeyBindings()) {
+  return bindingCodes(action, bindings).includes(code);
+}
+
+const RHYTHM_ACTIONS = Object.freeze({ left: 'A', forward: 'W', backward: 'S', right: 'D' });
+export function rhythmLaneForCode(code, bindings = loadKeyBindings()) {
+  for (const [action, lane] of Object.entries(RHYTHM_ACTIONS)) if (isBoundActionCode(action, code, bindings)) return lane;
+  return null;
+}
 
 const RHYTHM_LANES = Object.freeze({
-  KeyA: 'A',
-  ArrowLeft: 'A',
-  KeyW: 'W',
-  ArrowUp: 'W',
-  KeyS: 'S',
-  ArrowDown: 'S',
-  KeyD: 'D',
-  ArrowRight: 'D'
+  KeyA: 'A', ArrowLeft: 'A', KeyW: 'W', ArrowUp: 'W', KeyS: 'S', ArrowDown: 'S', KeyD: 'D', ArrowRight: 'D'
 });
-
-const TOUCH_RHYTHM_LANES = Object.freeze({
-  left: 'A',
-  up: 'W',
-  down: 'S',
-  right: 'D'
-});
-
+const TOUCH_RHYTHM_LANES = Object.freeze({ left: 'A', up: 'W', down: 'S', right: 'D' });
 const TOUCH_DIRECTIONS = new Set(Object.keys(TOUCH_RHYTHM_LANES));
 export const FISHING_CAST_CODES = Object.freeze(['ArrowUp', 'KeyW']);
 export const FISHING_HOOK_CODES = Object.freeze(['ArrowDown', 'KeyS']);
 export const SLIDE_CODES = Object.freeze(['KeyC']);
-
-export function isSlideInputCode(code) {
-  return SLIDE_CODES.includes(code);
-}
+export function isSlideInputCode(code) { return isBoundActionCode('slide', code); }
 
 // A lane may have more than one physical source (for example ArrowRight and D, or two
 // touch pointers). Press edges are tracked per source while hold ownership is aggregated
@@ -110,6 +163,13 @@ export function touchActionHeld(pointerMap, action) {
 export class PlayerInput {
   constructor(canvas) {
     this.canvas = canvas;
+    this.bindings = loadKeyBindings();
+    this.onBindingsChanged = (event) => {
+      this.bindings = normalizeKeyBindings(event.detail ?? loadKeyBindings());
+      this.held.clear();
+      this.rhythmLaneInput?.clearActive?.();
+    };
+    globalThis.window?.addEventListener?.('reel-ascent:key-bindings-changed', this.onBindingsChanged);
     this.held = new Set();
     this.jumpQueued = false;
     this.fishingToggleQueued = false;
@@ -139,24 +199,22 @@ export class PlayerInput {
     this.onKeyDown = (event) => {
       if (!this.forceMobile) this.setMobileMode(false);
       const wasHeld = this.held.has(event.code);
-      const lane = RHYTHM_LANES[event.code];
+      const lane = rhythmLaneForCode(event.code, this.bindings);
       this.rhythmLaneInput.press(`key:${event.code}`, lane, performance.now() / 1000, event.repeat);
-      if (MOVEMENT_KEYS.has(event.code)) {
-        event.preventDefault();
-      }
-      if (event.code === 'Space' && !event.repeat) {
+      if (this.matchesAnyGameplayCode(event.code) || ['KeyB', 'KeyN', 'F10', 'Escape'].includes(event.code)) event.preventDefault();
+      if (this.matchesAction('jump', event.code) && !event.repeat) {
         this.jumpQueued = true;
       }
-      if (event.code === 'KeyF' && !event.repeat) {
+      if (this.matchesAction('fish', event.code) && !event.repeat) {
         this.fishingToggleQueued = true;
       }
-      if (event.code === 'KeyG' && !event.repeat && !wasHeld) {
+      if (this.matchesAction('grip', event.code) && !event.repeat && !wasHeld) {
         this.gripInteractionQueued = true;
       }
-      if (FISHING_CAST_CODES.includes(event.code) && !event.repeat && !wasHeld) {
+      if (this.matchesAction('forward', event.code) && !event.repeat && !wasHeld) {
         this.fishingCastPressed = true;
       }
-      if (FISHING_HOOK_CODES.includes(event.code)
+      if (this.matchesAction('backward', event.code)
         && !this.rhythmCapture && !event.repeat && !wasHeld) {
         this.fishingHookPressed = true;
       }
@@ -176,7 +234,7 @@ export class PlayerInput {
     };
 
     this.onKeyUp = (event) => {
-      if (FISHING_CAST_CODES.includes(event.code) && this.held.has(event.code)) {
+      if (this.matchesAction('forward', event.code) && this.held.has(event.code)) {
         this.fishingCastReleased = true;
       }
       this.held.delete(event.code);
@@ -314,11 +372,22 @@ export class PlayerInput {
     return this.primarySources.size > 0;
   }
 
+  matchesAction(action, code) {
+    return isBoundActionCode(action, code, this.bindings);
+  }
+
+  getBinding(action) { return this.bindings[action] ?? KEY_BINDING_DEFINITIONS[action]?.defaultCode ?? ''; }
+
+  matchesAnyGameplayCode(code) {
+    return Object.keys(KEY_BINDING_DEFINITIONS).some((action) => this.matchesAction(action, code));
+  }
+
   getMoveAxes() {
-    const left = this.held.has('KeyA') || this.held.has('ArrowLeft') || this.touchActions.has('left');
-    const right = this.held.has('KeyD') || this.held.has('ArrowRight') || this.touchActions.has('right');
-    const forward = this.held.has('KeyW') || this.held.has('ArrowUp') || this.touchActions.has('up');
-    const backward = this.held.has('KeyS') || this.held.has('ArrowDown') || this.touchActions.has('down');
+    const heldAction = (action) => bindingCodes(action, this.bindings).some((code) => this.held.has(code));
+    const left = heldAction('left') || this.touchActions.has('left');
+    const right = heldAction('right') || this.touchActions.has('right');
+    const forward = heldAction('forward') || this.touchActions.has('up');
+    const backward = heldAction('backward') || this.touchActions.has('down');
 
     return {
       x: Number(right) - Number(left),
@@ -327,28 +396,24 @@ export class PlayerInput {
   }
 
   get sprintHeld() {
-    return this.held.has('ShiftLeft') || this.held.has('ShiftRight') || this.touchActions.has('sprint');
+    return bindingCodes('sprint', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('sprint');
   }
 
   get slideHeld() {
-    return SLIDE_CODES.some((code) => this.held.has(code))
-      || this.touchActions.has('slide');
+    return bindingCodes('slide', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('slide');
   }
 
   get rawGripHeld() {
-    return this.held.has('KeyG')
-      || this.touchActions.has('grip')
-      || this.primaryHeld;
+    return bindingCodes('grip', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('grip') || this.primaryHeld;
   }
 
   get gripHeld() {
-    return !this.gripInteractionSuppressed && (this.held.has('KeyG')
-      || this.touchActions.has('grip')
-      || (this.primaryHeld && !this.primarySuppressed));
+    return !this.gripInteractionSuppressed && (bindingCodes('grip', this.bindings).some((code) => this.held.has(code))
+      || this.touchActions.has('grip') || (this.primaryHeld && !this.primarySuppressed));
   }
 
   get fishingCastHeld() {
-    return this.held.has('ArrowUp') || this.held.has('KeyW') || this.touchActions.has('up');
+    return bindingCodes('forward', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('up');
   }
 
   consumeJump() {
@@ -460,6 +525,7 @@ export class PlayerInput {
   }
 
   destroy() {
+    globalThis.window?.removeEventListener?.('reel-ascent:key-bindings-changed', this.onBindingsChanged);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
@@ -504,7 +570,7 @@ export class StaminaResource {
 
     if (sprinting) {
       this.value = Math.max(0, this.value
-        - this.config.sprintDrainPerSecond * Math.max(.1, sprintDrainMultiplier) * dt);
+        - this.config.sprintDrainPerSecond * Math.max(0, sprintDrainMultiplier) * dt);
       this.regenerationDelay = this.config.regenerationDelay;
       if (this.value === 0) {
         this.sprintLocked = true;

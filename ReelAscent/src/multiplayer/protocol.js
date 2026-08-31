@@ -39,6 +39,11 @@ export function createPlayerSnapshot(playerId, state, sequence) {
     playerId,
     sequence,
     position: state.position,
+    // Optional v9 location metadata is backward-compatible with protocol v1 servers.
+    // Rendering still interpolates `position`; GPS/room state can use stable global data.
+    locationId: state.locationId ?? 'main-mountain',
+    coordinateSpace: state.coordinateSpace ?? 'global-world',
+    globalPosition: state.globalPosition ?? state.position,
     yaw: state.yaw,
     movement: state.movement,
     posture: state.posture === 'seated' ? 'seated' : 'standing',

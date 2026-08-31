@@ -7,12 +7,24 @@ export class RemotePlayer {
     this.snapshots = new SnapshotBuffer();
     this.fishingState = null;
     this.movement = 'airborne';
+    this.locationId = 'main-mountain';
+    this.coordinateSpace = 'global-world';
+    this.globalPosition = null;
+    this.localLocationId = 'main-mountain';
     this.lastSample = null;
     this.lastSampleAt = null;
   }
 
   consumeSnapshot(snapshot) {
     if (snapshot?.playerId !== this.playerId) return false;
+    if (typeof snapshot.locationId === 'string' && snapshot.locationId) this.locationId = snapshot.locationId;
+    if (typeof snapshot.coordinateSpace === 'string') this.coordinateSpace = snapshot.coordinateSpace;
+    if (snapshot.globalPosition && ['x', 'y', 'z'].every((axis) => Number.isFinite(snapshot.globalPosition[axis]))) {
+      this.globalPosition = { ...snapshot.globalPosition };
+    } else if (snapshot.position && this.coordinateSpace === 'global-world') {
+      this.globalPosition = { ...snapshot.position };
+    }
+    this.syncVisibility();
     if (snapshot.appearance !== undefined) this.representation?.setAppearance?.(snapshot.appearance);
     if (snapshot.posture !== undefined) this.representation?.setPosture?.(snapshot.posture);
     if (snapshot.fishingState !== undefined) {
@@ -24,22 +36,38 @@ export class RemotePlayer {
     return this.snapshots.push(snapshot);
   }
 
+  setLocalLocationId(locationId) {
+    this.localLocationId = locationId || 'main-mountain';
+    this.syncVisibility();
+  }
+
+  syncVisibility() {
+    if (this.representation) this.representation.enabled = this.locationId === this.localLocationId;
+  }
+
   update(now = Date.now()) {
     const sample = this.snapshots.sample(now);
     if (!sample) return null;
-    this.representation?.setPosition?.(sample.position.x, sample.position.y, sample.position.z);
-    this.representation?.setEulerAngles?.(0, sample.yaw, 0);
+    const previousSample = this.lastSample;
     const elapsed = this.lastSampleAt === null ? 0 : Math.max(.001, (now - this.lastSampleAt) / 1000);
-    const speed = this.lastSample && elapsed > 0
+    const speed = previousSample && elapsed > 0
       ? Math.hypot(
-          sample.position.x - this.lastSample.x,
-          sample.position.y - this.lastSample.y,
-          sample.position.z - this.lastSample.z
+          sample.position.x - previousSample.x,
+          sample.position.y - previousSample.y,
+          sample.position.z - previousSample.z
         ) / elapsed
       : 0;
-    this.representation?.setMovementState?.(sample.movement ?? this.movement, now, speed);
     this.lastSample = { ...sample.position };
     this.lastSampleAt = now;
+    if (sample.globalPosition && ['x', 'y', 'z'].every((axis) => Number.isFinite(sample.globalPosition[axis]))) {
+      this.globalPosition = { ...sample.globalPosition };
+    } else if (this.coordinateSpace === 'global-world') this.globalPosition = { ...sample.position };
+    this.syncVisibility();
+    if (this.locationId === this.localLocationId) {
+      this.representation?.setPosition?.(sample.position.x, sample.position.y, sample.position.z);
+      this.representation?.setEulerAngles?.(0, sample.yaw, 0);
+      this.representation?.setMovementState?.(sample.movement ?? this.movement, now, speed);
+    }
     return sample;
   }
 

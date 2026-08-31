@@ -1,6 +1,6 @@
 const BLOCKING_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'emote-menu-open',
-  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open'
+  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open', 'pause-open'
 ]);
 
 export class MountainMapMenu {
@@ -104,12 +104,15 @@ export class MountainMapMenu {
     for (const location of this.mapData.locations.filter((entry) => entry.type !== 'main-island')) {
       const point = this.project(location.position);
       const marker = this.createSvg('g', { class: `map-island map-island-${location.type}` });
+      const footprint = location.outline?.length >= 3
+        ? this.createSvg('polygon', { points: this.polygon(location.outline) })
+        : this.createSvg('ellipse', {
+            cx: point.x.toFixed(1), cy: point.y.toFixed(1),
+            rx: Math.max(5, location.radii.x * scale).toFixed(1),
+            ry: Math.max(4, location.radii.z * scale).toFixed(1)
+          });
       marker.append(
-        this.createSvg('ellipse', {
-          cx: point.x.toFixed(1), cy: point.y.toFixed(1),
-          rx: Math.max(5, location.radii.x * scale).toFixed(1),
-          ry: Math.max(4, location.radii.z * scale).toFixed(1)
-        }),
+        footprint,
         this.createSvg('text', { x: point.x.toFixed(1), y: (point.y - Math.max(7, location.radii.z * scale + 4)).toFixed(1) }, location.label)
       );
       islandGroup.appendChild(marker);

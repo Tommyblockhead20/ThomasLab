@@ -1,7 +1,9 @@
+import { formatInputCode } from '../player/movement.js';
+
 const MODAL_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open',
   'mountain-map-open', 'emote-menu-open', 'appearance-open', 'shop-open',
-  'aquarium-open', 'boat-travel-open'
+  'aquarium-open', 'boat-travel-open', 'pause-open'
 ]);
 
 export class HomeInteractionController {
@@ -17,10 +19,11 @@ export class HomeInteractionController {
     this.button = document.querySelector('#home-interaction-action');
     this.current = null;
     this.pendingSeat = null;
+    this.promptAllowed = true;
 
     this.onKeyDown = (event) => {
       const editable = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase?.()) || event.target?.isContentEditable;
-      if (editable || event.repeat || event.code !== 'KeyX') return;
+      if (editable || event.repeat || !this.player.input.matchesAction?.('interact', event.code)) return;
       this.refreshCurrent();
       if (!this.current) return;
       event.preventDefault();
@@ -54,10 +57,13 @@ export class HomeInteractionController {
   }
 
   captureInteractionInput() {
-    const pressed = this.player.input.consumeGripInteraction?.();
-    if (!pressed) return false;
+    // Never steal a Grip edge from active climbing. Only consume after confirming there is
+    // a real nearby generic interaction target.
+    if (['climbing', 'mantling'].includes(this.player.movementState)) return false;
     this.refreshCurrent();
     if (!this.current) return false;
+    const pressed = this.player.input.consumeGripInteraction?.();
+    if (!pressed) return false;
     const handled = this.interact();
     if (handled) this.player.input.suppressGripUntilRelease?.();
     return handled;
@@ -74,7 +80,12 @@ export class HomeInteractionController {
     }
     const { seatedInteraction } = this.refreshCurrent();
     if (!this.prompt) return;
-    this.prompt.hidden = !this.current;
+    this.prompt.hidden = !this.current || !this.promptAllowed;
+    if (this.button) {
+      const caps = this.button.querySelectorAll('kbd');
+      if (caps[0]) caps[0].textContent = formatInputCode(this.player.input.getBinding?.('interact') ?? 'KeyX');
+      if (caps[1]) caps[1].textContent = formatInputCode(this.player.input.getBinding?.('grip') ?? 'KeyG');
+    }
     if (this.current && this.label) {
       if (this.eyebrow) this.eyebrow.textContent = ({
         boat: 'ISLAND FERRY', shop: 'SHOP ISLAND', aquarium: 'AQUARIUM ISLAND', appearance: 'CABIN / HOME ISLAND'
@@ -83,6 +94,11 @@ export class HomeInteractionController {
         ? (this.player.fishing?.active ? 'STOP FISHING & GET UP' : 'CLICK TO GET UP')
         : this.current.label;
     }
+  }
+
+  setPromptAllowed(allowed) {
+    this.promptAllowed = Boolean(allowed);
+    if (this.prompt) this.prompt.hidden = !this.promptAllowed || !this.current;
   }
 
   interact() {

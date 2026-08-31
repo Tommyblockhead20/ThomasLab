@@ -21,7 +21,10 @@ import {
 
 // Mountain V2 is deliberately independent from the Milestone 5.x radial-band layout.
 // The old mountain.js remains in the project as the compatibility/reference implementation.
-export const MOUNTAIN_CENTER = Object.freeze({ x: 260, z: 0 });
+export const MOUNTAIN_CENTER = Object.freeze({
+  x: MAIN_WORLD_LOCATION.worldPosition.x,
+  z: MAIN_WORLD_LOCATION.worldPosition.z
+});
 export const SUMMIT_HEIGHT = 304.8; // exactly 1,000 ft
 export const COASTAL_SHELF_RADIUS = 214;
 export const OCEAN_FLOOR_OUTER_RADIUS = 350;
@@ -29,7 +32,9 @@ export const OCEAN_SEABED_JOIN_RADIUS = 208;
 export const OCEAN_WATER_INNER_RADIUS = 221;
 export const OCEAN_SHALLOW_WALK_END_RADIUS = 239;
 export const OCEAN_SURFACE_Y = -.76;
-export const OCEAN_VISUAL_OUTER_RADIUS = 380;
+// Track the registry's global map extent so later far-away load groups still sit over
+// visible ocean without changing Mountain traversal/failure distances.
+export const OCEAN_VISUAL_OUTER_RADIUS = Math.max(380, WORLD_MAP_RADIUS + 24);
 export const OCEAN_WADE_DISTANCE = OCEAN_FLOOR_OUTER_RADIUS - OCEAN_WATER_INNER_RADIUS;
 // Compatibility name retained for older diagnostics. It marks generated floor extent only;
 // crossing this radius is not fatal and there is no invisible deep-water boundary.
@@ -70,36 +75,46 @@ export const MOUNTAIN_REST_LEDGE_CONFIG = Object.freeze({
   sixHundred: Object.freeze({ targetHeight: 182.88, angle: 222, radius: 50, width: 8.4, depth: 5.8, coreTerrain: true }),
   sevenHundred: Object.freeze({ targetHeight: 213.36 })
 });
-export const MID_MOUNTAIN_ROCK_DENSITY_CONFIG = Object.freeze({
-  minimumHeight: 91.44,
-  maximumHeight: 213.36,
-  belts: Object.freeze([
-    Object.freeze({ id: '300ft', height: 91.44, count: 54, phase: 1.8 }),
-    Object.freeze({ id: '400ft', height: 121.92, count: 60, phase: 5.9 }),
-    Object.freeze({ id: '500ft', height: 152.4, count: 76, phase: 2.7 }),
-    Object.freeze({ id: '550ft', height: 167.64, count: 74, phase: 8.4 }),
-    Object.freeze({ id: '600ft', height: 182.88, count: 72, phase: 7.3 }),
-    Object.freeze({ id: '700ft', height: 213.36, count: 54, phase: 4.6 })
-  ]),
-  rocksPerOpenAnchor: 2
+export const MID_MOUNTAIN_SPIRAL_CONFIG = Object.freeze({
+  minimumHeight: 91.44,   // 300 ft
+  maximumHeight: 213.36, // 700 ft
+  routeCount: 12,
+  turns: 1.52,
+  generalStepHeight: 2.25,
+  priority450To550StepHeight: 1.55,
+  priority630To660StepHeight: 1.05,
+  branchEvery: 4
 });
+// Compatibility export retained for debug tooling that knew the older name. v9 no longer
+// describes these additions as altitude belts: the authored infill is a set of continuous
+// spiraling climb paths with deliberately reachable vertical step spacing.
+export const MID_MOUNTAIN_ROCK_DENSITY_CONFIG = MID_MOUNTAIN_SPIRAL_CONFIG;
 export const LOWLAND_TREE_CONFIG = Object.freeze({
-  candidateCount: 360,
-  maximumClimbableTrees: 100,
-  minimumRadius: 143,
-  radiusSpan: 40
+  candidateCount: 1440,
+  // Most of the 4× visual-density increase stays visual-only so the extra forest does
+  // not multiply physics/climb colliders at the same rate.
+  maximumClimbableTrees: 140,
+  minimumRadius: 141,
+  radiusSpan: 43
 });
 export const MOUNTAIN_BIOME_SECTORS = Object.freeze([
-  Object.freeze({ id: 'sunwash', label: 'Sunwash Scrub', startAngle: 330, endAngle: 90, forestDensity: .72 }),
-  Object.freeze({ id: 'blackstone', label: 'Blackstone Pinewood', startAngle: 90, endAngle: 210, forestDensity: .94 }),
+  Object.freeze({ id: 'sunwash', label: 'Sunwash Scrub', startAngle: 330, endAngle: 90, forestDensity: .78 }),
+  Object.freeze({ id: 'blackstone', label: 'Blackstone Pinewood', startAngle: 90, endAngle: 210, forestDensity: .98 }),
   Object.freeze({ id: 'fernwood', label: 'Fernwood Forest', startAngle: 210, endAngle: 330, forestDensity: 1 })
 ]);
+const worldLocationById = (id) => SMALL_ISLAND_LOCATIONS.find((location) => location.id === id) ?? null;
+const HOME_WORLD_LOCATION = worldLocationById('home-island');
+const AQUARIUM_WORLD_LOCATION = worldLocationById('aquarium-island');
+const CAVE_FISHING_WORLD_LOCATION = worldLocationById('cave-fishing-island');
+const NORMAL_FISHING_WORLD_LOCATION = worldLocationById('normal-fishing-island');
+const FROSTHOOK_WORLD_LOCATION = worldLocationById('cold-island');
+
 export const SUMMIT_BENCH_CONFIG = Object.freeze({
   id: 'summit-bench',
   angle: 222,
   radius: 6.55,
   seatHeight: .65,
-  interactionDistance: 2.8,
+  interactionDistance: 2.35,
   fishingFacing: 'summit-tarn'
 });
 export const SUMMIT_BENCH_CONFIGS = Object.freeze([
@@ -109,18 +124,18 @@ export const SUMMIT_BENCH_CONFIGS = Object.freeze([
     angle: (SUMMIT_BENCH_CONFIG.angle + 180) % 360,
     radius: 6.55,
     seatHeight: .65,
-    interactionDistance: 2.8,
+    interactionDistance: 2.35,
     fishingFacing: 'summit-tarn'
   })
 ]);
 export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
-  angle: 103,
-  radius: 278,
-  floorY: .98,
+  angle: AQUARIUM_WORLD_LOCATION?.angle ?? 103,
+  radius: AQUARIUM_WORLD_LOCATION?.radius ?? 278,
+  floorY: (AQUARIUM_WORLD_LOCATION?.elevation ?? .7) + .28,
   width: 10.8,
   depth: 6.4,
   tankHeight: 4.2,
-  interactionDistance: 3,
+  interactionDistance: 2.35,
   visibleResidentLimit: 48,
   separateFromCabin: true
 });
@@ -132,13 +147,13 @@ export const CAVE_TOPOLOGY_CONFIG = Object.freeze({
   exteriorTrench: false
 });
 export const HOME_CABIN_CONFIG = Object.freeze({
-  angle: 318,
-  radius: 272,
-  floorY: .98,
+  angle: HOME_WORLD_LOCATION?.angle ?? 318,
+  radius: HOME_WORLD_LOCATION?.radius ?? 272,
+  floorY: (HOME_WORLD_LOCATION?.elevation ?? .72) + .26,
   width: 8.4,
   depth: 6.8,
   wallHeight: 3.45,
-  interactionDistance: 2.65
+  interactionDistance: 2.15
 });
 export const FRACTURED_ROCK_FORM_KINDS = Object.freeze([
   'chunk', 'chunk', 'spire', 'spire', 'blade', 'lean', 'wedge', 'column',
@@ -254,6 +269,47 @@ function angularDistance(a, b) {
   return Math.abs(((a - b + 540) % 360) - 180);
 }
 
+// The world-location registry owns each satellite island's normalized shoreline outline.
+// Rendering and all map UIs consume the same data so a separately loaded island never grows
+// a second, contradictory "map shape" inside this module.
+function outlineRadiusAt(location, angle) {
+  const outline = location?.outline;
+  if (!outline?.length) return 1;
+  const wrapped = ((angle % 360) + 360) % 360;
+  const rawIndex = wrapped / 360 * outline.length;
+  const indexA = Math.floor(rawIndex) % outline.length;
+  const indexB = (indexA + 1) % outline.length;
+  const t = rawIndex - Math.floor(rawIndex);
+  const radiusA = Math.hypot(outline[indexA].x, outline[indexA].z);
+  const radiusB = Math.hypot(outline[indexB].x, outline[indexB].z);
+  return lerp(radiusA, radiusB, t);
+}
+
+export function islandFootprintScale(locationId, angle) {
+  const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === locationId);
+  return outlineRadiusAt(location, angle);
+}
+
+export function createIslandOutline(location, samples = location?.outline?.length ?? 28) {
+  if (!location?.worldPosition || !location?.radii) return [];
+  if (location.outline?.length) {
+    return location.outline.map((point) => ({
+      x: location.worldPosition.x + point.x * location.radii.x,
+      z: location.worldPosition.z + point.z * location.radii.z
+    }));
+  }
+  const points = [];
+  for (let index = 0; index < samples; index += 1) {
+    const angle = index * 360 / samples;
+    const radians = degreesToRadians(angle);
+    points.push({
+      x: location.worldPosition.x + Math.cos(radians) * location.radii.x,
+      z: location.worldPosition.z + Math.sin(radians) * location.radii.z
+    });
+  }
+  return points;
+}
+
 // These broad fields shape one continuous mountain rather than creating altitude rings.
 // The values are intentionally low-frequency so the silhouette reads as ridges/valleys,
 // while authored route rocks provide the local traversal detail.
@@ -363,8 +419,8 @@ const FISHING_LAYOUT = Object.freeze([
   Object.freeze({ id: 'sunwash-tidepool', label: 'Sunwash Tidepool', tier: 'lower', waterType: 'tidepool', theme: 'sunwash', angle: 348, radius: 190, radii: [6, 4.8], depth: 'shallow', basinDepth: .35, fish: ['sardine', 'anchovy', 'tidepool-sculpin', 'striped-mullet'], size: .94, rarityBias: 0.08, trophyChance: .9 }),
   Object.freeze({ id: 'blackstone-inlet', label: 'Blackstone Inlet', tier: 'lower', waterType: 'inlet', theme: 'blackstone', angle: 62, radius: 188, radii: [7, 5.3], depth: 'deep', basinDepth: .45, fish: ['mackerel', 'rockfish', 'sea-bass', 'flounder'], size: 1, rarityBias: 0.1, trophyChance: 1 }),
   Object.freeze({ id: 'fernwater-pond', label: 'Fernwater Pond', tier: 'lower', waterType: 'pond', theme: 'fernwood', angle: 104, radius: 164, radii: [7.3, 5.8], depth: 'shallow', basinDepth: 2.2, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'largemouth-bass', 'common-carp'], size: 1, rarityBias: 0.09, trophyChance: 1 }),
-  Object.freeze({ id: 'amber-reed-pond', label: 'Reedwater Pond', tier: 'lower', waterType: 'pond', theme: 'fernwood', offshore: 'normal-fishing-island', angle: 344, radius: 300, waterY: .88, radii: [6.2, 4.8], depth: 'shallow', basinDepth: .8, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'black-crappie'], size: 1, rarityBias: 0.12, trophyChance: 1.01 }),
-  Object.freeze({ id: 'basalt-grotto', label: 'Basalt Grotto', tier: 'lower', waterType: 'cave-pool', theme: 'fallglass', offshore: 'cave-fishing-island', cave: true, entranceDepth: 11.5, angle: 164, radius: 300, waterY: .22, radii: [4.8, 3.9], depth: 'shallow', basinDepth: 1.15, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.01, rarityBias: 0.16, trophyChance: 1.04 }),
+  Object.freeze({ id: 'amber-reed-pond', label: 'Reedwater Pond', tier: 'lower', waterType: 'pond', theme: 'fernwood', offshore: 'normal-fishing-island', angle: NORMAL_FISHING_WORLD_LOCATION?.angle ?? 344, radius: NORMAL_FISHING_WORLD_LOCATION?.radius ?? 300, waterY: .88, radii: [6.2, 4.8], depth: 'shallow', basinDepth: .8, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'black-crappie'], size: 1, rarityBias: 0.12, trophyChance: 1.01 }),
+  Object.freeze({ id: 'basalt-grotto', label: 'Basalt Grotto', tier: 'lower', waterType: 'cave-pool', theme: 'fallglass', offshore: 'cave-fishing-island', cave: true, entranceDepth: 11.5, angle: CAVE_FISHING_WORLD_LOCATION?.angle ?? 164, radius: CAVE_FISHING_WORLD_LOCATION?.radius ?? 300, waterY: .22, radii: [4.8, 3.9], depth: 'shallow', basinDepth: 1.15, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.01, rarityBias: 0.16, trophyChance: 1.04 }),
   Object.freeze({ id: 'boulder-lagoon', label: 'Boulder Coast Lagoon', tier: 'lower', waterType: 'lagoon', theme: 'blackstone', angle: 226, radius: 177, radii: [7.2, 5.3], depth: 'deep', basinDepth: .7, fish: ['rockfish', 'flounder', 'striped-mullet', 'sea-bass'], size: 1.01, rarityBias: 0.1, trophyChance: 1.02 }),
   Object.freeze({ id: 'gull-crag-pond', label: 'Gull Crag Pond', tier: 'lower', waterType: 'pond', theme: 'blackstone', angle: 263, radius: 160, radii: [6.5, 5.1], depth: 'shallow', basinDepth: 2.5, fish: ['yellow-perch', 'black-crappie', 'freshwater-drum', 'channel-catfish'], size: 1.03, rarityBias: 0.14, trophyChance: 1.05 }),
   Object.freeze({ id: 'sheltered-mirror', label: 'Sheltered Mirror', tier: 'lower', waterType: 'pond', theme: 'sunwash', angle: 306, radius: 168, radii: [6.4, 5], depth: 'shallow', basinDepth: 2.0, fish: ['bluegill', 'golden-shiner', 'common-carp', 'largemouth-bass'], size: 1, rarityBias: 0.11, trophyChance: 1.01 }),
@@ -373,32 +429,32 @@ const FISHING_LAYOUT = Object.freeze([
 
   // MIDDLE MOUNTAIN — 7 waters
   Object.freeze({ id: 'red-river-bend', label: 'Red River Bend', tier: 'middle', waterType: 'stream-pool', theme: 'sunwash', angle: 47, radius: 126, radii: [6.6, 4.8], depth: 'shallow', basinDepth: 2.1, fish: ['longnose-dace', 'white-sucker', 'smallmouth-bass', 'rainbow-trout'], size: 1.04, rarityBias: 0.34, trophyChance: 1.08 }),
-  Object.freeze({ id: 'echo-cave-pool', label: 'Echo Cave Pool', tier: 'middle', waterType: 'cave-pool', theme: 'fernwood', cave: true, entranceDepth: 23, angle: 137, radius: 110, radii: [5.7, 4.5], depth: 'shallow', basinDepth: 2.3, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.08, rarityBias: 0.42, trophyChance: 1.16 }),
+  Object.freeze({ id: 'echo-cave-pool', label: 'Echo Cave Pool', tier: 'middle', waterType: 'cave-pool', theme: 'fernwood', cave: true, entranceDepth: 21, angle: 139, radius: 112, radii: [5.7, 4.5], depth: 'shallow', basinDepth: 2.3, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.08, rarityBias: 0.42, trophyChance: 1.16 }),
   Object.freeze({ id: 'mossbell-lake', label: 'Mossbell Lake', tier: 'middle', waterType: 'lake', theme: 'fernwood', angle: 92, radius: 119, radii: [7.1, 5.2], depth: 'deep', basinDepth: 2.65, fish: ['rainbow-trout', 'brook-trout', 'yellow-perch', 'smallmouth-bass'], size: 1.07, rarityBias: 0.38, trophyChance: 1.13 }),
   Object.freeze({ id: 'split-rock-pool', label: 'Split Rock Pool', tier: 'middle', waterType: 'pool', theme: 'sunwash', angle: 315, radius: 116, radii: [5.6, 4.2], depth: 'shallow', basinDepth: 1.9, fish: ['brook-trout', 'longnose-dace', 'white-sucker', 'smallmouth-bass'], size: 1.06, rarityBias: 0.4, trophyChance: 1.12 }),
-  Object.freeze({ id: 'obsidian-cup', label: 'Obsidian Cup', tier: 'middle', waterType: 'cave-pool', theme: 'fallglass', cave: true, entranceDepth: 20, angle: 217, radius: 105, radii: [4.9, 3.8], depth: 'shallow', basinDepth: 2.25, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.09, rarityBias: 0.46, trophyChance: 1.18 }),
+  Object.freeze({ id: 'obsidian-cup', label: 'Obsidian Cup', tier: 'middle', waterType: 'cave-pool', theme: 'fallglass', cave: true, entranceDepth: 19, angle: 222, radius: 102, radii: [4.9, 3.8], depth: 'shallow', basinDepth: 2.25, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.09, rarityBias: 0.46, trophyChance: 1.18 }),
   Object.freeze({ id: 'windcut-tarn', label: 'Windcut Tarn', tier: 'middle', waterType: 'tarn', theme: 'blackstone', angle: 278, radius: 121, radii: [6.1, 4.5], depth: 'shallow', basinDepth: 2.1, fish: ['brook-trout', 'cutthroat-trout', 'mountain-whitefish', 'burbot'], size: 1.08, rarityBias: 0.43, trophyChance: 1.17 }),
   Object.freeze({ id: 'twilight-basin', label: 'Twilight Basin', tier: 'middle', waterType: 'pond', theme: 'sunwash', angle: 344, radius: 112, radii: [6.3, 4.8], depth: 'shallow', basinDepth: 2.2, fish: ['rainbow-trout', 'brook-trout', 'mountain-whitefish', 'cutthroat-trout'], size: 1.09, rarityBias: 0.41, trophyChance: 1.2 }),
 
   // UPPER / ALPINE — 4 waters
-  Object.freeze({ id: 'cloudstep-lake', label: 'Cloudstep Lake', tier: 'upper', waterType: 'lake', theme: 'fallglass', uniformProbabilities: true, probabilityGroup: 'cloudstep-lake', angle: 183, radius: 89, radii: [7, 5.4], depth: 'deep', basinDepth: 2.8, fish: ['rainbow-trout', 'brook-trout', 'mountain-whitefish', 'cutthroat-trout'], size: 1.11, rarityBias: 0.68, trophyChance: 1.24 }),
+  Object.freeze({ id: 'cloudstep-lake', label: 'Cloudstep Lake', physicalZone: 'Cloudstep Lake', tier: 'upper', waterType: 'lake', theme: 'fallglass', uniformProbabilities: true, probabilityGroup: 'cloudstep-lake', angle: 183, radius: 89, radii: [7, 5.4], depth: 'deep', basinDepth: 2.8, fish: ['rainbow-trout', 'brook-trout', 'mountain-whitefish', 'cutthroat-trout'], size: 1.11, rarityBias: 0.68, trophyChance: 1.24 }),
   Object.freeze({ id: 'hidden-ridge-pool', label: 'Hidden Ridge Pool', tier: 'upper', waterType: 'tarn', theme: 'sunwash', angle: 335, radius: 82, radii: [5.6, 4.3], depth: 'shallow', basinDepth: 2.0, fish: ['brook-trout', 'cutthroat-trout', 'mountain-whitefish', 'burbot'], size: 1.12, rarityBias: 0.72, trophyChance: 1.28 }),
-  Object.freeze({ id: 'blue-ice-melt', label: 'Frosthook Melt', tier: 'upper', waterType: 'ice-pool', theme: 'blackstone', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], offshore: 'cold-island', angle: 230, radius: 286, waterY: .96, radii: [5.8, 4.6], depth: 'shallow', basinDepth: .75, fish: ['brook-trout', 'mountain-whitefish', 'cutthroat-trout', 'alpine-char'], size: 1.14, rarityBias: 0.76, trophyChance: 1.34 }),
-  Object.freeze({ id: 'high-cirque-tarn', label: 'High Cirque Tarn', tier: 'upper', waterType: 'cave-tarn', theme: 'fernwood', cave: true, entranceDepth: 22, angle: 74, radius: 56, radii: [4.8, 3.8], depth: 'shallow', basinDepth: 1.8, fish: ['mountain-whitefish', 'cutthroat-trout', 'alpine-char', 'burbot'], size: 1.16, rarityBias: 0.8, trophyChance: 1.42 }),
+  Object.freeze({ id: 'blue-ice-melt', label: 'Frosthook Melt', tier: 'upper', waterType: 'ice-pool', theme: 'blackstone', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], offshore: 'cold-island', angle: FROSTHOOK_WORLD_LOCATION?.angle ?? 230, radius: FROSTHOOK_WORLD_LOCATION?.radius ?? 286, waterY: .96, radii: [5.8, 4.6], depth: 'shallow', basinDepth: .75, fish: ['brook-trout', 'mountain-whitefish', 'cutthroat-trout', 'alpine-char'], size: 1.14, rarityBias: 0.76, trophyChance: 1.34 }),
+  Object.freeze({ id: 'high-cirque-tarn', label: 'High Cirque Tarn', tier: 'upper', waterType: 'cave-tarn', theme: 'fernwood', cave: true, entranceDepth: 19, angle: 69, radius: 58, radii: [4.8, 3.8], depth: 'shallow', basinDepth: 1.8, fish: ['mountain-whitefish', 'cutthroat-trout', 'alpine-char', 'burbot'], size: 1.16, rarityBias: 0.8, trophyChance: 1.42 }),
 
   // SUMMIT — 1 water
   Object.freeze({ id: 'crooked-peak-tarn', label: 'Crooked Peak Tarn', tier: 'summit', waterType: 'summit-pond', theme: 'summit', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], angle: 0, radius: 0, radii: [3.7, 3.1], depth: 'shallow', basinDepth: 0, summit: true, fish: ['rainbow-trout', 'cutthroat-trout', 'alpine-char', 'channel-catfish'], size: 1.18, rarityBias: 1.0, trophyChance: 1.55, maximumSpeciesProbability: .05 }),
 
   // WATERFALL — 1 dedicated fishable plunge pool
-  Object.freeze({ id: 'fallglass-cascade', label: 'Fallglass Cascade', tier: 'waterfall', waterType: 'waterfall-pool', theme: 'fallglass', waterfall: true, uniformProbabilities: true, probabilityGroup: 'fallglass-cascade', angle: 183, radius: 156, radii: [5.7, 3.8], depth: 'shallow', basinDepth: 1.9, fish: ['creek-chub', 'longnose-dace', 'rainbow-trout', 'smallmouth-bass'], size: 1.08, rarityBias: 0.58, trophyChance: 1.18 })
+  Object.freeze({ id: 'fallglass-cascade', label: 'Fallglass Cascade', physicalZone: 'Waterfall', tier: 'waterfall', waterType: 'waterfall-pool', theme: 'fallglass', waterfall: true, uniformProbabilities: true, probabilityGroup: 'fallglass-cascade', angle: 183, radius: 156, radii: [5.7, 3.8], depth: 'shallow', basinDepth: 1.9, fish: ['creek-chub', 'longnose-dace', 'rainbow-trout', 'smallmouth-bass'], size: 1.08, rarityBias: 0.58, trophyChance: 1.18 })
 ]);
 
 // The visible ocean is one annular fishing zone. The hollow center is essential: treating
 // it as a giant ellipse would incorrectly make every inland cast an ocean cast.
 export const OCEAN_FISHING_DESCRIPTOR = Object.freeze({
-  id: 'outer-ocean', label: 'Outer Ocean', tier: 'ocean', waterType: 'ocean', theme: 'coastal',
+  id: 'outer-ocean', label: 'Outer Ocean', physicalZone: 'Ocean', tier: 'ocean', waterType: 'ocean', theme: 'coastal',
   ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], uniformProbabilities: true, probabilityGroup: 'outer-ocean',
-  center: MOUNTAIN_CENTER, innerRadius: OCEAN_WATER_INNER_RADIUS, outerRadius: OCEAN_FLOOR_OUTER_RADIUS - 5,
+  center: MOUNTAIN_CENTER, innerRadius: OCEAN_WATER_INNER_RADIUS, outerRadius: OCEAN_VISUAL_OUTER_RADIUS - 5,
   fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
 });
 
@@ -449,21 +505,32 @@ function caveDepthAt(location) {
     location.entranceDepth ?? location.radii[0] * 4.6);
 }
 
-function isCaveEntranceSurfacePoint(x, z) {
-  return FISHING_LAYOUT.some((cave) => {
-    if (!cave.cave || cave.offshore) return false;
-    const center = localPolarPoint(cave.angle, cave.radius);
-    const radians = degreesToRadians(cave.angle);
-    const dx = x - center.x;
-    const dz = z - center.z;
-    const outward = dx * Math.cos(radians) + dz * Math.sin(radians);
-    const lateral = Math.abs(-dx * Math.sin(radians) + dz * Math.cos(radians));
-    const caveDepth = caveDepthAt(cave);
-    const halfWidth = cave.radii[1] * .72 + 1.05;
-    return outward > caveDepth - CAVE_TOPOLOGY_CONFIG.entranceCutDepth
-      && outward < caveDepth + 2.2
-      && lateral < halfWidth + 1.25;
-  });
+function isCaveEntranceSurfacePoint(x, z, cave) {
+  const center = localPolarPoint(cave.angle, cave.radius);
+  const radians = degreesToRadians(cave.angle);
+  const dx = x - center.x;
+  const dz = z - center.z;
+  const outward = dx * Math.cos(radians) + dz * Math.sin(radians);
+  const lateral = Math.abs(-dx * Math.sin(radians) + dz * Math.cos(radians));
+  const caveDepth = caveDepthAt(cave);
+  const halfWidth = cave.radii[1] * .72 + 1.35;
+  return outward > caveDepth - CAVE_TOPOLOGY_CONFIG.entranceCutDepth - .75
+    && outward < caveDepth + 2.35
+    && lateral < halfWidth + 1.25;
+}
+
+function triangleIntersectsCaveEntrance(a, b, c) {
+  const samples = [
+    a, b, c,
+    [(a[0] + b[0]) * .5, 0, (a[2] + b[2]) * .5],
+    [(b[0] + c[0]) * .5, 0, (b[2] + c[2]) * .5],
+    [(c[0] + a[0]) * .5, 0, (c[2] + a[2]) * .5],
+    [(a[0] + b[0] + c[0]) / 3, 0, (a[2] + b[2] + c[2]) / 3]
+  ];
+  return FISHING_LAYOUT.some((cave) => (
+    cave.cave && !cave.offshore
+      && samples.some((point) => isCaveEntranceSurfacePoint(point[0], point[2], cave))
+  ));
 }
 
 // Three broad ecological wedges correspond to roughly 12–4, 4–8, and 8–12 o'clock.
@@ -564,9 +631,17 @@ export function createMountainMapData() {
       id: location.id,
       label: location.displayName,
       type: location.type,
+      // Map data is explicitly GLOBAL even if a future renderer loads this destination
+      // into a convenient local frame. The registry remains the source of truth.
+      coordinateSpace: 'global-world',
+      globalPosition: { ...location.worldPosition },
       position: { ...location.worldPosition },
       radii: { ...location.radii },
-      dock: location.dock ? { ...location.dock.worldPosition } : null
+      loadGroup: location.loadGroup ?? null,
+      alwaysLoaded: location.alwaysLoaded ?? true,
+      outline: location === MAIN_WORLD_LOCATION ? null : createIslandOutline(location),
+      dock: location.dock ? { ...location.dock.worldPosition } : null,
+      arrival: location.dock?.arrivalPosition ? { ...location.dock.arrivalPosition } : null
     })),
     docks: [
       ...START_LOCATIONS.map((start) => ({ id: `${start.id}-dock`, label: start.label, position: { ...start.dockPosition } })),
@@ -593,13 +668,25 @@ export function createMountainMapData() {
 }
 
 export const START_LOCATIONS = Object.freeze([
-  ...[352, 54, 111, 181, 254, 309].map((angle, index) => Object.freeze({
-    id: ['sandy-beach', 'rocky-coast', 'forest-inlet', 'waterfall-basin', 'boulder-coast', 'sheltered-cove'][index],
-    label: SECTORS[index], sector: SECTORS[index], angle,
-    position: radialPoint(angle, 204, 1.18),
-    dockPosition: radialPoint(angle, 220, OCEAN_SURFACE_Y + .3),
-    facingYaw: inwardYaw(angle)
-  }))
+  ...[352, 54, 111, 181, 254, 309].map((angle, index) => {
+    const arrivalRadius = 205.6;
+    const dockRadius = 214.1;
+    const terrainY = terrainHeightAt(angle, arrivalRadius);
+    const arrivalY = Math.max(OCEAN_SURFACE_Y + PLAYER_FOOT_OFFSET + .45, terrainY + PLAYER_FOOT_OFFSET + .18);
+    const position = radialPoint(angle, arrivalRadius, arrivalY);
+    const dockPosition = radialPoint(angle, dockRadius, OCEAN_SURFACE_Y + .3);
+    return Object.freeze({
+      id: ['sandy-beach', 'rocky-coast', 'forest-inlet', 'waterfall-basin', 'boulder-coast', 'sheltered-cove'][index],
+      label: SECTORS[index], sector: SECTORS[index], angle,
+      locationId: MAIN_WORLD_LOCATION.id,
+      coordinateSpace: 'global-world',
+      position,
+      globalPosition: Object.freeze({ ...position }),
+      dockPosition,
+      safe: true,
+      facingYaw: inwardYaw(angle)
+    });
+  })
 ]);
 
 // V2.5 keeps the old named route identities only as navigation/flavor anchors. They no
@@ -704,6 +791,8 @@ export class MountainWorld extends TestWorld {
     this.homeInteractions = [];
     this.homeTrophies = [];
     this.islandEntities = new Map();
+    this.locationLoadGroups = new Map();
+    this.activeLocationId = MAIN_WORLD_LOCATION.id;
     this.summitRadius = CROWN_TOP_RADIUS + 1.5;
 
     // Mid-value palette on purpose: navigation/readability comes before mood in V2.0.
@@ -764,6 +853,7 @@ export class MountainWorld extends TestWorld {
     this.buildEnvironmentAesthetics();
     this.rockSupportAudit = this.auditSolidRockSupport();
     this.buildFishingLocations();
+    this.setActiveLocation(this.activeLocationId);
   }
 
   point(angle, radius, y, tangentOffset = 0) {
@@ -783,13 +873,27 @@ export class MountainWorld extends TestWorld {
     );
   }
 
-  createStructureRoot(name, angle, radius, floorY) {
+  createStructureRoot(name, angle, radius, floorY, locationId = null) {
     const root = new pc.Entity(name);
     const center = this.point(angle, radius, floorY);
     root.setPosition(center.x, center.y, center.z);
     root.setEulerAngles(0, inwardYaw(angle), 0);
-    this.buildTarget.addChild(root);
+    (this.locationLoadGroups.get(locationId) ?? this.buildTarget).addChild(root);
     return root;
+  }
+
+  setActiveLocation(locationId = MAIN_WORLD_LOCATION.id) {
+    const nextId = WORLD_LOCATIONS.some((location) => location.id === locationId)
+      ? locationId : MAIN_WORLD_LOCATION.id;
+    this.activeLocationId = nextId;
+    for (const location of SMALL_ISLAND_LOCATIONS) {
+      const group = this.locationLoadGroups.get(location.id);
+      if (group) group.enabled = location.alwaysLoaded === true || location.id === nextId;
+    }
+    // The heavy saved-fish display follows Aquarium Island's load group. Physics/world
+    // metadata stays globally valid even when that render group is inactive.
+    if (this.aquariumResidentRoot) this.aquariumResidentRoot.enabled = nextId === 'aquarium-island';
+    return nextId;
   }
 
   addStructureBox(root, name, localPosition, size, material, rotation = {}, solid = true) {
@@ -839,6 +943,10 @@ export class MountainWorld extends TestWorld {
   }
 
   buildOceanIsland(location) {
+    const group = new pc.Entity(`${location.displayName} load group`);
+    group.locationId = location.id;
+    this.buildTarget.addChild(group);
+    this.locationLoadGroups.set(location.id, group);
     const segments = 36;
     const ringFactors = [1.2, 1, .68, .2, .035];
     const ringHeights = [OCEAN_SURFACE_Y - 1.6, OCEAN_SURFACE_Y - .08,
@@ -847,12 +955,17 @@ export class MountainWorld extends TestWorld {
     for (let ring = 0; ring < ringFactors.length; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
         const theta = segment * Math.PI * 2 / segments;
-        const wobble = 1 + Math.sin(segment * 2.17 + location.worldPosition.x * .01) * .045
-          + Math.sin(segment * .79 + location.worldPosition.z * .013) * .025;
+        const angle = segment * 360 / segments;
+        const identityScale = islandFootprintScale(location.id, angle);
+        const microWobble = 1 + Math.sin(segment * 2.17 + location.worldPosition.x * .01) * .022
+          + Math.sin(segment * .79 + location.worldPosition.z * .013) * .014;
+        // Underwater skirts are slightly softened, while the shoreline/top rings preserve
+        // the destination's actual distinctive silhouette for future map simplification.
+        const footprintScale = lerp(1, identityScale, ring === 0 ? .72 : 1) * microWobble;
         vertices.push([
-          location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * wobble,
+          location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * footprintScale,
           ringHeights[ring] + (ring >= 2 ? Math.sin(segment * 1.91) * .035 : 0),
-          location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * wobble
+          location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * footprintScale
         ]);
       }
     }
@@ -888,7 +1001,7 @@ export class MountainWorld extends TestWorld {
         : this.materials.islandGrass;
     entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
     entity.render.castShadows = false;
-    this.buildTarget.addChild(entity);
+    group.addChild(entity);
     entity.physicsCollider = this.physicsWorld.createCollider(
       this.RAPIER.ColliderDesc.trimesh(
         new Float32Array(vertices.flat()),
@@ -896,7 +1009,10 @@ export class MountainWorld extends TestWorld {
       ).setFriction(.94).setRestitution(0)
     );
     this.islandEntities.set(location.id, entity);
+    const previousTarget = this.buildTarget;
+    this.buildTarget = group;
     this.decorateOceanIsland(location);
+    this.buildTarget = previousTarget;
   }
 
   decorateOceanIsland(location) {
@@ -960,21 +1076,24 @@ export class MountainWorld extends TestWorld {
   buildTravelDocks() {
     const buildDock = (id, label, position, angle, length, destinationId) => {
       const yaw = inwardYaw(angle);
-      this.addBox(`${label} dock deck`, position, { x: 3.4, y: .28, z: length }, this.materials.woodLight, { y: yaw });
+      const loadGroup = this.locationLoadGroups.get(destinationId) ?? null;
+      const deck = this.addBox(`${label} dock deck`, position, { x: 3.4, y: .28, z: length }, this.materials.woodLight, { y: yaw });
+      if (loadGroup) loadGroup.addChild(deck);
       for (const side of [-1, 1]) for (const end of [-1, 1]) {
         const theta = degreesToRadians(angle);
         const tangentX = -Math.sin(theta) * side * 1.65;
         const tangentZ = Math.cos(theta) * side * 1.65;
         const radial = end * length * .38;
-        this.addCylinder(`${label} dock pile ${side}:${end}`, {
+        const pile = this.addCylinder(`${label} dock pile ${side}:${end}`, {
           x: position.x + tangentX + Math.cos(theta) * radial,
           y: OCEAN_SURFACE_Y - .18,
           z: position.z + tangentZ + Math.sin(theta) * radial
         }, { x: .28, y: 2.3, z: .28 }, this.materials.wood);
+        if (loadGroup) loadGroup.addChild(pile);
       }
       this.homeInteractions.push({
         id, label: `BOARD BOAT • ${label}`, action: 'boat', destinationId,
-        position: { x: position.x, y: position.y + .14, z: position.z }, range: 3.4
+        position: { x: position.x, y: position.y + .14, z: position.z }, range: 2.5
       });
     };
     for (const start of START_LOCATIONS) buildDock(`${start.id}-boat`, start.label, start.dockPosition, start.angle, 13, MAIN_WORLD_LOCATION.id);
@@ -987,7 +1106,7 @@ export class MountainWorld extends TestWorld {
   buildShopOutpost() {
     const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === 'shop-island');
     const floorY = location.elevation + .2;
-    this.shopRoot = this.createStructureRoot('Shop island outfitter', location.angle, location.radius, floorY);
+    this.shopRoot = this.createStructureRoot('Shop island outfitter', location.angle, location.radius, floorY, location.id);
     const box = (name, position, size, material, rotation = {}, solid = true) => (
       this.addStructureBox(this.shopRoot, name, position, size, material, rotation, solid)
     );
@@ -1004,7 +1123,7 @@ export class MountainWorld extends TestWorld {
     this.homeInteractions.push({
       id: 'shop-counter', label: 'OPEN OUTFITTER SHOP', action: 'shop',
       position: counterPromptPosition,
-      range: 2.8,
+      range: 2.25,
       // Use a counter-shaped interaction volume instead of the old broad sphere. The old
       // prompt was also authored behind the counter (radius - 1.6), so its target could
       // remain stale as the player left. This volume is confined to the open customer side.
@@ -1014,8 +1133,8 @@ export class MountainWorld extends TestWorld {
         const radialOffset = offsetX * radialX + offsetZ * radialZ;
         const tangentOffset = -offsetX * radialZ + offsetZ * radialX;
         const feetY = point.y - PLAYER_FOOT_OFFSET;
-        return radialOffset >= 1.85 && radialOffset <= 3.45
-          && Math.abs(tangentOffset) <= 2.65
+        return radialOffset >= 2.0 && radialOffset <= 3.35
+          && Math.abs(tangentOffset) <= 2.15
           && feetY >= floorY - .4 && feetY <= floorY + 1.8;
       }
     });
@@ -1027,12 +1146,33 @@ export class MountainWorld extends TestWorld {
 
   chooseTravelArrival(destinationId, rng = Math.random) {
     if (destinationId === MAIN_WORLD_LOCATION.id) {
-      const start = START_LOCATIONS[Math.floor(rng() * START_LOCATIONS.length)];
-      return { location: MAIN_WORLD_LOCATION, dockId: `${start.id}-dock`, position: { ...start.position }, facingYaw: start.facingYaw };
+      const safeStarts = START_LOCATIONS.filter((start) => start.safe !== false);
+      const start = safeStarts[Math.floor(rng() * safeStarts.length)];
+      return {
+        location: MAIN_WORLD_LOCATION,
+        locationId: MAIN_WORLD_LOCATION.id,
+        coordinateSpace: 'global-world',
+        dockId: `${start.id}-dock`,
+        dockPosition: { ...start.dockPosition },
+        position: { ...start.position },
+        globalPosition: { ...start.position },
+        safe: true,
+        facingYaw: start.facingYaw
+      };
     }
     const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === destinationId);
     if (!location) return null;
-    return { location, dockId: location.dock.id, position: { ...location.dock.arrivalPosition }, facingYaw: location.dock.facingYaw };
+    return {
+      location,
+      locationId: location.id,
+      coordinateSpace: 'global-world',
+      dockId: location.dock.id,
+      dockPosition: { ...location.dock.worldPosition },
+      position: { ...location.dock.arrivalPosition },
+      globalPosition: { ...location.dock.arrivalPosition },
+      safe: true,
+      facingYaw: location.dock.facingYaw
+    };
   }
 
   getHomeArrival() {
@@ -1055,7 +1195,7 @@ export class MountainWorld extends TestWorld {
     const config = HOME_CABIN_CONFIG;
     this.homeCabinFloorY = config.floorY ?? this.terrainY(config.angle, config.radius) + .22;
     this.homeCabinRoot = this.createStructureRoot(
-      'Trail cabin aligned structure', config.angle, config.radius, this.homeCabinFloorY
+      'Trail cabin aligned structure', config.angle, config.radius, this.homeCabinFloorY, HOME_WORLD_LOCATION?.id
     );
 
     this.addCabinBox('Trail cabin stable floor', { x: 0, y: -.16, z: 0 },
@@ -1232,7 +1372,7 @@ export class MountainWorld extends TestWorld {
         seatPosition: this.homePoint(-2.65, .77 + PLAYER_FOOT_OFFSET + .03, -1.55),
         exitPosition: this.homePoint(-1.22, PLAYER_FOOT_OFFSET + .08, -1.15),
         facingYaw: cabinYaw + 180,
-        range: 2.75
+        range: 2.15
       },
       {
         id: 'chair', label: 'SIT BY THE TABLE', action: 'rest', seatKind: 'chair',
@@ -1240,7 +1380,7 @@ export class MountainWorld extends TestWorld {
         seatPosition: this.homePoint(2.15, .69 + PLAYER_FOOT_OFFSET + .03, 1.45),
         exitPosition: this.homePoint(.9, PLAYER_FOOT_OFFSET + .08, 1.55),
         facingYaw: cabinYaw,
-        range: 2.6
+        range: 1.95
       },
       { id: 'trophies', label: 'CHECK TRAIL TROPHIES', action: 'trophies', position: this.homePoint(2.25, 1.1, -2.45) }
     );
@@ -1250,7 +1390,7 @@ export class MountainWorld extends TestWorld {
     const config = PUBLIC_AQUARIUM_CONFIG;
     this.publicAquariumFloorY = config.floorY ?? this.terrainY(config.angle, config.radius) + .28;
     this.publicAquariumRoot = this.createStructureRoot(
-      'Shoreline aquarium aligned structure', config.angle, config.radius, this.publicAquariumFloorY
+      'Shoreline aquarium aligned structure', config.angle, config.radius, this.publicAquariumFloorY, AQUARIUM_WORLD_LOCATION?.id
     );
     this.aquariumResidents = [];
     this.aquariumResidentSignature = '';
@@ -1379,6 +1519,7 @@ export class MountainWorld extends TestWorld {
   }
 
   updateAquariumSwimming() {
+    if (this.activeLocationId !== 'aquarium-island') return;
     for (const [index, resident] of this.aquariumResidents.entries()) {
       const t = this.elapsed * resident.speed + resident.phase;
       const x = Math.sin(t) * resident.range;
@@ -2165,10 +2306,7 @@ export class MountainWorld extends TestWorld {
       const a = vertices[triangle[0]];
       const b = vertices[triangle[1]];
       const c = vertices[triangle[2]];
-      return !isCaveEntranceSurfacePoint(
-        (a[0] + b[0] + c[0]) / 3,
-        (a[2] + b[2] + c[2]) / 3
-      );
+      return !triangleIntersectsCaveEntrance(a, b, c);
     });
 
     const geometry = new pc.Geometry();
@@ -2779,7 +2917,7 @@ export class MountainWorld extends TestWorld {
       return this.point(angle, radius, this.terrainY(sampleAngle, sampleRadius) + clearance, tangentOffset);
     };
     const waterfallPath = FALLGLASS_WATERFALL_RADII.map((radius) => (
-      waterfallPoint(radius, fallglassTangentAt(radius), .26)
+      waterfallPoint(radius, fallglassTangentAt(radius), .4)
     ));
     const cascadeGeometry = new pc.Geometry();
     cascadeGeometry.positions = [];
@@ -2792,7 +2930,7 @@ export class MountainWorld extends TestWorld {
           + Math.sin(fallglassPhaseAt(radius) * 1.7) * .12;
       const centerTangent = fallglassTangentAt(radius);
       for (const side of [-1, 1]) {
-        const edgePoint = waterfallPoint(radius, centerTangent + width * .5 * side, .28);
+        const edgePoint = waterfallPoint(radius, centerTangent + width * .5 * side, .44);
         cascadeGeometry.positions.push(
           edgePoint.x,
           edgePoint.y,
@@ -2886,14 +3024,19 @@ export class MountainWorld extends TestWorld {
   addEnvironmentTree(angle, radius, size, name, solidTrunk = false, style = 'conifer') {
     const baseY = this.terrainY(angle, radius);
     const point = this.point(angle, radius, baseY);
-    const trunk = this.addCylinder(`${name} climbable trunk`, { x: point.x, y: baseY + 1.5 * size, z: point.z },
-      { x: .62 * size, y: 3 * size, z: .62 * size }, this.materials.wood, {}, solidTrunk);
+    const trunkHeight = style === 'scrub-tree' ? 1.65 : style === 'broadleaf' ? 2.75 : 3.55;
+    const trunkWidth = style === 'scrub-tree' ? .5 : style === 'broadleaf' ? .7 : .58;
+    const trunk = this.addCylinder(`${name} climbable trunk`,
+      { x: point.x, y: baseY + trunkHeight * size * .5, z: point.z },
+      { x: trunkWidth * size, y: trunkHeight * size, z: trunkWidth * size },
+      this.materials.wood, {}, solidTrunk);
     if (solidTrunk) {
       this.registerClimbSurface(trunk, trunk.physicsCollider, 'rough', `${name} trunk`);
       // Two low, solid branch stubs make the larger pines useful short climb objects
       // instead of featureless poles. Their cones remain visual-only and snag-free.
-      for (const side of [-1, 1]) {
-        const branchPoint = this.point(angle, radius, baseY + 2.35 * size, side * .58 * size);
+      if (style !== 'scrub-tree') for (const side of [-1, 1]) {
+        const branchY = style === 'broadleaf' ? 2.05 : 2.55;
+        const branchPoint = this.point(angle, radius, baseY + branchY * size, side * .58 * size);
         const branch = this.addCylinder(`${name} ${side < 0 ? 'left' : 'right'} climbable branch`, branchPoint,
           { x: .32 * size, y: 1.4 * size, z: .32 * size }, this.materials.wood,
           { x: 0, y: inwardYaw(angle), z: side * 58 }, true);
@@ -2903,7 +3046,7 @@ export class MountainWorld extends TestWorld {
     const crownMaterial = stableNameHash(name) % 3 ? this.materials.foliage : this.materials.foliageLight;
     if (style === 'scrub-tree') {
       for (const [lobe, offset] of [[0, -1], [1, 0], [2, 1], [3, .35]]) {
-        const lobePoint = this.point(angle, radius, baseY + (2.45 + (lobe % 2) * .24) * size,
+        const lobePoint = this.point(angle, radius, baseY + (1.62 + (lobe % 2) * .2) * size,
           offset * 1.05 * size);
         this.createPrimitive(`${name} umbrella lobe ${lobe + 1}`, 'sphere', lobePoint,
           { x: 1.8 * size, y: .72 * size, z: 1.45 * size },
@@ -2913,7 +3056,7 @@ export class MountainWorld extends TestWorld {
     } else if (style === 'broadleaf') {
       for (const [lobe, offset] of [[0, 0], [1, -1], [2, 1]]) {
         const tangent = offset * .72 * size;
-        const lobePoint = this.point(angle, radius, baseY + (3.45 + (lobe % 2) * .45) * size, tangent);
+        const lobePoint = this.point(angle, radius, baseY + (2.95 + (lobe % 2) * .42) * size, tangent);
         this.createPrimitive(`${name} broad crown ${lobe + 1}`, 'sphere', lobePoint,
           { x: (1.65 - lobe * .12) * size, y: (1.35 + (lobe % 2) * .18) * size, z: 1.45 * size },
           lobe === 1 ? this.materials.shrubLight : crownMaterial,
@@ -2921,8 +3064,8 @@ export class MountainWorld extends TestWorld {
       }
     } else {
       const windOffset = style === 'wind-pine' ? .58 * size : 0;
-      const lowerPoint = this.point(angle, radius, baseY + 3.25 * size, windOffset);
-      const upperPoint = this.point(angle, radius, baseY + 4.45 * size, windOffset * 1.55);
+      const lowerPoint = this.point(angle, radius, baseY + 3.55 * size, windOffset);
+      const upperPoint = this.point(angle, radius, baseY + 5.05 * size, windOffset * 1.55);
       this.createPrimitive(`${name} lower crown`, 'cone', lowerPoint,
         { x: (style === 'wind-pine' ? 2.1 : 2.45) * size, y: 3.4 * size, z: 2.45 * size }, crownMaterial,
         { x: 0, y: stableNameHash(name) % 180, z: style === 'wind-pine' ? 8 : 0 }, { castShadows: size >= .72 });
@@ -2978,7 +3121,7 @@ export class MountainWorld extends TestWorld {
 
     // Secondary plants echo the dominant silhouette instead of homogenizing the sectors:
     // dry scrub in Sunwash, needle-dark saplings in Blackstone, and fern fans in Fernwood.
-    for (let index = 0; index < 84; index += 1) {
+    for (let index = 0; index < 336; index += 1) {
       const angle = (index * 13.73 + 7 + Math.sin(index * .71) * 3 + 360) % 360;
       const radius = 150 + ((index * 17) % 34);
       if (!this.isEnvironmentPlacementOpen(angle, radius, .78)) continue;
@@ -3002,7 +3145,7 @@ export class MountainWorld extends TestWorld {
 
     // Bushes taper from the lower slopes into hardy alpine scrub. They are deliberately
     // offset from authored rocks and water approaches so grips and shore casting stay clear.
-    for (let index = 0; index < 24; index += 1) {
+    for (let index = 0; index < 96; index += 1) {
       const angle = (17 + index * 14.9 + Math.sin(index * .87) * 4.2 + 360) % 360;
       const radius = 118 + ((index * 11) % 36);
       if (!this.isEnvironmentPlacementOpen(angle, radius, 1.55)) continue;
@@ -3017,7 +3160,7 @@ export class MountainWorld extends TestWorld {
         `Hardy alpine scrub ${index + 1}`, index % 2 ? this.materials.shrubDark : this.materials.dryGrass);
     }
 
-    for (let index = 0; index < 44; index += 1) {
+    for (let index = 0; index < 176; index += 1) {
       const angle = (8 + index * 8.15 + Math.sin(index * 1.7) * 2.1 + 360) % 360;
       const radius = 164 + ((index * 5) % 17);
       if (!this.isEnvironmentPlacementOpen(angle, radius, .65)) continue;
@@ -3029,7 +3172,7 @@ export class MountainWorld extends TestWorld {
         index % 4 ? this.materials.shrubLight : this.materials.dryGrass,
         { x: 0, y: index * 47, z: index % 2 ? 8 : -8 }, { castShadows: false });
     }
-    for (let index = 0; index < 16; index += 1) {
+    for (let index = 0; index < 64; index += 1) {
       const angle = (64 + index * 17.2) % 360;
       const radius = 166 + ((index * 7) % 13);
       if (!this.isEnvironmentPlacementOpen(angle, radius, .55)) continue;
@@ -3402,139 +3545,181 @@ export class MountainWorld extends TestWorld {
     });
   }
 
+  spiralStepHeightAt(targetHeight) {
+    const feet = targetHeight / .3048;
+    if (feet >= 630 && feet <= 660) return MID_MOUNTAIN_SPIRAL_CONFIG.priority630To660StepHeight;
+    if (feet >= 450 && feet <= 550) return MID_MOUNTAIN_SPIRAL_CONFIG.priority450To550StepHeight;
+    if (feet > 550 && feet < 630) return 1.9;
+    return MID_MOUNTAIN_SPIRAL_CONFIG.generalStepHeight;
+  }
+
+  spiralRouteSample(routeIndex, targetHeight) {
+    const config = MID_MOUNTAIN_SPIRAL_CONFIG;
+    const t = clamp((targetHeight - config.minimumHeight) / (config.maximumHeight - config.minimumHeight), 0, 1);
+    const direction = routeIndex % 2 === 0 ? 1 : -1;
+    const phase = routeIndex * 360 / config.routeCount + Math.sin(routeIndex * 2.17) * 5.5;
+    const turns = config.turns + ((routeIndex % 4) - 1.5) * .075;
+    const angle = (phase + direction * turns * 360 * t
+      + Math.sin(t * Math.PI * 5.2 + routeIndex * .81) * 2.6 + 720) % 360;
+    const routeRadius = this.findRouteRadiusForHeight(angle, 145, 38, targetHeight);
+    const radialJitter = Math.sin(t * 21.7 + routeIndex * 1.41) * .72;
+    return { angle, radius: routeRadius + radialJitter, direction, t };
+  }
+
   buildThreeToSevenHundredRockField() {
-    // A dedicated five-belt field now fills the previously thin 300–700 ft interval.
-    // Each open anchor gets a primary formation and a laterally/radially offset companion,
-    // so the result reads as broken geology and branching scrambles rather than ring steps.
-    const broadForms = [
-      'anvil', 'tooth', 'fin', 'bulb', 'terrace', 'prow', 'twist', 'crouch',
-      'spire', 'blade', 'lean', 'wedge', 'column', 'needle', 'shelfblade',
-      'crooked', 'shard', 'hook', 'knuckle', 'slab'
+    // v9: these are actual continuous climb paths, NOT horizontal altitude bands.
+    // Each route winds around Mountain as elevation rises. Vertical sample spacing is
+    // intentionally tighter through 450–550 ft and especially 630–660 ft so adding more
+    // rocks makes the next move reachable rather than merely decorating the same elevation.
+    const config = MID_MOUNTAIN_SPIRAL_CONFIG;
+    const forms = [
+      'crooked', 'wedge', 'spire', 'knuckle', 'blade', 'hook', 'tooth', 'lean',
+      'shelfblade', 'shard', 'crouch', 'prow', 'slab', 'fin'
     ];
     let added = 0;
-    for (const [beltIndex, belt] of MID_MOUNTAIN_ROCK_DENSITY_CONFIG.belts.entries()) {
-      for (let index = 0; index < belt.count; index += 1) {
-        const spacing = 360 / belt.count;
-        const angle = (belt.phase + index * spacing
-          + Math.sin(index * 1.83 + beltIndex * .67) * spacing * .24 + 360) % 360;
-        const radius = this.findRouteRadiusForHeight(angle, 142, 40, belt.height)
-          + Math.sin(index * 2.17 + beltIndex) * 1.25;
-        if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
-        const difficulty = climbDifficultyAt(angle, beltIndex >= 3 ? 2 : 1);
-        const materialType = chooseClimbMaterial(beltIndex >= 3 ? 2 : 1, angle, index, 880 + beltIndex, .02);
-        const formKind = broadForms[(index * 3 + beltIndex * 5) % broadForms.length];
-        const tall = ['tooth', 'fin', 'spire', 'column', 'needle', 'shard', 'prow'].includes(formKind);
-        const height = tall
-          ? 3.7 + (index % 4) * .52 + difficulty * .7
-          : 2.15 + (index % 5) * .31;
+    let requested = 0;
+    let priority630To660Requested = 0;
+    const routeAudits = [];
+
+    for (let routeIndex = 0; routeIndex < config.routeCount; routeIndex += 1) {
+      let targetHeight = config.minimumHeight + (routeIndex % 3) * .34;
+      let stepIndex = 0;
+      let routeAdded = 0;
+
+      while (targetHeight <= config.maximumHeight + .01) {
+        requested += 1;
+        const feet = targetHeight / .3048;
+        if (feet >= 630 && feet <= 660) priority630To660Requested += 1;
+        const sample = this.spiralRouteSample(routeIndex, targetHeight);
+        const { angle, direction } = sample;
+        let radius = sample.radius;
+        if (this.isRockInProtectedWaterApproach(angle, radius)) {
+          // Keep the route continuous around water by slipping a little inward/outward,
+          // rather than deleting a whole height step and creating an accidental dead end.
+          const alternatives = [2.2, -2.2, 4.0, -4.0];
+          const alternative = alternatives.find((offset) => !this.isRockInProtectedWaterApproach(angle, radius + offset));
+          if (alternative === undefined) {
+            targetHeight += this.spiralStepHeightAt(targetHeight);
+            stepIndex += 1;
+            continue;
+          }
+          radius += alternative;
+        }
+
         const ground = this.terrainY(angle, radius);
-        const primary = this.addRadialRock(`${belt.id} dense formation ${index + 1}`, angle, radius,
-          ground + height * .27,
-          { x: tall ? 1.75 + (index % 3) * .24 : 2.35 + (index % 4) * .25,
-            y: height, z: tall ? 1.48 + (index % 2) * .22 : 1.75 + (index % 3) * .24 },
+        const materialType = chooseClimbMaterial(
+          feet >= 620 ? 2 : feet >= 450 ? 1 : 0,
+          angle, stepIndex, 910 + routeIndex, feet >= 630 && feet <= 660 ? -.08 : .015
+        );
+        const formKind = forms[(stepIndex * 3 + routeIndex * 5) % forms.length];
+        const denseHighGap = feet >= 630 && feet <= 660;
+        const priorityMid = feet >= 450 && feet <= 550;
+        const rockHeight = denseHighGap
+          ? 2.65 + (stepIndex % 3) * .28
+          : priorityMid ? 2.45 + (stepIndex % 4) * .3 : 2.2 + (stepIndex % 4) * .34;
+        const rockWidth = denseHighGap ? 2.0 + (stepIndex % 3) * .24 : 1.8 + (stepIndex % 4) * .27;
+        const tangent = Math.sin(stepIndex * 1.31 + routeIndex * .73) * (denseHighGap ? .82 : 1.15);
+        const primary = this.addRadialRock(
+          `spiral ${routeIndex + 1} step ${stepIndex + 1}`,
+          angle, radius, ground + rockHeight * .28,
+          { x: rockWidth, y: rockHeight, z: 1.45 + (stepIndex % 3) * .22 },
           this.materialForClimb(materialType), {
-            tangentOffset: Math.sin(index * 1.37 + beltIndex) * 1.35,
-            pitch: tall ? -15 - difficulty * 8 : -5 - difficulty * 6,
-            roll: ((index + beltIndex) % 3 - 1) * 7,
+            tangentOffset: tangent,
+            pitch: -8 - (stepIndex % 4) * 3 - (denseHighGap ? 3 : 0),
+            roll: direction * (((stepIndex + routeIndex) % 3) - 1) * 6,
             climbMaterial: materialType,
             formKind
-          });
-        if (primary) added += 1;
+          }
+        );
+        if (primary) { added += 1; routeAdded += 1; }
 
-        const side = (index + beltIndex) % 2 ? 1 : -1;
-        const companionAngle = angle + side * spacing * .19;
-        const companionRadius = radius + side * (1.75 + (index % 3) * .38);
-        if (this.isRockInProtectedWaterApproach(companionAngle, companionRadius)) continue;
-        const companionGround = this.terrainY(companionAngle, companionRadius);
-        const companionForm = broadForms[(index * 5 + beltIndex * 7 + 6) % broadForms.length];
-        const companionType = index % 9 === 4 ? 'normal' : materialType === 'ice' ? 'normal' : 'rough';
-        const companionHeight = 1.9 + ((index + beltIndex) % 4) * .42;
-        const companion = this.addRadialRock(`${belt.id} dense companion ${index + 1}`,
-          companionAngle, companionRadius, companionGround + companionHeight * .25,
-          { x: 1.8 + (index % 3) * .3, y: companionHeight, z: 1.5 + (index % 4) * .2 },
-          this.materialForClimb(companionType), {
-            tangentOffset: side * (1.75 + (index % 4) * .34),
-            pitch: -7 - (index % 3) * 4,
-            roll: side * (4 + (index % 4) * 2),
-            climbMaterial: companionType,
-            formKind: companionForm
-          });
-        if (companion) added += 1;
+        // Frequent side options overlap adjacent spiral steps vertically. These are branches
+        // off the same ascent path—not another ring—and make passing/rest choices possible.
+        if (stepIndex % config.branchEvery === (routeIndex % config.branchEvery)
+          || denseHighGap && stepIndex % 2 === 0) {
+          const side = ((stepIndex + routeIndex) % 2 ? 1 : -1) * direction;
+          const branchAngle = angle + side * (1.2 + (stepIndex % 3) * .42);
+          const branchRadius = radius + side * (1.25 + (stepIndex % 4) * .26);
+          if (!this.isRockInProtectedWaterApproach(branchAngle, branchRadius)) {
+            const branchGround = this.terrainY(branchAngle, branchRadius);
+            const branchHeight = denseHighGap ? 2.35 : 1.95 + (stepIndex % 3) * .3;
+            const branchType = materialType === 'ice' ? 'normal' : (stepIndex % 5 === 2 ? 'normal' : 'rough');
+            const branch = this.addRadialRock(
+              `spiral ${routeIndex + 1} branch ${stepIndex + 1}`,
+              branchAngle, branchRadius, branchGround + branchHeight * .27,
+              { x: 1.75 + (stepIndex % 3) * .22, y: branchHeight, z: 1.4 + (stepIndex % 2) * .25 },
+              this.materialForClimb(branchType), {
+                tangentOffset: side * (1.05 + (stepIndex % 3) * .3),
+                pitch: -9 - (stepIndex % 3) * 4,
+                roll: side * (5 + (stepIndex % 4) * 2),
+                climbMaterial: branchType,
+                formKind: forms[(stepIndex * 5 + routeIndex * 2 + 4) % forms.length]
+              }
+            );
+            if (branch) { added += 1; routeAdded += 1; }
+          }
+        }
+
+        targetHeight += this.spiralStepHeightAt(targetHeight);
+        stepIndex += 1;
       }
+      routeAudits.push({ routeId: routeIndex + 1, requestedSteps: stepIndex, added: routeAdded });
     }
+
     this.midMountainRockFieldAudit = {
-      requestedAnchors: MID_MOUNTAIN_ROCK_DENSITY_CONFIG.belts.reduce((total, belt) => total + belt.count, 0),
-      requestedRocksPerAnchor: MID_MOUNTAIN_ROCK_DENSITY_CONFIG.rocksPerOpenAnchor,
-      added
+      layout: 'continuous-spirals',
+      routeCount: config.routeCount,
+      requestedSteps: requested,
+      priority630To660Requested,
+      added,
+      routeAudits
     };
   }
 
   buildMidHighTraversalAnchors() {
-    // Distributed clusters create recognizable choices near 500/700/850 ft without
-    // turning the mountain into a single radial staircase. Each cluster has one useful
-    // ledge and two offset approach/traverse rocks, all grounded by the normal support pass.
-    const anchorBelts = [
-      { id: '500ft', height: 152.4, count: 28, phase: 3.4, crown: false },
-      { id: '600ft', height: 182.88, count: 22, phase: 7.6, crown: false },
-      { id: '700ft', height: 213.36, count: 18, phase: 11.2, crown: false },
-      { id: '850ft', height: 259.08, count: 24, phase: 6.7, crown: true }
+    // A few larger transfer/rest formations are tied to specific points ON the spirals.
+    // They are deliberately not repeated around an elevation ring.
+    const anchors = [
+      { id: '500ft-transfer', route: 2, height: 152.4, width: 4.8, depth: 3.4 },
+      { id: '550ft-transfer', route: 7, height: 167.64, width: 4.5, depth: 3.2 },
+      { id: '600ft-transfer', route: 4, height: 182.88, width: 4.35, depth: 3.0 },
+      { id: '642ft-transfer', route: 9, height: 195.68, width: 4.0, depth: 2.9 },
+      { id: '655ft-transfer', route: 1, height: 199.64, width: 3.9, depth: 2.8 },
+      { id: '690ft-transfer', route: 10, height: 210.31, width: 3.8, depth: 2.7 }
     ];
-    anchorBelts.forEach((belt, beltIndex) => {
-      for (let index = 0; index < belt.count; index += 1) {
-        const spacing = 360 / belt.count;
-        const angle = (belt.phase + index * spacing
-          + Math.sin(index * 1.71 + beltIndex * .83) * spacing * .2 + 360) % 360;
-        let radius;
-        let centerY;
-        if (belt.crown) {
-          centerY = belt.height + Math.sin(index * 1.39) * 1.2;
-          radius = this.crownRadiusAtHeight(centerY) + .52;
-        } else {
-          radius = this.findRouteRadiusForHeight(angle, 72, 38, belt.height);
-          centerY = this.terrainY(angle, radius);
-        }
-        if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
-        const side = index % 2 ? 1 : -1;
-        const type = index % 5 === 3 ? 'normal' : 'rough';
-        const majorFiveHundredRest = belt.id === '500ft'
-          && index === MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred.anchorIndex;
-        this.addRadialRock(majorFiveHundredRest
-          ? '500ft broad natural rest ledge'
-          : `${belt.id} traversal ledge ${index + 1}`, angle, radius - .18,
-          centerY + (belt.crown ? 0 : .72),
-          majorFiveHundredRest
-            ? {
-                x: MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred.width,
-                y: 1.35,
-                z: MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred.depth
-              }
-            : { x: 4.0 + (index % 3) * .38, y: 1.15, z: 3.05 },
-          this.materialForClimb(type), {
-            tangentOffset: side * (1.1 + (index % 4) * .38),
-            pitch: majorFiveHundredRest ? 1 : 1 + (index % 2) * 2,
-            roll: majorFiveHundredRest ? side : side * (2 + index % 3),
-            climbMaterial: type,
-            formKind: 'chunk'
+    for (const [index, anchor] of anchors.entries()) {
+      const sample = this.spiralRouteSample(anchor.route % MID_MOUNTAIN_SPIRAL_CONFIG.routeCount, anchor.height);
+      const angle = sample.angle;
+      const radius = sample.radius;
+      if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
+      const ground = this.terrainY(angle, radius);
+      const side = sample.direction * (index % 2 ? 1 : -1);
+      const type = index % 3 === 1 ? 'normal' : 'rough';
+      this.addRadialRock(anchor.id, angle, radius - .15, ground + .62,
+        { x: anchor.width, y: 1.2, z: anchor.depth }, this.materialForClimb(type), {
+          tangentOffset: side * .85,
+          pitch: 1 + index % 2,
+          roll: side * 2,
+          climbMaterial: type,
+          formKind: 'chunk'
+        });
+      for (let option = 0; option < 2; option += 1) {
+        const optionSide = option ? -side : side;
+        const optionAngle = angle + optionSide * (1.0 + option * .35);
+        const optionRadius = radius + optionSide * (1.5 + option * .45);
+        if (this.isRockInProtectedWaterApproach(optionAngle, optionRadius)) continue;
+        const optionGround = this.terrainY(optionAngle, optionRadius);
+        this.addRadialRock(`${anchor.id} option ${option + 1}`, optionAngle, optionRadius,
+          optionGround + .58, { x: 2.1, y: 2.25 + option * .25, z: 1.65 },
+          this.materialForClimb('rough'), {
+            tangentOffset: optionSide * 1.4,
+            pitch: -8 - option * 4,
+            roll: optionSide * 7,
+            climbMaterial: 'rough',
+            formKind: option ? 'wedge' : 'crooked'
           });
-        for (let branch = 0; branch < 2; branch += 1) {
-          const branchAngle = angle + side * (branch ? 1.05 : -.72);
-          const branchRadius = radius + (branch ? 2.5 : -2.15);
-          const branchY = belt.crown
-            ? centerY + (branch ? 1.15 : -1.0)
-            : this.terrainY(branchAngle, branchRadius);
-          this.addRadialRock(`${belt.id} irregular option ${index + 1}-${branch + 1}`,
-            branchAngle, branchRadius, branchY + (belt.crown ? 0 : .72),
-            { x: 2.35 + branch * .45, y: 2.25 + ((index + branch) % 3) * .42, z: 2.05 },
-            this.materialForClimb(branch && index % 4 === 0 ? 'normal' : 'rough'), {
-              tangentOffset: side * (3.1 + branch * 1.4),
-              pitch: -7 - branch * 5,
-              roll: side * (branch ? -7 : 8),
-              climbMaterial: branch && index % 4 === 0 ? 'normal' : 'rough',
-              formKind: branch ? 'wedge' : 'crooked'
-            });
-        }
       }
-    });
+    }
   }
 
   isRockInProtectedWaterApproach(angle, radius) {
@@ -3683,6 +3868,7 @@ export class MountainWorld extends TestWorld {
     zone.ecologyThemes = [...descriptor.ecologyThemes];
     zone.uniformProbabilities = descriptor.uniformProbabilities;
     zone.probabilityGroup = descriptor.probabilityGroup;
+    zone.physicalZone = descriptor.physicalZone ?? 'Ocean';
     this.fishingZones.push(attachZoneEcology(zone));
   }
 
@@ -3696,10 +3882,16 @@ export class MountainWorld extends TestWorld {
     const island = location.offshore
       ? SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === location.offshore)
       : null;
-    const entranceFloor = island ? island.elevation + .05 : rawTerrainHeightAt(location.angle, entranceRadius) - .28;
-    const throatFloor = entranceFloor - 2.45;
+    const entranceTerrainY = rawTerrainHeightAt(location.angle, entranceRadius);
+    // Mountain caves begin below the cut gray surface. The previous mouth floor was only
+    // 0.28 m below terrain while the arch rose 5.25 m, which let dark tunnel geometry stick
+    // outside the mountain and read as an attached facade. Offshore cave geometry keeps its
+    // shallow-island floor, while mountain mouths are deliberately inset.
+    const entranceFloor = island ? island.elevation + .05 : entranceTerrainY - 2.9;
+    const throatFloor = entranceFloor - (island ? 2.45 : 1.45);
     const rearFloor = location.y - 1.08;
     const tunnelHeight = 5.25;
+    const entranceArchHeight = island ? tunnelHeight : 2.45;
     const segments = CAVE_TOPOLOGY_CONFIG.tunnelSegments;
     const segmentLength = caveDepth / segments;
     const yaw = inwardYaw(location.angle);
@@ -3736,13 +3928,14 @@ export class MountainWorld extends TestWorld {
     const archSides = 10;
     for (let segment = 0; segment <= segments; segment += 1) {
       const t = segment / segments;
-      const radius = entranceRadius - t * caveDepth - (segment === 0 ? .32 : 0);
+      const radius = entranceRadius - t * caveDepth - (segment === 0 ? .55 : 0);
       const widthScale = 1 + Math.sin(t * Math.PI) * .08;
       const floor = floorAt(t);
+      const localArchHeight = lerp(entranceArchHeight, tunnelHeight, smoothstep(.08, .42, t));
       for (let side = 0; side <= archSides; side += 1) {
         const phase = side / archSides * Math.PI;
         const lateral = Math.cos(phase) * (halfWidth * widthScale + .42);
-        const y = floor + Math.sin(phase) * tunnelHeight;
+        const y = floor + Math.sin(phase) * localArchHeight;
         const point = this.point(location.angle, radius, y, lateral);
         archVertices.push([point.x, point.y, point.z]);
       }
@@ -3806,7 +3999,7 @@ export class MountainWorld extends TestWorld {
     const waterfallPath = location.waterfall ? FALLGLASS_WATERFALL_RADII.map((radius) => {
       const angle = fallglassAngleAt(radius);
       return this.point(angle, radius,
-        radius >= OCEAN_WATER_INNER_RADIUS ? OCEAN_SURFACE_Y + .04 : this.terrainY(angle, radius) + .28,
+        radius >= OCEAN_WATER_INNER_RADIUS ? OCEAN_SURFACE_Y + .04 : this.terrainY(angle, radius) + .4,
         fallglassTangentAt(radius));
     }) : [];
     const zone = new FishingZone({
@@ -3839,6 +4032,7 @@ export class MountainWorld extends TestWorld {
     zone.probabilityGroup = location.probabilityGroup ?? location.id;
     zone.cave = Boolean(location.cave);
     zone.waterfall = Boolean(location.waterfall);
+    zone.physicalZone = location.physicalZone ?? location.label;
     this.fishingZones.push(attachZoneEcology(zone));
     if (location.waterfall) return;
     const waterThickness = .08;

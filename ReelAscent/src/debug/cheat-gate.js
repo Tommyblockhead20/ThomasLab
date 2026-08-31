@@ -6,7 +6,6 @@ export class CheatGate extends EventTarget {
     this.enabled = false;
     this.startedAt = 0;
     this.timer = null;
-    this.progressTimer = null;
     this.hideTimer = null;
     this.installed = false;
     this.holdDurationMs = holdDurationMs;
@@ -20,12 +19,8 @@ export class CheatGate extends EventTarget {
       if (event.code !== 'F1' || event.repeat || this.enabled) return;
       event.preventDefault();
       this.startedAt = performance.now();
-      this.show('HOLD F1 • 0%', 0);
+      // Secret gate: no hint, progress bar, or acknowledgement exists before success.
       this.timer = globalThis.setTimeout(() => this.enable(), this.holdDurationMs);
-      this.progressTimer = globalThis.setInterval(() => {
-        const progress = Math.min(1, (performance.now() - this.startedAt) / this.holdDurationMs);
-        this.show(`HOLD F1 • ${Math.floor(progress * 100)}%`, progress);
-      }, 50);
     };
     this.onKeyUp = (event) => {
       if (event.code !== 'F1' || this.enabled) return;
@@ -48,10 +43,8 @@ export class CheatGate extends EventTarget {
 
   cancel() {
     globalThis.clearTimeout(this.timer);
-    globalThis.clearInterval(this.progressTimer);
     globalThis.clearTimeout(this.hideTimer);
     this.timer = null;
-    this.progressTimer = null;
     this.startedAt = 0;
     if (this.indicator) this.indicator.hidden = true;
   }
@@ -60,9 +53,7 @@ export class CheatGate extends EventTarget {
     if (this.enabled) return;
     this.enabled = true;
     globalThis.clearTimeout(this.timer);
-    globalThis.clearInterval(this.progressTimer);
     this.timer = null;
-    this.progressTimer = null;
     this.show('CHEATS ENABLED', 1);
     this.hideTimer = globalThis.setTimeout(() => { if (this.indicator) this.indicator.hidden = true; }, 1800);
     this.dispatchEvent(new Event('enabled'));

@@ -42,7 +42,20 @@ export class BoatTravelMenu {
       const y = 50 + (location.worldPosition.z - WORLD_CENTER.z) / WORLD_MAP_RADIUS * 42;
       button.style.left = `${x}%`;
       button.style.top = `${y}%`;
-      button.innerHTML = `<span>${location.type === 'main-island' ? '⛰' : location.type === 'cold-island' ? '❄' : location.type === 'cave-island' ? '◒' : '●'}</span><b>${location.displayName}</b>`;
+      const footprint = document.createElement('span');
+      footprint.className = 'boat-map-footprint';
+      if (location.type === 'main-island') {
+        footprint.textContent = '⛰';
+      } else if (location.outline?.length) {
+        const xs = location.outline.map((point) => point.x);
+        const zs = location.outline.map((point) => point.z);
+        const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
+        footprint.style.clipPath = `polygon(${location.outline.map((point) => `${((point.x - minX) / Math.max(.001, maxX - minX) * 100).toFixed(1)}% ${((point.z - minZ) / Math.max(.001, maxZ - minZ) * 100).toFixed(1)}%`).join(',')})`;
+        footprint.dataset.theme = location.type;
+      }
+      const label = document.createElement('b');
+      label.textContent = location.displayName;
+      button.append(footprint, label);
       button.title = location.displayName;
       return button;
     }));

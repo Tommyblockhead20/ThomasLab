@@ -1,11 +1,11 @@
 import { getCatchValue } from './economy.js';
-import { EquipmentManager } from './equipment.js';
+import { EQUIPMENT_CATALOG, EquipmentManager } from './equipment.js';
 import { removeAquariumSpecimen, storeAquariumSpecimen } from './aquarium.js';
 import { createSpecimenRecord, findSpecimenIndex } from './inventory.js';
 import { normalizeProgressionState } from './progression-save.js';
 import { serializeProgress, validateProgressImport } from './progress-transfer.js';
 import { normalizeAppearance } from '../player/appearance.js';
-import { MAP_ITEM_BY_ID } from '../world/world-locations.js';
+import { MAP_ITEM_BY_ID, MAP_ITEMS } from '../world/world-locations.js';
 
 const copy = (value) => JSON.parse(JSON.stringify(value));
 
@@ -39,11 +39,12 @@ export class ProgressionSystem {
     return true;
   }
 
-  addMoney(amount) {
+  addMoney(amount, { legitimate = true } = {}) {
     const delta = Math.max(0, Math.floor(Number(amount) || 0));
     if (!delta) return this.state.money;
     this.state.money += delta;
     this.commit();
+    if (legitimate) this.saveSystem.recordLegitimateEarnings?.(delta);
     return this.state.money;
   }
 
@@ -66,6 +67,7 @@ export class ProgressionSystem {
     if (this.state.heldSpecimenId === specimenId) this.state.heldSpecimenId = null;
     this.state.money += specimen.value;
     this.commit();
+    if (specimen.provenance?.legitimate !== false) this.saveSystem.recordLegitimateEarnings?.(specimen.value);
     return { ok: true, specimen, amount: specimen.value };
   }
 
@@ -103,6 +105,7 @@ export class ProgressionSystem {
     if (!specimen) return { ok: false, reason: 'Specimen not found' };
     this.state.money += specimen.value;
     this.commit();
+    if (specimen.provenance?.legitimate !== false) this.saveSystem.recordLegitimateEarnings?.(specimen.value);
     return { ok: true, specimen, amount: specimen.value };
   }
 
@@ -124,6 +127,15 @@ export class ProgressionSystem {
 
   ownsWorldItem(itemId) {
     return this.state.ownedItems.includes(itemId);
+  }
+
+  getPurchaseProgress() {
+    const purchasableEquipment = EQUIPMENT_CATALOG.filter((item) => item.price > 0);
+    const purchasableWorldItems = MAP_ITEMS.filter((item) => item.price > 0);
+    const purchased = purchasableEquipment.filter((item) => this.state.ownedEquipment.includes(item.id)).length
+      + purchasableWorldItems.filter((item) => this.state.ownedItems.includes(item.id)).length;
+    const total = purchasableEquipment.length + purchasableWorldItems.length;
+    return { purchased, total, percent: total ? purchased / total * 100 : 100 };
   }
 
   setHeldWorldItem(itemId = null) {

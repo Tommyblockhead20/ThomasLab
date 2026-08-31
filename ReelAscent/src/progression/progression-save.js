@@ -2,12 +2,14 @@ import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 6;
+export const PROGRESSION_SCHEMA_VERSION = 7;
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
   'standard-line',
   'plain-spoon',
+  'trail-boots',
+  'trail-gloves',
   'trail-kit'
 ]);
 
@@ -16,7 +18,9 @@ export const DEFAULT_EQUIPPED = Object.freeze({
   reel: 'creek-reel',
   line: 'standard-line',
   lure: 'plain-spoon',
-  traversal: 'trail-kit'
+  boots: 'trail-boots',
+  gloves: 'trail-gloves',
+  climbing: 'trail-kit'
 });
 
 const finite = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
@@ -72,6 +76,8 @@ export function normalizeSpecimen(value = {}, fallbackOwnerId = '') {
     condition: Math.max(0, finite(value.condition, 1)),
     provenance: {
       origin: 'caught',
+      // Old saves predate provenance legitimacy and are treated as normal catches.
+      legitimate: value.provenance?.legitimate !== false,
       caughtAt: Math.max(0, finite(value.provenance?.caughtAt ?? value.caughtAt)),
       locationId: typeof (value.provenance?.locationId ?? value.location) === 'string'
         ? (value.provenance?.locationId ?? value.location).slice(0, 160)
@@ -112,6 +118,13 @@ export function normalizeProgressionState(value = {}) {
   for (const category of Object.keys(equipped)) {
     const selected = value.equipped?.[category];
     if (typeof selected === 'string' && owned.has(selected)) equipped[category] = selected;
+  }
+  // v6 stored every traversal item in one slot. Preserve the selected item in its new v9 slot.
+  const legacyTraversal = value.equipped?.traversal;
+  if (typeof legacyTraversal === 'string' && owned.has(legacyTraversal)) {
+    if (['trail-runners', 'endurance-belt', 'springstep-boots'].includes(legacyTraversal)) equipped.boots = legacyTraversal;
+    else if (legacyTraversal === 'chalk-gloves') equipped.gloves = legacyTraversal;
+    else equipped.climbing = legacyTraversal;
   }
   if (typeof value.equipped?.guide === 'string' && owned.has(value.equipped.guide)) equipped.guide = value.equipped.guide;
   const validWorldItems = new Set(MAP_ITEMS.map((item) => item.id));

@@ -1,4 +1,5 @@
 import { resolveSpecies } from '../fishing/fish-data.js';
+import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
 import { MAP_ITEM_BY_ID } from '../world/world-locations.js';
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -7,20 +8,8 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 
 const OTHER_MODAL_OPEN = () => [
   'fish-gallery', 'journal-open', 'multiplayer-open', 'mountain-map-open', 'emote-menu-open',
-  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open'
+  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open', 'pause-open'
 ].some((className) => document.body.classList.contains(className));
-
-function downloadProgressJson(text, prefix = 'reel-ascent-progress') {
-  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${prefix}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
-}
 
 function colorCss(color = [.45, .62, .55]) {
   return `rgb(${color.map((channel) => Math.round(channel * 255)).join(' ')})`;
@@ -41,6 +30,11 @@ function specimenPreview(specimen) {
   </svg>`;
 }
 
+const CATEGORY_LABELS = Object.freeze({
+  rod: 'Rod', reel: 'Reel', line: 'Line', lure: 'Lure', guide: 'Ecology Guide',
+  boots: 'Boots', gloves: 'Gloves', climbing: 'Climbing Equipment'
+});
+
 export class InventoryMenu {
   constructor(progression, player = null) {
     this.progression = progression;
@@ -53,15 +47,9 @@ export class InventoryMenu {
     this.title = document.querySelector('#inventory-title');
     this.closeButton = document.querySelector('#close-inventory');
     this.mobileButton = document.querySelector('#open-inventory');
-    this.transferPanel = document.querySelector('#progress-transfer');
-    this.transferText = document.querySelector('#progress-transfer-text');
-    this.transferFile = document.querySelector('#progress-transfer-file');
-    this.transferStatus = document.querySelector('#progress-transfer-status');
-    this.importSlot = document.querySelector('#progress-import-slot');
     this.isOpen = false;
-    this.activeTab = 'inventory';
+    this.activeTab = 'catches';
     this.renderedRevision = -1;
-    this.renderedSaveRevision = -1;
     this.previousFocus = null;
 
     this.onKeyDown = (event) => {
@@ -81,23 +69,10 @@ export class InventoryMenu {
     this.onClick = (event) => this.handleClick(event);
     this.onCloseClick = () => this.close();
     this.onOpenClick = () => { if (!OTHER_MODAL_OPEN()) this.open(); };
-    this.onTransferFile = async () => {
-      const file = this.transferFile?.files?.[0];
-      if (!file || !this.transferText) return;
-      try {
-        this.transferText.value = await file.text();
-        const result = this.progression.previewProgressImport(this.transferText.value);
-        this.transferStatus.textContent = `Ready: ${result.summary.discovered} discovered, $${result.summary.money}. Choose a destination slot.`;
-      } catch (error) {
-        this.transferStatus.textContent = error instanceof Error ? error.message : 'Could not read progress file.';
-      }
-      this.transferFile.value = '';
-    };
     window.addEventListener('keydown', this.onKeyDown, true);
     this.screen?.addEventListener('click', this.onClick);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.mobileButton?.addEventListener('click', this.onOpenClick);
-    this.transferFile?.addEventListener('change', this.onTransferFile);
   }
 
   handleClick(event) {
@@ -120,54 +95,11 @@ export class InventoryMenu {
       }
       return;
     }
-    const slotAction = event.target.closest('[data-slot-action]');
-    if (slotAction) return this.handleSlotAction(slotAction.dataset.slotAction, slotAction.dataset.slotId);
-    const transferAction = event.target.closest('[data-progress-action]')?.dataset.progressAction;
-    if (transferAction) void this.handleProgressTransfer(transferAction);
-  }
-
-  handleSlotAction(action, slotId) {
-    const saves = this.progression.saveSystem;
-    if (action === 'create') {
-      if (saves.createSlot(slotId)) this.render(true);
-      return;
-    }
-    if (action === 'select') {
-      if (!globalThis.confirm?.('Load this save slot? The page will reload and leave any current multiplayer room.')) return;
-      if (saves.selectSlot(slotId)) globalThis.location?.reload();
-      return;
-    }
-    const summary = saves.getSlotSummaries().find((slot) => slot.id === slotId);
-    const phrase = `RESET ${summary?.label?.toUpperCase() ?? 'SAVE SLOT'}`;
-    if (globalThis.prompt?.(`This permanently clears only ${summary?.label}. Type ${phrase} to confirm.`) !== phrase) return;
-    const ok = action === 'delete' ? saves.deleteSlot(slotId) : saves.resetSlot(slotId);
-    if (!ok) return;
-    if (summary?.active) globalThis.location?.reload();
-    else this.render(true);
-  }
-
-  async handleProgressTransfer(action) {
-    if (action === 'file') return this.transferFile?.click();
-    if (action === 'download') {
-      const text = this.progression.exportProgress();
-      if (this.transferText) this.transferText.value = text;
-      downloadProgressJson(text);
-      if (this.transferStatus) this.transferStatus.textContent = 'Current save downloaded as versioned JSON.';
-      return;
-    }
-    if (action !== 'import' || !this.transferText) return;
-    try {
-      const preview = this.progression.previewProgressImport(this.transferText.value);
-      const slotId = this.importSlot?.value ?? this.progression.saveSystem.activeSlotId;
-      const summary = this.progression.saveSystem.getSlotSummaries().find((slot) => slot.id === slotId);
-      if (!globalThis.confirm?.(`Overwrite ${summary?.label ?? slotId} with ${preview.summary.discovered} discoveries and $${preview.summary.money}?`)) return;
-      downloadProgressJson(this.progression.exportProgress(), 'reel-ascent-backup-before-import');
-      this.progression.importProgressToSlot(this.transferText.value, slotId);
-      this.transferStatus.textContent = 'Backup downloaded. Import complete.';
-      if (summary?.active) globalThis.setTimeout(() => globalThis.location?.reload(), 180);
-      else this.render(true, true);
-    } catch (error) {
-      this.transferStatus.textContent = error instanceof Error ? error.message : 'Progress import failed.';
+    const equipButton = event.target.closest('[data-inventory-equip]');
+    if (equipButton) {
+      const result = this.progression.equip(equipButton.dataset.inventoryEquip);
+      this.status.textContent = result.ok ? `${result.item.name} equipped.` : result.reason;
+      this.render(true, true);
     }
   }
 
@@ -179,7 +111,7 @@ export class InventoryMenu {
     this.isOpen = true;
     this.screen.hidden = false;
     document.body.classList.add('inventory-open');
-    this.activeTab = ['inventory', 'save-data'].includes(tab) ? tab : 'inventory';
+    this.activeTab = ['catches', 'gear'].includes(tab) ? tab : 'catches';
     this.render(true);
     this.closeButton?.focus({ preventScroll: true });
   }
@@ -192,63 +124,52 @@ export class InventoryMenu {
     this.previousFocus = null;
   }
   setTab(tab) {
-    if (!['inventory', 'save-data'].includes(tab) || tab === this.activeTab) return;
+    if (!['catches', 'gear'].includes(tab) || tab === this.activeTab) return;
     this.activeTab = tab;
     this.render(true);
   }
   update() {
-    if (this.isOpen && (this.renderedRevision !== this.progression.revision
-      || this.renderedSaveRevision !== this.progression.saveSystem.revision)) this.render();
+    if (this.isOpen && this.renderedRevision !== this.progression.revision) this.render();
   }
 
   render(force = false, preserveStatus = false) {
-    if (!this.isOpen || !this.content || (!force && this.renderedRevision === this.progression.revision
-      && this.renderedSaveRevision === this.progression.saveSystem.revision)) return;
+    if (!this.isOpen || !this.content || (!force && this.renderedRevision === this.progression.revision)) return;
     const state = this.progression.getSnapshot();
     this.balance.textContent = `$${state.money}`;
-    this.title.textContent = this.activeTab === 'inventory' ? 'Inventory' : 'Save / Data';
+    this.title.textContent = 'Inventory';
     for (const button of this.tabs?.querySelectorAll('[data-collection-tab]') ?? []) {
       button.setAttribute('aria-pressed', String(button.dataset.collectionTab === this.activeTab));
     }
-    if (!preserveStatus) this.status.textContent = this.activeTab === 'inventory'
-      ? 'Owned items and carried specimens. Commerce and aquarium management happen at their islands.'
-      : 'Manage four independent local saves. Changing slots reloads the game cleanly.';
-    this.transferPanel.hidden = this.activeTab !== 'save-data';
-    this.content.className = this.activeTab === 'inventory' ? 'inventory-content' : 'save-data-content';
-    this.content.innerHTML = this.activeTab === 'inventory' ? this.renderInventory(state) : this.renderSaveSlots();
-    this.refreshImportSlots();
+    if (!preserveStatus) this.status.textContent = this.activeTab === 'catches'
+      ? 'Every landed catch stays here until you sell it at Shop Island or move it at Aquarium Island.'
+      : 'Equip owned gear here. Buying and selling stay at Shop Island.';
+    this.content.className = `inventory-content inventory-${this.activeTab}`;
+    this.content.innerHTML = this.activeTab === 'catches' ? this.renderCatches(state) : this.renderGear(state);
     this.renderedRevision = this.progression.revision;
-    this.renderedSaveRevision = this.progression.saveSystem.revision;
   }
 
-  renderInventory(state) {
-    const items = (state.ownedItems ?? []).map((id) => MAP_ITEM_BY_ID.get(id)).filter(Boolean).map((item) => (
-      `<article class="inventory-card inventory-item-card" data-held="${state.heldItemId === item.id}"><div class="inventory-item-icon">${item.mode === 'gps' ? '⌖' : '⌁'}</div><div><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.description)}</p></div><button type="button" data-world-item-action="${item.id}">${item.mode === 'gps' ? 'USE GPS MAP' : 'HOLD / READ MAP'}</button></article>`
-    )).join('');
+  renderCatches(state) {
     const specimens = [...(state.inventory ?? [])].reverse().map((specimen) => (
       `<article class="inventory-card" data-rarity="${escapeHtml(specimen.rarity.toLowerCase())}" data-held="${state.heldSpecimenId === specimen.specimenId}">${specimenPreview(specimen)}<div class="inventory-card-heading"><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)} • ${escapeHtml(specimen.quality)}</small></div><dl><div><dt>LENGTH</dt><dd>${specimen.length.toFixed(1)} in • ${escapeHtml(specimen.lengthCategory)}</dd></div><div><dt>BODY</dt><dd>${specimen.weight.toFixed(2)} lb • ${escapeHtml(specimen.sizeCategory)}</dd></div><div><dt>VALUE</dt><dd>$${specimen.value}</dd></div><div><dt>FOUND</dt><dd>${escapeHtml(specimen.provenance.locationLabel || 'Unknown water')}</dd></div></dl><div class="inventory-actions"><button type="button" data-inventory-action="hold" data-specimen-id="${escapeHtml(specimen.specimenId)}">${state.heldSpecimenId === specimen.specimenId ? 'PUT AWAY' : 'HOLD IN HAND'}</button></div></article>`
     )).join('');
-    return items + specimens || '<p class="shop-empty">Nothing carried yet. Successful catches appear here automatically; maps are sold at Shop Island.</p>';
+    return specimens || '<p class="shop-empty">No carried catches yet.</p>';
   }
 
-  renderSaveSlots() {
-    return this.progression.saveSystem.getSlotSummaries().map((slot) => {
-      const date = slot.updatedAt ? new Date(slot.updatedAt).toLocaleString() : 'Unused';
-      if (slot.empty) return `<article class="save-slot-card"><header><strong>${slot.label}</strong><span>EMPTY</span></header><button data-slot-action="create" data-slot-id="${slot.id}">CREATE SAVE</button></article>`;
-      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'CURRENT' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} discovered</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} fish • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions">${slot.active ? '' : `<button data-slot-action="select" data-slot-id="${slot.id}">LOAD</button>`}<button data-slot-action="${slot.active ? 'reset' : 'delete'}" data-slot-id="${slot.id}">${slot.active ? 'RESET CURRENT SAVE' : 'DELETE'}</button></div></article>`;
+  renderGear(state) {
+    const maps = (state.ownedItems ?? []).map((id) => MAP_ITEM_BY_ID.get(id)).filter(Boolean).map((item) => (
+      `<article class="inventory-card inventory-item-card" data-held="${state.heldItemId === item.id}"><div class="inventory-item-icon">${item.mode === 'gps' ? '⌖' : '⌁'}</div><div><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.description)}</p></div><button type="button" data-world-item-action="${item.id}">${item.mode === 'gps' ? 'USE GPS MAP' : 'HOLD / READ MAP'}</button></article>`
+    )).join('');
+    const equipment = Object.entries(CATEGORY_LABELS).map(([category, label]) => {
+      const owned = EQUIPMENT_CATALOG.filter((item) => item.category === category && state.ownedEquipment.includes(item.id));
+      if (!owned.length) return '';
+      const cards = owned.map((item) => {
+        const equipped = state.equipped[category] === item.id;
+        return `<article class="inventory-card gear-card ${equipped ? 'is-equipped' : ''}"><div class="inventory-card-heading"><strong>${escapeHtml(item.name)}</strong><small>${equipped ? 'EQUIPPED' : 'OWNED'}</small></div><p>${escapeHtml(item.effect)}</p><button type="button" data-inventory-equip="${item.id}" ${equipped ? 'disabled' : ''}>${equipped ? 'EQUIPPED' : 'EQUIP'}</button></article>`;
+      }).join('');
+      return `<section class="inventory-gear-group"><h3>${label}</h3><div class="inventory-gear-row">${cards}</div></section>`;
     }).join('');
-  }
-
-  refreshImportSlots() {
-    if (!this.importSlot) return;
-    const selected = this.importSlot.value || this.progression.saveSystem.activeSlotId;
-    this.importSlot.replaceChildren(...this.progression.saveSystem.getSlotSummaries().map((slot) => {
-      const option = document.createElement('option');
-      option.value = slot.id;
-      option.textContent = `${slot.label}${slot.empty ? ' (empty)' : slot.active ? ' (current)' : ''}`;
-      option.selected = slot.id === selected;
-      return option;
-    }));
+    return `${maps ? `<section class="inventory-gear-group"><h3>Maps</h3><div class="inventory-gear-row">${maps}</div></section>` : ''}${equipment}`
+      || '<p class="shop-empty">No gear yet. Visit Shop Island.</p>';
   }
 
   destroy() {
@@ -256,7 +177,6 @@ export class InventoryMenu {
     this.screen?.removeEventListener('click', this.onClick);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.mobileButton?.removeEventListener('click', this.onOpenClick);
-    this.transferFile?.removeEventListener('change', this.onTransferFile);
     document.body.classList.remove('inventory-open');
   }
 }
