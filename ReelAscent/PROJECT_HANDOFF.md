@@ -8,6 +8,7 @@ This section supersedes older descriptions below where they differ.
 
 ### Input, menus, map, and emotes
 
+- Startup wardrobe regression fixed: `.appearance-menu[hidden]` explicitly uses `display: none`, preventing the authored grid display from showing a blank, non-interactive Appearance dialog while its controller is closed.
 - Fixed the Firefox/pointer-lock auto-interaction root cause in two places. The click that acquires pointer lock is suppressed until release, and a Grip/click edge made with no nearby target is consumed that frame instead of remaining queued until the player walks into a shop, bench, wardrobe, aquarium, or boat trigger. Proximity still controls prompts; entering a trigger requires a fresh press.
 - Appearance is a fixed-height, non-scrolling desktop dialog with the live preview on the left and tabbed `BODY & COLORS` / `ACCESSORIES` controls on the right. Close, Randomize, and Reset remain in one stable header across human/blob switches and rerenders. Small screens retain a scrolling fallback.
 - Added Clap to the local emote menu, local humanoid animation, remote-avatar animation, shared emote definitions, and server snapshot allowlist. This is an additive protocol-v1 value; no envelope or protocol version changed.
