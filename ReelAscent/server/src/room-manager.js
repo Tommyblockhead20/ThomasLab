@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import { Room } from './room.js';
 
-const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ROOM_ALPHABET = '0123456789';
+const ROOM_CODE_LENGTH = 5;
 
 export class RoomManager {
   constructor({ roomCapacity = 6, reconnectWindowMs = 25_000 } = {}) {
@@ -13,7 +14,9 @@ export class RoomManager {
   createCode() {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       let code = '';
-      for (let index = 0; index < 5; index += 1) code += ROOM_ALPHABET[crypto.randomInt(0, ROOM_ALPHABET.length)];
+      for (let index = 0; index < ROOM_CODE_LENGTH; index += 1) {
+        code += ROOM_ALPHABET[crypto.randomInt(0, ROOM_ALPHABET.length)];
+      }
       if (!this.rooms.has(code)) return code;
     }
     throw new Error('Could not allocate a room code.');
@@ -30,7 +33,10 @@ export class RoomManager {
 
   join(session, rawCode) {
     if (session.room) return { ok: false, code: 'already_in_room', message: 'You are already in a room.' };
-    const code = String(rawCode ?? '').trim().toUpperCase();
+    const code = String(rawCode ?? '').replace(/\D/g, '').slice(0, ROOM_CODE_LENGTH);
+    if (code.length !== ROOM_CODE_LENGTH) {
+      return { ok: false, code: 'invalid_room_code', message: 'Enter the five-digit room code.' };
+    }
     const room = this.rooms.get(code);
     if (!room) return { ok: false, code: 'room_not_found', message: 'That room does not exist.' };
     if (room.players.has(session.playerId)) return { ok: false, code: 'already_in_room', message: 'That player is already in this room.' };

@@ -3,11 +3,14 @@ import test from 'node:test';
 import {
   FISHING_CAST_CODES,
   FISHING_HOOK_CODES,
+  isEditableInputTarget,
   RHYTHM_LANES,
   StaminaResource,
   TOUCH_RHYTHM_LANES,
   touchActionHeld
 } from '../src/player/movement.js';
+import { normalizeRoomCode, ROOM_CODE_LENGTH } from '../src/multiplayer/multiplayer-client.js';
+import { RoomManager } from '../server/src/room-manager.js';
 import { TEMPORARY_PLAYTEST_CONTROLS } from '../src/world/run-manager.js';
 
 test('desktop WASD and arrow keys share the four canonical rhythm lanes', () => {
@@ -15,6 +18,21 @@ test('desktop WASD and arrow keys share the four canonical rhythm lanes', () => 
   assert.equal(RHYTHM_LANES.KeyA, RHYTHM_LANES.ArrowLeft);
   assert.equal(RHYTHM_LANES.KeyS, RHYTHM_LANES.ArrowDown);
   assert.equal(RHYTHM_LANES.KeyD, RHYTHM_LANES.ArrowRight);
+});
+
+test('multiplayer room codes use the same five-digit format on client and server', () => {
+  assert.equal(ROOM_CODE_LENGTH, 5);
+  assert.equal(normalizeRoomCode(' 12-A3 456 '), '12345');
+  const manager = new RoomManager();
+  for (let index = 0; index < 30; index += 1) assert.match(manager.createCode(), /^\d{5}$/);
+});
+
+test('gameplay input yields to editable controls', () => {
+  assert.equal(isEditableInputTarget({ tagName: 'INPUT' }), true);
+  assert.equal(isEditableInputTarget({ tagName: 'textarea' }), true);
+  assert.equal(isEditableInputTarget({ tagName: 'SELECT' }), true);
+  assert.equal(isEditableInputTarget({ tagName: 'DIV', isContentEditable: true }), true);
+  assert.equal(isEditableInputTarget({ tagName: 'CANVAS' }), false);
 });
 
 test('mouse-free fishing maps up/W to cast and down/S to hook', () => {

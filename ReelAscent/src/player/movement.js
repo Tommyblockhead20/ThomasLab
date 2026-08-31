@@ -111,6 +111,10 @@ export const FISHING_CAST_CODES = Object.freeze(['ArrowUp', 'KeyW']);
 export const FISHING_HOOK_CODES = Object.freeze(['ArrowDown', 'KeyS']);
 export const SLIDE_CODES = Object.freeze(['KeyC']);
 export function isSlideInputCode(code) { return isBoundActionCode('slide', code); }
+export function isEditableInputTarget(target) {
+  const tagName = target?.tagName?.toLowerCase?.();
+  return Boolean(target?.isContentEditable || ['input', 'textarea', 'select'].includes(tagName));
+}
 
 // A lane may have more than one physical source (for example ArrowRight and D, or two
 // touch pointers). Press edges are tracked per source while hold ownership is aggregated
@@ -207,6 +211,7 @@ export class PlayerInput {
     this.setMobileMode(this.mobileMode);
 
     this.onKeyDown = (event) => {
+      if (isEditableInputTarget(event.target)) return;
       if (!this.forceMobile) this.setMobileMode(false);
       const wasHeld = this.held.has(event.code);
       const lane = rhythmLaneForCode(event.code, this.bindings);
@@ -244,6 +249,11 @@ export class PlayerInput {
     };
 
     this.onKeyUp = (event) => {
+      if (isEditableInputTarget(event.target)) {
+        this.held.delete(event.code);
+        this.rhythmLaneInput.release(`key:${event.code}`);
+        return;
+      }
       if (this.matchesAction('forward', event.code) && this.held.has(event.code)) {
         this.fishingCastReleased = true;
       }

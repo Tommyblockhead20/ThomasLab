@@ -10,6 +10,8 @@ export const MULTIPLAYER_ENDPOINT = String(import.meta.env?.VITE_MULTIPLAYER_END
 
 const SNAPSHOT_INTERVAL_MS = 1000 / 15;
 const RECONNECT_DELAYS_MS = Object.freeze([500, 1000, 2000, 3000, 4500, 6000]);
+export const ROOM_CODE_LENGTH = 5;
+export const normalizeRoomCode = (value) => String(value ?? '').replace(/\D/g, '').slice(0, ROOM_CODE_LENGTH);
 
 export class MultiplayerClient extends EventTarget {
   constructor(playerId, {
@@ -88,9 +90,9 @@ export class MultiplayerClient extends EventTarget {
   }
 
   async join(roomCode) {
-    const normalized = String(roomCode ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-    if (!normalized) {
-      this.setState('error', 'Enter a room code.');
+    const normalized = normalizeRoomCode(roomCode);
+    if (normalized.length !== ROOM_CODE_LENGTH) {
+      this.setState('error', 'Enter the five-digit room code.');
       return false;
     }
     this.pendingRoomRequest = {

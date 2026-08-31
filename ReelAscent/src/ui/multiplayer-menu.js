@@ -1,4 +1,5 @@
 import { isBoundActionCode } from '../player/movement.js';
+import { normalizeRoomCode, ROOM_CODE_LENGTH } from '../multiplayer/multiplayer-client.js';
 
 const OTHER_MODAL_OPEN = () => [
   'fish-gallery', 'journal-open', 'inventory-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open'
@@ -46,6 +47,12 @@ export class MultiplayerMenu {
     this.onHost = () => { void this.client.host(); };
     this.onJoin = () => { void this.client.join(this.codeInput?.value); };
     this.onLeave = () => this.client.leave();
+    this.onCodeInput = () => {
+      if (!this.codeInput) return;
+      const normalized = normalizeRoomCode(this.codeInput.value);
+      if (this.codeInput.value !== normalized) this.codeInput.value = normalized;
+      this.updateJoinAvailability();
+    };
     this.client.addEventListener('statechange', this.onStateChange);
     this.client.addEventListener('roomstate', this.onRoomState);
     window.addEventListener('keydown', this.onKeyDown, true);
@@ -53,6 +60,7 @@ export class MultiplayerMenu {
     this.hostButton?.addEventListener('click', this.onHost);
     this.joinButton?.addEventListener('click', this.onJoin);
     this.leaveButton?.addEventListener('click', this.onLeave);
+    this.codeInput?.addEventListener('input', this.onCodeInput);
     this.render();
   }
 
@@ -92,12 +100,19 @@ export class MultiplayerMenu {
     }
   }
 
+  updateJoinAvailability(state = this.client.getState()) {
+    if (!this.joinButton) return;
+    const busy = ['connecting', 'joining', 'reconnecting'].includes(state.state);
+    const hasCompleteCode = normalizeRoomCode(this.codeInput?.value).length === ROOM_CODE_LENGTH;
+    this.joinButton.disabled = !state.endpointConfigured || busy || state.state === 'in_room' || !hasCompleteCode;
+  }
+
   render() {
     const state = this.client.getState();
     const unavailable = !state.endpointConfigured;
     const busy = ['connecting', 'joining', 'reconnecting'].includes(state.state);
     if (this.hostButton) this.hostButton.disabled = unavailable || busy || state.state === 'in_room';
-    if (this.joinButton) this.joinButton.disabled = unavailable || busy || state.state === 'in_room';
+    this.updateJoinAvailability(state);
     if (this.codeInput) this.codeInput.disabled = unavailable || state.state === 'in_room';
     if (this.leaveButton) this.leaveButton.hidden = state.state !== 'in_room' && state.state !== 'reconnecting';
 
@@ -127,6 +142,7 @@ export class MultiplayerMenu {
     this.hostButton?.removeEventListener('click', this.onHost);
     this.joinButton?.removeEventListener('click', this.onJoin);
     this.leaveButton?.removeEventListener('click', this.onLeave);
+    this.codeInput?.removeEventListener('input', this.onCodeInput);
     document.body.classList.remove('multiplayer-open');
   }
 }

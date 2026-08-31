@@ -8,6 +8,7 @@ This section supersedes older descriptions below where they differ.
 
 ### Input, menus, map, and emotes
 
+- Multiplayer room entry fix: newly hosted rooms now use five-digit numeric codes, the join field presents a numeric keyboard and strips non-digits, Join activates only for a complete code, and gameplay key handling now yields while typing in editable controls.
 - Startup wardrobe regression fixed: `.appearance-menu[hidden]` explicitly uses `display: none`, preventing the authored grid display from showing a blank, non-interactive Appearance dialog while its controller is closed.
 - Fixed the Firefox/pointer-lock auto-interaction root cause in two places. The click that acquires pointer lock is suppressed until release, and a Grip/click edge made with no nearby target is consumed that frame instead of remaining queued until the player walks into a shop, bench, wardrobe, aquarium, or boat trigger. Proximity still controls prompts; entering a trigger requires a fresh press.
 - Appearance is a fixed-height, non-scrolling desktop dialog with the live preview on the left and tabbed `BODY & COLORS` / `ACCESSORIES` controls on the right. Close, Randomize, and Reset remain in one stable header across human/blob switches and rerenders. Small screens retain a scrolling fallback.
