@@ -1,0 +1,1683 @@
+{
+  "metadata": {
+    "format": "bike-trip-planner-demo-v1",
+    "fake": true,
+    "note": "All routes, distances, scores, surfaces and geometries are demo-only approximations. Do not use for navigation."
+  },
+  "nodes": [
+    {
+      "id": "paris",
+      "name": "Paris",
+      "lat": 48.8566,
+      "lon": 2.3522,
+      "region": "europe",
+      "destinationId": "d_paris"
+    },
+    {
+      "id": "chartres",
+      "name": "Chartres",
+      "lat": 48.4469,
+      "lon": 1.489,
+      "region": "europe",
+      "destinationId": "d_chartres"
+    },
+    {
+      "id": "orleans",
+      "name": "Orl\u00e9ans",
+      "lat": 47.903,
+      "lon": 1.9093,
+      "region": "europe",
+      "destinationId": "d_orleans"
+    },
+    {
+      "id": "blois",
+      "name": "Blois",
+      "lat": 47.5861,
+      "lon": 1.3359,
+      "region": "europe",
+      "destinationId": "d_blois"
+    },
+    {
+      "id": "tours",
+      "name": "Tours",
+      "lat": 47.3941,
+      "lon": 0.6848,
+      "region": "europe",
+      "destinationId": "d_tours"
+    },
+    {
+      "id": "saumur",
+      "name": "Saumur",
+      "lat": 47.2601,
+      "lon": -0.076,
+      "region": "europe",
+      "destinationId": "d_saumur"
+    },
+    {
+      "id": "angers",
+      "name": "Angers",
+      "lat": 47.4784,
+      "lon": -0.5632,
+      "region": "europe",
+      "destinationId": "d_angers"
+    },
+    {
+      "id": "nantes",
+      "name": "Nantes",
+      "lat": 47.2184,
+      "lon": -1.5536,
+      "region": "europe",
+      "destinationId": "d_nantes"
+    },
+    {
+      "id": "saintnazaire",
+      "name": "Saint-Nazaire",
+      "lat": 47.2735,
+      "lon": -2.2134,
+      "region": "europe",
+      "destinationId": "d_saintnazaire"
+    },
+    {
+      "id": "lille",
+      "name": "Lille",
+      "lat": 50.6292,
+      "lon": 3.0573,
+      "region": "europe",
+      "destinationId": "d_lille"
+    },
+    {
+      "id": "ghent",
+      "name": "Ghent",
+      "lat": 51.0543,
+      "lon": 3.7174,
+      "region": "europe",
+      "destinationId": "d_ghent"
+    },
+    {
+      "id": "bruges",
+      "name": "Bruges",
+      "lat": 51.2093,
+      "lon": 3.2247,
+      "region": "europe",
+      "destinationId": "d_bruges"
+    },
+    {
+      "id": "brussels",
+      "name": "Brussels",
+      "lat": 50.8503,
+      "lon": 4.3517,
+      "region": "europe",
+      "destinationId": "d_brussels"
+    },
+    {
+      "id": "reims",
+      "name": "Reims",
+      "lat": 49.2583,
+      "lon": 4.0317,
+      "region": "europe",
+      "destinationId": "d_reims"
+    },
+    {
+      "id": "dc",
+      "name": "Washington, DC",
+      "lat": 38.9072,
+      "lon": -77.0369,
+      "region": "north_america",
+      "destinationId": "d_dc"
+    },
+    {
+      "id": "harpers",
+      "name": "Harpers Ferry",
+      "lat": 39.3254,
+      "lon": -77.7389,
+      "region": "north_america",
+      "destinationId": "d_harpers"
+    },
+    {
+      "id": "cumberland",
+      "name": "Cumberland",
+      "lat": 39.6529,
+      "lon": -78.7625,
+      "region": "north_america",
+      "destinationId": "d_cumberland"
+    },
+    {
+      "id": "pittsburgh",
+      "name": "Pittsburgh",
+      "lat": 40.4406,
+      "lon": -79.9959,
+      "region": "north_america",
+      "destinationId": "d_pittsburgh"
+    },
+    {
+      "id": "youngstown",
+      "name": "Youngstown",
+      "lat": 41.0998,
+      "lon": -80.6495,
+      "region": "north_america",
+      "destinationId": "d_youngstown"
+    },
+    {
+      "id": "cleveland",
+      "name": "Cleveland",
+      "lat": 41.4993,
+      "lon": -81.6944,
+      "region": "north_america",
+      "destinationId": "d_cleveland"
+    },
+    {
+      "id": "akron",
+      "name": "Akron",
+      "lat": 41.0814,
+      "lon": -81.519,
+      "region": "north_america",
+      "destinationId": "d_akron"
+    },
+    {
+      "id": "columbus",
+      "name": "Columbus",
+      "lat": 39.9612,
+      "lon": -82.9988,
+      "region": "north_america",
+      "destinationId": "d_columbus"
+    },
+    {
+      "id": "dayton",
+      "name": "Dayton",
+      "lat": 39.7589,
+      "lon": -84.1916,
+      "region": "north_america",
+      "destinationId": "d_dayton"
+    },
+    {
+      "id": "cincinnati",
+      "name": "Cincinnati",
+      "lat": 39.1031,
+      "lon": -84.512,
+      "region": "north_america",
+      "destinationId": "d_cincinnati"
+    },
+    {
+      "id": "toledo",
+      "name": "Toledo",
+      "lat": 41.6528,
+      "lon": -83.5379,
+      "region": "north_america",
+      "destinationId": "d_toledo"
+    },
+    {
+      "id": "detroit",
+      "name": "Detroit",
+      "lat": 42.3314,
+      "lon": -83.0458,
+      "region": "north_america",
+      "destinationId": "d_detroit"
+    },
+    {
+      "id": "buffalo",
+      "name": "Buffalo",
+      "lat": 42.8864,
+      "lon": -78.8784,
+      "region": "north_america",
+      "destinationId": "d_buffalo"
+    },
+    {
+      "id": "albany",
+      "name": "Albany",
+      "lat": 42.6526,
+      "lon": -73.7562,
+      "region": "north_america",
+      "destinationId": "d_albany"
+    },
+    {
+      "id": "nyc",
+      "name": "New York City",
+      "lat": 40.7128,
+      "lon": -74.006,
+      "region": "north_america",
+      "destinationId": "d_nyc"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "a": "paris",
+      "b": "chartres",
+      "region": "europe",
+      "distanceMiles": 58,
+      "ascentFt": 900,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 65,
+      "remoteness": 1,
+      "urbanFriction": 0.28,
+      "geometry": [
+        [
+          48.8566,
+          2.3522
+        ],
+        [
+          48.66,
+          1.96
+        ],
+        [
+          48.4469,
+          1.489
+        ]
+      ]
+    },
+    {
+      "id": "e2",
+      "a": "chartres",
+      "b": "orleans",
+      "region": "europe",
+      "distanceMiles": 70,
+      "ascentFt": 1100,
+      "surface": "compacted",
+      "infrastructure": "path",
+      "scenery": 67,
+      "remoteness": 2,
+      "urbanFriction": 0.12,
+      "geometry": [
+        [
+          48.4469,
+          1.489
+        ],
+        [
+          48.1,
+          1.55
+        ],
+        [
+          47.903,
+          1.9093
+        ]
+      ]
+    },
+    {
+      "id": "e3",
+      "a": "paris",
+      "b": "orleans",
+      "region": "europe",
+      "distanceMiles": 83,
+      "ascentFt": 800,
+      "surface": "paved",
+      "infrastructure": "quiet_road",
+      "scenery": 58,
+      "remoteness": 2,
+      "urbanFriction": 0.24,
+      "geometry": [
+        [
+          48.8566,
+          2.3522
+        ],
+        [
+          48.32,
+          2.12
+        ],
+        [
+          47.903,
+          1.9093
+        ]
+      ]
+    },
+    {
+      "id": "e4",
+      "a": "orleans",
+      "b": "blois",
+      "region": "europe",
+      "distanceMiles": 42,
+      "ascentFt": 420,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 90,
+      "remoteness": 1,
+      "urbanFriction": 0.1,
+      "geometry": [
+        [
+          47.903,
+          1.9093
+        ],
+        [
+          47.74,
+          1.62
+        ],
+        [
+          47.5861,
+          1.3359
+        ]
+      ]
+    },
+    {
+      "id": "e5",
+      "a": "blois",
+      "b": "tours",
+      "region": "europe",
+      "distanceMiles": 43,
+      "ascentFt": 500,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 93,
+      "remoteness": 1,
+      "urbanFriction": 0.1,
+      "geometry": [
+        [
+          47.5861,
+          1.3359
+        ],
+        [
+          47.47,
+          1.0
+        ],
+        [
+          47.3941,
+          0.6848
+        ]
+      ]
+    },
+    {
+      "id": "e6",
+      "a": "tours",
+      "b": "saumur",
+      "region": "europe",
+      "distanceMiles": 48,
+      "ascentFt": 520,
+      "surface": "compacted",
+      "infrastructure": "path",
+      "scenery": 94,
+      "remoteness": 1,
+      "urbanFriction": 0.08,
+      "geometry": [
+        [
+          47.3941,
+          0.6848
+        ],
+        [
+          47.31,
+          0.31
+        ],
+        [
+          47.2601,
+          -0.076
+        ]
+      ]
+    },
+    {
+      "id": "e7",
+      "a": "saumur",
+      "b": "angers",
+      "region": "europe",
+      "distanceMiles": 39,
+      "ascentFt": 420,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 88,
+      "remoteness": 1,
+      "urbanFriction": 0.1,
+      "geometry": [
+        [
+          47.2601,
+          -0.076
+        ],
+        [
+          47.38,
+          -0.31
+        ],
+        [
+          47.4784,
+          -0.5632
+        ]
+      ]
+    },
+    {
+      "id": "e8",
+      "a": "angers",
+      "b": "nantes",
+      "region": "europe",
+      "distanceMiles": 58,
+      "ascentFt": 610,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 83,
+      "remoteness": 1,
+      "urbanFriction": 0.12,
+      "geometry": [
+        [
+          47.4784,
+          -0.5632
+        ],
+        [
+          47.33,
+          -1.06
+        ],
+        [
+          47.2184,
+          -1.5536
+        ]
+      ]
+    },
+    {
+      "id": "e9",
+      "a": "nantes",
+      "b": "saintnazaire",
+      "region": "europe",
+      "distanceMiles": 43,
+      "ascentFt": 350,
+      "surface": "paved",
+      "infrastructure": "protected",
+      "scenery": 91,
+      "remoteness": 1,
+      "urbanFriction": 0.2,
+      "geometry": [
+        [
+          47.2184,
+          -1.5536
+        ],
+        [
+          47.24,
+          -1.89
+        ],
+        [
+          47.2735,
+          -2.2134
+        ]
+      ]
+    },
+    {
+      "id": "e10",
+      "a": "paris",
+      "b": "reims",
+      "region": "europe",
+      "distanceMiles": 91,
+      "ascentFt": 1200,
+      "surface": "paved",
+      "infrastructure": "quiet_road",
+      "scenery": 62,
+      "remoteness": 2,
+      "urbanFriction": 0.18,
+      "geometry": [
+        [
+          48.8566,
+          2.3522
+        ],
+        [
+          49.05,
+          3.22
+        ],
+        [
+          49.2583,
+          4.0317
+        ]
+      ]
+    },
+    {
+      "id": "e11",
+      "a": "reims",
+      "b": "brussels",
+      "region": "europe",
+      "distanceMiles": 132,
+      "ascentFt": 1700,
+      "surface": "fine_gravel",
+      "infrastructure": "path",
+      "scenery": 72,
+      "remoteness": 2,
+      "urbanFriction": 0.12,
+      "geometry": [
+        [
+          49.2583,
+          4.0317
+        ],
+        [
+          49.96,
+          4.12
+        ],
+        [
+          50.8503,
+          4.3517
+        ]
+      ]
+    },
+    {
+      "id": "e12",
+      "a": "brussels",
+      "b": "ghent",
+      "region": "europe",
+      "distanceMiles": 36,
+      "ascentFt": 260,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 76,
+      "remoteness": 1,
+      "urbanFriction": 0.32,
+      "geometry": [
+        [
+          50.8503,
+          4.3517
+        ],
+        [
+          50.97,
+          4.0
+        ],
+        [
+          51.0543,
+          3.7174
+        ]
+      ]
+    },
+    {
+      "id": "e13",
+      "a": "ghent",
+      "b": "bruges",
+      "region": "europe",
+      "distanceMiles": 31,
+      "ascentFt": 180,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 92,
+      "remoteness": 1,
+      "urbanFriction": 0.2,
+      "geometry": [
+        [
+          51.0543,
+          3.7174
+        ],
+        [
+          51.13,
+          3.46
+        ],
+        [
+          51.2093,
+          3.2247
+        ]
+      ]
+    },
+    {
+      "id": "e14",
+      "a": "bruges",
+      "b": "lille",
+      "region": "europe",
+      "distanceMiles": 49,
+      "ascentFt": 330,
+      "surface": "paved",
+      "infrastructure": "protected",
+      "scenery": 78,
+      "remoteness": 1,
+      "urbanFriction": 0.22,
+      "geometry": [
+        [
+          51.2093,
+          3.2247
+        ],
+        [
+          50.91,
+          3.1
+        ],
+        [
+          50.6292,
+          3.0573
+        ]
+      ]
+    },
+    {
+      "id": "e15",
+      "a": "lille",
+      "b": "paris",
+      "region": "europe",
+      "distanceMiles": 137,
+      "ascentFt": 1300,
+      "surface": "paved",
+      "infrastructure": "lane",
+      "scenery": 52,
+      "remoteness": 2,
+      "urbanFriction": 0.26,
+      "geometry": [
+        [
+          50.6292,
+          3.0573
+        ],
+        [
+          49.73,
+          2.68
+        ],
+        [
+          48.8566,
+          2.3522
+        ]
+      ]
+    },
+    {
+      "id": "e16",
+      "a": "lille",
+      "b": "brussels",
+      "region": "europe",
+      "distanceMiles": 70,
+      "ascentFt": 450,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 66,
+      "remoteness": 1,
+      "urbanFriction": 0.24,
+      "geometry": [
+        [
+          50.6292,
+          3.0573
+        ],
+        [
+          50.73,
+          3.66
+        ],
+        [
+          50.8503,
+          4.3517
+        ]
+      ]
+    },
+    {
+      "id": "e17",
+      "a": "reims",
+      "b": "lille",
+      "region": "europe",
+      "distanceMiles": 119,
+      "ascentFt": 900,
+      "surface": "paved",
+      "infrastructure": "quiet_road",
+      "scenery": 57,
+      "remoteness": 2,
+      "urbanFriction": 0.16,
+      "geometry": [
+        [
+          49.2583,
+          4.0317
+        ],
+        [
+          49.86,
+          3.55
+        ],
+        [
+          50.6292,
+          3.0573
+        ]
+      ]
+    },
+    {
+      "id": "n1",
+      "a": "dc",
+      "b": "harpers",
+      "region": "north_america",
+      "distanceMiles": 63,
+      "ascentFt": 850,
+      "surface": "compacted",
+      "infrastructure": "path",
+      "scenery": 88,
+      "remoteness": 2,
+      "urbanFriction": 0.14,
+      "geometry": [
+        [
+          38.9072,
+          -77.0369
+        ],
+        [
+          39.12,
+          -77.42
+        ],
+        [
+          39.3254,
+          -77.7389
+        ]
+      ]
+    },
+    {
+      "id": "n2",
+      "a": "harpers",
+      "b": "cumberland",
+      "region": "north_america",
+      "distanceMiles": 121,
+      "ascentFt": 1500,
+      "surface": "compacted",
+      "infrastructure": "path",
+      "scenery": 90,
+      "remoteness": 3,
+      "urbanFriction": 0.06,
+      "geometry": [
+        [
+          39.3254,
+          -77.7389
+        ],
+        [
+          39.47,
+          -78.25
+        ],
+        [
+          39.6529,
+          -78.7625
+        ]
+      ]
+    },
+    {
+      "id": "n3",
+      "a": "cumberland",
+      "b": "pittsburgh",
+      "region": "north_america",
+      "distanceMiles": 150,
+      "ascentFt": 2400,
+      "surface": "fine_gravel",
+      "infrastructure": "path",
+      "scenery": 94,
+      "remoteness": 3,
+      "urbanFriction": 0.05,
+      "geometry": [
+        [
+          39.6529,
+          -78.7625
+        ],
+        [
+          40.02,
+          -79.39
+        ],
+        [
+          40.4406,
+          -79.9959
+        ]
+      ]
+    },
+    {
+      "id": "n4",
+      "a": "pittsburgh",
+      "b": "youngstown",
+      "region": "north_america",
+      "distanceMiles": 70,
+      "ascentFt": 1900,
+      "surface": "paved",
+      "infrastructure": "quiet_road",
+      "scenery": 61,
+      "remoteness": 2,
+      "urbanFriction": 0.17,
+      "geometry": [
+        [
+          40.4406,
+          -79.9959
+        ],
+        [
+          40.77,
+          -80.34
+        ],
+        [
+          41.0998,
+          -80.6495
+        ]
+      ]
+    },
+    {
+      "id": "n5",
+      "a": "youngstown",
+      "b": "cleveland",
+      "region": "north_america",
+      "distanceMiles": 78,
+      "ascentFt": 1200,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 70,
+      "remoteness": 2,
+      "urbanFriction": 0.18,
+      "geometry": [
+        [
+          41.0998,
+          -80.6495
+        ],
+        [
+          41.31,
+          -81.17
+        ],
+        [
+          41.4993,
+          -81.6944
+        ]
+      ]
+    },
+    {
+      "id": "n6",
+      "a": "cleveland",
+      "b": "akron",
+      "region": "north_america",
+      "distanceMiles": 42,
+      "ascentFt": 950,
+      "surface": "compacted",
+      "infrastructure": "path",
+      "scenery": 86,
+      "remoteness": 1,
+      "urbanFriction": 0.16,
+      "geometry": [
+        [
+          41.4993,
+          -81.6944
+        ],
+        [
+          41.3,
+          -81.64
+        ],
+        [
+          41.0814,
+          -81.519
+        ]
+      ]
+    },
+    {
+      "id": "n7",
+      "a": "akron",
+      "b": "columbus",
+      "region": "north_america",
+      "distanceMiles": 126,
+      "ascentFt": 1600,
+      "surface": "paved",
+      "infrastructure": "lane",
+      "scenery": 58,
+      "remoteness": 2,
+      "urbanFriction": 0.18,
+      "geometry": [
+        [
+          41.0814,
+          -81.519
+        ],
+        [
+          40.5,
+          -82.2
+        ],
+        [
+          39.9612,
+          -82.9988
+        ]
+      ]
+    },
+    {
+      "id": "n8",
+      "a": "columbus",
+      "b": "dayton",
+      "region": "north_america",
+      "distanceMiles": 72,
+      "ascentFt": 700,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 69,
+      "remoteness": 1,
+      "urbanFriction": 0.13,
+      "geometry": [
+        [
+          39.9612,
+          -82.9988
+        ],
+        [
+          39.86,
+          -83.55
+        ],
+        [
+          39.7589,
+          -84.1916
+        ]
+      ]
+    },
+    {
+      "id": "n9",
+      "a": "dayton",
+      "b": "cincinnati",
+      "region": "north_america",
+      "distanceMiles": 55,
+      "ascentFt": 650,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 74,
+      "remoteness": 1,
+      "urbanFriction": 0.18,
+      "geometry": [
+        [
+          39.7589,
+          -84.1916
+        ],
+        [
+          39.45,
+          -84.38
+        ],
+        [
+          39.1031,
+          -84.512
+        ]
+      ]
+    },
+    {
+      "id": "n10",
+      "a": "cleveland",
+      "b": "toledo",
+      "region": "north_america",
+      "distanceMiles": 119,
+      "ascentFt": 900,
+      "surface": "paved",
+      "infrastructure": "quiet_road",
+      "scenery": 62,
+      "remoteness": 2,
+      "urbanFriction": 0.13,
+      "geometry": [
+        [
+          41.4993,
+          -81.6944
+        ],
+        [
+          41.48,
+          -82.65
+        ],
+        [
+          41.6528,
+          -83.5379
+        ]
+      ]
+    },
+    {
+      "id": "n11",
+      "a": "toledo",
+      "b": "detroit",
+      "region": "north_america",
+      "distanceMiles": 62,
+      "ascentFt": 350,
+      "surface": "paved",
+      "infrastructure": "lane",
+      "scenery": 54,
+      "remoteness": 2,
+      "urbanFriction": 0.28,
+      "geometry": [
+        [
+          41.6528,
+          -83.5379
+        ],
+        [
+          41.98,
+          -83.25
+        ],
+        [
+          42.3314,
+          -83.0458
+        ]
+      ]
+    },
+    {
+      "id": "n12",
+      "a": "cleveland",
+      "b": "buffalo",
+      "region": "north_america",
+      "distanceMiles": 190,
+      "ascentFt": 900,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 88,
+      "remoteness": 2,
+      "urbanFriction": 0.1,
+      "geometry": [
+        [
+          41.4993,
+          -81.6944
+        ],
+        [
+          42.07,
+          -80.21
+        ],
+        [
+          42.8864,
+          -78.8784
+        ]
+      ]
+    },
+    {
+      "id": "n13",
+      "a": "buffalo",
+      "b": "albany",
+      "region": "north_america",
+      "distanceMiles": 295,
+      "ascentFt": 1600,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 82,
+      "remoteness": 2,
+      "urbanFriction": 0.12,
+      "geometry": [
+        [
+          42.8864,
+          -78.8784
+        ],
+        [
+          42.95,
+          -76.3
+        ],
+        [
+          42.6526,
+          -73.7562
+        ]
+      ]
+    },
+    {
+      "id": "n14",
+      "a": "albany",
+      "b": "nyc",
+      "region": "north_america",
+      "distanceMiles": 160,
+      "ascentFt": 1200,
+      "surface": "paved",
+      "infrastructure": "path",
+      "scenery": 87,
+      "remoteness": 1,
+      "urbanFriction": 0.22,
+      "geometry": [
+        [
+          42.6526,
+          -73.7562
+        ],
+        [
+          41.75,
+          -73.9
+        ],
+        [
+          40.7128,
+          -74.006
+        ]
+      ]
+    },
+    {
+      "id": "n15",
+      "a": "pittsburgh",
+      "b": "cleveland",
+      "region": "north_america",
+      "distanceMiles": 137,
+      "ascentFt": 2200,
+      "surface": "paved",
+      "infrastructure": "road",
+      "scenery": 46,
+      "remoteness": 2,
+      "urbanFriction": 0.2,
+      "geometry": [
+        [
+          40.4406,
+          -79.9959
+        ],
+        [
+          40.93,
+          -80.84
+        ],
+        [
+          41.4993,
+          -81.6944
+        ]
+      ]
+    },
+    {
+      "id": "n16",
+      "a": "akron",
+      "b": "youngstown",
+      "region": "north_america",
+      "distanceMiles": 51,
+      "ascentFt": 900,
+      "surface": "paved",
+      "infrastructure": "quiet_road",
+      "scenery": 56,
+      "remoteness": 2,
+      "urbanFriction": 0.12,
+      "geometry": [
+        [
+          41.0814,
+          -81.519
+        ],
+        [
+          41.08,
+          -80.99
+        ],
+        [
+          41.0998,
+          -80.6495
+        ]
+      ]
+    },
+    {
+      "id": "n17",
+      "a": "columbus",
+      "b": "toledo",
+      "region": "north_america",
+      "distanceMiles": 145,
+      "ascentFt": 700,
+      "surface": "paved",
+      "infrastructure": "quiet_road",
+      "scenery": 51,
+      "remoteness": 2,
+      "urbanFriction": 0.12,
+      "geometry": [
+        [
+          39.9612,
+          -82.9988
+        ],
+        [
+          40.83,
+          -83.27
+        ],
+        [
+          41.6528,
+          -83.5379
+        ]
+      ]
+    },
+    {
+      "id": "n18",
+      "a": "dayton",
+      "b": "toledo",
+      "region": "north_america",
+      "distanceMiles": 150,
+      "ascentFt": 650,
+      "surface": "paved",
+      "infrastructure": "lane",
+      "scenery": 49,
+      "remoteness": 2,
+      "urbanFriction": 0.13,
+      "geometry": [
+        [
+          39.7589,
+          -84.1916
+        ],
+        [
+          40.71,
+          -83.86
+        ],
+        [
+          41.6528,
+          -83.5379
+        ]
+      ]
+    }
+  ],
+  "destinations": [
+    {
+      "id": "d_paris",
+      "nodeId": "paris",
+      "name": "Paris",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 100,
+        "towns": 20,
+        "history": 95,
+        "nature": 15,
+        "mountains": 0,
+        "water": 35,
+        "iconic": 100
+      },
+      "blurb": "Major city, architecture, museums, monuments, and an iconic start or finish."
+    },
+    {
+      "id": "d_chartres",
+      "nodeId": "chartres",
+      "name": "Chartres",
+      "region": "europe",
+      "serviceLevel": 4,
+      "scores": {
+        "cities": 28,
+        "towns": 80,
+        "history": 95,
+        "nature": 25,
+        "mountains": 0,
+        "water": 10,
+        "iconic": 62
+      },
+      "blurb": "Historic cathedral city that works well as a first smaller stop outside Paris."
+    },
+    {
+      "id": "d_orleans",
+      "nodeId": "orleans",
+      "name": "Orl\u00e9ans",
+      "region": "europe",
+      "serviceLevel": 4,
+      "scores": {
+        "cities": 48,
+        "towns": 68,
+        "history": 72,
+        "nature": 38,
+        "mountains": 0,
+        "water": 75,
+        "iconic": 45
+      },
+      "blurb": "Loire city with a historic center and strong river access."
+    },
+    {
+      "id": "d_blois",
+      "nodeId": "blois",
+      "name": "Blois",
+      "region": "europe",
+      "serviceLevel": 4,
+      "scores": {
+        "cities": 30,
+        "towns": 88,
+        "history": 94,
+        "nature": 45,
+        "mountains": 0,
+        "water": 82,
+        "iconic": 68
+      },
+      "blurb": "Compact Loire town with ch\u00e2teau scenery and river riding."
+    },
+    {
+      "id": "d_tours",
+      "nodeId": "tours",
+      "name": "Tours",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 48,
+        "towns": 79,
+        "history": 82,
+        "nature": 43,
+        "mountains": 0,
+        "water": 82,
+        "iconic": 58
+      },
+      "blurb": "Lively historic Loire city and a natural touring hub."
+    },
+    {
+      "id": "d_saumur",
+      "nodeId": "saumur",
+      "name": "Saumur",
+      "region": "europe",
+      "serviceLevel": 4,
+      "scores": {
+        "cities": 25,
+        "towns": 92,
+        "history": 90,
+        "nature": 55,
+        "mountains": 0,
+        "water": 88,
+        "iconic": 62
+      },
+      "blurb": "Small historic city with riverfront riding and a dramatic ch\u00e2teau."
+    },
+    {
+      "id": "d_angers",
+      "nodeId": "angers",
+      "name": "Angers",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 42,
+        "towns": 82,
+        "history": 83,
+        "nature": 47,
+        "mountains": 0,
+        "water": 72,
+        "iconic": 50
+      },
+      "blurb": "Historic western Loire stop with strong services."
+    },
+    {
+      "id": "d_nantes",
+      "nodeId": "nantes",
+      "name": "Nantes",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 78,
+        "towns": 38,
+        "history": 68,
+        "nature": 40,
+        "mountains": 0,
+        "water": 78,
+        "iconic": 62
+      },
+      "blurb": "Large cultural city near the lower Loire and Atlantic approach."
+    },
+    {
+      "id": "d_saintnazaire",
+      "nodeId": "saintnazaire",
+      "name": "Saint-Nazaire",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 42,
+        "towns": 45,
+        "history": 38,
+        "nature": 52,
+        "mountains": 0,
+        "water": 98,
+        "iconic": 44
+      },
+      "blurb": "Atlantic-facing industrial and maritime finish with coast access."
+    },
+    {
+      "id": "d_lille",
+      "nodeId": "lille",
+      "name": "Lille",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 76,
+        "towns": 42,
+        "history": 65,
+        "nature": 20,
+        "mountains": 0,
+        "water": 15,
+        "iconic": 48
+      },
+      "blurb": "Dense northern French city with architecture and regional connections."
+    },
+    {
+      "id": "d_ghent",
+      "nodeId": "ghent",
+      "name": "Ghent",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 72,
+        "towns": 70,
+        "history": 94,
+        "nature": 30,
+        "mountains": 0,
+        "water": 72,
+        "iconic": 75
+      },
+      "blurb": "Canals, medieval architecture, and very strong cycling conditions."
+    },
+    {
+      "id": "d_bruges",
+      "nodeId": "bruges",
+      "name": "Bruges",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 55,
+        "towns": 96,
+        "history": 100,
+        "nature": 25,
+        "mountains": 0,
+        "water": 88,
+        "iconic": 96
+      },
+      "blurb": "Highly preserved medieval city with canals and major sightseeing value."
+    },
+    {
+      "id": "d_brussels",
+      "nodeId": "brussels",
+      "name": "Brussels",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 92,
+        "towns": 25,
+        "history": 76,
+        "nature": 20,
+        "mountains": 0,
+        "water": 15,
+        "iconic": 85
+      },
+      "blurb": "Major city and logical northern-European destination."
+    },
+    {
+      "id": "d_reims",
+      "nodeId": "reims",
+      "name": "Reims",
+      "region": "europe",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 52,
+        "towns": 62,
+        "history": 91,
+        "nature": 35,
+        "mountains": 0,
+        "water": 10,
+        "iconic": 66
+      },
+      "blurb": "Historic cathedral city amid Champagne country."
+    },
+    {
+      "id": "d_dc",
+      "nodeId": "dc",
+      "name": "Washington, DC",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 95,
+        "towns": 20,
+        "history": 95,
+        "nature": 32,
+        "mountains": 0,
+        "water": 48,
+        "iconic": 100
+      },
+      "blurb": "Major capital-city start with monuments, museums, and trail connections."
+    },
+    {
+      "id": "d_harpers",
+      "nodeId": "harpers",
+      "name": "Harpers Ferry",
+      "region": "north_america",
+      "serviceLevel": 3,
+      "scores": {
+        "cities": 12,
+        "towns": 92,
+        "history": 92,
+        "nature": 80,
+        "mountains": 45,
+        "water": 88,
+        "iconic": 72
+      },
+      "blurb": "Historic river town at a dramatic confluence."
+    },
+    {
+      "id": "d_cumberland",
+      "nodeId": "cumberland",
+      "name": "Cumberland",
+      "region": "north_america",
+      "serviceLevel": 4,
+      "scores": {
+        "cities": 22,
+        "towns": 78,
+        "history": 56,
+        "nature": 82,
+        "mountains": 72,
+        "water": 70,
+        "iconic": 45
+      },
+      "blurb": "Classic trail town connecting canal and mountain rail-trail riding."
+    },
+    {
+      "id": "d_pittsburgh",
+      "nodeId": "pittsburgh",
+      "name": "Pittsburgh",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 82,
+        "towns": 30,
+        "history": 58,
+        "nature": 45,
+        "mountains": 48,
+        "water": 90,
+        "iconic": 72
+      },
+      "blurb": "Major river city and a famous long-distance trail endpoint."
+    },
+    {
+      "id": "d_youngstown",
+      "nodeId": "youngstown",
+      "name": "Youngstown",
+      "region": "north_america",
+      "serviceLevel": 4,
+      "scores": {
+        "cities": 38,
+        "towns": 50,
+        "history": 38,
+        "nature": 42,
+        "mountains": 20,
+        "water": 35,
+        "iconic": 18
+      },
+      "blurb": "Useful regional connector with parks and urban services."
+    },
+    {
+      "id": "d_cleveland",
+      "nodeId": "cleveland",
+      "name": "Cleveland",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 84,
+        "towns": 25,
+        "history": 50,
+        "nature": 48,
+        "mountains": 0,
+        "water": 96,
+        "iconic": 68
+      },
+      "blurb": "Lake Erie city with major waterfront and regional trail potential."
+    },
+    {
+      "id": "d_akron",
+      "nodeId": "akron",
+      "name": "Akron",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 52,
+        "towns": 42,
+        "history": 40,
+        "nature": 72,
+        "mountains": 18,
+        "water": 55,
+        "iconic": 32
+      },
+      "blurb": "Urban trail junction next to Cuyahoga Valley and the Towpath corridor."
+    },
+    {
+      "id": "d_columbus",
+      "nodeId": "columbus",
+      "name": "Columbus",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 80,
+        "towns": 22,
+        "history": 32,
+        "nature": 35,
+        "mountains": 0,
+        "water": 30,
+        "iconic": 42
+      },
+      "blurb": "Large city with extensive central Ohio trail connections."
+    },
+    {
+      "id": "d_dayton",
+      "nodeId": "dayton",
+      "name": "Dayton",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 52,
+        "towns": 48,
+        "history": 58,
+        "nature": 42,
+        "mountains": 0,
+        "water": 45,
+        "iconic": 45
+      },
+      "blurb": "Major trail-network hub with aviation history."
+    },
+    {
+      "id": "d_cincinnati",
+      "nodeId": "cincinnati",
+      "name": "Cincinnati",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 82,
+        "towns": 32,
+        "history": 52,
+        "nature": 40,
+        "mountains": 22,
+        "water": 78,
+        "iconic": 62
+      },
+      "blurb": "Ohio River city with historic neighborhoods and regional connections."
+    },
+    {
+      "id": "d_toledo",
+      "nodeId": "toledo",
+      "name": "Toledo",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 55,
+        "towns": 38,
+        "history": 35,
+        "nature": 40,
+        "mountains": 0,
+        "water": 83,
+        "iconic": 30
+      },
+      "blurb": "Lake Erie / Maumee River regional city and northern connector."
+    },
+    {
+      "id": "d_detroit",
+      "nodeId": "detroit",
+      "name": "Detroit",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 84,
+        "towns": 25,
+        "history": 62,
+        "nature": 30,
+        "mountains": 0,
+        "water": 82,
+        "iconic": 70
+      },
+      "blurb": "Major Great Lakes city with architecture, culture, and waterfront."
+    },
+    {
+      "id": "d_buffalo",
+      "nodeId": "buffalo",
+      "name": "Buffalo",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 72,
+        "towns": 30,
+        "history": 48,
+        "nature": 52,
+        "mountains": 0,
+        "water": 95,
+        "iconic": 60
+      },
+      "blurb": "Lake Erie city and gateway to long east-west trail corridors."
+    },
+    {
+      "id": "d_albany",
+      "nodeId": "albany",
+      "name": "Albany",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 52,
+        "towns": 48,
+        "history": 62,
+        "nature": 48,
+        "mountains": 18,
+        "water": 72,
+        "iconic": 36
+      },
+      "blurb": "Hudson/Mohawk junction and long-distance trail hub."
+    },
+    {
+      "id": "d_nyc",
+      "nodeId": "nyc",
+      "name": "New York City",
+      "region": "north_america",
+      "serviceLevel": 5,
+      "scores": {
+        "cities": 100,
+        "towns": 5,
+        "history": 75,
+        "nature": 28,
+        "mountains": 0,
+        "water": 82,
+        "iconic": 100
+      },
+      "blurb": "Globally iconic urban endpoint with extensive regional access."
+    }
+  ]
+}

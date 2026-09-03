@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bike Trip Generator</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg:#f5f7f4; --panel:#ffffff; --ink:#172018; --muted:#657166;
+      --line:#dce4dc; --accent:#246b45; --accent2:#dcefe4; --warn:#9b5c11;
+      --shadow:0 10px 28px rgba(28,48,35,.08);
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+    button,input,select { font:inherit; }
+    .app { max-width:1500px; margin:auto; padding:18px; }
+    header { display:flex; justify-content:space-between; align-items:end; gap:16px; margin-bottom:14px; }
+    header h1 { margin:0; font-size:clamp(1.55rem,3vw,2.25rem); letter-spacing:-.03em; }
+    header p { margin:.35rem 0 0; color:var(--muted); }
+    .demo-badge { white-space:nowrap; background:#fff4dd; color:#7b4b0d; border:1px solid #efcf96; border-radius:999px; padding:7px 11px; font-size:.83rem; font-weight:700; }
+    .layout { display:grid; grid-template-columns:390px minmax(0,1fr); gap:14px; align-items:start; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+    .controls { padding:16px; position:sticky; top:12px; max-height:calc(100vh - 24px); overflow:auto; }
+    section + section { margin-top:20px; padding-top:18px; border-top:1px solid var(--line); }
+    h2 { font-size:.93rem; letter-spacing:.055em; text-transform:uppercase; margin:0 0 12px; color:#425046; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    label { display:block; font-size:.84rem; font-weight:700; color:#46534a; }
+    select,input[type="number"] { width:100%; margin-top:5px; min-height:42px; border:1px solid #cfd8d0; border-radius:10px; background:white; padding:8px 10px; color:var(--ink); }
+    .segmented { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:6px; }
+    .segmented.three { grid-template-columns:repeat(3,1fr); }
+    .segmented label { margin:0; }
+    .segmented input { position:absolute; opacity:0; pointer-events:none; }
+    .segmented span { min-height:42px; display:flex; align-items:center; justify-content:center; text-align:center; border:1px solid #cfd8d0; border-radius:10px; padding:6px; cursor:pointer; font-weight:700; background:#fff; }
+    .segmented input:checked + span { border-color:var(--accent); background:var(--accent2); color:#154b2e; }
+    .slider-row { display:grid; grid-template-columns:150px minmax(0,1fr) 38px; gap:8px; align-items:center; margin:9px 0; }
+    .slider-row label { font-weight:650; }
+    input[type="range"] { width:100%; accent-color:var(--accent); }
+    .value { text-align:right; font-variant-numeric:tabular-nums; color:#566359; font-size:.84rem; }
+    .hint { color:var(--muted); font-size:.79rem; line-height:1.35; margin:6px 0 0; }
+    .primary { width:100%; min-height:48px; border:0; border-radius:12px; background:var(--accent); color:white; font-weight:800; cursor:pointer; margin-top:18px; }
+    .primary:hover { filter:brightness(.95); }
+    .primary:disabled { opacity:.55; cursor:not-allowed; }
+    .main { min-width:0; }
+    #map { height:430px; border-radius:18px 18px 0 0; z-index:1; }
+    .map-panel { overflow:hidden; }
+    .legend { display:flex; gap:14px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--line); font-size:.79rem; color:var(--muted); }
+    .swatch { display:inline-block; width:18px; height:4px; vertical-align:middle; border-radius:999px; margin-right:5px; }
+    .results { margin-top:14px; padding:18px; display:none; }
+    .results.show { display:block; }
+    .result-head { display:flex; justify-content:space-between; align-items:start; gap:18px; }
+    .result-head h3 { margin:0; font-size:1.55rem; letter-spacing:-.025em; }
+    .route-sub { color:var(--muted); margin-top:4px; }
+    .score { border-radius:14px; padding:10px 12px; background:var(--accent2); text-align:center; min-width:82px; }
+    .score strong { display:block; font-size:1.45rem; }
+    .score span { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:#365c46; }
+    .warning { margin:13px 0 0; border-left:4px solid #d9912b; background:#fff6e6; padding:10px 12px; color:#70460c; border-radius:8px; display:none; }
+    .warning.show { display:block; }
+    .stats { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin:16px 0; }
+    .stat { background:#f7f9f7; border:1px solid var(--line); border-radius:12px; padding:11px; min-width:0; }
+    .stat strong { display:block; font-size:1.1rem; }
+    .stat span { display:block; margin-top:2px; color:var(--muted); font-size:.75rem; }
+    .columns { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .card { border:1px solid var(--line); border-radius:14px; padding:14px; }
+    .card h4 { margin:0 0 10px; }
+    .bar { display:grid; grid-template-columns:105px 1fr 40px; gap:8px; align-items:center; margin:7px 0; font-size:.8rem; }
+    .track { height:8px; border-radius:999px; background:#edf1ed; overflow:hidden; }
+    .fill { height:100%; background:var(--accent); border-radius:999px; }
+    .days { margin-top:14px; display:grid; gap:8px; }
+    .day { border-top:1px solid var(--line); padding-top:9px; }
+    .day:first-child { border-top:0; padding-top:0; }
+    .day-title { display:flex; justify-content:space-between; gap:10px; font-weight:800; }
+    .day p { margin:4px 0 0; color:var(--muted); font-size:.84rem; line-height:1.4; }
+    .empty { padding:18px; color:var(--muted); }
+    .leaflet-tooltip { font-weight:700; }
+    @media (max-width:980px) {
+      .layout { grid-template-columns:1fr; }
+      .controls { position:static; max-height:none; }
+      #map { height:390px; }
+    }
+    @media (max-width:680px) {
+      .app { padding:10px; }
+      header { align-items:start; }
+      .demo-badge { white-space:normal; }
+      .grid2,.columns { grid-template-columns:1fr; }
+      .stats { grid-template-columns:repeat(2,1fr); }
+      .slider-row { grid-template-columns:125px 1fr 34px; }
+      #map { height:330px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Bike Trip Generator</h1>
+        <p>Multi-day touring ideas optimized around great riding, scenery, and the places you care about.</p>
+      </div>
+      <div class="demo-badge">Demo network / fake data</div>
+    </header>
+
+    <div class="layout">
+      <aside class="panel controls">
+        <form id="plannerForm">
+          <section>
+            <h2>Trip</h2>
+            <div class="grid2">
+              <label>Region
+                <select id="region">
+                  <option value="europe">Europe</option>
+                  <option value="north_america">US + Canada</option>
+                  <option value="anywhere">Anywhere</option>
+                </select>
+              </label>
+              <label>Days
+                <input id="days" type="number" min="1" max="60" value="6" />
+              </label>
+              <label>Pace
+                <select id="pace">
+                  <option value="sightseeing">Sightseeing</option>
+                  <option value="relaxed">Relaxed</option>
+                  <option value="balanced" selected>Balanced</option>
+                  <option value="fast">Fast</option>
+                  <option value="big">Big miles</option>
+                </select>
+              </label>
+              <label>Remoteness
+                <select id="remoteness">
+                  <option value="1">Highly serviced</option>
+                  <option value="2">Town-to-town</option>
+                  <option value="3" selected>Mixed</option>
+                  <option value="4">Remote</option>
+                  <option value="5">Expedition</option>
+                </select>
+              </label>
+            </div>
+            <div class="grid2" style="margin-top:10px">
+              <label>Bike
+                <div class="segmented">
+                  <label><input type="radio" name="bike" value="regular" checked><span>🚲 Regular</span></label>
+                  <label><input type="radio" name="bike" value="ebike"><span>⚡ E-bike</span></label>
+                </div>
+              </label>
+              <label>Shape
+                <div class="segmented three">
+                  <label><input type="radio" name="shape" value="oneway" checked><span>One-way</span></label>
+                  <label><input type="radio" name="shape" value="loop"><span>Loop</span></label>
+                  <label><input type="radio" name="shape" value="either"><span>Either</span></label>
+                </div>
+              </label>
+            </div>
+          </section>
+
+          <section>
+            <h2>What do you want to see?</h2>
+            <div class="slider-row"><label for="cities">Cities</label><input id="cities" type="range" min="0" max="100" value="45"><span class="value"></span></div>
+            <div class="slider-row"><label for="towns">Towns & villages</label><input id="towns" type="range" min="0" max="100" value="70"><span class="value"></span></div>
+            <div class="slider-row"><label for="history">History & architecture</label><input id="history" type="range" min="0" max="100" value="65"><span class="value"></span></div>
+            <div class="slider-row"><label for="nature">Nature</label><input id="nature" type="range" min="0" max="100" value="70"><span class="value"></span></div>
+            <div class="slider-row"><label for="mountains">Mountains</label><input id="mountains" type="range" min="0" max="100" value="35"><span class="value"></span></div>
+            <div class="slider-row"><label for="water">Water & coast</label><input id="water" type="range" min="0" max="100" value="70"><span class="value"></span></div>
+            <div class="slider-row"><label for="iconic">Iconic places</label><input id="iconic" type="range" min="0" max="100" value="45"><span class="value"></span></div>
+          </section>
+
+          <section>
+            <h2>Riding preferences</h2>
+            <div class="slider-row"><label for="traffic">Traffic tolerance</label><input id="traffic" type="range" min="1" max="5" value="2"><span class="value"></span></div>
+            <div class="slider-row"><label for="surface">Rough surface tolerance</label><input id="surface" type="range" min="1" max="5" value="3"><span class="value"></span></div>
+            <div class="slider-row"><label for="hills">Hill tolerance</label><input id="hills" type="range" min="1" max="5" value="3"><span class="value"></span></div>
+            <div class="slider-row"><label for="infrastructure">Infrastructure preference</label><input id="infrastructure" type="range" min="1" max="5" value="5"><span class="value"></span></div>
+            <div class="slider-row"><label for="scenicDetour">Scenic detours</label><input id="scenicDetour" type="range" min="1" max="5" value="4"><span class="value"></span></div>
+            <p class="hint">Low = prioritize progress. High = accept modest extra riding for prettier corridors.</p>
+          </section>
+
+          <button id="generateBtn" class="primary" type="submit">Generate a trip</button>
+        </form>
+      </aside>
+
+      <main class="main">
+        <div class="panel map-panel">
+          <div id="map"></div>
+          <div class="legend">
+            <span><i class="swatch" style="background:#2f855a"></i>Chosen trip</span>
+            <span><i class="swatch" style="background:#9aa69c"></i>Demo touring network</span>
+          </div>
+        </div>
+
+        <div id="results" class="panel results">
+          <div class="result-head">
+            <div>
+              <h3 id="tripTitle">Trip</h3>
+              <div id="tripSub" class="route-sub"></div>
+            </div>
+            <div class="score"><strong id="tripScore">—</strong><span>Trip score</span></div>
+          </div>
+          <div id="warning" class="warning"></div>
+          <div id="stats" class="stats"></div>
+          <div class="columns">
+            <div class="card">
+              <h4>Why this route</h4>
+              <div id="qualityBars"></div>
+            </div>
+            <div class="card">
+              <h4>Highlights</h4>
+              <div id="highlights"></div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <h4>Daily stages</h4>
+            <div id="daysList" class="days"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="planner.js"></script>
+</body>
+</html>
