@@ -27,9 +27,9 @@ class MemoryStorage {
   setItem(key, value) { this.values.set(key, String(value)); }
 }
 
-test('v9 registry has a main destination and six small, docked islands', () => {
-  assert.equal(WORLD_LOCATIONS.length, 7);
-  assert.equal(SMALL_ISLAND_LOCATIONS.length, 6);
+test('world registry has a main destination, six islands, and Bluewater Reach', () => {
+  assert.equal(WORLD_LOCATIONS.length, 8);
+  assert.equal(SMALL_ISLAND_LOCATIONS.length, 7);
   assert.ok(SMALL_ISLAND_LOCATIONS.every((location) => Number.isFinite(location.angle) && Number.isFinite(location.radius)));
   assert.ok(SMALL_ISLAND_LOCATIONS.every((location) => location.dock?.arrivalPosition));
   const cave = SMALL_ISLAND_LOCATIONS.find((location) => location.id === 'cave-fishing-island');
@@ -67,7 +67,7 @@ test('shop interaction exists only in the customer space beside its counter', ()
   const shop = SMALL_ISLAND_LOCATIONS.find((location) => location.id === 'shop-island');
   const floorY = shop.elevation + .2;
   const customerPosition = world.point(
-    shop.angle, shop.radius + 2.65, floorY + PLAYER_FOOT_OFFSET + .1
+    shop.angle, shop.radius + 2.65, floorY + PLAYER_FOOT_OFFSET + .1, 2.2
   );
   assert.equal(world.getNearestHomeInteraction(customerPosition)?.id, 'shop-counter');
   assert.equal(world.getNearestHomeInteraction(START_LOCATIONS[0].position), null);
@@ -108,11 +108,12 @@ test('Home action resolves to the cabin porch instead of the run spawn', () => {
 
 test('data-derived world map includes islands, docks, waters, and in-bounds GPS projection', () => {
   const data = createMountainMapData();
-  assert.equal(data.locations.length, 7);
-  assert.equal(data.docks.length, 12);
-  assert.equal(data.waters.length, 24);
+  assert.equal(data.locations.length, 8);
+  assert.equal(data.docks.length, 13);
+  assert.equal(data.waters.length, 27);
   const menu = Object.create(MountainMapMenu.prototype);
   menu.mapData = data;
+  menu.view = menu.computeView();
   for (const location of data.locations) {
     const point = menu.project(location.position);
     assert.ok(point.x >= 25 && point.x <= 495);

@@ -9,7 +9,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 
 const OTHER_MODAL_OPEN = () => [
   'fish-gallery', 'journal-open', 'multiplayer-open', 'mountain-map-open', 'emote-menu-open',
-  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open', 'pause-open'
+  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open', 'trail-badges-open', 'pause-open'
 ].some((className) => document.body.classList.contains(className));
 
 function colorCss(color = [.45, .62, .55]) {
@@ -18,7 +18,7 @@ function colorCss(color = [.45, .62, .55]) {
 
 const SPECIMEN_PREVIEW_CACHE = new Map();
 
-function specimenPreview(specimen) {
+export function specimenPreview(specimen) {
   const species = resolveSpecies(specimen.speciesId);
   const [primary, accent] = species?.visual?.colors ?? [[.45, .62, .55], [.82, .72, .38]];
   const archetype = species?.visual?.archetype ?? 'panfish';

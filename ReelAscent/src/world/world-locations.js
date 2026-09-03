@@ -108,6 +108,43 @@ function islandLocation({
   });
 }
 
+const BLUEWATER_BOAT_OUTLINE = freezePoints([
+  [-.42, -1], [.42, -1], [.72, -.42], [.78, .38], [.5, .92],
+  [0, 1], [-.5, .92], [-.78, .38], [-.72, -.42]
+]);
+
+function openWaterBoatLocation({ id, displayName, angle, radius }) {
+  const direction = { x: Math.cos(radians(angle)), z: Math.sin(radians(angle)) };
+  const center = Object.freeze({
+    x: WORLD_CENTER.x + direction.x * radius,
+    y: -.18,
+    z: WORLD_CENTER.z + direction.z * radius
+  });
+  return Object.freeze({
+    id, displayName, type: 'open-water-boat', angle, radius,
+    worldPosition: center,
+    radii: Object.freeze({ x: 7, z: 11 }),
+    outline: BLUEWATER_BOAT_OUTLINE,
+    elevation: -.18,
+    theme: 'bluewater',
+    functions: Object.freeze(['open-ocean-fishing']),
+    loadGroup: id,
+    alwaysLoaded: false,
+    coordinateSpace: 'global-world',
+    mapRepresentation: Object.freeze({ className: 'open-water-boat', label: displayName }),
+    destination: Object.freeze({ enabled: true, order: 1 }),
+    dock: Object.freeze({
+      id: `${id}-helm`,
+      worldPosition: center,
+      arrivalPosition: Object.freeze({ x: center.x, y: .92, z: center.z + 1.8 }),
+      facingYaw: 90 - angle,
+      length: 0,
+      safe: true,
+      virtual: true
+    })
+  });
+}
+
 export const SMALL_ISLAND_LOCATIONS = Object.freeze([
   islandLocation({
     id: 'home-island', displayName: 'Hearthward Isle', type: 'home-island',
@@ -142,6 +179,9 @@ export const SMALL_ISLAND_LOCATIONS = Object.freeze([
     // Negative Z is chart-up in the existing boat/map projection, so 270° is directly NORTH.
     angle: 270, radius: 1540, radii: { x: 22, z: 18 }, elevation: .76,
     theme: 'polar', functions: ['cold-fishing']
+  }),
+  openWaterBoatLocation({
+    id: 'bluewater-reach', displayName: 'Bluewater Reach', angle: 196, radius: 1640
   })
 ]);
 

@@ -61,6 +61,8 @@ export class BoatTravelMenu {
       footprint.className = 'boat-map-footprint';
       if (location.type === 'main-island') {
         footprint.textContent = '⛰';
+      } else if (location.type === 'open-water-boat') {
+        footprint.textContent = '⛵';
       } else if (location.outline?.length) {
         const xs = location.outline.map((point) => point.x);
         const zs = location.outline.map((point) => point.z);
@@ -85,7 +87,7 @@ export class BoatTravelMenu {
     this.isOpen = true;
     this.screen.hidden = false;
     document.body.classList.add('boat-travel-open');
-    this.title.textContent = 'Choose an island on the chart';
+    this.title.textContent = 'Choose a destination on the chart';
     this.confirmButton.disabled = true;
     for (const marker of this.map?.querySelectorAll('[data-travel-destination]') ?? []) {
       const location = WORLD_LOCATIONS.find((entry) => entry.id === marker.dataset.travelDestination);

@@ -19,7 +19,7 @@ import { AppearancePreview } from './appearance-preview.js';
 
 const BLOCKING_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open',
-  'mountain-map-open', 'emote-menu-open'
+  'mountain-map-open', 'emote-menu-open', 'trail-badges-open'
 ]);
 
 const GROUPS = Object.freeze([

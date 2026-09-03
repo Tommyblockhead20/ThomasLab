@@ -1151,10 +1151,12 @@ export class Player {
     }
     const sitFishingCompatible = this.currentEmote?.id === 'sit'
       && (this.movementState === 'fishing' || fishingToggle);
-    if (!this.benchSeat && this.currentEmote && (hasMoveInput || jumpPressed
-      || (!sitFishingCompatible && fishingToggle)
-      || this.input.sprintHeld || this.input.slideHeld || this.input.gripHeld
-      || (!sitFishingCompatible && this.movementState !== 'grounded'))) {
+    const emoteInterrupted = sitFishingCompatible
+      ? jumpPressed
+      : (hasMoveInput || jumpPressed || fishingToggle
+        || this.input.sprintHeld || this.input.slideHeld || this.input.gripHeld
+        || this.movementState !== 'grounded');
+    if (!this.benchSeat && this.currentEmote && emoteInterrupted) {
       this.cancelEmote();
     }
     const footSupport = this.getFootSupportInfo();
@@ -2220,6 +2222,7 @@ export class Player {
   }
 
   startEmote(id, startedAt = Date.now()) {
+    if (this.currentEmote?.id === id) return this.cancelEmote();
     if (!this.canStartEmote() || !EMOTE_IDS.includes(id)) return false;
     this.currentEmote = normalizeEmote({ id, startedAt });
     return Boolean(this.currentEmote);

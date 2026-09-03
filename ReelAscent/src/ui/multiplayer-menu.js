@@ -1,7 +1,8 @@
 import { DISPLAY_NAME_MAX_LENGTH, normalizeDisplayName, normalizeRoomCode, ROOM_CODE_LENGTH } from '../multiplayer/multiplayer-client.js';
 
 const OTHER_MODAL_OPEN = () => [
-  'fish-gallery', 'journal-open', 'inventory-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open'
+  'fish-gallery', 'journal-open', 'inventory-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open',
+  'trail-badges-open'
 ]
   .some((className) => document.body.classList.contains(className));
 

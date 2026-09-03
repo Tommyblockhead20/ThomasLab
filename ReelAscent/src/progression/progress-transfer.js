@@ -22,6 +22,7 @@ export function createProgressExport(saveSnapshot) {
     progression: {
       collection: copy(save.collection),
       lifetime: copy(save.lifetime),
+      trailBadges: copy(save.trailBadges),
       runHistory: copy(save.runHistory),
       economy: copy(save.progression)
     }
@@ -81,6 +82,7 @@ export function validateProgressImport(input) {
     version: document.schemaVersion,
     collection: portable.collection,
     lifetime: portable.lifetime,
+    trailBadges: portable.trailBadges,
     runHistory: portable.runHistory,
     progression: normalizedEconomy
   });

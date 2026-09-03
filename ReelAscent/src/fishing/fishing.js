@@ -1611,6 +1611,7 @@ export class FishingController {
   enter(zone) {
     if (!zone || this.state !== 'inactive') return false;
     this.zone = zone;
+    this.player.input.setFishingActive?.(true);
     this.state = 'ready';
     this.stateTime = 0;
     this.message = 'Hold ↑ to charge • release to cast';
@@ -1631,6 +1632,7 @@ export class FishingController {
   cancel() {
     this.recordPerformanceEncounter('cancelled');
     this.player.input.suppressPrimaryUntilRelease();
+    this.player.input.setFishingActive?.(false);
     this.state = 'inactive';
     this.stateTime = 0;
     this.zone = null;
@@ -1942,11 +1944,11 @@ export class FishingController {
     return {
       ...zone?.modifiers,
       rarityTier: ecology.habitat.rarityTier,
-      rareWeightMultiplier: equipment.rareWeightMultiplier ?? 1,
-      legendaryWeightMultiplier: equipment.legendaryWeightMultiplier ?? 1,
+      rareProbabilityBonus: equipment.rareProbabilityBonus ?? 0,
+      legendaryProbabilityBonus: equipment.legendaryProbabilityBonus ?? 0,
       nonFishWeightMultiplier: equipment.nonFishWeightMultiplier ?? 1,
       shinyChanceMultiplier: equipment.shinyChanceMultiplier ?? 1,
-      specimenSizeBias: equipment.specimenSizeBias ?? 0,
+      specimenSizeBias: (zone?.modifiers?.specimenSizeBias ?? 0) + (equipment.specimenSizeBias ?? 0),
       recentSpeciesIds: includeRecent ? this.recentHookSpecies : [],
       habitatWeights: ecology.habitatWeights,
       disablePoolEnrichment: true

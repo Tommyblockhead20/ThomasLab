@@ -14,7 +14,7 @@ import { serializeProgress, validateProgressImport } from '../src/progression/pr
 
 test('v9.2 active roster has stable rarity pages, catalog IDs, and legacy identity resolution', () => {
   assert.equal(FISH_SPECIES.length, 300);
-  const expectedCounts = { Common: 77, Uncommon: 78, Rare: 70, Legendary: 75 };
+  const expectedCounts = { Common: 75, Uncommon: 75, Rare: 75, Legendary: 75 };
   for (const [rarity, prefix] of [['Common', 'C'], ['Uncommon', 'U'], ['Rare', 'R'], ['Legendary', 'L']]) {
     const page = FISH_SPECIES.filter((fish) => fish.rarity === rarity);
     assert.equal(page.length, expectedCounts[rarity]);

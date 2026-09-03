@@ -42,16 +42,10 @@ export function getRarityProfile(modifiers = {}, availableRarities = CATCH_RARIT
   const source = modifiers.rarityProfile
     ?? TIER_RARITY_PROFILES[modifiers.rarityTier]
     ?? profileFromLegacyBias(modifiers.rarityBias);
-  const multipliers = {
-    Common: 1,
-    Uncommon: 1,
-    Rare: Math.max(0, modifiers.rareWeightMultiplier ?? 1),
-    Legendary: Math.max(0, modifiers.legendaryWeightMultiplier ?? 1)
-  };
   const available = new Set(availableRarities);
   const weighted = Object.fromEntries(CATCH_RARITIES.map((rarity) => [
     rarity,
-    available.has(rarity) ? Math.max(0, source[rarity] ?? 0) * multipliers[rarity] : 0
+    available.has(rarity) ? Math.max(0, source[rarity] ?? 0) : 0
   ]));
   const total = Object.values(weighted).reduce((sum, value) => sum + value, 0);
   if (total <= 0) {
@@ -60,7 +54,26 @@ export function getRarityProfile(modifiers = {}, availableRarities = CATCH_RARIT
       rarity, available.has(rarity) ? 1 / fallback : 0
     ])));
   }
-  return Object.freeze(Object.fromEntries(CATCH_RARITIES.map((rarity) => [rarity, weighted[rarity] / total])));
+  const profile = Object.fromEntries(CATCH_RARITIES.map((rarity) => [rarity, weighted[rarity] / total]));
+  const addPercentagePoints = (target, requestedBonus) => {
+    if (!available.has(target)) return;
+    let remaining = Math.min(Math.max(0, requestedBonus ?? 0), 1 - profile[target]);
+    if (remaining <= 0) return;
+    const targetIndex = CATCH_RARITIES.indexOf(target);
+    const lower = CATCH_RARITIES.filter((rarity, index) => index < targetIndex && available.has(rarity));
+    const fallback = CATCH_RARITIES.filter((rarity) => rarity !== target && available.has(rarity) && !lower.includes(rarity));
+    for (const donors of [lower, fallback]) {
+      const donorMass = donors.reduce((sum, rarity) => sum + profile[rarity], 0);
+      if (donorMass <= 0 || remaining <= 0) continue;
+      const taken = Math.min(remaining, donorMass);
+      for (const rarity of donors) profile[rarity] -= taken * profile[rarity] / donorMass;
+      profile[target] += taken;
+      remaining -= taken;
+    }
+  };
+  addPercentagePoints('Rare', modifiers.rareProbabilityBonus);
+  addPercentagePoints('Legendary', modifiers.legendaryProbabilityBonus);
+  return Object.freeze(profile);
 }
 
 function capProbabilityShares(rawWeights, requestedCap = 1) {
@@ -101,6 +114,15 @@ function repeatWeight(fishId, eligibleCount, recentSpeciesIds) {
   return result;
 }
 
+function naturallyLargeSpeciesWeight(fish, bias = 0) {
+  const amount = clamp(bias, 0, .3);
+  if (amount <= 0) return 1;
+  const lengthScore = clamp(Math.log1p(Math.max(0, fish.maxLength ?? 0)) / Math.log1p(220), 0, 1);
+  const weightScore = clamp(Math.log1p(Math.max(0, fish.maxWeight ?? 0)) / Math.log1p(2200), 0, 1);
+  const sizeScore = lengthScore * .45 + weightScore * .55;
+  return 1 + amount * (sizeScore * 2 - 1);
+}
+
 export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) {
   const ids = new Set(fishIds ?? []);
   const eligible = species.filter((fish) => ids.has(fish.id));
@@ -111,6 +133,7 @@ export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) 
   const habitatWeights = modifiers.habitatWeights ?? {};
   const maximumFinalShare = clamp(modifiers.maximumSpeciesProbability ?? .25, .01, 1);
   const nonFishMultiplier = Math.max(0, modifiers.nonFishWeightMultiplier ?? 1);
+  const largeSpeciesWeightBias = Math.max(0, modifiers.largeSpeciesWeightBias ?? 0);
   const entries = [];
 
   for (const rarity of CATCH_RARITIES) {
@@ -124,6 +147,7 @@ export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) 
       return Math.max(.001, fish.catchWeight)
         * Math.max(.001, habitatWeight)
         * repeatWeight(fish.id, eligible.length, recentSpeciesIds)
+        * naturallyLargeSpeciesWeight(fish, largeSpeciesWeightBias)
         * (isNonFishCreature(fish) ? nonFishMultiplier : 1);
     });
     const withinCap = Math.min(1, maximumFinalShare / Math.max(.0001, rarityProbability));

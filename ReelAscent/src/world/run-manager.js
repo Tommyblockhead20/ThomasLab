@@ -123,8 +123,8 @@ export class RunManager {
         this.status = 'active';
         this.endedTime = 0;
         this.player.clearBenchSeat?.();
-        this.player.exitFishing({ releasePointerLock: true });
-        this.onLocationChange(home.locationId, home.coordinateSpace ?? 'global-world');
+        this.player.exitFishing?.({ releasePointerLock: true });
+        this.onLocationChange?.(home.locationId, home.coordinateSpace ?? 'global-world');
         this.player.teleport(home.position, home.facingYaw);
         this.camera.setYaw(home.facingYaw);
         this.world.setDeveloperCourseVisible(false);
@@ -210,7 +210,7 @@ export class RunManager {
     };
     this.banner = {
       title: 'SUMMIT REACHED',
-      detail: `${formatTime(this.elapsed)} • ${catches.length} fish • highest ${Math.round(this.highestElevation * 3.28084)}ft • ${this.summary.rarest} • ${this.currentStart.label}`
+      detail: `${formatTime(this.elapsed)} • ${catches.length} catches • highest ${Math.round(this.highestElevation * 3.28084)}ft • ${this.summary.rarest} • ${this.currentStart.label}`
     };
     this.bannerTime = 5.5;
   }

@@ -22,7 +22,8 @@ const RARITY_PAGES = [
 ];
 
 const OTHER_MODAL_OPEN = () => [
-  'fish-gallery', 'inventory-open', 'multiplayer-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open'
+  'fish-gallery', 'inventory-open', 'multiplayer-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open',
+  'trail-badges-open'
 ].some((name) => document.body.classList.contains(name));
 
 export class FishJournal {

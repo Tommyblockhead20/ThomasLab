@@ -122,7 +122,7 @@ test('Kraken is dramatically larger than an ordinary giant octopus in the v9.2 r
       rarity,
       FISH_SPECIES.filter((entry) => entry.rarity === rarity).length
     ])),
-    { Common: 77, Uncommon: 78, Rare: 70, Legendary: 75 }
+    { Common: 75, Uncommon: 75, Rare: 75, Legendary: 75 }
   );
 });
 

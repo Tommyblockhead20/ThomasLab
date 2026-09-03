@@ -1,6 +1,86 @@
-# Reel Ascent v10 update handoff
+# Reel Ascent v11 update handoff
 
-Status: the requested v10 remaining-polish pass is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Testing stayed intentionally light: changed-module syntax checks, two focused state/protocol checks, a production build, and a multiplayer-server startup smoke test.
+Status: the requested v11 continuation is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Testing stayed intentionally light: 57 focused gameplay/data checks and one production frontend build. The older v10 and v9 notes remain below for historical context; this section supersedes them wherever behavior differs.
+
+Post-pass room-capacity update: multiplayer rooms now default to **10 players** in both server configuration and direct `RoomManager` construction. `server/.env.example` also advertises `ROOM_CAPACITY=10`; a deployed `ROOM_CAPACITY` environment variable still takes precedence and must be set to `10` if the host currently overrides the default.
+
+## v11 continuation
+
+1. **Cabin aesthetic changes** — The existing compact cabin keeps its aligned pitched roof, porch, windows/openings, chimney, rafters, rug, lanterns, shelving, fishing/climbing gear, and furniture. This continuation fills the remaining dead space with a physical Trail Badge board and medallions, framed field map/art, a storage chest with lid, and wall-mounted coat hooks. All additions use the current low-poly materials and stay inside the cabin's existing collision layout.
+
+2. **Outfitter's Reach aesthetic changes** — The existing two-service outpost remains intact, but the counters now read more clearly as separate staffed stations. Physical signs, merchandise, market equipment, lighting/cargo details, and role-specific countertop arrangements make the shop feel inhabited without adding a third NPC or merging the services.
+
+3. **NPC face/sign/counter-prop changes** — Both existing NPCs now have attached low-poly eyes and noses. The buy counter has physical `OUTFITTER / BUY GEAR` signage plus boots, chalk, map, and ice-axe props. The sell counter has `FISH MARKET / SELL CATCHES`, baskets/cargo, a balance scale, and actual Sardine/Blue Crab specimen models. Buy and Sell remain distinct tabs/interaction areas, and Sell All still confirms.
+
+4. **Frosthook z-fighting root cause/fix** — A second transparent cold-water overlay competed with the global ocean, while the lake/island cap also left nearly coplanar surfaces. The duplicate cold-water surface was removed and replaced by a pale submerged ice shelf beneath the one global ocean; Frosthook's lake basin is now carved below its water instead of laying a competing cap on top. This fixes the underlying overlap rather than scattering tiny render offsets.
+
+5. **Frosthook Lake vs Cold Ocean split** — `blue-ice-melt` remains the freshwater **Frosthook Lake**. `frosthook-cold-ocean` is a separate prioritized marine annulus with its own `cold-ocean` ecology family. Polar Bear, Penguin, Qallupilluk, Blue-Ice Codling, and Frostglass Shrimp are exclusive to the Cold Ocean; the lake retains freshwater species such as Brook Trout, Mountain Whitefish, Cutthroat Trout, and Alpine Char. Generic coast/ocean matching no longer leaks into the cold table.
+
+6. **Aquarium UI redesign** — The modal now uses a fixed-height desktop layout: one horizontal summary bar for retained/capacity, collection value, visitor income, next payout, next expansion, and Upgrade; a horizontally efficient retained/carried collection area on the left; and one selected-creature detail/action panel on the right. Only the collection region scrolls on desktop, with a responsive stacked fallback on small screens.
+
+7. **Controls-box sizing** — The normal Controls panel max width increased from 25 rem to 33 rem so the standard bindings fit into roughly two clean lines on desktop. The visible sprint binding remains `Shift — Sprint`.
+
+8. **Ocean-floor extension** — The continuous walkable seabed now reaches radius **1,748 m** (`WORLD_MAP_RADIUS + 48`) using sparse performance-conscious rings after the denser near-shore area. It runs beneath the mountain, islands, docks, ordinary ocean, and Bluewater Reach; island underwater skirts descend to the shared seabed so they do not look like floating platforms. The seabed remains above the fatal-fall plane.
+
+9. **Cave concavity implementation** — Main mountain-core vertices are now deformed through a broad staged recess beginning 8 m outside each throat, reaching up to 3.4 m inward and 4.2 m vertically. The visible core and its trimesh collision use the same deformed vertices; only the final inner throat triangles are removed. With tunnel/interior meshes hidden, the gray core still shows a substantial slope→indentation→deep recess rather than only a doorway hole.
+
+10. **Basalt Hollow spike root cause/fix** — The island fan used a tiny 0.035-radius pseudo-center ring, producing near-degenerate center triangles that could stretch into the long spikes. It now uses one real center vertex with consistently wound fan triangles, yielding a compact coherent island instead of masking the defect with props.
+
+11. **Signal Crayfish retirement** — `signal-crayfish` is removed from the active roster and added to `RETIRED_SPECIES_IDS`. Its canonical ID is preserved, so old saved Signal Crayfish specimens still resolve as Signal Crayfish and are never converted into Panda records.
+
+12. **Giant Panda implementation + Mangrove exclusivity** — New canonical ID `giant_panda` is Rare, exclusive to `amber-reed-pond` on Mangrove Cay, and uses realistic adult-scale length/weight data. Its specimen factory branch is a terrestrial black-and-white low-poly mammal with body, head, ears, eye patches, nose, and limbs—not a fish silhouette.
+
+13. **Active rarity totals before rebalance** — The current pre-v11 active roster was **77 Common / 78 Uncommon / 70 Rare / 75 Legendary = 300**. Retiring the Uncommon Signal Crayfish and adding the Rare Giant Panda changed the working subtotal to 77 / 77 / 71 / 75 before the four sensible promotions.
+
+14. **All rarity changes made** — Signal Crayfish (Uncommon) was retired and Giant Panda was added as Rare. Star-Nosed Mole and Remora moved Common→Rare; Nokken and Green Sea Turtle moved Uncommon→Rare. Canonical IDs of existing creatures did not change, and no filler creature was added or legitimate active creature deleted.
+
+15. **Final exact rarity totals** — The active roster is exactly **75 Common / 75 Uncommon / 75 Rare / 75 Legendary**, for **300 active creatures**. Retired records are excluded. All 300 also retain distinct deterministic rhythm signatures after a same-difficulty lane-remapping pass fixed inherited duplicate signatures.
+
+16. **Creature/Catch terminology changes** — General collection/progression UI now uses Creature/Creatures and Catch/Catches, including Creature Journal, Lifetime/Total Catches, aquarium wording, sell wording, run results, and rhythm/catch prompts. Fishing, Fishing Area, Fishing Rod, Fish Market, and actual fish names remain where mechanically or contextually correct.
+
+17. **Full Trail Badge list** — 30 badges were added: Field Naturalist I–IV (50/100/200/all active unique creatures); Seasoned Angler, Thousand Catches, Ten-Thousand Catches (100/1,000/10,000); Market Naturalist and Complete Market Ledger (100/all unique species sold); Curator I–VI and Grand Curator (25/50/100/150/200/250/300 retained); Biome Naturalist; Water Explorer I–III (5/15/all waters); First Ascent, Summit Regular, Peak Veteran (1/5/20); Island Hopper; First Shiny; Shiny Hunter (25); Legendary Encounter; Full Kit; Master Outfitter; and World Mapper.
+
+18. **Badge persistence/progress implementation** — Per-save badge state stores unlocked IDs plus stable species caught/sold, water IDs, ecological-biome IDs, and destination IDs. Existing legitimate lifetime catch/shiny/rarity/summit totals and durable inventory/aquarium ownership feed the remaining badges. Progress is numeric, completed badges never revoke when future content expands a target, Portable Progress exports/imports all fields, and only the specific debug catch or summit-teleport event is excluded—enabling cheats does not globally disable badges. The cabin badge board opens the locked/unlocked/progress viewer.
+
+19. **Graybox-label removal** — The visible `MOUNTAIN TRAVERSAL GRAYBOX` eyebrow is removed from the normal HUD. `REEL ASCENT`, location, elevation, and useful gameplay information remain. Internal entity names are not player-facing and were left alone.
+
+20. **Waters Fished In rename** — Player-facing `Waters Discovered` wording is now `WATERS FISHED IN` in Stats/progression displays, matching the fact that a successful legitimate catch in a stable water ID is required.
+
+21. **Bluewater Reach implementation** — Bluewater Reach is the seventh satellite travel destination and is explicitly **not an island**. It sits at a stable global position (bearing 196°, radius 1,640 m) as a collidable fishing boat with hull, safe deck, wheelhouse, roof, railings, mast, chart interaction, arrival point, surrounding ocean zone, and Paper/GPS/travel-chart boat symbol. It uses the generic destination registry and does not disturb multiplayer room membership.
+
+22. **Exact Bluewater bonuses** — `specimenSizeBias: 0.08` modestly shifts the within-species size-category distribution toward Large/Massive. Separately, `largeSpeciesWeightBias: 0.12` adjusts within-rarity species weights using normalized log length/weight scores, so naturally large eligible species are slightly more likely. Neither guarantees a trophy or changes the chosen rarity.
+
+23. **Prism Lure change** — Prism now supplies only `tempoMultiplier: 1.20`; fishing-song clock, chart, audio, notes, judgments, and holds share that tempo. Its old unrelated shiny modifier is gone.
+
+24. **Silverfish Spoon exact rarity math** — Silverfish Spoon supplies `rareProbabilityBonus: 0.20`, an additive **+20 percentage points** applied during rarity selection. The addition is taken proportionally from available lower-rarity probability mass, with fallback donors only if needed, then stays normalized. For the 62/20/11/7 Ocean profile it produces approximately **46.878/15.122/31/7**, totaling 100%.
+
+25. **Mythlight Lure exact rarity math** — Mythlight supplies `legendaryProbabilityBonus: 0.10`, an additive **+10 percentage points** during rarity selection. Ocean Legendary therefore changes exactly **7%→17%**; Common/Uncommon/Rare donate proportionally, yielding approximately **55.333/17.849/9.817/17**, totaling 100%. Both lures use rarity-first selection before a species is chosen within that rarity.
+
+26. **Master Atlas $12,000 change** — `master-naturalist-atlas` now costs **$12,000** in the single equipment catalog used by shop cards and displayed prices. Existing owners keep ownership.
+
+27. **Gear width/layout change** — Inventory/Gear desktop width increased from 66 rem to 78 rem and Gear uses four columns instead of three where space permits. Responsive breakpoints reduce it to two/one columns on smaller screens, where scrolling remains allowed.
+
+28. **Click-vs-grab implementation** — Mouse input now recognizes a deliberate click as a fresh unpointerlocked press/release lasting at most 350 ms with at most 6 px movement. A stationary hold becomes Grip after 140 ms; movement beyond the threshold becomes camera drag and cancels click/Grip promotion. Deliberate clicks are one-shot queued/consumed interactions instead of sharing raw `mousedown` state.
+
+29. **Pointer-lock fix** — Pointerlocked presses can feed active gameplay but never queue a generic world click. Camera drag discards click ownership, and requesting pointer lock clears any pending interaction. Nearby interactables only show prompts; opening them requires a fresh deliberate click or explicit Interact, preventing Firefox camera/pointer-lock movement from activating a seat, shop, travel, or other UI.
+
+30. **Seated-fishing input fix** — Fishing now publishes explicit input ownership, and bench/Sit-emote cancellation ignores arrows, rhythm keys, click, mouse/camera movement, cast/hook input, and catch completion while fishing. One shared fishing-exit path cancels rhythm/cast/presentation state, releases primary/contact input, closes UI, restores control/pointer-lock ownership, and deliberately preserves the seat on ESC. X/Interact, Jump, or selecting Sit again still exits the seat.
+
+31. **Sit rename/emote cleanup** — Every player-facing `Sit / Relax` label is now simply `SIT`/`Sit`, and the explanatory subtitle beneath the emote buttons was removed. Selecting the active Sit emote again is the explicit Sit cancel.
+
+32. **Minimap cave/dock/biome changes** — Compact in-hand/current-location maps now include small cave, dock/arrival, relevant water, player, and useful landmark symbols without importing the full map's large labels/legend. Biome polygons are clipped from the actual authored angular boundaries and use subtle related terrain tints. Bluewater is drawn as a boat, not an island. Badge biome targets now use the same exact ecological-theme IDs stored on legitimate catch records.
+
+33. **Files changed** — v11 work spans `index.html`; `src/styles.css`; camera/input/player files; fishing data, ecology, rarity, model, and controller files; persistence/progression/equipment/portable-progress files; game, emote, aquarium, inventory, journal, map, pause, home-interaction, multiplayer, appearance, and boat UI files; mountain/world-location/run-manager files; focused tests; and this handoff. New files are `src/progression/trail-badges.js` and `src/ui/trail-badges.js`. `dist/index.html` and its hashed JS/CSS were refreshed by the final build. The current worktree also retains the preceding approved 10-player server configuration edits.
+
+34. **Save-schema changes** — Durable save schema is now **10** (slot-container schema remains 1). Migration adds normalized `trailBadges` data without dropping old collections; old caught species and lifetime water participation seed compatible fields. Portable Progress includes the full Trail Badge record. Roster retirements preserve old Signal Crayfish records under their original ID.
+
+35. **Multiplayer protocol changes** — v11 adds **no** message, envelope, snapshot, or validation change. Bluewater travel keeps the current room and uses the existing location/global-position snapshot fields. The separate already-present v10 capacity configuration defaults rooms to 10 players but is not a v11 protocol change.
+
+36. **Whether Render needs redeployment** — **No for v11 itself**, because v11 changed no server code or protocol. If the preceding 10-player server-capacity change has not been deployed—or Render has an overriding `ROOM_CAPACITY` value below 10—redeploy/update that server configuration separately.
+
+37. **Whether frontend needs rebuild** — **Yes, and it has been rebuilt.** `npm run build` completed with 1,280 modules; output is `dist/assets/index-C5F2hQ1s.css` plus `dist/assets/index-aMAS6uNf.js`. Only the existing PlayCanvas worker-externalization notices and large-chunk warning remain. The focused suite passed **57/57**.
+
+38. **Short manual test list** — Sit on each bench and use the Sit emote, fish through arrows/click/drag/catch/fail/ESC, then exit only with X/Jump/Sit; drag the camera beside every interactable in Firefox; inspect minimap cave/dock/biome marks; sail to Bluewater and fish from its deck; compare Frosthook Lake/Cold Ocean tables and surfaces; walk into every cave recess and inspect Basalt Hollow; open Cabin badges and Aquarium at desktop/small widths; verify the two shop counters; catch Panda only at Mangrove Cay; and spot-check Prism/Silverfish/Mythlight plus an export/import.
 
 ## v10 current-tree pass
 

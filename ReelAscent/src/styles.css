@@ -158,7 +158,7 @@ body {
   right: max(1.1rem, env(safe-area-inset-right));
   display: flex;
   gap: 0.55rem 0.8rem;
-  max-width: 25rem;
+  max-width: 33rem;
   flex-wrap: wrap;
   justify-content: flex-end;
   padding: 0.72rem 0.85rem;
@@ -2135,6 +2135,7 @@ body.inventory-open #game-shell::after {
 
 body.shop-open #game-shell::after,
 body.aquarium-open #game-shell::after,
+body.trail-badges-open #game-shell::after,
 body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inset: 0; content: ""; background: rgb(2 13 15 / 64%); }
 .aquarium-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .5rem; }
 .shop-category-heading { display: flex; gap: .75rem; align-items: center; justify-content: space-between; }
@@ -2156,6 +2157,46 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .aquarium-expansion.is-max { opacity: .72; }
 .aquarium-content { display: grid; gap: 1rem; }
 .aquarium-content h3 { color: #efd98b; font-size: .64rem; letter-spacing: .08em; }
+.aquarium-menu { width: min(76rem, calc(100vw - 2rem)); height: min(46rem, calc(100vh - 3rem)); max-height: none; overflow: hidden; grid-template-rows: auto auto minmax(0, 1fr); }
+.aquarium-menu:not([hidden]) { display: grid; }
+.aquarium-menu .aquarium-content { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .65rem; }
+.aquarium-summary-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .45rem; }
+.aquarium-summary-bar > div { min-width: 0; display: grid; gap: .12rem; align-content: center; min-height: 3.55rem; padding: .5rem; background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .45rem; }
+.aquarium-summary-bar small { color: #efd98b; font-size: .46rem; font-weight: 950; letter-spacing: .06em; }
+.aquarium-summary-bar strong { font-size: .66rem; }
+.aquarium-summary-bar span { color: rgb(234 244 231 / 55%); font-size: .48rem; }
+.aquarium-summary-bar button,
+.aquarium-selected button { padding: .45rem .55rem; color: #153a36; font-size: .5rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .38rem; cursor: pointer; }
+.aquarium-summary-bar button:disabled,
+.aquarium-selected button:disabled { opacity: .42; cursor: default; }
+.aquarium-workspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: .65rem; }
+.aquarium-collection { min-height: 0; overflow: auto; display: grid; gap: .7rem; align-content: start; padding-right: .3rem; }
+.aquarium-collection h3 { margin: 0 0 .35rem; }
+.aquarium-creature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr)); gap: .4rem; }
+.aquarium-creature-card { min-width: 0; display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: .45rem; align-items: center; padding: .42rem; color: #edf6e9; text-align: left; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 10%); border-left: 3px solid #96a69a; border-radius: .42rem; cursor: pointer; }
+.aquarium-creature-card[data-rarity="uncommon"] { border-left-color: #62c77e; }
+.aquarium-creature-card[data-rarity="rare"] { border-left-color: #62a0e9; }
+.aquarium-creature-card[data-rarity="legendary"] { border-left-color: #b26de0; }
+.aquarium-creature-card.is-selected { background: rgb(239 217 139 / 13%); outline: 2px solid rgb(239 217 139 / 62%); }
+.aquarium-creature-card .inventory-specimen-preview { height: 3.2rem; padding: 0; }
+.aquarium-creature-card span { min-width: 0; display: grid; gap: .12rem; }
+.aquarium-creature-card strong { overflow: hidden; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.aquarium-creature-card small { color: rgb(234 244 231 / 58%); font-size: .46rem; }
+.aquarium-selected { min-height: 0; overflow: auto; padding: .7rem; background: rgb(0 0 0 / 18%); border: 1px solid rgb(239 217 139 / 25%); border-radius: .55rem; }
+.aquarium-selected-preview { display: grid; height: 13rem; place-items: center; margin-bottom: .5rem; background: radial-gradient(circle, rgb(76 151 159 / 32%), rgb(3 25 29 / 12%) 70%); border-radius: .5rem; }
+.aquarium-selected-preview .inventory-specimen-preview { height: 11rem; }
+.aquarium-selected > small { color: #efd98b; font-size: .5rem; }
+.aquarium-selected h3 { margin: .2rem 0 .55rem; font-size: 1rem; }
+.aquarium-selected dl { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; margin: 0 0 .65rem; }
+.aquarium-selected dl div { padding: .4rem; background: rgb(255 255 255 / 5%); border-radius: .32rem; }
+.aquarium-selected dt { color: rgb(239 217 139 / 72%); font-size: .43rem; font-weight: 950; }
+.aquarium-selected dd { margin: .1rem 0 0; font-size: .55rem; }
+@media (max-width: 800px) {
+  .aquarium-summary-bar { grid-template-columns: repeat(2, 1fr); }
+  .aquarium-workspace { grid-template-columns: 1fr; overflow: auto; }
+  .aquarium-collection { overflow: visible; }
+  .aquarium-selected { min-height: 20rem; }
+}
 
 .boat-travel { position: absolute; z-index: 70; inset: 50% auto auto 50%; display: grid; width: min(46rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 1rem; color: #edf6e9; background: #123e42; border: 2px solid #d9bb66; border-radius: 1rem; box-shadow: 0 1.4rem 5rem rgb(0 0 0 / 45%); transform: translate(-50%, -50%); }
 .boat-travel[hidden] { display: none; }
@@ -2194,10 +2235,10 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
   .inventory-item-card { grid-template-columns: auto 1fr; }
   .inventory-item-card button { grid-column: 1 / -1; }
 }
-.inventory-menu { width: min(66rem, calc(100vw - 2rem)); }
+.inventory-menu { width: min(78rem, calc(100vw - 2rem)); }
 .collection-tabs { position: sticky; top: -.9rem; z-index: 2; padding: .55rem 0; background: rgb(8 35 34 / 96%); }
 .inventory-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: .5rem; }
-.inventory-content.inventory-gear { grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; }
+.inventory-content.inventory-gear { grid-template-columns: repeat(4, minmax(0, 1fr)); align-content: start; }
 .inventory-gear-group { min-width: 0; padding: .5rem; background: rgb(255 255 255 / 4%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .5rem; }
 .inventory-gear-group h3 { display: flex; justify-content: space-between; gap: .4rem; margin: 0 0 .35rem; color: #efd98b; font-size: .55rem; letter-spacing: .07em; text-transform: uppercase; }
 .inventory-gear-group h3 small { color: rgb(234 244 231 / 48%); font-size: .44rem; }
@@ -2336,7 +2377,6 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .map-water-list li { break-inside: avoid; margin: .18rem 0 !important; }
 .emote-menu { width: min(27rem, calc(100vw - 2rem)); padding: 1rem; }
 .emote-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem; margin: .7rem 0; }
-.emote-menu small { color: rgb(234 244 231 / 62%); font-size: .55rem; line-height: 1.4; }
 
 .appearance-menu {
   position: fixed;
@@ -2580,13 +2620,38 @@ body.rhythm-high-contrast .rhythm-note { filter: saturate(1.4) contrast(1.45); o
 .minimap-island { fill: #7d9a66; stroke: #315b45; stroke-width: 2; }
 .minimap-cold-island { fill: #e4efea; stroke: #78aeb9; }
 .minimap-cave-island { fill: #777a70; }
+.minimap-biome { opacity: .14; }
+.minimap-biome-sunwash { fill: #b88748; }
+.minimap-biome-fernwood { fill: #2f7152; }
+.minimap-biome-blackstone { fill: #465866; }
 .minimap-water { fill: #5da7ae; stroke: #185e68; stroke-width: 1.3; opacity: .88; }
 .minimap-water.is-cold { fill: #a9d6dd; stroke: #528998; }
-.minimap-dock { fill: #9a4b34; stroke: #fff2b5; stroke-width: 1.4; }
+.minimap-features text { fill: #fff4bc; stroke: none; font: 900 4.5px ui-monospace, monospace; text-anchor: middle; }
+.minimap-dock rect { fill: #9a4b34; stroke: #fff2b5; stroke-width: 1; }
+.minimap-cave circle { fill: #303a3a; stroke: #fff2b5; stroke-width: 1; }
 .minimap-gps circle { stroke: #fff4bc; stroke-width: 1.6; }
 .minimap-gps .is-local { fill: #e7784f; }
 .minimap-gps .is-remote { fill: #4e82c5; }
-body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-open, .appearance-open, .multiplayer-open, .journal-open) .held-minimap { display: none; }
+body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-open, .appearance-open, .multiplayer-open, .journal-open, .trail-badges-open) .held-minimap { display: none; }
+
+.trail-badges-menu { position: absolute; z-index: 82; inset: 50% auto auto 50%; display: grid; width: min(68rem, calc(100vw - 2rem)); height: min(42rem, calc(100vh - 2rem)); min-height: 0; padding: 1rem; color: #e9f3e7; background: #0b302f; border: 2px solid #d9bb66; border-radius: .9rem; box-shadow: 0 1.4rem 5rem rgb(0 0 0 / 52%); transform: translate(-50%, -50%); }
+.trail-badges-menu[hidden] { display: none; }
+.trail-badges-menu > header { display: flex; gap: 1rem; align-items: start; justify-content: space-between; }
+.trail-badges-menu > header > div:last-child { display: flex; gap: .7rem; align-items: center; }
+.trail-badges-menu h2 { margin: .15rem 0 0; color: #f0d78b; }
+.trail-badges-menu > p { margin: .2rem 0 .7rem; color: rgb(233 243 231 / 70%); font-size: .66rem; }
+.trail-badges-menu button { padding: .55rem .7rem; color: #173a34; font-size: .58rem; font-weight: 950; background: #efd98b; border: 0; border-radius: .42rem; cursor: pointer; }
+.trail-badges-content { min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; padding-right: .3rem; align-content: start; }
+.trail-badge-card { min-width: 0; display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .65rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 12%); border-radius: .55rem; }
+.trail-badge-card.is-unlocked { background: rgb(208 180 91 / 12%); border-color: rgb(239 217 139 / 48%); }
+.trail-badge-card.is-locked { filter: saturate(.4); opacity: .72; }
+.trail-badge-medallion { display: grid; width: 2.35rem; height: 2.35rem; place-items: center; color: #f2d77e; font-size: 1.25rem; background: #173f3c; border: 2px solid #967d3e; border-radius: 50%; }
+.trail-badge-card small { display: block; color: #dfbd67; font-size: .48rem; letter-spacing: .08em; }
+.trail-badge-card strong { display: block; margin: .08rem 0; font-size: .7rem; }
+.trail-badge-card p { margin: 0; color: rgb(233 243 231 / 68%); font-size: .55rem; line-height: 1.35; }
+.trail-badge-card output { color: #f2dfa6; font-size: .58rem; font-weight: 900; white-space: nowrap; }
+@media (max-width: 850px) { .trail-badges-content { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 580px) { .trail-badges-content { grid-template-columns: 1fr; } }
 
 /* X/Interact now shares the same contextual-prompt footprint as Fish and Grip. */
 .home-interaction-prompt {
@@ -2637,12 +2702,17 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .boat-map-developed-island .boat-map-footprint { background: #9ca66b; }
 .boat-map-aquarium-island .boat-map-footprint { background: #82ae79; }
 .boat-map-fishing-island .boat-map-footprint { background: #76a667; }
+.boat-map-open-water-boat .boat-map-footprint { width: 2.8rem; height: 2rem; color: #f5e5ad; font-size: 1.3rem; background: #336e82; border-color: #174858; clip-path: none !important; }
 .boat-map-island.is-current { box-shadow: 0 0 0 3px #fff5b6; }
 .boat-map-island.is-selected { outline: 3px solid #f2bd45; outline-offset: 1px; }
 
 .map-islands :is(ellipse, polygon) { fill: #6f9958; stroke: #2d5c45; stroke-width: 1.4; }
 .map-island-cold-island :is(ellipse, polygon) { fill: #e4efea; stroke: #78aeb9; }
 .map-island-cave-island :is(ellipse, polygon) { fill: #777a70; }
+.map-open-water-boat path,
+.minimap-open-water-boat path { fill: #366f82; stroke: #f7e4a7; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.map-open-water-boat path + path,
+.minimap-open-water-boat path + path { fill: none; }
 
 /* Secret cheat activation has no pre-activation progress state. */
 .cheat-activation { --cheat-progress: 100%; background: rgb(6 35 38 / 94%); }

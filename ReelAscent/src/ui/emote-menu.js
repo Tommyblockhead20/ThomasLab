@@ -2,7 +2,8 @@ import { EMOTE_DEFINITIONS } from '../multiplayer/emotes.js';
 import { isBoundActionCode } from '../player/movement.js';
 
 const BLOCKING_CLASSES = Object.freeze([
-  'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'mountain-map-open', 'appearance-open'
+  'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'mountain-map-open', 'appearance-open',
+  'trail-badges-open'
 ]);
 
 export class EmoteMenu {

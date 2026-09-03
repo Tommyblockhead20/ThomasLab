@@ -98,7 +98,7 @@ test('v9.2 roster has 300 stable complete records and every base song is about 1
   assert.equal(new Set(FISH_SPECIES.map((fish) => fish.id)).size, 300);
   assert.deepEqual(
     Object.fromEntries(Object.entries(Object.groupBy(FISH_SPECIES, (fish) => fish.rarity)).map(([rarity, fish]) => [rarity, fish.length])),
-    { Common: 77, Uncommon: 78, Rare: 70, Legendary: 75 }
+    { Common: 75, Uncommon: 75, Rare: 75, Legendary: 75 }
   );
   for (const fish of FISH_SPECIES) {
     assert.ok(fish.name && fish.flavor && fish.visual && fish.habitat);

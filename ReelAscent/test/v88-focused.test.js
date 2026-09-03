@@ -46,7 +46,7 @@ test('v8.8 exact legacy appearance remains the new-save and reset target', async
 test('v8.8 map keeps five bands and cave symbols while removing noisy or false pins', async () => {
   const map = createMountainMapData();
   assert.equal(map.contours.length, 5);
-  assert.equal(map.waters.length, 24);
+  assert.equal(map.waters.length, 27);
   assert.equal(map.caves.length, 4);
   assert.equal(map.ledges.length, 3);
   assert.equal(map.landmarks.some((entry) => entry.id === 'split-boulder'), true);

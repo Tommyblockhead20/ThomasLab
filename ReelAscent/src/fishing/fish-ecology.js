@@ -1,21 +1,22 @@
 import { FISH_SPECIES, getWeightedSpeciesTable } from './fish-data.js';
 
 export const ECOLOGY_TARGETS = Object.freeze({
-  waters: 25,
+  waters: 27,
   species: 300,
   // The v7.1 summit promotions and v8 replacement roster intentionally moved four
   // creatures from the shared pool into location-specific discoveries. Individual
   // waters now vary modestly instead of all carrying exactly four exclusives.
-  exclusiveSpecies: 93,
-  sharedSpecies: 207,
+  exclusiveSpecies: 94,
+  sharedSpecies: 206,
   minimumExclusivePerWater: 2,
   maximumExclusivePerWater: 9,
   maximumSpeciesShare: .25
 });
 
-const SALT_WATER_TYPES = new Set(['ocean', 'tidepool', 'inlet', 'lagoon']);
+const SALT_WATER_TYPES = new Set(['ocean', 'cold-ocean', 'bluewater-ocean', 'tidepool', 'inlet', 'lagoon']);
 const TYPE_FAMILIES = Object.freeze({
-  coast: new Set(['ocean', 'tidepool', 'inlet', 'lagoon']),
+  coast: new Set(['ocean', 'bluewater-ocean', 'tidepool', 'inlet', 'lagoon']),
+  'cold-coast': new Set(['cold-ocean']),
   still: new Set(['pond', 'pool', 'lake', 'tarn', 'summit-pond', 'ice-pool']),
   flow: new Set(['stream-pool', 'waterfall-pool']),
   cave: new Set(['cave-pool', 'cave-tarn'])
@@ -43,8 +44,10 @@ function typeFamily(type) {
 export function getZoneHabitat(zone, point = zone.center) {
   const probabilityPoint = zone.uniformProbabilities ? (zone.probabilityAnchor ?? zone.center) : point;
   const waterType = zone.waterType ?? 'pond';
-  const isOcean = waterType === 'ocean';
-  const visualTheme = isOcean ? climateThemeAtPoint(probabilityPoint, zone.center) : zone.theme ?? climateThemeAtPoint(zone.center);
+  const isOcean = ['ocean', 'cold-ocean', 'bluewater-ocean'].includes(waterType);
+  const visualTheme = waterType === 'ocean'
+    ? climateThemeAtPoint(probabilityPoint, zone.center)
+    : zone.theme ?? climateThemeAtPoint(zone.center);
   // Fallglass is an environment treatment, not a fourth biological climate. Keeping the
   // ecology wedge separate prevents it from filtering out every shared climate creature.
   const ecologyTheme = isOcean
@@ -61,6 +64,7 @@ export function getZoneHabitat(zone, point = zone.center) {
   return Object.freeze({
     zoneId: zone.id,
     zoneName: zone.label,
+    habitatAliasIds: Object.freeze([...(zone.habitatAliasIds ?? [])]),
     tier,
     rarityTier,
     waterType,
@@ -78,29 +82,29 @@ export function getZoneHabitat(zone, point = zone.center) {
 
 export function getHabitatWeight(fish, habitat) {
   const preference = fish.habitat ?? {};
+  const compatibleWaterIds = new Set([habitat.zoneId, ...(habitat.habitatAliasIds ?? [])]);
   if (preference.exclusiveWaterId) {
-    if (preference.exclusiveWaterId !== habitat.zoneId) return 0;
+    if (!compatibleWaterIds.has(preference.exclusiveWaterId)) return 0;
     // This is a strong Stage-B preference only. Rarity has already been chosen separately.
     return ({ Common: 4.2, Uncommon: 4.8, Rare: 5.6, Legendary: 6.4 })[fish.rarity] ?? 4.8;
   }
   if (preference.salinity && preference.salinity !== 'both' && preference.salinity !== habitat.salinity) return 0;
   if (preference.tiers?.length && !preference.tiers.includes(habitat.tier)) return 0;
-  if (preference.waterIds?.length && !preference.waterIds.includes(habitat.zoneId)) return 0;
+  if (preference.waterIds?.length && !preference.waterIds.some((id) => compatibleWaterIds.has(id))) return 0;
   if (preference.themes?.length && !habitat.ecologyThemes.some((theme) => preference.themes.includes(theme))) return 0;
 
   let typeWeight = 1;
   if (preference.waterTypes?.length && !preference.waterTypes.includes(habitat.waterType)) {
-    if (preference.strictWaterTypes) return 0;
     const familyMatch = preference.waterTypes.some((type) => typeFamily(type) === habitat.typeFamily);
     if (!familyMatch) return 0;
-    typeWeight = .52;
+    typeWeight = preference.strictWaterTypes ? 1 : .52;
   }
 
   const preferredTheme = preference.preferredTheme ?? THEMES[stableIndex(fish.id, THEMES.length)];
   const themeWeight = habitat.ecologyThemes.length > 1
     ? (habitat.ecologyThemes.includes(preferredTheme) ? 1 : .72)
     : preferredTheme === habitat.ecologyTheme ? 1.48 : .64;
-  const favoredWaterWeight = preference.favoredWaterIds?.includes(habitat.zoneId)
+  const favoredWaterWeight = preference.favoredWaterIds?.some((id) => compatibleWaterIds.has(id))
     ? (fish.rarity === 'Legendary'
         ? 3.2
         : (({ Common: 1.6, Uncommon: 1.9, Rare: 2.6 })[fish.rarity] ?? 2))
@@ -131,6 +135,7 @@ export function attachZoneEcology(zone) {
   const baseline = getEcologySelection(zone, zone.center);
   zone.fishIds = [...baseline.fishIds];
   zone.ecologyWeights = { ...baseline.habitatWeights };
+  zone.ecologyTheme = baseline.habitat.ecologyTheme;
   return zone;
 }
 

@@ -7,9 +7,11 @@ import {
 import { FishingZone } from '../src/fishing/fishing-zone.js';
 import {
   ALL_FISHING_WATER_DESCRIPTORS,
+  BLUEWATER_REACH_DESCRIPTOR,
   COASTAL_SHELF_RADIUS,
   CROWN_DENSITY_CONFIG,
   FISHING_WATER_COUNTS,
+  FROSTHOOK_COLD_OCEAN_DESCRIPTOR,
   MOUNTAIN_CENTER,
   MOUNTAIN_FAILURE_RADIUS,
   MOUNTAIN_FISHING_LOCATIONS,
@@ -62,24 +64,35 @@ function ecologyZones() {
     });
     return attachZoneEcology(zone);
   });
-  const ocean = new FishingZone({
-    id: OCEAN_FISHING_DESCRIPTOR.id,
-    label: OCEAN_FISHING_DESCRIPTOR.label,
-    center: OCEAN_FISHING_DESCRIPTOR.center,
+  const oceanZone = (descriptor) => {
+    const ocean = new FishingZone({
+    id: descriptor.id,
+    label: descriptor.label,
+    center: descriptor.center,
     shape: 'annulus',
-    innerRadius: OCEAN_FISHING_DESCRIPTOR.innerRadius,
-    outerRadius: OCEAN_FISHING_DESCRIPTOR.outerRadius,
+    innerRadius: descriptor.innerRadius,
+    outerRadius: descriptor.outerRadius,
     surfaceY: 0,
-    fishIds: OCEAN_FISHING_DESCRIPTOR.fish,
+    fishIds: descriptor.fish,
     modifiers: { rarityBias: .18 },
     depth: 'deep'
   });
   Object.assign(ocean, {
-    tier: OCEAN_FISHING_DESCRIPTOR.tier,
-    waterType: OCEAN_FISHING_DESCRIPTOR.waterType,
-    theme: OCEAN_FISHING_DESCRIPTOR.theme
+    tier: descriptor.tier,
+    waterType: descriptor.waterType,
+    theme: descriptor.theme,
+    ecologyThemes: descriptor.ecologyThemes,
+    habitatAliasIds: descriptor.habitatAliasIds,
+    uniformProbabilities: descriptor.uniformProbabilities
   });
-  return [...inland, attachZoneEcology(ocean)];
+    return attachZoneEcology(ocean);
+  };
+  return [
+    ...inland,
+    oceanZone(FROSTHOOK_COLD_OCEAN_DESCRIPTOR),
+    oceanZone(BLUEWATER_REACH_DESCRIPTOR),
+    oceanZone(OCEAN_FISHING_DESCRIPTOR)
+  ];
 }
 
 test('mountain v2 provides six unique safe starts and preserves traversal geometry contracts', () => {
@@ -97,13 +110,13 @@ test('mountain v2 provides six unique safe starts and preserves traversal geomet
   }
 });
 
-test('the world exposes exactly 25 waters with one hollow annular ocean', () => {
+test('the world exposes 27 waters including distinct cold and bluewater ocean areas', () => {
   assert.deepEqual(FISHING_WATER_COUNTS, {
-    ocean: 1, lower: 10, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 25
+    ocean: 3, lower: 10, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 27
   });
   assert.equal(MOUNTAIN_FISHING_LOCATIONS.length, 24);
-  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 25);
-  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 25);
+  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 27);
+  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 27);
   assert.equal(OCEAN_FISHING_DESCRIPTOR.id, 'outer-ocean');
   assert.ok(OCEAN_FISHING_DESCRIPTOR.innerRadius >= COASTAL_SHELF_RADIUS - 5);
   assert.ok(OCEAN_FISHING_DESCRIPTOR.outerRadius > OCEAN_FISHING_DESCRIPTOR.innerRadius);
@@ -147,12 +160,12 @@ test('every cave entrance descends to its water surface', () => {
   }
 });
 
-test('300-creature ecology audit preserves the active 25-water topology', () => {
+test('300-creature ecology audit preserves the active 27-water topology', () => {
   const zones = ecologyZones();
   const audit = auditFishingEcology(zones);
   assert.equal(FISH_SPECIES.length, 300);
-  assert.equal(audit.waterCount, 25);
-  assert.equal(audit.uniqueWaterCount, 25);
+  assert.equal(audit.waterCount, 27);
+  assert.equal(audit.uniqueWaterCount, 27);
   assert.deepEqual(audit.zeroWaterSpecies, []);
   assert.equal(audit.exclusiveCount, ECOLOGY_TARGETS.exclusiveSpecies);
   assert.equal(audit.sharedCount, ECOLOGY_TARGETS.sharedSpecies);
@@ -163,10 +176,13 @@ test('300-creature ecology audit preserves the active 25-water topology', () => 
   )));
   assert.equal(audit.pools.reduce((total, pool) => total + pool.exclusiveCount, 0), audit.exclusiveCount);
   assert.ok(audit.pools.every((pool) => (
-    pool.exclusiveCount >= ECOLOGY_TARGETS.minimumExclusivePerWater
-      && pool.exclusiveCount <= ECOLOGY_TARGETS.maximumExclusivePerWater
+    ['blue-ice-melt', 'bluewater-reach-water'].includes(pool.id)
+      || (pool.exclusiveCount >= ECOLOGY_TARGETS.minimumExclusivePerWater
+        && pool.exclusiveCount <= ECOLOGY_TARGETS.maximumExclusivePerWater)
   )));
-  assert.ok(audit.pools.every((pool) => pool.poolSize >= 8));
+  assert.ok(audit.pools.every((pool) => pool.poolSize >= (
+    pool.id === 'frosthook-cold-ocean' ? 5 : pool.id === 'blue-ice-melt' ? 7 : 8
+  )));
   assert.ok(audit.maximumNormalizedShare <= .25 + 1e-9);
   assert.ok(audit.mostDiversePool.poolSize >= 40);
 
@@ -182,12 +198,12 @@ test('300-creature ecology audit preserves the active 25-water topology', () => 
   }
 });
 
-test('ocean ecology changes climate theme with cast angle while remaining one zone ID', () => {
+test('outer-ocean ecology remains one uniform table while climate projection still has three themes', () => {
   const ocean = ecologyZones().find((zone) => zone.id === 'outer-ocean');
   const samples = [0, 120, 240].map((angle) => getEcologySelection(ocean, pointAt(angle, 225)));
   assert.equal(new Set(samples.map((selection) => selection.habitat.zoneId)).size, 1);
-  assert.equal(new Set(samples.map((selection) => selection.habitat.theme)).size, 3);
+  assert.equal(new Set(samples.map((selection) => selection.habitat.theme)).size, 1);
   assert.equal(new Set([0, 120, 240].map((angle) => climateThemeAtPoint(pointAt(angle, 225), MOUNTAIN_CENTER))).size, 3);
   const themedFish = FISH_SPECIES.find((fish) => !fish.habitat.exclusiveWaterId && fish.habitat.salinity === 'salt');
-  assert.equal(new Set(samples.map((selection) => selection.habitatWeights[themedFish.id])).size, 2);
+  assert.equal(new Set(samples.map((selection) => selection.habitatWeights[themedFish.id])).size, 1);
 });

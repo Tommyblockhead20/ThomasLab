@@ -27,7 +27,7 @@ export const MOUNTAIN_CENTER = Object.freeze({
 });
 export const SUMMIT_HEIGHT = 304.8; // exactly 1,000 ft
 export const COASTAL_SHELF_RADIUS = 214;
-export const OCEAN_FLOOR_OUTER_RADIUS = 350;
+export const OCEAN_FLOOR_OUTER_RADIUS = WORLD_MAP_RADIUS + 48;
 export const OCEAN_SEABED_JOIN_RADIUS = 208;
 export const OCEAN_WATER_INNER_RADIUS = 221;
 export const OCEAN_SHALLOW_WALK_END_RADIUS = 239;
@@ -108,6 +108,7 @@ const AQUARIUM_WORLD_LOCATION = worldLocationById('aquarium-island');
 const CAVE_FISHING_WORLD_LOCATION = worldLocationById('cave-fishing-island');
 const NORMAL_FISHING_WORLD_LOCATION = worldLocationById('normal-fishing-island');
 const FROSTHOOK_WORLD_LOCATION = worldLocationById('cold-island');
+const BLUEWATER_WORLD_LOCATION = worldLocationById('bluewater-reach');
 
 export const SUMMIT_BENCH_CONFIG = Object.freeze({
   id: 'summit-bench',
@@ -146,6 +147,9 @@ export const CAVE_TOPOLOGY_CONFIG = Object.freeze({
   // describe only that opening and no longer borrow the much larger rear-pool radii.
   entranceCutDepth: 4.35,
   entranceOuterPad: .62,
+  coreConcavityOuterDepth: 8,
+  coreConcavityHorizontalInset: 3.4,
+  coreConcavityVerticalInset: 4.2,
   mouthHalfWidth: 2.18,
   throatStartInset: .3,
   archMinimumInset: 1.85,
@@ -449,7 +453,7 @@ const FISHING_LAYOUT = Object.freeze([
   // UPPER / ALPINE — 4 waters
   Object.freeze({ id: 'cloudstep-lake', label: 'Cloudstep Lake', physicalZone: 'Cloudstep Lake', tier: 'upper', waterType: 'lake', theme: 'fallglass', uniformProbabilities: true, probabilityGroup: 'cloudstep-lake', angle: 183, radius: 89, radii: [12.8, 9.4], depth: 'deep', basinDepth: 2.8, fish: ['rainbow-trout', 'brook-trout', 'mountain-whitefish', 'cutthroat-trout'], size: 1.11, rarityBias: 0.68, trophyChance: 1.24 }),
   Object.freeze({ id: 'hidden-ridge-pool', label: 'Hidden Ridge Pool', tier: 'upper', waterType: 'tarn', theme: 'sunwash', angle: 335, radius: 82, radii: [3.6, 2.6], depth: 'shallow', basinDepth: 2.0, fish: ['brook-trout', 'cutthroat-trout', 'mountain-whitefish', 'burbot'], size: 1.12, rarityBias: 0.72, trophyChance: 1.28 }),
-  Object.freeze({ id: 'blue-ice-melt', label: 'Frosthook Melt', tier: 'upper', waterType: 'ice-pool', theme: 'blackstone', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], offshore: 'cold-island', angle: FROSTHOOK_WORLD_LOCATION?.angle ?? 230, radius: FROSTHOOK_WORLD_LOCATION?.radius ?? 286, waterY: .96, radii: [5.8, 4.6], depth: 'shallow', basinDepth: .75, fish: ['brook-trout', 'mountain-whitefish', 'cutthroat-trout', 'alpine-char'], size: 1.14, rarityBias: 0.76, trophyChance: 1.34 }),
+  Object.freeze({ id: 'blue-ice-melt', label: 'Frosthook Lake', tier: 'upper', waterType: 'ice-pool', theme: 'blackstone', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], offshore: 'cold-island', angle: FROSTHOOK_WORLD_LOCATION?.angle ?? 230, radius: FROSTHOOK_WORLD_LOCATION?.radius ?? 286, waterY: .96, radii: [5.8, 4.6], depth: 'shallow', basinDepth: .75, fish: ['brook-trout', 'mountain-whitefish', 'cutthroat-trout', 'alpine-char'], size: 1.14, rarityBias: 0.76, trophyChance: 1.34 }),
   Object.freeze({ id: 'high-cirque-tarn', label: 'High Cirque Tarn', tier: 'upper', waterType: 'cave-tarn', theme: 'fernwood', cave: true, entranceDepth: 19, angle: 69, radius: 58, radii: [4.8, 3.8], depth: 'shallow', basinDepth: 1.8, fish: ['mountain-whitefish', 'cutthroat-trout', 'alpine-char', 'burbot'], size: 1.16, rarityBias: 0.8, trophyChance: 1.42 }),
 
   // CROWN / SUMMIT — one fixed-aperture cave plus the summit tarn
@@ -471,10 +475,22 @@ export const OCEAN_FISHING_DESCRIPTOR = Object.freeze({
 
 export const FROSTHOOK_COLD_OCEAN_DESCRIPTOR = Object.freeze({
   id: 'frosthook-cold-ocean', label: 'Frosthook Cold Ocean', physicalZone: 'Frosthook Cold Ocean',
-  tier: 'satellite-ocean', waterType: 'cold-ocean', theme: 'polar',
+  tier: 'ocean', waterType: 'cold-ocean', theme: 'polar',
   ecologyThemes: ['blackstone'], uniformProbabilities: true, probabilityGroup: 'frosthook-cold-ocean',
   center: FROSTHOOK_WORLD_LOCATION?.worldPosition ?? MOUNTAIN_CENTER,
   innerRadius: 24, outerRadius: 44, radii: [44, 39],
+  fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
+});
+
+export const BLUEWATER_REACH_DESCRIPTOR = Object.freeze({
+  id: 'bluewater-reach-water', label: 'Bluewater Reach', physicalZone: 'Bluewater Reach',
+  tier: 'ocean', waterType: 'bluewater-ocean', theme: 'coastal',
+  ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], uniformProbabilities: true,
+  probabilityGroup: 'bluewater-reach', habitatAliasIds: ['outer-ocean'],
+  center: BLUEWATER_WORLD_LOCATION?.worldPosition ?? MOUNTAIN_CENTER,
+  innerRadius: 8, outerRadius: 50, radii: [50, 50],
+  specimenSizeBias: .08,
+  largeSpeciesWeightBias: .12,
   fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
 });
 
@@ -484,8 +500,14 @@ function isFrosthookColdOceanPoint(point, margin = 0) {
   return radius >= descriptor.innerRadius + margin && radius <= descriptor.outerRadius - margin;
 }
 
+function isBluewaterReachPoint(point, margin = 0) {
+  const descriptor = BLUEWATER_REACH_DESCRIPTOR;
+  const radius = Math.hypot(point.x - descriptor.center.x, point.z - descriptor.center.z);
+  return radius >= descriptor.innerRadius + margin && radius <= descriptor.outerRadius - margin;
+}
+
 export const FISHING_WATER_COUNTS = Object.freeze({
-  ocean: 2, lower: 10, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 26
+  ocean: 3, lower: 10, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 27
 });
 
 export function terrainHeightAt(angle, radius) {
@@ -576,7 +598,9 @@ function caveApertureProfileAtDepth(cave, depthT) {
 function isCaveEntranceSurfacePoint(x, z, cave) {
   const { outward, lateral } = caveEntranceLocalCoordinates(x, z, cave);
   const caveDepth = caveDepthAt(cave);
-  const outerEdge = caveDepth + CAVE_TOPOLOGY_CONFIG.entranceOuterPad;
+  // Only the inner throat is omitted. The much broader outer approach remains part of the
+  // gray core and is physically deformed by deformCaveCoreVertex into a staged recess.
+  const outerEdge = caveDepth - 1.2;
   const innerEdge = caveDepth - CAVE_TOPOLOGY_CONFIG.entranceCutDepth;
   if (outward < innerEdge || outward > outerEdge) return false;
   const depthT = (outerEdge - outward) / Math.max(.001, outerEdge - innerEdge);
@@ -607,7 +631,7 @@ function caveApertureCoverageSamples(cave) {
   const tangentX = -radialZ;
   const tangentZ = radialX;
   const caveDepth = caveDepthAt(cave);
-  const outerEdge = caveDepth + CAVE_TOPOLOGY_CONFIG.entranceOuterPad;
+  const outerEdge = caveDepth - 1.2;
   const innerEdge = caveDepth - CAVE_TOPOLOGY_CONFIG.entranceCutDepth;
   const samples = [];
   for (const depthT of [0, .18, .38, .58, .78, 1]) {
@@ -647,6 +671,38 @@ function triangleIntersectsCaveEntrance(a, b, c) {
   });
 }
 
+export function deformCaveCoreVertex(x, y, z) {
+  let result = { x, y, z, maximumRecess: 0 };
+  for (const cave of FISHING_LAYOUT) {
+    if (!cave.cave || cave.offshore) continue;
+    const { outward, lateral } = caveEntranceLocalCoordinates(result.x, result.z, cave);
+    const caveDepth = caveDepthAt(cave);
+    const outerEdge = caveDepth + CAVE_TOPOLOGY_CONFIG.coreConcavityOuterDepth;
+    const throatEdge = caveDepth - 1.2;
+    if (outward > outerEdge || outward < throatEdge - .8) continue;
+    const broadHalfWidth = caveMouthHalfWidthAt(cave) + 4.1;
+    const lateralBlend = 1 - smoothstep(caveMouthHalfWidthAt(cave) + .45, broadHalfWidth, Math.abs(lateral));
+    if (lateralBlend <= 0) continue;
+    const depthBlend = 1 - smoothstep(throatEdge, outerEdge, outward);
+    const stagedDepth = depthBlend < .34
+      ? smoothstep(0, .34, depthBlend) * .18
+      : depthBlend < .72
+        ? lerp(.18, .58, smoothstep(.34, .72, depthBlend))
+        : lerp(.58, 1, smoothstep(.72, 1, depthBlend));
+    const recess = stagedDepth * lateralBlend * CAVE_TOPOLOGY_CONFIG.coreConcavityHorizontalInset;
+    const drop = stagedDepth * lateralBlend * CAVE_TOPOLOGY_CONFIG.coreConcavityVerticalInset
+      * lerp(.42, 1, 1 - Math.min(1, Math.abs(lateral) / broadHalfWidth));
+    const radians = degreesToRadians(cave.angle);
+    result = {
+      x: result.x - Math.cos(radians) * recess,
+      y: result.y - drop,
+      z: result.z - Math.sin(radians) * recess,
+      maximumRecess: Math.max(result.maximumRecess, recess)
+    };
+  }
+  return result;
+}
+
 // Three broad ecological wedges correspond to roughly 12–4, 4–8, and 8–12 o'clock.
 // Keeping theme independent from elevation/waterType lets the fishing pass weight a
 // shared species by climate, altitude, and habitat separately.
@@ -668,6 +724,7 @@ export const MOUNTAIN_FISHING_LOCATIONS = Object.freeze(FISHING_LAYOUT.map((loca
 export const ALL_FISHING_WATER_DESCRIPTORS = Object.freeze([
   ...MOUNTAIN_FISHING_LOCATIONS,
   FROSTHOOK_COLD_OCEAN_DESCRIPTOR,
+  BLUEWATER_REACH_DESCRIPTOR,
   OCEAN_FISHING_DESCRIPTOR
 ]);
 
@@ -719,6 +776,7 @@ export function createMountainMapData() {
     return {
       id: water.id, label: water.label, index: index + 2, tier: water.tier,
       waterType: water.waterType, theme: water.theme, cave: Boolean(water.cave),
+      ecologyTheme: water.theme === 'fallglass' ? climateThemeAt(water.angle) : water.theme,
       center, radii: [...water.radii],
       entrance: water.cave ? radialPoint(water.angle, entranceRadius,
         offshoreIsland ? offshoreIsland.elevation + .05 : rawTerrainHeightAt(water.angle, entranceRadius)) : null
@@ -730,6 +788,8 @@ export function createMountainMapData() {
     index: 1,
     tier: 'ocean',
     waterType: 'ocean',
+    theme: 'coastal',
+    ecologyTheme: 'sunwash',
     center: { ...MOUNTAIN_CENTER },
     innerRadius: OCEAN_FISHING_DESCRIPTOR.innerRadius,
     outerRadius: OCEAN_FISHING_DESCRIPTOR.outerRadius
@@ -741,8 +801,20 @@ export function createMountainMapData() {
     tier: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.tier,
     waterType: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.waterType,
     theme: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.theme,
+    ecologyTheme: 'polar',
     center: { ...FROSTHOOK_COLD_OCEAN_DESCRIPTOR.center },
     radii: [...FROSTHOOK_COLD_OCEAN_DESCRIPTOR.radii]
+  });
+  waters.push({
+    id: BLUEWATER_REACH_DESCRIPTOR.id,
+    label: BLUEWATER_REACH_DESCRIPTOR.label,
+    index: waters.length + 1,
+    tier: BLUEWATER_REACH_DESCRIPTOR.tier,
+    waterType: BLUEWATER_REACH_DESCRIPTOR.waterType,
+    theme: BLUEWATER_REACH_DESCRIPTOR.theme,
+    ecologyTheme: 'coastal',
+    center: { ...BLUEWATER_REACH_DESCRIPTOR.center },
+    radii: [...BLUEWATER_REACH_DESCRIPTOR.radii]
   });
   return {
     center: { ...MOUNTAIN_CENTER },
@@ -1093,10 +1165,16 @@ export class MountainWorld extends TestWorld {
     group.locationId = location.id;
     this.buildTarget.addChild(group);
     this.locationLoadGroups.set(location.id, group);
+    if (location.type === 'open-water-boat') {
+      this.buildBluewaterBoat(location, group);
+      return;
+    }
     const segments = 36;
-    const ringFactors = [1.2, 1, .68, .2, .035];
-    const ringHeights = [OCEAN_SURFACE_Y - 1.6, OCEAN_SURFACE_Y - .08,
-      location.elevation + .06, location.elevation + .16, location.elevation + .18];
+    // End at a real center vertex. The old .035-radius 36-vertex micro-ring produced
+    // near-degenerate center triangles; on Basalt Hollow those could stretch into spikes.
+    const ringFactors = [1.2, 1, .68, .2];
+    const ringHeights = [oceanFloorHeightAt(location.radius) + .12, OCEAN_SURFACE_Y - .08,
+      location.elevation + .06, location.elevation + .16];
     const vertices = [];
     for (let ring = 0; ring < ringFactors.length; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
@@ -1108,11 +1186,18 @@ export class MountainWorld extends TestWorld {
         // Underwater skirts are slightly softened, while the shoreline/top rings preserve
         // the destination's actual distinctive silhouette for future map simplification.
         const footprintScale = lerp(1, identityScale, ring === 0 ? .72 : 1) * microWobble;
-        vertices.push([
-          location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * footprintScale,
-          ringHeights[ring] + (ring >= 2 ? Math.sin(segment * 1.91) * .035 : 0),
-          location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * footprintScale
-        ]);
+        const vertexX = location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * footprintScale;
+        const vertexZ = location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * footprintScale;
+        let vertexY = ringHeights[ring] + (ring >= 2 ? Math.sin(segment * 1.91) * .035 : 0);
+        if (location.id === 'cold-island' && ring >= 2) {
+          const lakeRadius = Math.hypot(
+            (vertexX - location.worldPosition.x) / 6.35,
+            (vertexZ - location.worldPosition.z) / 5.05
+          );
+          const basinBlend = 1 - smoothstep(.72, 1.18, lakeRadius);
+          vertexY = lerp(vertexY, .96 - .78, basinBlend);
+        }
+        vertices.push([vertexX, vertexY, vertexZ]);
       }
     }
     const triangles = [];
@@ -1128,6 +1213,17 @@ export class MountainWorld extends TestWorld {
         const innerNext = (ring + 1) * segments + next;
         triangles.push([outer, inner, outerNext], [outerNext, inner, innerNext]);
       }
+    }
+    const centerIndex = vertices.length;
+    vertices.push([
+      location.worldPosition.x,
+      location.id === 'cold-island' ? .96 - .78 : location.elevation + .18,
+      location.worldPosition.z
+    ]);
+    const finalRingStart = (ringFactors.length - 1) * segments;
+    for (let segment = 0; segment < segments; segment += 1) {
+      const next = (segment + 1) % segments;
+      triangles.push([finalRingStart + segment, centerIndex, finalRingStart + next]);
     }
     const geometry = new pc.Geometry();
     geometry.positions = [];
@@ -1158,6 +1254,43 @@ export class MountainWorld extends TestWorld {
     const previousTarget = this.buildTarget;
     this.buildTarget = group;
     this.decorateOceanIsland(location);
+    this.buildTarget = previousTarget;
+  }
+
+  buildBluewaterBoat(location, group) {
+    const previousTarget = this.buildTarget;
+    this.buildTarget = group;
+    const { x, z } = location.worldPosition;
+    const yaw = inwardYaw(location.angle);
+    const radians = location.angle * Math.PI / 180;
+    const forward = { x: Math.cos(radians), z: Math.sin(radians) };
+    const sideward = { x: -forward.z, z: forward.x };
+    const localPoint = (side, forwardDistance) => ({
+      x: x + sideward.x * side + forward.x * forwardDistance,
+      z: z + sideward.z * side + forward.z * forwardDistance
+    });
+    this.addBox('Bluewater Reach deep hull', { x, y: OCEAN_SURFACE_Y - .18, z },
+      { x: 6.8, y: 1.05, z: 12.8 }, this.materials.deepRock, { y: yaw });
+    const deck = this.addBox('Bluewater Reach stable fishing deck', { x, y: OCEAN_SURFACE_Y + .34, z },
+      { x: 7.2, y: .32, z: 13.4 }, this.materials.woodLight, { y: yaw });
+    const wheelhouse = localPoint(0, -2.1);
+    this.addBox('Bluewater Reach wheelhouse', { ...wheelhouse, y: OCEAN_SURFACE_Y + 1.35 },
+      { x: 4.2, y: 1.75, z: 3.3 }, this.materials.cabinWall, { y: yaw });
+    this.addBox('Bluewater Reach wheelhouse roof', { ...wheelhouse, y: OCEAN_SURFACE_Y + 2.33 },
+      { x: 4.7, y: .22, z: 3.8 }, this.materials.cabinRoof, { y: yaw });
+    for (const side of [-1, 1]) {
+      const rail = localPoint(side * 3.45, 1.8);
+      this.addBox(`Bluewater Reach rail ${side}`, { ...rail, y: OCEAN_SURFACE_Y + 1.05 },
+        { x: .12, y: 1.05, z: 8.5 }, this.materials.cabinTrim, { y: yaw });
+    }
+    this.addCylinder('Bluewater Reach mast', { ...wheelhouse, y: OCEAN_SURFACE_Y + 3.15 },
+      { x: .14, y: 3.5, z: .14 }, this.materials.deepRock);
+    this.homeInteractions.push({
+      id: `${location.id}-boat`, label: 'OPEN BLUEWATER CHART', action: 'boat',
+      destinationId: location.id,
+      position: { x, y: OCEAN_SURFACE_Y + .5, z }, range: 3.2
+    });
+    this.islandEntities.set(location.id, deck);
     this.buildTarget = previousTarget;
   }
 
@@ -1246,10 +1379,13 @@ export class MountainWorld extends TestWorld {
         {}, { castShadows: false });
       }
     } else if (location.id === 'cold-island') {
-      const coldWater = this.addFishingWaterSurface('Frosthook pale cold-ocean water', {
-        x, y: OCEAN_SURFACE_Y + .035, z
-      }, { x: 46, z: 41 }, this.materials.frostWater);
-      coldWater.render.castShadows = false;
+      // A pale submerged ice shelf colors the one shared ocean surface from below. The old
+      // second transparent water sheet overlapped the global ocean and caused the widespread
+      // Frosthook transparency fighting reported around the shoreline.
+      const coldShelf = this.addFishingWaterSurface('Frosthook submerged pale cold-ocean shelf', {
+        x, y: OCEAN_SURFACE_Y - .34, z
+      }, { x: 46, z: 41 }, this.materials.ice);
+      coldShelf.render.castShadows = false;
       for (let index = 0; index < 12; index += 1) {
         const theta = (index * 29 + 8) * Math.PI / 180;
         this.createPrimitive(`Frosthook ice formation ${index + 1}`, 'cone',
@@ -1304,10 +1440,11 @@ export class MountainWorld extends TestWorld {
       });
     };
     for (const start of START_LOCATIONS) buildDock(`${start.id}-boat`, start.label, start.dockPosition, start.angle, 13, MAIN_WORLD_LOCATION.id);
-    for (const location of SMALL_ISLAND_LOCATIONS) buildDock(
-      `${location.id}-boat`, location.displayName, location.dock.worldPosition, location.angle,
-      location.dock.length, location.id
-    );
+    for (const location of SMALL_ISLAND_LOCATIONS) {
+      if (location.type === 'open-water-boat') continue;
+      buildDock(`${location.id}-boat`, location.displayName, location.dock.worldPosition, location.angle,
+        location.dock.length, location.id);
+    }
   }
 
   buildShopOutpost() {
@@ -1332,11 +1469,40 @@ export class MountainWorld extends TestWorld {
       box(`${prefix} head`, { x: localX, y: 2.25, z: -.9 }, { x: .68, y: .68, z: .62 }, this.materials.sand, {}, false);
       box(`${prefix} hat brim`, { x: localX, y: 2.63, z: -.86 }, { x: 1.02, y: .1, z: .78 }, hatMaterial, {}, false);
       box(`${prefix} hat crown`, { x: localX, y: 2.82, z: -.92 }, { x: .67, y: .34, z: .58 }, hatMaterial, {}, false);
+      for (const side of [-1, 1]) box(`${prefix} eye ${side}`, { x: localX + side * .15, y: 2.32, z: -.575 },
+        { x: .075, y: .09, z: .045 }, this.materials.caveWall, {}, false);
+      box(`${prefix} nose`, { x: localX, y: 2.18, z: -.54 },
+        { x: .09, y: .14, z: .09 }, this.materials.cabinWarm, {}, false);
     };
     buildNpc('Outfitter clerk', -2.2, this.materials.cabinFabric, this.materials.cabinWarm);
     buildNpc('Fish buyer', 2.2, this.materials.deepWater, this.materials.deepRock);
-    box('BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.35, y: .48, z: .1 }, this.materials.cabinWarm, {}, false);
-    box('SELL FISH counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.35, y: .48, z: .1 }, this.materials.shallowWater, {}, false);
+    box('OUTFITTER BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.cabinWarm, {}, false);
+    box('FISH MARKET SELL CATCHES counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.shallowWater, {}, false);
+    const glyphs = {
+      A: ['010', '101', '111', '101', '101'], B: ['110', '101', '110', '101', '110'],
+      C: ['111', '100', '100', '100', '111'], E: ['111', '100', '110', '100', '111'],
+      G: ['111', '100', '101', '101', '111'], H: ['101', '101', '111', '101', '101'],
+      L: ['100', '100', '100', '100', '111'], R: ['110', '101', '110', '101', '101'],
+      S: ['111', '100', '111', '001', '111'], T: ['111', '010', '010', '010', '010'],
+      U: ['101', '101', '101', '101', '111'], Y: ['101', '101', '010', '010', '010']
+    };
+    const addSignText = (text, centerX, centerY) => {
+      const cell = .052;
+      const width = [...text].reduce((sum, character) => sum + (character === ' ' ? 2 : 4), -1) * cell;
+      let cursor = centerX - width * .5;
+      for (const character of text) {
+        if (character === ' ') { cursor += cell * 2; continue; }
+        for (const [row, pixels] of (glyphs[character] ?? []).entries()) for (const [column, pixel] of [...pixels].entries()) {
+          if (pixel !== '1') continue;
+          box(`${text} sign letter ${character}-${row}-${column}`, {
+            x: cursor + column * cell, y: centerY + (.104 - row * cell), z: 2.005
+          }, { x: cell * .84, y: cell * .84, z: .025 }, this.materials.caveWall, {}, false);
+        }
+        cursor += cell * 4;
+      }
+    };
+    addSignText('BUY GEAR', -2.2, 1.74);
+    addSignText('SELL CATCHES', 2.2, 1.74);
     box("Outfitter's Reach hanging sign", { x: 0, y: 3.45, z: 3.62 }, { x: 4.7, y: .78, z: .12 }, this.materials.woodLight, {}, false);
     for (const side of [-1, 1]) {
       box(`Outfitter sign rope ${side}`, { x: side * 1.7, y: 3.9, z: 3.58 }, { x: .06, y: .88, z: .06 }, this.materials.wood, {}, false);
@@ -1358,6 +1524,25 @@ export class MountainWorld extends TestWorld {
     for (let index = 0; index < 5; index += 1) box(`Outfitter compact cargo ${index + 1}`,
       { x: -3.65 + index % 2 * 1.05, y: .39 + Math.floor(index / 4) * .75, z: -2.35 + Math.floor(index / 2) % 2 * 1.08 },
       { x: .92, y: .78, z: .92 }, this.materials.woodLight, { y: index * 13 }, false);
+    // Countertop silhouettes use the same categories sold here, while the market side
+    // shows actual canonical creature models rather than fish-shaped placeholders.
+    box('Outfitter display boots', { x: -2.75, y: 1.93, z: 1.18 }, { x: .62, y: .38, z: .72 }, this.materials.deepRock, {}, false);
+    box('Outfitter display chalk bag', { x: -2.05, y: 1.98, z: 1.2 }, { x: .38, y: .48, z: .35 }, this.materials.snow, {}, false);
+    box('Outfitter display folded map', { x: -1.45, y: 1.79, z: 1.18 }, { x: .72, y: .035, z: .55 }, this.materials.cabinWarm, { y: 8 }, false);
+    box('Outfitter display ice axe handle', { x: -2.2, y: 2.15, z: 1.1 }, { x: .08, y: 1.25, z: .08 }, this.materials.deepRock, { z: -56 }, false);
+    box('Outfitter display ice axe head', { x: -1.9, y: 2.42, z: 1.1 }, { x: .65, y: .08, z: .1 }, this.materials.holdIce, { z: -12 }, false);
+    box('Fish Market balance scale post', { x: 2.7, y: 2.08, z: 1.2 }, { x: .08, y: .72, z: .08 }, this.materials.deepRock, {}, false);
+    box('Fish Market balance scale beam', { x: 2.7, y: 2.4, z: 1.2 }, { x: 1.15, y: .07, z: .08 }, this.materials.deepRock, {}, false);
+    if (this.app?.systems) {
+      for (const speciesId of ['sardine', 'blue-crab']) {
+        const model = createSpecimenModel({ speciesId, length: speciesId === 'sardine' ? 8 : 5, weight: 1, shiny: false }, {
+          name: `Fish Market ${speciesId} display`, maximumScale: .48
+        });
+        this.shopRoot.addChild(model);
+        model.setLocalPosition(speciesId === 'sardine' ? 1.62 : 2.08, 2.06, 1.1);
+        model.setLocalEulerAngles(0, speciesId === 'sardine' ? 0 : 25, 0);
+      }
+    }
     const angleRadians = degreesToRadians(location.angle);
     const radialX = Math.cos(angleRadians);
     const radialZ = Math.sin(angleRadians);
@@ -1378,7 +1563,7 @@ export class MountainWorld extends TestWorld {
     });
     this.homeInteractions.push(
       counterInteraction('shop-counter', 'OPEN OUTFITTER', 'buy', 2.2),
-      counterInteraction('fishmonger-counter', 'SELL CARRIED FISH', 'sell', -2.2)
+      counterInteraction('fishmonger-counter', 'SELL CARRIED CATCHES', 'sell', -2.2)
     );
   }
 
@@ -1564,6 +1749,15 @@ export class MountainWorld extends TestWorld {
       this.addCabinBox(`Trail cabin trophy shelf ${shelf + 1}`, { x: 2.45, y: 1.48 + shelf * .72, z: -3.12 },
         { x: 2.85, y: .12, z: .48 }, this.materials.cabinTrim);
     }
+    this.addCabinBox('Trail Badges wall board', { x: .65, y: 2.72, z: -3.16 },
+      { x: 2.45, y: 1.05, z: .12 }, this.materials.woodLight, {}, false);
+    for (let index = 0; index < 10; index += 1) {
+      const badge = this.createPrimitive(`Trail Badge board medallion ${index + 1}`, 'cylinder',
+        this.homePoint(-.25 + index % 5 * .45, 2.48 + Math.floor(index / 5) * .45, -3.08),
+        { x: .13, y: .035, z: .13 }, index % 3 ? this.materials.cabinWarm : this.materials.shallowWater,
+        { x: 90, y: inwardYaw(config.angle), z: 0 }, { castShadows: false });
+      badge.enabled = true;
+    }
     const trophyColors = [this.materials.holdRough, this.materials.shallowWater, this.materials.holdIce, this.materials.cabinWarm];
     for (let index = 0; index < 4; index += 1) {
       const trophy = this.createPrimitive(`Trail cabin progress trophy ${index + 1}`, index === 1 ? 'sphere' : 'cone',
@@ -1630,6 +1824,17 @@ export class MountainWorld extends TestWorld {
       index === 1 ? this.materials.cabinWarm : this.materials.shallowWater, {}, false);
     this.addCabinBox('Trail cabin porch welcome mat', { x: 0, y: .035, z: 3.78 },
       { x: 1.45, y: .035, z: .72 }, this.materials.cabinFabric, {}, false);
+    this.addCabinBox('Trail cabin field map frame', { x: 4.05, y: 2.05, z: .3 },
+      { x: .08, y: 1.45, z: 1.85 }, this.materials.cabinTrim, {}, false);
+    this.addCabinBox('Trail cabin field map print', { x: 4.0, y: 2.05, z: .3 },
+      { x: .035, y: 1.2, z: 1.55 }, this.materials.cabinWarm, {}, false);
+    this.addCabinBox('Trail cabin storage chest', { x: -3.05, y: .48, z: 2.25 },
+      { x: 1.65, y: .9, z: 1.05 }, this.materials.woodLight);
+    this.addCabinBox('Trail cabin storage chest lid', { x: -3.05, y: .98, z: 2.25 },
+      { x: 1.78, y: .16, z: 1.14 }, this.materials.cabinTrim, {}, false);
+    for (const side of [-1, 0, 1]) this.addCabinBox(`Trail cabin coat hook ${side}`, {
+      x: -1.1 + side * .42, y: 2.18, z: -3.24
+    }, { x: .08, y: .28, z: .18 }, this.materials.deepRock, { x: -18 }, false);
 
     const cabinYaw = inwardYaw(config.angle);
     this.homeInteractions.push(
@@ -1650,7 +1855,7 @@ export class MountainWorld extends TestWorld {
         facingYaw: cabinYaw,
         range: 1.95
       },
-      { id: 'trophies', label: 'CHECK TRAIL TROPHIES', action: 'trophies', position: this.homePoint(2.25, 1.1, -2.45) }
+      { id: 'trophies', label: 'OPEN TRAIL BADGES', action: 'trophies', position: this.homePoint(2.25, 1.1, -2.45) }
     );
   }
 
@@ -2450,8 +2655,10 @@ export class MountainWorld extends TestWorld {
     const waterEdge = OCEAN_WATER_INNER_RADIUS;
     const outerRadius = OCEAN_FLOOR_OUTER_RADIUS;
     const ringRadii = [innerRadius, OCEAN_SEABED_JOIN_RADIUS + 2.5, waterEdge];
-    for (let radius = waterEdge + 5; radius < outerRadius; radius += 5) ringRadii.push(radius);
-    ringRadii.push(outerRadius);
+    for (let radius = waterEdge + 5; radius < Math.min(360, outerRadius); radius += 5) ringRadii.push(radius);
+    for (const radius of [420, 520, 650, 800, 1000, 1250, 1500, outerRadius]) {
+      if (radius > ringRadii.at(-1) && radius <= outerRadius) ringRadii.push(radius);
+    }
     const vertices = [];
     const ringStarts = [];
     const segments = TERRAIN_SEGMENTS;
@@ -2542,6 +2749,7 @@ export class MountainWorld extends TestWorld {
     this.buildWadeableOceanShelf();
 
     const vertices = [];
+    const sourceVertices = [];
     const ringStarts = [];
     for (let ringIndex = 0; ringIndex < TERRAIN_RADII.length; ringIndex += 1) {
       ringStarts.push(vertices.length);
@@ -2556,7 +2764,10 @@ export class MountainWorld extends TestWorld {
         const y = terrainHeightAt(angle, radius)
           + (ringIndex > 3 ? Math.sin(degreesToRadians(segment * 51 + ringIndex * 23)) * .11 : 0);
         const radians = degreesToRadians(angle);
-        vertices.push([Math.cos(radians) * radius, y, Math.sin(radians) * radius]);
+        const source = [Math.cos(radians) * radius, y, Math.sin(radians) * radius];
+        const deformed = deformCaveCoreVertex(source[0], source[1], source[2]);
+        sourceVertices.push(source);
+        vertices.push([deformed.x, deformed.y, deformed.z]);
       }
     }
 
@@ -2577,9 +2788,9 @@ export class MountainWorld extends TestWorld {
       }
     }
     const visibleTriangles = triangles.filter((triangle) => {
-      const a = vertices[triangle[0]];
-      const b = vertices[triangle[1]];
-      const c = vertices[triangle[2]];
+      const a = sourceVertices[triangle[0]];
+      const b = sourceVertices[triangle[1]];
+      const c = sourceVertices[triangle[2]];
       return !triangleIntersectsCaveEntrance(a, b, c);
     });
 
@@ -4135,6 +4346,7 @@ export class MountainWorld extends TestWorld {
   buildFishingLocations() {
     MOUNTAIN_FISHING_LOCATIONS.forEach((location, index) => this.addFishingLocation(location, index));
     this.addFrosthookColdOceanFishingLocation();
+    this.addBluewaterReachFishingLocation();
     this.addOceanFishingLocation();
   }
 
@@ -4169,6 +4381,39 @@ export class MountainWorld extends TestWorld {
     this.fishingZones.push(attachZoneEcology(zone));
   }
 
+  addBluewaterReachFishingLocation() {
+    const descriptor = BLUEWATER_REACH_DESCRIPTOR;
+    const zone = new FishingZone({
+      id: descriptor.id,
+      label: descriptor.label,
+      center: descriptor.center,
+      shape: 'annulus',
+      innerRadius: descriptor.innerRadius,
+      renderedInnerRadius: descriptor.innerRadius,
+      outerRadius: descriptor.outerRadius,
+      surfaceY: OCEAN_SURFACE_Y,
+      fishIds: descriptor.fish,
+      depth: 'deep',
+      modifiers: {
+        biteRate: 1,
+        size: 1,
+        specimenSizeBias: descriptor.specimenSizeBias,
+        largeSpeciesWeightBias: descriptor.largeSpeciesWeightBias,
+        trophyChance: 1.08,
+        maximumSpeciesProbability: ECOLOGY_TARGETS.maximumSpeciesShare
+      }
+    });
+    zone.tier = descriptor.tier;
+    zone.waterType = descriptor.waterType;
+    zone.theme = descriptor.theme;
+    zone.ecologyThemes = [...descriptor.ecologyThemes];
+    zone.habitatAliasIds = [...descriptor.habitatAliasIds];
+    zone.uniformProbabilities = descriptor.uniformProbabilities;
+    zone.probabilityGroup = descriptor.probabilityGroup;
+    zone.physicalZone = descriptor.physicalZone;
+    this.fishingZones.push(attachZoneEcology(zone));
+  }
+
   addOceanFishingLocation() {
     const descriptor = OCEAN_FISHING_DESCRIPTOR;
     const zone = new FishingZone({
@@ -4182,6 +4427,7 @@ export class MountainWorld extends TestWorld {
         point.x - descriptor.center.x, point.z - descriptor.center.z
       ) >= descriptor.innerRadius + margin
         && !isFrosthookColdOceanPoint(point, margin)
+        && !isBluewaterReachPoint(point, margin)
         && !SMALL_ISLAND_LOCATIONS.some((location) => {
         const dx = (point.x - location.worldPosition.x) / Math.max(.1, location.radii.x * 1.08 + margin);
         const dz = (point.z - location.worldPosition.z) / Math.max(.1, location.radii.z * 1.08 + margin);
@@ -4189,6 +4435,7 @@ export class MountainWorld extends TestWorld {
       }),
       distanceToRenderedWater: (point) => {
         if (isFrosthookColdOceanPoint(point)) return FROSTHOOK_COLD_OCEAN_DESCRIPTOR.outerRadius;
+        if (isBluewaterReachPoint(point)) return BLUEWATER_REACH_DESCRIPTOR.outerRadius;
         const radial = Math.hypot(point.x - descriptor.center.x, point.z - descriptor.center.z);
         if (radial < descriptor.innerRadius) return descriptor.innerRadius - radial;
         const island = SMALL_ISLAND_LOCATIONS.find((location) => {

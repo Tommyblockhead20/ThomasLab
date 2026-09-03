@@ -407,7 +407,7 @@ const RETIRED_SPECIES_IDS = new Set([
   'mossfin-darter', 'bellwater-mussel',
   'ridge-pond-snail', 'tarn-snail', 'echo-crayfish', 'crevice-crayfish',
   'rapids-crayfish', 'quietwater-shrimp', 'reed-shrimp', 'golden-pond-mussel',
-  'inlet-lobster', 'highcountry-eel'
+  'inlet-lobster', 'highcountry-eel', 'signal-crayfish'
 ]);
 
 const REAL_SPECIES_ADJUSTMENTS = Object.freeze({
@@ -433,7 +433,8 @@ const NEW_ACTIVE_SPECIES = [
   species('swordfish', 'Swordfish', 'Legendary', 1.3, [60, 150], [90, 1000], 'slender', [[.2, .3, .42], [.72, .68, .55]], 'cello_arco', 42, [108, 130], ['A1~~+D2 - W1 S2 A2~ - D1+S1 W2 -- A1 D2~~ W1+S2 A2'], .9, 'A huge pelagic hunter built around a long flattened bill and extraordinary burst speed.', { salinity: 'salt', tiers: ['ocean'], waterTypes: ['ocean'], themes: ['sunwash', 'fernwood', 'blackstone'], strictWaterTypes: true, exclusiveWaterId: 'outer-ocean' }),
   species('sailfish', 'Sailfish', 'Uncommon', 6.5, [60, 120], [50, 220], 'slender', [[.18, .37, .52], [.26, .64, .82]], 'violin_arco', 54, [116, 132], ['W1 D1 S2 A1 - W2~ S1 D2 -- A2 W1 D1'], .5, 'A fast blue-water billfish carrying an immense cobalt dorsal sail.', { salinity: 'salt', tiers: ['ocean'], waterTypes: ['ocean'], themes: ['sunwash', 'fernwood', 'blackstone'], strictWaterTypes: true, exclusiveWaterId: 'outer-ocean' }),
   species('giant_caribbean_anemone', 'Giant Caribbean Anemone', 'Common', 10, [4, 14], [1, 12], 'softbody', [[.42, .25, .55], [.85, .55, .32]], 'handpan', 58, [78, 90], ['A1 W1 S1 A2 - W2 S1'], .16, 'A large tropical sea anemone whose waving tentacles shelter small reef animals.', { salinity: 'salt', tiers: ['lower'], waterTypes: ['tidepool', 'lagoon', 'inlet'], themes: ['sunwash', 'fernwood'], strictWaterTypes: true, exclusiveWaterId: 'sunwash-tidepool' }),
-  species('staghorn_coral', 'Staghorn Coral', 'Common', 10, [12, 48], [10, 250], 'bivalve', [[.7, .48, .32], [.9, .72, .48]], 'marimba', 62, [76, 88], ['A1 A2 W1 S1 - W2 A1'], .15, 'A branching Caribbean reef coral that builds dense thickets in clear, shallow water.', { salinity: 'salt', tiers: ['lower'], waterTypes: ['tidepool', 'lagoon', 'inlet'], themes: ['sunwash', 'fernwood'], strictWaterTypes: true, exclusiveWaterId: 'boulder-lagoon' })
+  species('staghorn_coral', 'Staghorn Coral', 'Common', 10, [12, 48], [10, 250], 'bivalve', [[.7, .48, .32], [.9, .72, .48]], 'marimba', 62, [76, 88], ['A1 A2 W1 S1 - W2 A1'], .15, 'A branching Caribbean reef coral that builds dense thickets in clear, shallow water.', { salinity: 'salt', tiers: ['lower'], waterTypes: ['tidepool', 'lagoon', 'inlet'], themes: ['sunwash', 'fernwood'], strictWaterTypes: true, exclusiveWaterId: 'boulder-lagoon' }),
+  species('giant_panda', 'Giant Panda', 'Rare', 4, [48, 72], [150, 330], 'mammal', [[.88, .86, .76], [.08, .09, .08]], 'bassoon', 43, [92, 110], ['A1 W1~ S2 D1 - A2 W2 S1 -- D2 A1 W1'], .68, 'A black-and-white bamboo specialist found only beside the mangrove lagoon.', { salinity: 'salt', tiers: ['lower'], waterTypes: ['lagoon'], themes: ['sunwash', 'fernwood'], strictWaterTypes: true, exclusiveWaterId: 'amber-reed-pond' })
 ];
 
 const V92_RHYTHMS = Object.freeze({
@@ -442,6 +443,21 @@ const V92_RHYTHMS = Object.freeze({
   Rare: Object.freeze({ weight: 3.5, bpm: [98, 116], difficulty: .68, motif: 'A1 W2 S1+D2 - A2 W1 D1 S2 -- W2 A1 D2 S1' }),
   Legendary: Object.freeze({ weight: 1.25, bpm: [108, 128], difficulty: .9, motif: 'A1~~+D2 - W1 S2 A2~ - D1+S1 W2 -- A1 D2~~ W1+S2 A2' })
 });
+const v92RhythmSequence = new Map();
+
+function distinctV92Motif(rarity, motif) {
+  // Keep the authored note count, holds, and difficulty, but rotate the four input lanes
+  // so 31 creatures do not share only four identical performances.
+  const sequence = (v92RhythmSequence.get(rarity) ?? 0) + 1;
+  v92RhythmSequence.set(rarity, sequence);
+  const permutations = [
+    'AWSD', 'ASDW', 'ADWS', 'WASD', 'WSDA', 'WDAS',
+    'SAWD', 'SWDA', 'SDAW', 'DAWS', 'DWAS', 'DSAW'
+  ];
+  const source = 'AWSD';
+  const target = permutations[sequence % permutations.length];
+  return motif.replace(/[AWSD]/g, (lane) => target[source.indexOf(lane)]);
+}
 const v92Habitat = (salinity, tiers, waterTypes, favoredWaterIds = [], extra = {}) => ({
   salinity, tiers, waterTypes, favoredWaterIds, themes: ['sunwash', 'fernwood', 'blackstone'],
   strictWaterTypes: true, ...extra
@@ -451,7 +467,7 @@ function v92Species(id, name, rarity, archetype, length, weight, colors, flavor,
   const root = 42 + [...id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 24;
   return species(id, name, rarity, rhythm.weight, length, weight, archetype, colors,
     rarity === 'Legendary' ? 'cello_arco' : rarity === 'Rare' ? 'handpan' : 'marimba',
-    root, rhythm.bpm, [rhythm.motif], rhythm.difficulty, flavor, habitat);
+    root, rhythm.bpm, [distinctV92Motif(rarity, rhythm.motif)], rhythm.difficulty, flavor, habitat);
 }
 
 // The supplied v9.2 roster says “30” but names 31 distinct creatures. Every named entry is
@@ -493,13 +509,38 @@ const V92_ACTIVE_SPECIES = [
 ];
 
 const canonicalize = (value) => String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const V11_RARITY_OVERRIDES = Object.freeze({
+  'star-nosed-mole': 'Rare',
+  remora: 'Rare',
+  nokken: 'Rare',
+  'green-sea-turtle': 'Rare'
+});
+const V11_CATCH_WEIGHTS = Object.freeze({ Common: 12, Uncommon: 8, Rare: 4, Legendary: 1.8 });
+const FROSTHOOK_MARINE_HABITAT = Object.freeze({
+  salinity: 'salt', tiers: Object.freeze(['ocean']), waterTypes: Object.freeze(['cold-ocean']),
+  themes: Object.freeze(['blackstone']), strictWaterTypes: true,
+  waterIds: Object.freeze(['frosthook-cold-ocean']), favoredWaterIds: Object.freeze(['frosthook-cold-ocean']),
+  exclusiveWaterId: 'frosthook-cold-ocean', exclusive: true
+});
+const V11_HABITAT_OVERRIDES = Object.freeze({
+  polar_bear: FROSTHOOK_MARINE_HABITAT,
+  penguin: FROSTHOOK_MARINE_HABITAT,
+  qallupilluk: FROSTHOOK_MARINE_HABITAT,
+  'blue-ice-codling': FROSTHOOK_MARINE_HABITAT,
+  'frostglass-shrimp': FROSTHOOK_MARINE_HABITAT
+});
 const preparedSpecies = [...SPECIES, ...NEW_ACTIVE_SPECIES, ...V92_ACTIVE_SPECIES].map((fish) => {
   const adjustment = REAL_SPECIES_ADJUSTMENTS[fish.id];
   const length = adjustment?.length ?? [fish.minLength, fish.maxLength];
   const weight = adjustment?.weight ?? [fish.minWeight, fish.maxWeight];
   const canonicalId = adjustment?.canonicalId ?? canonicalize(fish.id);
+  const rarity = V11_RARITY_OVERRIDES[fish.id] ?? fish.rarity;
   return {
     ...fish,
+    rarity,
+    rarityLabel: rarity,
+    catchWeight: rarity === fish.rarity ? fish.catchWeight : V11_CATCH_WEIGHTS[rarity],
+    habitat: V11_HABITAT_OVERRIDES[fish.id] ?? fish.habitat,
     canonicalId,
     legacyIds: Object.freeze([...new Set([fish.id, canonicalize(fish.id)])]),
     name: adjustment?.name ?? fish.name,
@@ -794,7 +835,9 @@ export function createCatchRecord(specimen, zone, quality, caughtAt = Date.now()
     ...specimen,
     quality,
     location: zone.id,
+    fishingZoneId: zone.id,
     locationLabel: zone.label,
+    biomeId: zone.ecologyTheme ?? zone.theme ?? null,
     elevation: Number.isFinite(zone.surfaceY) ? zone.surfaceY : 0,
     caughtAt
   });

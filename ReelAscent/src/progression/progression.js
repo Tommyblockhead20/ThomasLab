@@ -83,6 +83,7 @@ export class ProgressionSystem {
     this.state.money += specimen.value;
     this.commit();
     if (specimen.provenance?.legitimate !== false) this.saveSystem.recordLegitimateEarnings?.(specimen.value);
+    this.saveSystem.recordSpeciesSold?.([specimen]);
     return { ok: true, specimen, amount: specimen.value };
   }
 
@@ -98,6 +99,7 @@ export class ProgressionSystem {
     this.state.money += amount;
     this.commit();
     if (legitimateAmount) this.saveSystem.recordLegitimateEarnings?.(legitimateAmount);
+    this.saveSystem.recordSpeciesSold?.(specimens);
     return { ok: true, count: specimens.length, amount, specimens };
   }
 
@@ -106,7 +108,7 @@ export class ProgressionSystem {
     if (index < 0) return { ok: false, reason: 'Specimen not found in Inventory' };
     const specimen = this.state.inventory[index];
     if (this.state.aquarium.length >= this.getAquariumCapacity()) {
-      return { ok: false, reason: `Aquarium is full (${this.getAquariumCapacity()} fish)` };
+      return { ok: false, reason: `Aquarium is full (${this.getAquariumCapacity()} creatures)` };
     }
     const prepared = { specimen, value: specimen.value };
     if (!storeAquariumSpecimen(this.state.aquarium, prepared)) {
@@ -187,6 +189,7 @@ export class ProgressionSystem {
     this.state.money += specimen.value;
     this.commit();
     if (specimen.provenance?.legitimate !== false) this.saveSystem.recordLegitimateEarnings?.(specimen.value);
+    this.saveSystem.recordSpeciesSold?.([specimen]);
     return { ok: true, specimen, amount: specimen.value };
   }
 

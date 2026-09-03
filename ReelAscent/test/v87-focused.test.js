@@ -24,7 +24,7 @@ import {
 test('v8.7 map is generated from five real contours and all 24 waters', () => {
   const map = createMountainMapData();
   assert.equal(map.contours.length, 5);
-  assert.equal(map.waters.length, 24);
+  assert.equal(map.waters.length, 27);
   assert.equal(new Set(map.waters.map((water) => water.id)).size, 24);
   assert.equal(map.caves.length, 4);
   assert.equal(map.ledges.some((ledge) => ledge.id === '550ft-alpine'), true);

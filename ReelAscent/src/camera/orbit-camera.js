@@ -61,6 +61,12 @@ export class OrbitCamera {
         || this.player.input.mobileMode
         || this.dragDistance > 4
         || document.pointerLockElement === this.canvas) return;
+      const nearWorldInteraction = Boolean(this.player.benchSeat)
+        || (!this.player.fishing?.active && Boolean(
+          this.player.surfaceRegistry?.getNearestHomeInteraction?.(this.player.getPosition())
+        ));
+      if (this.player.input.hasDeliberateClick?.() && nearWorldInteraction) return;
+      this.player.input.discardDeliberateClick?.();
       try {
         this.canvas.focus();
         this.canvas.requestPointerLock()?.catch(() => {});
@@ -75,6 +81,9 @@ export class OrbitCamera {
 
     this.onMouseMove = (event) => {
       if (document.pointerLockElement !== this.canvas && !this.dragging) return;
+      // A primary hold is Grip/fishing ownership, not a second camera gesture. Ordinary
+      // pointer-lock look and un-pointerlocked drag both work while no primary action owns it.
+      if (this.player.input.primaryHeld) return;
       if (this.dragging) {
         this.dragDistance += Math.abs(event.movementX) + Math.abs(event.movementY);
       }

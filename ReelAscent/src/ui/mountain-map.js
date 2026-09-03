@@ -5,7 +5,7 @@ import {
 
 const BLOCKING_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open', 'emote-menu-open',
-  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open', 'pause-open'
+  'appearance-open', 'shop-open', 'aquarium-open', 'boat-travel-open', 'trail-badges-open', 'pause-open'
 ]);
 
 export class MountainMapMenu {
@@ -162,16 +162,30 @@ export class MountainMapMenu {
     for (const location of this.mapData.locations.filter((entry) => entry.type !== 'main-island')) {
       const point = this.project(location.position);
       const marker = this.createSvg('g', { class: `map-island map-island-${location.type}` });
-      const footprint = location.outline?.length >= 3
-        ? this.createSvg('polygon', { points: this.islandPolygon(location) })
-        : this.createSvg('ellipse', {
-            cx: point.x.toFixed(1), cy: point.y.toFixed(1),
-            rx: Math.max(5, location.radii.x * scale).toFixed(1),
-            ry: Math.max(4, location.radii.z * scale).toFixed(1)
-          });
+      const footprint = location.type === 'open-water-boat'
+        ? this.createSvg('g', {
+            class: 'map-open-water-boat',
+            transform: `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`
+          })
+        : location.outline?.length >= 3
+          ? this.createSvg('polygon', { points: this.islandPolygon(location) })
+          : this.createSvg('ellipse', {
+              cx: point.x.toFixed(1), cy: point.y.toFixed(1),
+              rx: Math.max(5, location.radii.x * scale).toFixed(1),
+              ry: Math.max(4, location.radii.z * scale).toFixed(1)
+            });
+      if (location.type === 'open-water-boat') {
+        footprint.append(
+          this.createSvg('path', { d: 'M-8 1 L8 1 L5 6 L-5 6 Z' }),
+          this.createSvg('path', { d: 'M-3 1 V-5 H4 V1 M0-5 V-10' })
+        );
+      }
       marker.append(
         footprint,
-        this.createSvg('text', { x: point.x.toFixed(1), y: (point.y - Math.max(13, location.radii.z * scale * 2.2 + 4)).toFixed(1) }, location.label)
+        this.createSvg('text', {
+          x: point.x.toFixed(1),
+          y: (point.y - (location.type === 'open-water-boat' ? 16 : Math.max(13, location.radii.z * scale * 2.2 + 4))).toFixed(1)
+        }, location.label)
       );
       islandGroup.appendChild(marker);
     }
@@ -308,6 +322,23 @@ export class MountainMapMenu {
     };
   }
 
+  minimapBiomePolygon(biome, location, range) {
+    const points = [{ ...this.mapData.center }];
+    let end = biome.endAngle;
+    if (end <= biome.startAngle) end += 360;
+    for (let angle = biome.startAngle; angle <= end; angle += 3) {
+      const radians = angle * Math.PI / 180;
+      points.push({
+        x: this.mapData.center.x + Math.cos(radians) * 245,
+        z: this.mapData.center.z + Math.sin(radians) * 245
+      });
+    }
+    return points.map((point) => {
+      const projected = this.minimapProject(point, location, range);
+      return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
+    }).join(' ');
+  }
+
   renderMinimapBase(item, location) {
     if (!this.minimapSvg) return;
     const svg = this.minimapSvg;
@@ -325,6 +356,15 @@ export class MountainMapMenu {
     this.minimapView = { item, location, range };
     svg.replaceChildren(this.createSvg('rect', { width: 220, height: 220, rx: 14, class: 'minimap-paper' }));
     if (main) {
+      const defs = this.createSvg('defs');
+      const clip = this.createSvg('clipPath', { id: 'minimap-mountain-outline' });
+      const outline = this.mapData.contours[0].points.map((point) => {
+        const projected = this.minimapProject(point, location, range);
+        return `${projected.x.toFixed(1)},${projected.y.toFixed(1)}`;
+      }).join(' ');
+      clip.appendChild(this.createSvg('polygon', { points: outline }));
+      defs.appendChild(clip);
+      svg.appendChild(defs);
       const elevationClasses = ['map-elevation-coast', 'map-elevation-lower', 'map-elevation-middle', 'map-elevation-alpine', 'map-elevation-summit'];
       this.mapData.contours.forEach((contour, index) => {
         const points = contour.points.map((point) => {
@@ -333,6 +373,23 @@ export class MountainMapMenu {
         }).join(' ');
         svg.appendChild(this.createSvg('polygon', { points, class: `map-elevation ${elevationClasses[index]}` }));
       });
+      const biomeGroup = this.createSvg('g', { class: 'minimap-biomes', 'clip-path': 'url(#minimap-mountain-outline)' });
+      for (const biome of this.mapData.biomes) biomeGroup.appendChild(this.createSvg('polygon', {
+        points: this.minimapBiomePolygon(biome, location, range),
+        class: `minimap-biome minimap-biome-${biome.id}`
+      }));
+      svg.appendChild(biomeGroup);
+    } else if (location.type === 'open-water-boat') {
+      const point = this.minimapProject(location.position, location, range);
+      const boat = this.createSvg('g', {
+        class: 'minimap-open-water-boat',
+        transform: `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`
+      });
+      boat.append(
+        this.createSvg('path', { d: 'M-9 1 L9 1 L6 7 L-6 7 Z' }),
+        this.createSvg('path', { d: 'M-3 1 V-6 H4 V1 M0-6 V-12' })
+      );
+      svg.appendChild(boat);
     } else if (location.outline?.length) {
       const points = location.outline.map((point) => {
         const projected = this.minimapProject(point, location, range);
@@ -349,8 +406,21 @@ export class MountainMapMenu {
         class: water.waterType === 'cold-ocean' ? 'minimap-water is-cold' : 'minimap-water'
       }));
     }
-    const dock = location.dock ? this.minimapProject(location.dock, location, range) : null;
-    if (dock) svg.appendChild(this.createSvg('circle', { cx: dock.x.toFixed(1), cy: dock.y.toFixed(1), r: 3, class: 'minimap-dock' }));
+    const featureGroup = this.createSvg('g', { class: 'minimap-features' });
+    const nearby = (point) => point && Math.hypot(point.x - location.position.x, point.z - location.position.z) <= range * 1.08;
+    for (const dock of this.mapData.docks.filter((entry) => nearby(entry.position))) {
+      const point = this.minimapProject(dock.position, location, range);
+      const marker = this.createSvg('g', { class: 'minimap-dock', transform: `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})` });
+      marker.append(this.createSvg('rect', { x: -3.1, y: -3.1, width: 6.2, height: 6.2, rx: 1 }), this.createSvg('text', { y: 1.8 }, 'S'));
+      featureGroup.appendChild(marker);
+    }
+    for (const cave of this.mapData.caves.filter((entry) => nearby(entry.position))) {
+      const point = this.minimapProject(cave.position, location, range);
+      const marker = this.createSvg('g', { class: 'minimap-cave', transform: `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})` });
+      marker.append(this.createSvg('circle', { r: 3.5 }), this.createSvg('text', { y: 1.8 }, 'C'));
+      featureGroup.appendChild(marker);
+    }
+    svg.appendChild(featureGroup);
     this.minimapGpsGroup = this.createSvg('g', { class: 'minimap-gps' });
     svg.appendChild(this.minimapGpsGroup);
     if (this.minimapTitle) this.minimapTitle.textContent = location.label;

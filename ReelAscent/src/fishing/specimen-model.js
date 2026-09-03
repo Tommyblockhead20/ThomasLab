@@ -54,9 +54,29 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
   const [base, accent, dark] = materials;
   const root = new pc.Entity(name);
   const archetype = visual.archetype ?? 'panfish';
+  const speciesId = species?.canonicalId ?? species?.id ?? specimen?.speciesId;
   let tail = null;
 
-  if (['shark', 'dogfish'].includes(archetype)) {
+  if (speciesId === 'giant_panda') {
+    primitive(root, `${name} panda body`, 'sphere', { x: -.12, y: 0, z: 0 },
+      { x: .58, y: .38, z: .34 }, base);
+    primitive(root, `${name} panda shoulders`, 'sphere', { x: .23, y: .08, z: 0 },
+      { x: .38, y: .36, z: .35 }, accent);
+    primitive(root, `${name} panda head`, 'sphere', { x: .54, y: .25, z: 0 },
+      { x: .3, y: .3, z: .29 }, base);
+    for (const side of [-1, 1]) {
+      primitive(root, `${name} panda ear ${side}`, 'sphere', { x: .48, y: .48, z: side * .19 },
+        { x: .12, y: .13, z: .09 }, accent);
+      primitive(root, `${name} panda eye patch ${side}`, 'sphere', { x: .78, y: .3, z: side * .115 },
+        { x: .04, y: .09, z: .065 }, accent, { x: side * 18 });
+      primitive(root, `${name} panda foreleg ${side}`, 'cylinder', { x: .22, y: -.27, z: side * .24 },
+        { x: .11, y: .28, z: .11 }, accent, { z: 8 });
+      tail = primitive(root, `${name} panda hind leg ${side}`, 'sphere', { x: -.42, y: -.25, z: side * .23 },
+        { x: .22, y: .2, z: .16 }, accent);
+    }
+    primitive(root, `${name} panda nose`, 'sphere', { x: .81, y: .18, z: 0 },
+      { x: .055, y: .045, z: .055 }, dark);
+  } else if (['shark', 'dogfish'].includes(archetype)) {
     primitive(root, `${name} shark body`, 'sphere', { x: -.03, y: 0, z: 0 },
       { x: .68, y: .24, z: .22 }, base);
     primitive(root, `${name} shark snout`, 'cone', { x: .65, y: 0, z: 0 },

@@ -1,7 +1,7 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 9;
+export const SAVE_SCHEMA_VERSION = 10;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -33,6 +33,14 @@ export function defaultSave() {
       fastestAscentSeconds: null,
       activePlaytimeSeconds: 0,
       legitimateEarnings: 0
+    },
+    trailBadges: {
+      unlocked: [],
+      uniqueSpeciesCaught: [],
+      uniqueSpeciesSold: [],
+      watersFished: [],
+      biomesFished: [],
+      destinationsVisited: []
     },
     runHistory: [],
     progression: defaultProgressionState()
@@ -124,6 +132,20 @@ export function normalizeSave(value = {}) {
     ? lifetime.fastestAscentSeconds : null;
   normalized.lifetime.activePlaytimeSeconds = Math.max(0, finiteNumber(lifetime.activePlaytimeSeconds));
   normalized.lifetime.legitimateEarnings = Math.max(0, Math.floor(finiteNumber(lifetime.legitimateEarnings)));
+  const badgeSource = value.trailBadges && typeof value.trailBadges === 'object' ? value.trailBadges : {};
+  const cleanIds = (items, maximum = 500) => [...new Set((Array.isArray(items) ? items : [])
+    .filter((id) => typeof id === 'string' && id).map((id) => id.slice(0, 160)))].slice(0, maximum);
+  normalized.trailBadges = {
+    unlocked: cleanIds(badgeSource.unlocked, 200),
+    uniqueSpeciesCaught: cleanIds([
+      ...cleanIds(badgeSource.uniqueSpeciesCaught),
+      ...Object.entries(normalized.collection).filter(([, entry]) => entry.catches > 0).map(([id]) => id)
+    ]),
+    uniqueSpeciesSold: cleanIds(badgeSource.uniqueSpeciesSold),
+    watersFished: cleanIds([...cleanIds(badgeSource.watersFished), ...normalized.lifetime.fishingWatersCaught]),
+    biomesFished: cleanIds(badgeSource.biomesFished, 100),
+    destinationsVisited: cleanIds(badgeSource.destinationsVisited, 100)
+  };
   normalized.runHistory = Array.isArray(value.runHistory)
     ? value.runHistory.slice(0, 12).filter((entry) => entry && typeof entry === 'object').map((entry) => ({
       ...entry,
@@ -181,6 +203,13 @@ const MIGRATIONS = Object.freeze({
   8: (value) => ({
     ...value,
     version: 9,
+    progression: normalizeProgressionState(value.progression),
+    lifetime: value.lifetime ?? {}
+  }),
+  9: (value) => ({
+    ...value,
+    version: 10,
+    trailBadges: value.trailBadges ?? {},
     progression: normalizeProgressionState(value.progression),
     lifetime: value.lifetime ?? {}
   })
@@ -396,6 +425,10 @@ export class SaveSystem {
     if (catchData.shiny) lifetime.shinyCaught += 1;
     const zoneId = catchData.fishingZoneId ?? catchData.zoneId;
     if (typeof zoneId === 'string' && zoneId && !lifetime.fishingWatersCaught.includes(zoneId)) lifetime.fishingWatersCaught.push(zoneId.slice(0, 160));
+    if (!this.data.trailBadges.uniqueSpeciesCaught.includes(speciesId)) this.data.trailBadges.uniqueSpeciesCaught.push(speciesId);
+    if (typeof zoneId === 'string' && zoneId && !this.data.trailBadges.watersFished.includes(zoneId)) this.data.trailBadges.watersFished.push(zoneId.slice(0, 160));
+    const biomeId = catchData.biomeId ?? catchData.ecologyTheme ?? catchData.theme;
+    if (typeof biomeId === 'string' && biomeId && !this.data.trailBadges.biomesFished.includes(biomeId)) this.data.trailBadges.biomesFished.push(biomeId.slice(0, 160));
     const candidate = {
       speciesId, name: catchData.name ?? speciesId, rarity, shiny: Boolean(catchData.shiny),
       weight: Math.max(0, finiteNumber(catchData.weight)), length: Math.max(0, finiteNumber(catchData.length))
@@ -415,6 +448,36 @@ export class SaveSystem {
     if (!legitimate) return false;
     this.data.lifetime.boatTrips += 1;
     return this.save();
+  }
+
+  recordSpeciesSold(specimens = [], { legitimate = true } = {}) {
+    if (!legitimate) return false;
+    let changed = false;
+    for (const specimen of specimens) {
+      if (specimen?.provenance?.legitimate === false) continue;
+      const speciesId = canonicalSpeciesId(specimen?.canonicalSpeciesId ?? specimen?.speciesId);
+      if (!speciesId || this.data.trailBadges.uniqueSpeciesSold.includes(speciesId)) continue;
+      this.data.trailBadges.uniqueSpeciesSold.push(speciesId);
+      changed = true;
+    }
+    return changed ? this.save() : false;
+  }
+
+  recordDestinationVisit(destinationId, { legitimate = true } = {}) {
+    if (!legitimate || typeof destinationId !== 'string' || !destinationId) return false;
+    if (this.data.trailBadges.destinationsVisited.includes(destinationId)) return false;
+    this.data.trailBadges.destinationsVisited.push(destinationId.slice(0, 160));
+    return this.save();
+  }
+
+  unlockTrailBadges(ids = []) {
+    let changed = false;
+    for (const id of ids) {
+      if (typeof id !== 'string' || !id || this.data.trailBadges.unlocked.includes(id)) continue;
+      this.data.trailBadges.unlocked.push(id.slice(0, 160));
+      changed = true;
+    }
+    return changed ? this.save() : false;
   }
 
   recordFastestAscent(seconds, { legitimate = true } = {}) {

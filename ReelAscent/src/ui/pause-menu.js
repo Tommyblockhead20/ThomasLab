@@ -218,12 +218,12 @@ export class PauseMenu {
     const rarity = stats.catchesByRarity ?? {};
     return `<div class="pause-stats-grid">
       <article><small>ACTIVE PLAYTIME</small><strong>${formatDuration(stats.activePlaytimeSeconds)}</strong></article>
-      <article><small>TOTAL FISH</small><strong>${stats.fishCaught ?? 0}</strong></article>
+      <article><small>TOTAL CATCHES</small><strong>${stats.fishCaught ?? 0}</strong></article>
       <article><small>SHINY</small><strong>${stats.shinyCaught ?? 0}</strong></article>
       <article><small>ASCENTS</small><strong>${stats.ascents ?? 0}</strong></article>
       <article><small>FASTEST ASCENT</small><strong>${stats.fastestAscentSeconds ? formatDuration(stats.fastestAscentSeconds) : '—'}</strong></article>
       <article><small>BOAT TRIPS</small><strong>${stats.boatTrips ?? 0}</strong></article>
-      <article><small>WATERS DISCOVERED</small><strong>${stats.watersCaught ?? 0}/${stats.totalWaters ?? 0} • ${Math.round(stats.waterPercent ?? 0)}%</strong></article>
+      <article><small>WATERS FISHED IN</small><strong>${stats.watersCaught ?? 0}/${stats.totalWaters ?? 0} • ${Math.round(stats.waterPercent ?? 0)}%</strong></article>
       <article><small>ITEMS PURCHASED</small><strong>${stats.itemsPurchased ?? 0}/${stats.totalPurchasableItems ?? 0} • ${Math.round(stats.purchasePercent ?? 0)}%</strong></article>
     </div>
     <section class="pause-stat-detail"><h3>CATCHES BY RARITY</h3><p>Common ${rarity.Common ?? 0} • Uncommon ${rarity.Uncommon ?? 0} • Rare ${rarity.Rare ?? 0} • Legendary ${rarity.Legendary ?? 0}</p></section>
@@ -234,7 +234,7 @@ export class PauseMenu {
     const slotCards = this.progression.saveSystem.getSlotSummaries().map((slot) => {
       const date = slot.updatedAt ? new Date(slot.updatedAt).toLocaleString() : 'Unused';
       if (slot.empty) return `<article class="save-slot-card"><header><strong>${slot.label}</strong><span>EMPTY</span></header><button data-pause-slot-action="create" data-slot-id="${slot.id}">CREATE SAVE</button></article>`;
-      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'CURRENT' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} discovered</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} fish • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions">${slot.active ? '' : `<button data-pause-slot-action="select" data-slot-id="${slot.id}">LOAD</button>`}<button data-pause-slot-action="${slot.active ? 'reset' : 'delete'}" data-slot-id="${slot.id}">${slot.active ? 'RESET CURRENT SAVE' : 'DELETE'}</button></div></article>`;
+      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'CURRENT' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} creatures</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} catches • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions">${slot.active ? '' : `<button data-pause-slot-action="select" data-slot-id="${slot.id}">LOAD</button>`}<button data-pause-slot-action="${slot.active ? 'reset' : 'delete'}" data-slot-id="${slot.id}">${slot.active ? 'RESET CURRENT SAVE' : 'DELETE'}</button></div></article>`;
     }).join('');
     const options = this.progression.saveSystem.getSlotSummaries().map((slot) => `<option value="${slot.id}" ${slot.active ? 'selected' : ''}>${slot.label}${slot.empty ? ' (empty)' : slot.active ? ' (current)' : ''}</option>`).join('');
     return `<div class="save-data-content">${slotCards}</div><section class="progress-transfer"><header><h3>PORTABLE PROGRESS</h3><strong>EXPORT / IMPORT</strong></header><p>Export durable progress or import it into a chosen local slot.</p><textarea id="pause-progress-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste progress JSON here."></textarea><div class="progress-transfer-actions"><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="download">DOWNLOAD PROGRESS</button><button data-pause-progress-action="file">LOAD FILE</button><button data-pause-progress-action="import">IMPORT PROGRESS</button></div></section>`;

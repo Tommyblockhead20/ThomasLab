@@ -5,7 +5,7 @@ const ROOM_ALPHABET = '0123456789';
 const ROOM_CODE_LENGTH = 4;
 
 export class RoomManager {
-  constructor({ roomCapacity = 6, reconnectWindowMs = 25_000 } = {}) {
+  constructor({ roomCapacity = 10, reconnectWindowMs = 25_000 } = {}) {
     this.roomCapacity = roomCapacity;
     this.reconnectWindowMs = reconnectWindowMs;
     this.rooms = new Map();

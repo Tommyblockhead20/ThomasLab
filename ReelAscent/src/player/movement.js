@@ -15,7 +15,7 @@ export const KEY_BINDING_DEFINITIONS = Object.freeze({
   fish: Object.freeze({ label: 'Fish', defaultCode: 'KeyF', fixedCodes: Object.freeze([]) }),
   interact: Object.freeze({ label: 'World Interact', defaultCode: 'KeyX', fixedCodes: Object.freeze([]) }),
   inventory: Object.freeze({ label: 'Inventory', defaultCode: 'KeyI', fixedCodes: Object.freeze([]) }),
-  journal: Object.freeze({ label: 'Fish Journal', defaultCode: 'KeyJ', fixedCodes: Object.freeze([]) }),
+  journal: Object.freeze({ label: 'Creature Journal', defaultCode: 'KeyJ', fixedCodes: Object.freeze([]) }),
   emotes: Object.freeze({ label: 'Emotes', defaultCode: 'KeyE', fixedCodes: Object.freeze([]) }),
   map: Object.freeze({ label: 'Use Map / GPS', defaultCode: 'KeyV', fixedCodes: Object.freeze([]) })
 });
@@ -198,6 +198,9 @@ export class PlayerInput {
     this.primarySuppressed = false;
     this.gripInteractionQueued = false;
     this.gripInteractionSuppressed = false;
+    this.deliberateClickQueued = false;
+    this.fishingActive = false;
+    this.mouseGesture = null;
     this.rhythmCapture = false;
     this.rhythmLaneInput = new RhythmLaneInputState();
     this.touchPointers = new Map();
@@ -264,12 +267,49 @@ export class PlayerInput {
     this.onMouseDown = (event) => {
       if (event.button !== 0) return;
       if (!this.forceMobile) this.setMobileMode(false);
-      this.pressPrimary('mouse');
+      // Mouse-primary remains an immediate Grip/fishing press, but it is not a world-UI
+      // interaction. World interactions use X/G or the actual prompt button, preventing a
+      // camera drag/pointer-lock click from also opening a shop, boat, seat, or aquarium.
+      this.mouseGesture = {
+        x: event.clientX, y: event.clientY, startedAt: performance.now(), moved: 0,
+        pointerLocked: document.pointerLockElement === this.canvas,
+        becameGrip: false, cameraDrag: false,
+        holdTimer: null
+      };
+      if (this.mouseGesture.pointerLocked || this.fishingActive) {
+        this.mouseGesture.becameGrip = true;
+        this.pressPrimary('mouse', false);
+      } else {
+        const gesture = this.mouseGesture;
+        gesture.holdTimer = globalThis.setTimeout(() => {
+          if (this.mouseGesture !== gesture || gesture.becameGrip || gesture.cameraDrag) return;
+          gesture.becameGrip = true;
+          this.pressPrimary('mouse', false);
+        }, 140);
+      }
     };
 
     this.onMouseUp = (event) => {
       if (event.button !== 0) return;
-      this.releasePrimary('mouse');
+      const gesture = this.mouseGesture;
+      if (gesture?.holdTimer) globalThis.clearTimeout(gesture.holdTimer);
+      if (gesture?.becameGrip) this.releasePrimary('mouse');
+      else if (gesture && !gesture.pointerLocked && document.pointerLockElement !== this.canvas
+        && !gesture.cameraDrag && gesture.moved <= 6 && performance.now() - gesture.startedAt <= 350) {
+        this.deliberateClickQueued = true;
+      }
+      this.mouseGesture = null;
+    };
+
+    this.onMouseMove = (event) => {
+      if (!this.mouseGesture) return;
+      this.mouseGesture.moved += Math.abs(event.movementX) + Math.abs(event.movementY);
+      if (!this.mouseGesture.becameGrip && this.mouseGesture.moved > 6) {
+        if (this.mouseGesture.holdTimer) globalThis.clearTimeout(this.mouseGesture.holdTimer);
+        // A moving un-pointerlocked gesture belongs exclusively to the orbit camera. Grip
+        // is a stationary hold (or a pointer-locked press), so drag cannot do both jobs.
+        this.mouseGesture.cameraDrag = true;
+      }
     };
 
     this.onBlur = () => {
@@ -287,6 +327,7 @@ export class PlayerInput {
         this.primaryPressed = false;
         this.primarySuppressed = this.primaryHeld;
         this.gripInteractionSuppressed = this.rawGripHeld;
+        this.deliberateClickQueued = false;
       } else {
         this.held.clear();
         this.rhythmLaneInput.clearActive();
@@ -309,6 +350,7 @@ export class PlayerInput {
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('blur', this.onBlur);
     window.addEventListener('mouseup', this.onMouseUp);
+    window.addEventListener('mousemove', this.onMouseMove);
     this.canvas.addEventListener('mousedown', this.onMouseDown);
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
@@ -338,7 +380,7 @@ export class PlayerInput {
       if (action === 'down' && !alreadyHeld) this.fishingHookPressed = true;
       if (action === 'jump' && !alreadyHeld) this.jumpQueued = true;
       if (action === 'fish' && !alreadyHeld) this.fishingToggleQueued = true;
-      if (action === 'grip') this.pressPrimary(`touch-${event.pointerId}`);
+      if (action === 'grip') this.pressPrimary(`touch-${event.pointerId}`, false);
     };
     this.onTouchActionUp = (event) => {
       const pointer = this.touchPointers.get(event.pointerId);
@@ -376,11 +418,11 @@ export class PlayerInput {
     }
   }
 
-  pressPrimary(source) {
+  pressPrimary(source, queueInteraction = true) {
     if (this.primarySources.has(source)) return;
     if (!this.primaryHeld) {
       this.primaryPressed = true;
-      this.gripInteractionQueued = true;
+      if (queueInteraction) this.gripInteractionQueued = true;
     }
     this.primarySources.add(source);
   }
@@ -508,6 +550,16 @@ export class PlayerInput {
     return queued;
   }
 
+  consumeDeliberateClick() {
+    const queued = this.deliberateClickQueued;
+    this.deliberateClickQueued = false;
+    return queued;
+  }
+
+  hasDeliberateClick() { return this.deliberateClickQueued; }
+  discardDeliberateClick() { this.deliberateClickQueued = false; }
+  setFishingActive(active) { this.fishingActive = Boolean(active); }
+
   suppressGripUntilRelease() {
     this.gripInteractionSuppressed = this.rawGripHeld;
     this.suppressPrimaryUntilRelease();
@@ -524,12 +576,15 @@ export class PlayerInput {
   }
 
   resetPrimary() {
+    if (this.mouseGesture?.holdTimer) globalThis.clearTimeout(this.mouseGesture.holdTimer);
     this.primarySources.clear();
     this.primaryPressed = false;
     this.primaryReleased = false;
     this.primarySuppressed = false;
     this.gripInteractionQueued = false;
     this.gripInteractionSuppressed = false;
+    this.deliberateClickQueued = false;
+    this.mouseGesture = null;
   }
 
   beginRhythmCapture() {
@@ -551,11 +606,13 @@ export class PlayerInput {
   }
 
   destroy() {
+    this.resetPrimary();
     globalThis.window?.removeEventListener?.('reel-ascent:key-bindings-changed', this.onBindingsChanged);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('blur', this.onBlur);
     window.removeEventListener('mouseup', this.onMouseUp);
+    window.removeEventListener('mousemove', this.onMouseMove);
     this.canvas.removeEventListener('mousedown', this.onMouseDown);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     document.removeEventListener('visibilitychange', this.onVisibilityChange);

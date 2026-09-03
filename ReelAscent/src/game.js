@@ -29,7 +29,9 @@ import { ShopMenu } from './ui/shop.js';
 import { AquariumMenu } from './ui/aquarium.js';
 import { BoatTravelMenu } from './ui/boat-travel.js';
 import { PauseMenu } from './ui/pause-menu.js';
-import { resolveGlobalWorldPosition } from './world/world-locations.js';
+import { resolveGlobalWorldPosition, WORLD_LOCATIONS } from './world/world-locations.js';
+import { TrailBadgeSystem } from './progression/trail-badges.js';
+import { TrailBadgeMenu } from './ui/trail-badges.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -131,6 +133,14 @@ export class Game {
     this.aquariumMenu = new AquariumMenu(this.progression);
     const mountainMapData = this.world.getMapData();
     this.totalMapWaters = mountainMapData.waters?.length ?? 0;
+    this.saveSystem.recordDestinationVisit(this.currentLocationId);
+    this.trailBadges = new TrailBadgeSystem(this.saveSystem, this.progression, {
+      activeSpecies: FISH_SPECIES,
+      waters: mountainMapData.waters ?? [],
+      biomes: [...new Set((mountainMapData.waters ?? []).map((water) => water.ecologyTheme ?? water.theme).filter(Boolean))],
+      destinations: WORLD_LOCATIONS
+    });
+    this.trailBadgeMenu = new TrailBadgeMenu(this.trailBadges);
     this.mapMenu = new MountainMapMenu(mountainMapData, {
       getLocalPlayer: () => ({ id: 'YOU', position: this.getLocalGlobalPosition() }),
       getRemotePlayers: () => [...(this.multiplayer?.room?.members ?? new Map()).entries()]
@@ -298,6 +308,8 @@ export class Game {
     if (!localGameplayPaused) this.updateSessionStats(dt);
     this.syncPersistentProgress();
     if (this.lastHomeProgressRevision !== this.saveSystem.revision) {
+      const unlocked = this.trailBadges.evaluate();
+      if (unlocked.length) this.hud.showToast?.(`Trail Badge unlocked • ${unlocked.length} new`);
       this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
       this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot());
       this.lastHomeProgressRevision = this.saveSystem.revision;
@@ -357,7 +369,8 @@ export class Game {
   isGameplayModalOpen() {
     return this.journal.isOpen || this.inventory.isOpen || this.multiplayerMenu.isOpen
       || this.mapMenu.isOpen || this.emoteMenu.isOpen || this.appearanceMenu.isOpen
-      || this.shopMenu.isOpen || this.aquariumMenu.isOpen || this.boatTravel.isOpen;
+      || this.shopMenu.isOpen || this.aquariumMenu.isOpen || this.boatTravel.isOpen
+      || this.trailBadgeMenu.isOpen;
   }
 
   hasEscapePriorityState() {
@@ -430,7 +443,7 @@ export class Game {
   recordCatchStats(catchData) {
     const legitimate = this.isLegitimateCatch(catchData);
     const rarity = String(catchData?.rarity ?? 'unknown').toLowerCase();
-    const zoneId = catchData?.zoneId ?? catchData?.fishingZoneId ?? this.fishing.zone?.id ?? null;
+    const zoneId = catchData?.zoneId ?? catchData?.fishingZoneId ?? catchData?.location ?? this.fishing.zone?.id ?? null;
 
     this.recordStatEvent('fish-caught', {
       speciesId: catchData?.speciesId ?? null, rarity, zoneId, shiny: Boolean(catchData?.shiny)
@@ -549,6 +562,7 @@ export class Game {
     this.player.teleport(arrival.position, arrival.facingYaw);
     this.camera.setYaw(arrival.facingYaw);
     this.setCurrentLocation(arrival.locationId ?? arrival.location?.id ?? destinationId, arrival.coordinateSpace ?? 'global-world');
+    this.saveSystem.recordDestinationVisit(this.currentLocationId, { legitimate: true });
     this.sessionStats.boatTrips += 1;
     this.saveSystem.recordBoatTrip({ legitimate: true });
     this.recordStatEvent('boat-trip', { destinationId: this.currentLocationId, dockId: arrival.dockId ?? null }, true);
@@ -648,9 +662,13 @@ export class Game {
       if (this.persistedCatches.has(catchData)) continue;
       this.persistedCatches.add(catchData);
       const legitimateCatch = this.isLegitimateCatch(catchData);
-      const zoneId = catchData?.zoneId ?? catchData?.fishingZoneId ?? this.fishing.zone?.id ?? null;
+      const zoneId = catchData?.zoneId ?? catchData?.fishingZoneId ?? catchData?.location ?? this.fishing.zone?.id ?? null;
       this.recordCatchStats(catchData);
-      this.saveSystem.recordCatch({ ...catchData, fishingZoneId: zoneId }, { legitimate: legitimateCatch });
+      this.saveSystem.recordCatch({
+        ...catchData,
+        fishingZoneId: zoneId,
+        biomeId: catchData?.biomeId ?? this.fishing.zone?.ecologyTheme ?? this.fishing.zone?.theme ?? null
+      }, { legitimate: legitimateCatch });
       const presentation = {
         ...catchData,
         presentationId: `${catchData.speciesId}:${catchData.caughtAt}`,
@@ -717,6 +735,7 @@ export class Game {
     this.shopMenu.destroy();
     this.aquariumMenu.destroy();
     this.boatTravel.destroy();
+    this.trailBadgeMenu.destroy();
     this.pauseMenu?.destroy();
     window.removeEventListener('reel-ascent:open-boat', this.onOpenBoat);
     this.appearanceMenu.destroy();

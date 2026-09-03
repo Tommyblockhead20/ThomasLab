@@ -22,17 +22,17 @@ export const EQUIPMENT_CATALOG = Object.freeze([
 
   item('plain-spoon', 'lure', 'Plain Spoon', 0, 'Simple starter tackle.'),
   item('fast-bite-chum', 'lure', 'Fast-Bite Chum', 1250, 'Cuts average bite waiting time in half.', { biteDelayMultiplier: .5 }),
-  item('silverflash-spoon', 'lure', 'Silverflash Spoon', 2000, 'Multiplies Rare odds by 1.5 at the rarity-choice layer.', { rareWeightMultiplier: 1.5 }),
+  item('silverflash-spoon', 'lure', 'Silverfish Spoon', 2000, 'Increases the odds of Rare creatures by 20 percentage points.', { rareProbabilityBonus: .20 }),
   item('oddity-bait', 'lure', 'Oddity Bait', 3000, 'Doubles eligible non-fish creature odds within the chosen rarity.', { nonFishWeightMultiplier: 2 }),
-  item('mythlight-lure', 'lure', 'Mythlight Lure', 10000, 'Multiplies Legendary odds by 1.78 at the rarity-choice layer.', { legendaryWeightMultiplier: 1.78 }),
-  item('prism-lure', 'lure', 'Prism Lure', 10000, 'Doubles Shiny odds, but songs play 9% faster.', { shinyChanceMultiplier: 2, tempoMultiplier: 1.09 }),
+  item('mythlight-lure', 'lure', 'Mythlight Lure', 10000, 'Increases the odds of Legendary creatures by 10 percentage points.', { legendaryProbabilityBonus: .10 }),
+  item('prism-lure', 'lure', 'Prism Lure', 10000, 'Fishing songs play 20% faster.', { tempoMultiplier: 1.20 }),
 
   item('common-field-notes', 'guide', 'Common Field Notes', 400, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),
   item('uncommon-field-notes', 'guide', 'Uncommon Field Notes', 800, 'Shows the five likeliest Uncommon creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Uncommon' }),
   item('rare-field-notes', 'guide', 'Rare Field Notes', 2000, 'Shows the five likeliest Rare creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Rare' }),
   item('legendary-field-notes', 'guide', 'Legendary Field Notes', 5000, 'Shows the five likeliest Legendary creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Legendary' }),
   item('local-secrets-guide', 'guide', 'Local Secrets Guide', 3500, 'Shows every location-exclusive creature and its live chance.', {}, { guideMode: 'exclusive' }),
-  item('master-naturalist-atlas', 'guide', "Master Naturalist's Atlas", 20000, 'Shows each rarity’s top five plus all location exclusives.', {}, { guideMode: 'atlas' }),
+  item('master-naturalist-atlas', 'guide', "Master Naturalist's Atlas", 12000, 'Shows each rarity’s top five plus all location exclusives.', {}, { guideMode: 'atlas' }),
 
   item('trail-boots', 'boots', 'Trail Boots', 0, 'Balanced starter boots.'),
   item('trail-gloves', 'gloves', 'Trail Gloves', 0, 'Balanced starter gloves.'),

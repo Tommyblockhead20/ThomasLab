@@ -3,7 +3,7 @@ import { formatInputCode } from '../player/movement.js';
 const MODAL_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open',
   'mountain-map-open', 'emote-menu-open', 'appearance-open', 'shop-open',
-  'aquarium-open', 'boat-travel-open', 'pause-open'
+  'aquarium-open', 'boat-travel-open', 'trail-badges-open', 'pause-open'
 ]);
 
 export class HomeInteractionController {
@@ -61,9 +61,14 @@ export class HomeInteractionController {
     // interaction edge unconditionally: a press made out of range must not be banked and
     // replayed when the player later walks into a trigger.
     if (['climbing', 'mantling'].includes(this.player.movementState)) return false;
-    const pressed = this.player.input.consumeGripInteraction?.();
+    const gripPressed = this.player.input.consumeGripInteraction?.();
+    const clickPressed = this.player.input.consumeDeliberateClick?.();
+    // A seated player exits only through X/Interact, Jump, explicit Sit cancellation, or
+    // clicking the visible prompt. Fishing/rhythm/camera mouse input never reaches this
+    // generic world-interaction path.
+    if (this.player.benchSeat && this.player.fishing?.active) return false;
     this.refreshCurrent();
-    if (!this.current || !pressed) return false;
+    if (!this.current || (!gripPressed && !clickPressed)) return false;
     const handled = this.interact();
     if (handled) this.player.input.suppressGripUntilRelease?.();
     return handled;
@@ -148,14 +153,13 @@ export class HomeInteractionController {
       this.player.setBenchSeat(interaction);
       this.camera?.setYaw?.(interaction.facingYaw);
       this.pendingSeat = { expiresAt: performance.now() + 1800 };
-      this.hud.showToast?.(`Rested on the ${interaction.seatKind ?? 'seat'} • stamina restored • move or interact to stand.`);
+      this.hud.showToast?.(`Rested on the ${interaction.seatKind ?? 'seat'} • stamina restored • use X or the prompt to stand.`);
       return true;
     }
     if (interaction.action === 'trophies') {
-      const progress = this.world.homeProgressSummary ?? {};
-      this.hud.showToast?.(
-        `Cabin display • ${progress.discovered ?? 0} species • ${progress.aquarium ?? 0} kept • ${progress.summits ?? 0} summits`
-      );
+      this.player.cancelEmote();
+      this.dismissPrompt();
+      window.dispatchEvent(new CustomEvent('reel-ascent:open-trail-badges'));
       return true;
     }
     if (interaction.action === 'bench') {
