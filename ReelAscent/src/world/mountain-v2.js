@@ -1538,9 +1538,9 @@ export class MountainWorld extends TestWorld {
         const model = createSpecimenModel({ speciesId, length: speciesId === 'sardine' ? 8 : 5, weight: 1, shiny: false }, {
           name: `Fish Market ${speciesId} display`, maximumScale: .48
         });
-        this.shopRoot.addChild(model);
-        model.setLocalPosition(speciesId === 'sardine' ? 1.62 : 2.08, 2.06, 1.1);
-        model.setLocalEulerAngles(0, speciesId === 'sardine' ? 0 : 25, 0);
+        this.shopRoot.addChild(model.root);
+        model.root.setLocalPosition(speciesId === 'sardine' ? 1.62 : 2.08, 2.06, 1.1);
+        model.root.setLocalEulerAngles(0, speciesId === 'sardine' ? 0 : 25, 0);
       }
     }
     const angleRadians = degreesToRadians(location.angle);

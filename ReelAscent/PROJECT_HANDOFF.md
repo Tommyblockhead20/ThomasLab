@@ -2,6 +2,8 @@
 
 Status: the requested v11 continuation is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Testing stayed intentionally light: 57 focused gameplay/data checks and one production frontend build. The older v10 and v9 notes remain below for historical context; this section supersedes them wherever behavior differs.
 
+Post-v11 startup hotfix: the Fish Market's new Sardine/Blue Crab countertop displays passed the specimen factory's wrapper object to `shopRoot.addChild(...)`. PlayCanvas `GraphNode.addChild` calls `.remove()` on its incoming child, but that wrapper is not an entity, causing the minified startup error `e.remove is not a function`. Both displays now add and transform `model.root`, the actual PlayCanvas entity. The corrected production bundle is listed in item 37.
+
 Post-pass room-capacity update: multiplayer rooms now default to **10 players** in both server configuration and direct `RoomManager` construction. `server/.env.example` also advertises `ROOM_CAPACITY=10`; a deployed `ROOM_CAPACITY` environment variable still takes precedence and must be set to `10` if the host currently overrides the default.
 
 ## v11 continuation
@@ -78,7 +80,7 @@ Post-pass room-capacity update: multiplayer rooms now default to **10 players** 
 
 36. **Whether Render needs redeployment** — **No for v11 itself**, because v11 changed no server code or protocol. If the preceding 10-player server-capacity change has not been deployed—or Render has an overriding `ROOM_CAPACITY` value below 10—redeploy/update that server configuration separately.
 
-37. **Whether frontend needs rebuild** — **Yes, and it has been rebuilt.** `npm run build` completed with 1,280 modules; output is `dist/assets/index-C5F2hQ1s.css` plus `dist/assets/index-aMAS6uNf.js`. Only the existing PlayCanvas worker-externalization notices and large-chunk warning remain. The focused suite passed **57/57**.
+37. **Whether frontend needs rebuild** — **Yes, and it has been rebuilt.** `npm run build` completed with 1,280 modules; output is `dist/assets/index-C5F2hQ1s.css` plus corrected startup bundle `dist/assets/index-CiPgbhBv.js`. Only the existing PlayCanvas worker-externalization notices and large-chunk warning remain. The main focused suite passed **57/57**, and the startup hotfix's mountain/world subset passed **7/7**.
 
 38. **Short manual test list** — Sit on each bench and use the Sit emote, fish through arrows/click/drag/catch/fail/ESC, then exit only with X/Jump/Sit; drag the camera beside every interactable in Firefox; inspect minimap cave/dock/biome marks; sail to Bluewater and fish from its deck; compare Frosthook Lake/Cold Ocean tables and surfaces; walk into every cave recess and inspect Basalt Hollow; open Cabin badges and Aquarium at desktop/small widths; verify the two shop counters; catch Panda only at Mangrove Cay; and spot-check Prism/Silverfish/Mythlight plus an export/import.
 
