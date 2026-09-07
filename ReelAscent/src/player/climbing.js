@@ -24,6 +24,8 @@ export class ClimbingController {
     this.pushStartPosition = new pc.Vec3();
     this.pushStartNormal = new pc.Vec3();
     this.surface = null;
+    this.pendingSurfaceHandle = null;
+    this.pendingSurfaceTime = 0;
     this.surfaceNormal = new pc.Vec3(0, 0, 1);
     this.surfacePoint = new pc.Vec3();
     this.surfaceRight = new pc.Vec3(1, 0, 0);
@@ -204,6 +206,8 @@ export class ClimbingController {
     this.surfaceNormal.copy(candidate.normal);
     this.surfacePoint.copy(candidate.point);
     this.lostSurfaceTimer = 0;
+    this.pendingSurfaceHandle = null;
+    this.pendingSurfaceTime = 0;
     this.updateSurfaceAxes();
     this.transitionMomentum.set(0, 0, 0);
     if (incomingVelocity) {
@@ -566,6 +570,9 @@ export class ClimbingController {
     if (t >= 1) {
       this.mantling = false;
       this.reattachTimer = Math.max(this.reattachTimer, 0.16);
+      this.surface = null;
+      this.pendingSurfaceHandle = null;
+      this.pendingSurfaceTime = 0;
     }
     return this.output;
   }
@@ -691,11 +698,31 @@ export class ClimbingController {
     }
 
     let best = [...candidates.values()].sort((a, b) => a.score - b.score)[0] ?? null;
-    if (!best) return null;
+    if (!best) {
+      this.pendingSurfaceHandle = null;
+      this.pendingSurfaceTime = 0;
+      return null;
+    }
     const current = candidates.get(this.surface?.collider?.handle);
     if (current && best !== current
       && best.score + CLIMBING_CONFIG.surfaceSwitchAdvantage >= current.score) {
       best = current;
+    }
+    // Adjacent rocks and terrain triangles can alternate at a seam. If the old collider
+    // momentarily vanishes, let the ordinary lost-contact grace retain the old frame of
+    // reference until the replacement has remained stable for a few frames.
+    if (current) {
+      this.pendingSurfaceHandle = null;
+      this.pendingSurfaceTime = 0;
+    } else if (best.collider.handle !== this.surface?.collider?.handle) {
+      if (this.pendingSurfaceHandle === best.collider.handle) this.pendingSurfaceTime += dt;
+      else {
+        this.pendingSurfaceHandle = best.collider.handle;
+        this.pendingSurfaceTime = dt;
+      }
+      if (this.pendingSurfaceTime < CLIMBING_CONFIG.surfaceSwitchConfirmSeconds) return null;
+      this.pendingSurfaceHandle = null;
+      this.pendingSurfaceTime = 0;
     }
     const switched = best.surface !== this.surface;
     if (switched) {
@@ -740,6 +767,9 @@ export class ClimbingController {
     this.active = false;
     this.mantling = false;
     this.reattachTimer = Math.max(this.reattachTimer, delay);
+    this.surface = null;
+    this.pendingSurfaceHandle = null;
+    this.pendingSurfaceTime = 0;
   }
 
   computePushOffVelocity(axes) {
@@ -784,6 +814,8 @@ export class ClimbingController {
     this.pushStartNormal.set(0, 0, 0);
     this.transitionMomentum.set(0, 0, 0);
     this.lastPushDirection.set(0, 0, 0);
+    this.pendingSurfaceHandle = null;
+    this.pendingSurfaceTime = 0;
   }
 
   getSurfaceStaminaMultiplier() {

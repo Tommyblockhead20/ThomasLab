@@ -6,7 +6,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 })[character]);
 
 const CATEGORY_LABELS = Object.freeze({
-  rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', guide: 'ECOLOGY GUIDES',
+  rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', bobber: 'BOBBERS', guide: 'ECOLOGY GUIDES',
   boots: 'BOOTS', gloves: 'GLOVES', climbingTool: 'CLIMBING TOOLS', chalk: 'CHALK BAGS', harness: 'HARNESSES & PACKS'
 });
 

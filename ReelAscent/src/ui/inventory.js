@@ -51,7 +51,7 @@ export function specimenPreview(specimen) {
 }
 
 const CATEGORY_LABELS = Object.freeze({
-  rod: 'Rod', reel: 'Reel', line: 'Line', lure: 'Lure', guide: 'Ecology Guide',
+  rod: 'Rod', reel: 'Reel', line: 'Line', lure: 'Lure', bobber: 'Bobber', guide: 'Ecology Guide',
   boots: 'Boots', gloves: 'Gloves', climbingTool: 'Climbing Tool', chalk: 'Chalk Bag', harness: 'Harness / Pack'
 });
 

@@ -27,6 +27,14 @@ export const EQUIPMENT_CATALOG = Object.freeze([
   item('mythlight-lure', 'lure', 'Mythlight Lure', 10000, 'Increases the odds of Legendary creatures by 10 percentage points.', { legendaryProbabilityBonus: .10 }),
   item('prism-lure', 'lure', 'Prism Lure', 10000, 'Fishing songs play 20% faster.', { tempoMultiplier: 1.20 }),
 
+  item('trail-bobber', 'bobber', 'Trail Bobber', 0, 'Responsive starter float.', {}, { bobberMode: 'standard' }),
+  item('selective-drift-bobber', 'bobber', 'Selective Drift Bobber', 3500,
+    'Selective float. Bites average about 30 seconds, but weak catches often fail to trigger it.', {},
+    { bobberMode: 'selective' }),
+  item('trophy-sentinel-bobber', 'bobber', 'Trophy Sentinel Bobber', 11000,
+    'Extremely selective trophy float. Bites average about two minutes, with much better catches.', {},
+    { bobberMode: 'trophy' }),
+
   item('common-field-notes', 'guide', 'Common Field Notes', 400, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),
   item('uncommon-field-notes', 'guide', 'Uncommon Field Notes', 800, 'Shows the five likeliest Uncommon creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Uncommon' }),
   item('rare-field-notes', 'guide', 'Rare Field Notes', 2000, 'Shows the five likeliest Rare creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Rare' }),

@@ -99,7 +99,10 @@ export const CLIMBING_CONFIG = Object.freeze({
   currentSurfaceBias: 0.34,
   compatibleSurfaceBias: 0.1,
   surfaceSwitchAdvantage: 0.16,
-  lostSurfaceGrace: 0.22,
+  // A seam may hide the current collider for one or two frames while an adjacent rock
+  // remains visible. Confirm that replacement briefly instead of snapping immediately.
+  surfaceSwitchConfirmSeconds: 0.07,
+  lostSurfaceGrace: 0.28,
   holdingDrainPerSecond: 4,
   movingDrainPerSecond: 2.1,
   difficultSurfaceMultiplier: 1.65,
@@ -174,6 +177,7 @@ export const FISHING_CONFIG = Object.freeze({
   minimumCastSeconds: 0.5,
   biteDelayMinimum: 2,
   biteDelayMaximum: 8,
+  rhythmStartupFallbackSeconds: 0.9,
   hookWindow: 1.65,
   resultHoldSeconds: 1.35,
   pondSurfaceY: 0.09

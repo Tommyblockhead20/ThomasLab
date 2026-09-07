@@ -1,3 +1,53 @@
+# Reel Ascent v12 update handoff
+
+Status: the focused v12 core-gameplay reliability pass is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Final validation stayed light: a production frontend build plus 26 targeted climbing/world/v12 checks, all passing. This section supersedes older notes wherever behavior differs.
+
+## v12 focused reliability pass
+
+1. **Files changed** — `src/config.js`; `src/fishing/fishing.js`, `rarity-selection.js`, and new `selective-bobbers.js`; `src/game.js`; `src/player/climbing.js` and `player.js`; `src/progression/equipment.js` and `progression-save.js`; `src/styles.css`; `src/ui/home-interaction.js`, `hud.js`, `inventory.js`, and `shop.js`; `src/world/mountain-v2.js` and `world-locations.js`; new `test/v12-focused.test.js`; this handoff; and rebuilt `dist/index.html`, `dist/assets/index-B3ChD-9T.css`, and `dist/assets/index-isYWBpy9.js`.
+
+2. **Climbing jank root causes found** — The wall tracker already biased the current collider, but switched immediately when that collider vanished for one frame and a neighboring rock/triangle remained. Active climbing also ran through the ordinary ground-locomotion wedge hard-lock and cached side normal, so legitimate overlapping wall contacts could freeze movement. Finally, Rapier's grounded result could overwrite `grounded=false` during active grip, creating a contradictory grounded+climbing frame, while detach/mantle completion retained stale surface data.
+
+3. **Climbing fixes** — Adjacent replacement surfaces must now remain stable for **0.07 s** before a switch when the current collider disappears; lost-contact grace increased modestly **0.22→0.28 s**. A still-visible current surface retains the existing score advantage. Climb movement still uses Rapier collision limiting but bypasses locomotion-only wedge locking/contact memory. Grip acquisition clears an old lock/side normal, active climb explicitly remains non-grounded, landing explicitly restores grounded, and detach/mantle completion clear stale surface/pending-contact state. Controls, speeds, stamina costs, manual grip, and manual mantle intent are unchanged.
+
+4. **Boat/ocean-floor softlock root cause** — Bluewater Reach used one full-width solid lower-hull box (`6.8 × 1.05 × 12.8 m`) above a seabed roughly 12 m down. There is no upward swimming system, so a player under/inside that collider could neither pass the underside nor jump from the ocean floor back to the elevated deck.
+
+5. **Boarding/recovery implementation** — Only the oversized deep-hull box is now visual-only; the deck, wheelhouse, rails, and mast collision remain. Visible port and starboard ladders each expose a short-range **BOARD BOAT** interaction measured horizontally so it also works from the seabed and teleports to one validated clear deck point. As a last resort, a player stationary for **3.5 s** strictly inside the boat footprint and below the old hull is returned to that deck point; any inconsistent fishing state is canceled through the shared exit first. Moving, being beside the hull, or merely being underwater elsewhere resets/does not arm it.
+
+6. **Upper >700-ft rock reduction** — Crown routes retain all 26 authored lines but use **28 instead of 30** primary stages; branch stages use **5 instead of 6**; the six decorative crown belts total **228 instead of 274** rocks. That removes 52 requested primary holds, 52 branch rocks, and 46 belt rocks—**150 requested crown rocks total**—while preserving summit lips/thresholds, several continuous routes, rests, and the 700-ft ledge.
+
+7. **500–650-ft rock additions** — The 12 continuous spiral routes now sample 500–550 ft every **1.35 m**, 550–600 every **1.50 m**, and 600–650 every **1.30 m** (previously 1.55 m, 1.90 m, and a lopsided 1.90/1.05 m split). Extra side alternatives occur every third step across the full band. Existing grounded placement/exposure/overlap validation, varied fractured forms, and the 500/550/600/642-ft transfer/rest formations remain in use; 650–700 returns to the sparser general cadence.
+
+8. **Missing movement-arrow UI root cause** — `beginRhythmIntro()` displayed “Match the fish's movements!” before a `RhythmSession` existed, then waited on `prepareForRhythm()`. The HUD was hidden whenever `fishing.rhythm` was null. A browser whose WebAudio resume/preparation promise stalled could therefore remain in `rhythm-starting` forever with the message visible but no arrow panel.
+
+9. **Movement-HUD robustness fix** — `rhythm-starting` now immediately shows/reset the direction lanes, receptors, meters, and a GET READY state. Entering either match phase removes stale inline display/opacity/visibility and hidden/ARIA state; if the panel was unexpectedly removed, a lightweight check rebuilds and rebinds it once rather than every frame. If audio preparation remains unresolved for **0.9 s**, the normal `RhythmSession` starts via its existing silent/synth-safe path. Panel positioning now clamps to short/zoomed viewports. Note timing, success windows, and difficulty are unchanged.
+
+10. **First bobber name** — **Selective Drift Bobber**, purchasable for **$3,500** in the new Bobber equipment slot.
+
+11. **First bobber exact settings** — Target average **30 s**, uniform **±25%** variation (**22.5–37.5 s** before existing water/lure timing multipliers). Bite acceptance is Common **42%** (58% rejected), Uncommon **72%** (28% rejected), Rare **96%** (4% rejected), Legendary **100%**.
+
+12. **Second bobber name** — **Trophy Sentinel Bobber**, purchasable for **$11,000** in the same slot.
+
+13. **Second bobber exact settings** — Target average **120 s**, uniform **±20%** variation (**96–144 s** before existing water/lure timing multipliers). Bite acceptance is Common **8%** (92% rejected), Uncommon **30%** (70% rejected), Rare **82%** (18% rejected), Legendary **100%**.
+
+14. **Representative resulting rarity distributions** — Direct normalized calculation for Outer Ocean: no selective bobber = **62.00% Common / 20.00% Uncommon / 11.00% Rare / 7.00% Legendary**; Selective Drift = **44.90 / 24.83 / 18.21 / 12.07%**; Trophy Sentinel = **18.38 / 22.24 / 33.43 / 25.95%**. Neither guarantees a high rarity.
+
+15. **Interaction between bobbers and existing lures** — The effective order is base water rarity → one application of Silverfish/Mythlight percentage-point changes → bobber rarity acceptance/renormalization → species weighting/selection inside the accepted rarity. This is mathematically equivalent to rejecting sampled bites by rarity without rolling every species repeatedly. Prism still changes song tempo only; Fast-Bite Chum and water bite-rate modifiers scale the selected bobber's wait once. No lure bonus is applied twice.
+
+16. **Outfitter dock/store orientation changes** — `shop-island` now uses the registry's outward dock side, matching its outward-facing storefront just as the Cabin already does. The dock, safe arrival, and departure metadata move together; arrival remains above island elevation and faces inward toward the store. Shop counters/NPCs/interactions and the island's global coordinates are untouched.
+
+17. **Whether save schema changed** — **Yes, progression schema 10→11** to add the durable Bobber slot and starter `trail-bobber`. Old saves normalize forward with that free default and retain every purchase/equipped item. The outer save schema remains 10 and the slot container/export architecture is unchanged.
+
+18. **Whether multiplayer protocol changed** — **No.** No server, room, snapshot, message, appearance, or protocol field changed.
+
+19. **Whether Render needs redeployment** — **No.** This pass changed no multiplayer server code or server environment requirement.
+
+20. **Whether frontend needs rebuild** — **Yes, and it has been rebuilt.** `npm run build` completed with 1,281 modules. Output is `dist/assets/index-B3ChD-9T.css` and `dist/assets/index-isYWBpy9.js`; only the existing PlayCanvas worker-externalization notices and large-chunk warning remain. The focused suite passed **26/26**.
+
+21. **Short manual test list** — Climb across close overlapping rocks, release/regrip after jumps, mantle/land, and watch grounded/stamina behavior; fall beside/under Bluewater, use both ladders, and wait under only the hull footprint for fallback; inspect representative 500–650 and >700 routes; hook fish in Firefox/zoomed layouts and confirm arrows appear immediately even with blocked audio; buy/equip each bobber and spot-check waits/lure combinations; sail to Outfitter's Reach and confirm a clear dock-to-store approach.
+
+---
+
 # Reel Ascent v11 update handoff
 
 Status: the requested v11 continuation is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Testing stayed intentionally light: 57 focused gameplay/data checks and one production frontend build. The older v10 and v9 notes remain below for historical context; this section supersedes them wherever behavior differs.

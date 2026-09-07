@@ -80,6 +80,7 @@ export class Game {
     this.mainWorldLocationId = mainWorldLocation?.id ?? this.currentLocationId;
     this.world.setActiveLocation?.(this.currentLocationId);
     this.localPause = { active: false, openedAt: null, totalPausedSeconds: 0 };
+    this.boatSoftlockRecovery = { timer: 0, lastPosition: null };
     this.sessionStats = {
       activePlaytimeSeconds: 0,
       fishCaught: 0,
@@ -303,6 +304,7 @@ export class Game {
         this.physicsWorld.timestep = dt;
         this.physicsWorld.step();
         this.player.afterPhysics(dt);
+        this.updateBoatSoftlockRecovery(dt);
       }
     }
     if (!localGameplayPaused) this.updateSessionStats(dt);
@@ -401,8 +403,35 @@ export class Game {
     this.currentLocationId = locationId;
     this.currentCoordinateSpace = coordinateSpace || 'global-world';
     this.world.setActiveLocation?.(locationId);
+    this.boatSoftlockRecovery.timer = 0;
+    this.boatSoftlockRecovery.lastPosition = null;
     this.multiplayer?.room?.setLocalLocationId?.(locationId);
     return this.currentLocationId;
+  }
+
+  updateBoatSoftlockRecovery(dt) {
+    const state = this.boatSoftlockRecovery;
+    const position = this.player.getPosition();
+    const recovery = this.currentLocationId === 'bluewater-reach'
+      ? this.world.getBoatSoftlockRecovery?.(position)
+      : null;
+    const moved = state.lastPosition
+      ? Math.hypot(position.x - state.lastPosition.x, position.y - state.lastPosition.y, position.z - state.lastPosition.z)
+      : Infinity;
+    state.lastPosition = { x: position.x, y: position.y, z: position.z };
+    if (!recovery || moved > .035) {
+      state.timer = 0;
+      return false;
+    }
+    state.timer += dt;
+    if (state.timer < 3.5) return false;
+    state.timer = 0;
+    state.lastPosition = null;
+    if (this.fishing.active) this.player.exitFishing();
+    this.player.teleport(recovery.position, recovery.facingYaw);
+    this.camera.setYaw(recovery.facingYaw);
+    this.hud.showToast?.('Recovered safely to the boat deck.');
+    return true;
   }
 
   getLocalGlobalPosition(position = this.player?.getPosition?.() ?? { x: 0, y: 0, z: 0 }) {

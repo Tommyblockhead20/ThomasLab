@@ -65,9 +65,9 @@ export const SUMMIT_ROUTE_CONNECTOR = Object.freeze({
   maximumVerticalGap: .82
 });
 export const CROWN_DENSITY_CONFIG = Object.freeze({
-  routeStages: 30,
-  branchStages: Object.freeze([4, 8, 13, 18, 23, 27]),
-  beltCounts: Object.freeze([58, 54, 48, 44, 38, 32])
+  routeStages: 28,
+  branchStages: Object.freeze([4, 9, 14, 20, 25]),
+  beltCounts: Object.freeze([48, 44, 40, 36, 32, 28])
 });
 export const MOUNTAIN_REST_LEDGE_CONFIG = Object.freeze({
   fiveHundred: Object.freeze({ targetHeight: 152.4, angle: 79, radius: 58.55, anchorIndex: 6, width: 10.6, depth: 7.2, coreTerrain: true, mantleApron: 1.7 }),
@@ -81,8 +81,12 @@ export const MID_MOUNTAIN_SPIRAL_CONFIG = Object.freeze({
   routeCount: 12,
   turns: 1.52,
   generalStepHeight: 2.25,
+  // Compatibility value retained for diagnostics; placement uses the narrower sub-bands.
   priority450To550StepHeight: 1.55,
-  priority630To660StepHeight: 1.05,
+  priority500To550StepHeight: 1.35,
+  priority550To600StepHeight: 1.5,
+  priority600To650StepHeight: 1.3,
+  priority630To660StepHeight: 1.3,
   branchEvery: 4
 });
 // Compatibility export retained for debug tooling that knew the older name. v9 no longer
@@ -1269,8 +1273,10 @@ export class MountainWorld extends TestWorld {
       x: x + sideward.x * side + forward.x * forwardDistance,
       z: z + sideward.z * side + forward.z * forwardDistance
     });
+    // The old full-width lower box was a large invisible underside trap. Keep the visual
+    // hull silhouette, while the deck/wheelhouse/rails remain the boat's useful collision.
     this.addBox('Bluewater Reach deep hull', { x, y: OCEAN_SURFACE_Y - .18, z },
-      { x: 6.8, y: 1.05, z: 12.8 }, this.materials.deepRock, { y: yaw });
+      { x: 6.8, y: 1.05, z: 12.8 }, this.materials.deepRock, { y: yaw }, false);
     const deck = this.addBox('Bluewater Reach stable fishing deck', { x, y: OCEAN_SURFACE_Y + .34, z },
       { x: 7.2, y: .32, z: 13.4 }, this.materials.woodLight, { y: yaw });
     const wheelhouse = localPoint(0, -2.1);
@@ -1285,6 +1291,31 @@ export class MountainWorld extends TestWorld {
     }
     this.addCylinder('Bluewater Reach mast', { ...wheelhouse, y: OCEAN_SURFACE_Y + 3.15 },
       { x: .14, y: 3.5, z: .14 }, this.materials.deepRock);
+    const boardingPosition = { ...localPoint(0, 3.25), y: OCEAN_SURFACE_Y + 1.68 };
+    for (const side of [-1, 1]) {
+      const ladderCenter = localPoint(side * 3.7, 3.25);
+      for (const forwardOffset of [-.42, .42]) {
+        const railPoint = localPoint(side * 3.7, 3.25 + forwardOffset);
+        this.addCylinder(`Bluewater Reach ladder ${side} rail ${forwardOffset}`, {
+          ...railPoint, y: OCEAN_SURFACE_Y - 1.25
+        }, { x: .09, y: 4.5, z: .09 }, this.materials.cabinTrim, {}, false);
+      }
+      for (let rung = 0; rung < 8; rung += 1) {
+        this.addBox(`Bluewater Reach ladder ${side} rung ${rung + 1}`, {
+          ...ladderCenter, y: OCEAN_SURFACE_Y + .45 - rung * .48
+        }, { x: .12, y: .08, z: .9 }, this.materials.cabinTrim, { y: yaw }, false);
+      }
+      this.homeInteractions.push({
+        id: `${location.id}-ladder-${side < 0 ? 'port' : 'starboard'}`,
+        label: 'BOARD BOAT', action: 'board', position: { ...ladderCenter, y: OCEAN_SURFACE_Y },
+        boardingPosition, facingYaw: yaw, range: 3,
+        distanceTo: (point) => Math.hypot(point.x - ladderCenter.x, point.z - ladderCenter.z),
+        contains: (point) => point.y > -14 && point.y < OCEAN_SURFACE_Y + 1.3
+      });
+    }
+    this.bluewaterRecovery = {
+      center: { x, z }, forward, sideward, boardingPosition, facingYaw: yaw
+    };
     this.homeInteractions.push({
       id: `${location.id}-boat`, label: 'OPEN BLUEWATER CHART', action: 'boat',
       destinationId: location.id,
@@ -2020,18 +2051,21 @@ export class MountainWorld extends TestWorld {
   getNearestHomeInteraction(point, maximumDistance = Math.max(
     HOME_CABIN_CONFIG.interactionDistance,
     SUMMIT_BENCH_CONFIG.interactionDistance,
-    PUBLIC_AQUARIUM_CONFIG.interactionDistance
+    PUBLIC_AQUARIUM_CONFIG.interactionDistance,
+    3.2 // Boat chart/ladder interactions intentionally have a slightly longer short range.
   )) {
     if (![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
     let nearest = null;
     let nearestDistance = maximumDistance;
     for (const interaction of this.homeInteractions ?? []) {
       if (![interaction.position?.x, interaction.position?.y, interaction.position?.z].every(Number.isFinite)) continue;
-      const distance = Math.hypot(
-        point.x - interaction.position.x,
-        (point.y - PLAYER_FOOT_OFFSET) - interaction.position.y,
-        point.z - interaction.position.z
-      );
+      const distance = interaction.distanceTo
+        ? interaction.distanceTo(point)
+        : Math.hypot(
+            point.x - interaction.position.x,
+            (point.y - PLAYER_FOOT_OFFSET) - interaction.position.y,
+            point.z - interaction.position.z
+          );
       const interactionRange = interaction.range ?? HOME_CABIN_CONFIG.interactionDistance;
       if (interaction.contains && !interaction.contains(point)) continue;
       if (distance > interactionRange || distance > nearestDistance) continue;
@@ -2039,6 +2073,22 @@ export class MountainWorld extends TestWorld {
       nearestDistance = distance;
     }
     return nearest ? { ...nearest, distance: nearestDistance } : null;
+  }
+
+  getBoatSoftlockRecovery(point) {
+    const recovery = this.bluewaterRecovery;
+    if (!recovery || ![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
+    const dx = point.x - recovery.center.x;
+    const dz = point.z - recovery.center.z;
+    const along = dx * recovery.forward.x + dz * recovery.forward.z;
+    const across = dx * recovery.sideward.x + dz * recovery.sideward.z;
+    // Only the actual footprint below the former hull volume qualifies. Swimming/diving
+    // beside the boat does not arm the fallback.
+    if (Math.abs(along) > 6.55 || Math.abs(across) > 3.45 || point.y >= OCEAN_SURFACE_Y - .7) return null;
+    return {
+      position: { ...recovery.boardingPosition },
+      facingYaw: recovery.facingYaw
+    };
   }
 
   updateHomeProgress(save = {}) {
@@ -4075,9 +4125,10 @@ export class MountainWorld extends TestWorld {
 
   spiralStepHeightAt(targetHeight) {
     const feet = targetHeight / .3048;
-    if (feet >= 630 && feet <= 660) return MID_MOUNTAIN_SPIRAL_CONFIG.priority630To660StepHeight;
-    if (feet >= 450 && feet <= 550) return MID_MOUNTAIN_SPIRAL_CONFIG.priority450To550StepHeight;
-    if (feet > 550 && feet < 630) return 1.9;
+    if (feet >= 600 && feet <= 650) return MID_MOUNTAIN_SPIRAL_CONFIG.priority600To650StepHeight;
+    if (feet >= 550 && feet < 600) return MID_MOUNTAIN_SPIRAL_CONFIG.priority550To600StepHeight;
+    if (feet >= 500 && feet < 550) return MID_MOUNTAIN_SPIRAL_CONFIG.priority500To550StepHeight;
+    if (feet >= 450 && feet < 500) return MID_MOUNTAIN_SPIRAL_CONFIG.priority450To550StepHeight;
     return MID_MOUNTAIN_SPIRAL_CONFIG.generalStepHeight;
   }
 
@@ -4097,7 +4148,7 @@ export class MountainWorld extends TestWorld {
   buildThreeToSevenHundredRockField() {
     // v9: these are actual continuous climb paths, NOT horizontal altitude bands.
     // Each route winds around Mountain as elevation rises. Vertical sample spacing is
-    // intentionally tighter through 450–550 ft and especially 630–660 ft so adding more
+    // intentionally tighter through 500–650 ft so adding more
     // rocks makes the next move reachable rather than merely decorating the same elevation.
     const config = MID_MOUNTAIN_SPIRAL_CONFIG;
     const forms = [
@@ -4106,7 +4157,7 @@ export class MountainWorld extends TestWorld {
     ];
     let added = 0;
     let requested = 0;
-    let priority630To660Requested = 0;
+    let priority500To650Requested = 0;
     const routeAudits = [];
 
     for (let routeIndex = 0; routeIndex < config.routeCount; routeIndex += 1) {
@@ -4117,7 +4168,7 @@ export class MountainWorld extends TestWorld {
       while (targetHeight <= config.maximumHeight + .01) {
         requested += 1;
         const feet = targetHeight / .3048;
-        if (feet >= 630 && feet <= 660) priority630To660Requested += 1;
+        if (feet >= 500 && feet <= 650) priority500To650Requested += 1;
         const sample = this.spiralRouteSample(routeIndex, targetHeight);
         const { angle, direction } = sample;
         let radius = sample.radius;
@@ -4137,11 +4188,11 @@ export class MountainWorld extends TestWorld {
         const ground = this.terrainY(angle, radius);
         const materialType = chooseClimbMaterial(
           feet >= 620 ? 2 : feet >= 450 ? 1 : 0,
-          angle, stepIndex, 910 + routeIndex, feet >= 630 && feet <= 660 ? -.08 : .015
+          angle, stepIndex, 910 + routeIndex, feet >= 500 && feet <= 650 ? -.035 : .015
         );
         const formKind = forms[(stepIndex * 3 + routeIndex * 5) % forms.length];
-        const denseHighGap = feet >= 630 && feet <= 660;
-        const priorityMid = feet >= 450 && feet <= 550;
+        const priorityMid = feet >= 500 && feet <= 650;
+        const denseHighGap = feet >= 600 && feet <= 650;
         const rockHeight = denseHighGap
           ? 2.65 + (stepIndex % 3) * .28
           : priorityMid ? 2.45 + (stepIndex % 4) * .3 : 2.2 + (stepIndex % 4) * .34;
@@ -4164,7 +4215,7 @@ export class MountainWorld extends TestWorld {
         // Frequent side options overlap adjacent spiral steps vertically. These are branches
         // off the same ascent path—not another ring—and make passing/rest choices possible.
         if (stepIndex % config.branchEvery === (routeIndex % config.branchEvery)
-          || denseHighGap && stepIndex % 2 === 0) {
+          || priorityMid && stepIndex % 3 === 0) {
           const side = ((stepIndex + routeIndex) % 2 ? 1 : -1) * direction;
           const branchAngle = angle + side * (1.2 + (stepIndex % 3) * .42);
           const branchRadius = radius + side * (1.25 + (stepIndex % 4) * .26);
@@ -4198,7 +4249,7 @@ export class MountainWorld extends TestWorld {
       layout: 'continuous-spirals',
       routeCount: config.routeCount,
       requestedSteps: requested,
-      priority630To660Requested,
+      priority500To650Requested,
       added,
       routeAudits
     };

@@ -37,29 +37,8 @@ export class Hud {
     this.castFill = document.querySelector('#cast-fill');
     this.castValue = document.querySelector('#cast-value');
     this.bitePrompt = document.querySelector('#bite-prompt');
-    this.rhythmPanel = document.querySelector('#rhythm-panel');
-    this.rhythmBpm = document.querySelector('#rhythm-bpm');
-    this.rhythmJudgment = document.querySelector('#rhythm-judgment');
-    this.rhythmProgressFill = document.querySelector('#rhythm-progress-fill');
-    this.rhythmProgressValue = document.querySelector('#rhythm-progress-value');
-    this.rhythmEscapeFill = document.querySelector('#rhythm-escape-fill');
-    this.rhythmEscapeValue = document.querySelector('#rhythm-escape-value');
-    this.rhythmLaneElements = new Map(
-      [...document.querySelectorAll('.rhythm-lane')].map((lane) => [lane.dataset.lane, lane])
-    );
-    this.rhythmLayers = new Map(
-      [...this.rhythmLaneElements.values()].map((lane) => [
-        lane.dataset.lane,
-        lane.querySelector('.note-layer')
-      ])
-    );
-    this.rhythmReceptors = new Map(
-      [...this.rhythmLaneElements.values()].map((lane) => [
-        lane.dataset.lane,
-        lane.querySelector('.rhythm-receptor')
-      ])
-    );
     this.rhythmNoteElements = new Map();
+    this.bindRhythmHudElements();
     this.catchBanner = document.querySelector('#catch-banner');
     this.catchRarity = document.querySelector('#catch-rarity');
     this.catchSpecies = document.querySelector('#catch-species');
@@ -106,6 +85,42 @@ export class Hud {
 
   show() {
     this.root.hidden = false;
+  }
+
+  bindRhythmHudElements() {
+    this.rhythmPanel = document.querySelector('#rhythm-panel');
+    this.rhythmBpm = document.querySelector('#rhythm-bpm');
+    this.rhythmJudgment = document.querySelector('#rhythm-judgment');
+    this.rhythmProgressFill = document.querySelector('#rhythm-progress-fill');
+    this.rhythmProgressValue = document.querySelector('#rhythm-progress-value');
+    this.rhythmEscapeFill = document.querySelector('#rhythm-escape-fill');
+    this.rhythmEscapeValue = document.querySelector('#rhythm-escape-value');
+    this.rhythmLaneElements = new Map(
+      [...document.querySelectorAll('.rhythm-lane')].map((lane) => [lane.dataset.lane, lane])
+    );
+    this.rhythmLayers = new Map([...this.rhythmLaneElements.values()].map((lane) => [
+      lane.dataset.lane, lane.querySelector('.note-layer')
+    ]));
+    this.rhythmReceptors = new Map([...this.rhythmLaneElements.values()].map((lane) => [
+      lane.dataset.lane, lane.querySelector('.rhythm-receptor')
+    ]));
+  }
+
+  ensureRhythmHud() {
+    if (this.rhythmPanel?.isConnected) return true;
+    if (!this.root) return false;
+    const panel = document.createElement('section');
+    panel.id = 'rhythm-panel';
+    panel.className = 'rhythm-panel';
+    panel.setAttribute('aria-label', 'Fishing rhythm challenge');
+    const lanes = [['A', '←'], ['W', '↑'], ['S', '↓'], ['D', '→']]
+      .map(([lane, arrow]) => `<div class="rhythm-lane" data-lane="${lane}"><div class="note-layer"></div><div class="rhythm-receptor" aria-hidden="true"><span>${arrow}</span></div></div>`)
+      .join('');
+    panel.innerHTML = `<div class="rhythm-heading"><strong>MATCH THE MOVEMENT</strong><span id="rhythm-bpm">GET READY</span></div><div id="rhythm-stage" class="rhythm-stage">${lanes}</div><output id="rhythm-judgment" class="rhythm-judgment"></output><div class="rhythm-meters"><div class="rhythm-meter-row"><span><b>REEL IN</b><output id="rhythm-progress-value">0%</output></span><div class="meter-track"><div id="rhythm-progress-fill" class="meter-fill rhythm-progress-fill"></div></div></div><div class="rhythm-meter-row"><span><b>ESCAPE</b><output id="rhythm-escape-value">0%</output></span><div class="meter-track"><div id="rhythm-escape-fill" class="meter-fill rhythm-escape-fill"></div></div></div></div>`;
+    this.root.appendChild(panel);
+    this.rhythmNoteElements.clear();
+    this.bindRhythmHudElements();
+    return Boolean(this.rhythmPanel);
   }
 
   setPointerLocked(locked) {
@@ -215,9 +230,23 @@ export class Hud {
     }
 
     const rhythm = playerState.fishing.rhythm;
+    const matchingMovement = playerState.fishing.state === 'rhythm-starting'
+      || playerState.fishing.state === 'rhythm';
     document.body.classList.toggle('fish-danger', Boolean(rhythm && rhythm.misses === 1));
-    this.rhythmPanel.hidden = !rhythm;
-    if (this.mobileControls) this.mobileControls.dataset.mode = rhythm ? 'rhythm' : 'movement';
+    // The panel is part of the static HUD, but explicitly repair stale hidden/presentation
+    // state on entry so a canceled prior cast, browser style quirk, or audio startup race
+    // cannot produce an active match phase with invisible direction indicators.
+    if (matchingMovement) {
+      this.ensureRhythmHud();
+      this.rhythmPanel.hidden = false;
+      this.rhythmPanel.removeAttribute('aria-hidden');
+      for (const property of ['display', 'opacity', 'visibility']) {
+        this.rhythmPanel.style.removeProperty(property);
+      }
+    } else {
+      this.rhythmPanel.hidden = true;
+    }
+    if (this.mobileControls) this.mobileControls.dataset.mode = matchingMovement ? 'rhythm' : 'movement';
     if (rhythm) {
       this.rhythmBpm.textContent = `${rhythm.bpm} BPM`;
       this.rhythmJudgment.textContent = rhythm.judgment;
@@ -230,6 +259,15 @@ export class Hud {
       this.syncRhythmInputFeedback(playerState.fishing.inputFeedbacks ?? []);
     } else {
       this.syncRhythmNotes([]);
+      if (matchingMovement) {
+        this.rhythmBpm.textContent = 'GET READY';
+        this.rhythmJudgment.textContent = 'MOVEMENT CUES LOADING';
+        this.rhythmJudgment.dataset.judgment = '';
+        this.rhythmProgressFill.style.transform = 'scaleX(0)';
+        this.rhythmProgressValue.textContent = '0%';
+        this.rhythmEscapeFill.style.transform = 'scaleX(0)';
+        this.rhythmEscapeValue.textContent = '0%';
+      }
     }
 
     const catchData = playerState.fishing.catchCard;

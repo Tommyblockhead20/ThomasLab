@@ -157,7 +157,9 @@ export const SMALL_ISLAND_LOCATIONS = Object.freeze([
   islandLocation({
     id: 'shop-island', displayName: "Outfitter's Reach", type: 'shop-island',
     angle: 35, radius: 1120, radii: { x: 19, z: 15 }, elevation: .62,
-    theme: 'developed-outpost', functions: ['buy', 'sell', 'gear', 'maps']
+    theme: 'developed-outpost', functions: ['buy', 'sell', 'gear', 'maps'],
+    // The storefront faces away from Mountain, so its dock belongs on that same side.
+    dockSide: 'outward'
   }),
   islandLocation({
     id: 'aquarium-island', displayName: 'Glasswater Isle', type: 'aquarium-island',

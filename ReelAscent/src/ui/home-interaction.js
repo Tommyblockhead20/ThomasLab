@@ -93,7 +93,7 @@ export class HomeInteractionController {
     }
     if (this.current && this.label) {
       if (this.eyebrow) this.eyebrow.textContent = ({
-        boat: 'ISLAND FERRY', shop: "OUTFITTER'S REACH", aquarium: 'GLASSWATER ISLE', appearance: 'HEARTHWARD ISLE'
+        boat: 'ISLAND FERRY', board: 'BOAT LADDER', shop: "OUTFITTER'S REACH", aquarium: 'GLASSWATER ISLE', appearance: 'HEARTHWARD ISLE'
       })[this.current.action] ?? 'WORLD INTERACTION';
       this.label.textContent = seatedInteraction
         ? (this.player.fishing?.active ? 'STOP FISHING & GET UP' : 'CLICK TO GET UP')
@@ -141,6 +141,16 @@ export class HomeInteractionController {
       window.dispatchEvent(new CustomEvent('reel-ascent:open-boat', {
         detail: { currentLocationId: interaction.destinationId }
       }));
+      return true;
+    }
+    if (interaction.action === 'board' && interaction.boardingPosition) {
+      if (this.player.fishing?.active) this.player.exitFishing();
+      this.player.cancelEmote();
+      this.player.clearBenchSeat?.();
+      this.player.teleport(interaction.boardingPosition, interaction.facingYaw);
+      this.camera?.setYaw?.(interaction.facingYaw);
+      this.dismissPrompt();
+      this.hud.showToast?.('Boarded Bluewater Reach safely.');
       return true;
     }
     if (interaction.action === 'rest' && interaction.seatPosition) {

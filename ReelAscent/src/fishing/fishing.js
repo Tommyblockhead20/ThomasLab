@@ -14,6 +14,7 @@ import { getAudioGain } from '../audio/settings.js';
 import { hasSeenHookTutorial, markHookTutorialSeen } from './tutorial-state.js';
 import { createFishingRodModel } from './rod-model.js';
 import { createSpecimenModel, destroySpecimenModel, positionSpecimenModel } from './specimen-model.js';
+import { getSelectiveBobberSettings, sampleBobberBiteDelay } from './selective-bobbers.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -1846,8 +1847,12 @@ export class FishingController {
         this.updateBite(dt, pressed || hookPressed);
         break;
       case 'rhythm-starting':
-        // Audio resume/sample preparation owns this very short phase. No chart clock exists
-        // yet, so an opening event cannot pass visually before its sound path is valid.
+        // Some browser/audio combinations can leave AudioContext preparation unresolved.
+        // Start the playable chart with its silent-safe fallback instead of leaving the
+        // player forever on a message with no movement cues.
+        if (this.stateTime >= (this.config.rhythmStartupFallbackSeconds ?? .9)) {
+          this.startRhythmSession({ ready: false, leadSeconds: .045, audioStartTime: null });
+        }
         break;
       case 'rhythm':
         this.updateRhythm(dt);
@@ -1926,10 +1931,15 @@ export class FishingController {
     const biteRate = (this.zone.modifiers.biteRate ?? 1)
       * (this.progression?.getModifier('biteRate') ?? 1);
     const biteDelayMultiplier = this.progression?.getModifier('biteDelayMultiplier') ?? 1;
-    this.biteTimer = (
-      this.config.biteDelayMinimum
-      + this.rng() * (this.config.biteDelayMaximum - this.config.biteDelayMinimum)
-    ) / biteRate * biteDelayMultiplier;
+    const bobber = getSelectiveBobberSettings(
+      this.progression?.getEquippedItem?.('bobber')?.bobberMode
+    );
+    this.biteTimer = sampleBobberBiteDelay(bobber, this.rng(), {
+      minimum: this.config.biteDelayMinimum,
+      maximum: this.config.biteDelayMaximum,
+      biteRate,
+      biteDelayMultiplier
+    });
     this.setState('waiting', 'Watch the bobber…');
   }
 
@@ -1941,11 +1951,15 @@ export class FishingController {
 
   getSelectionModifiers(ecology, includeRecent = true, zone = this.zone) {
     const equipment = this.progression?.getModifiers?.() ?? {};
+    const bobber = getSelectiveBobberSettings(
+      this.progression?.getEquippedItem?.('bobber')?.bobberMode
+    );
     return {
       ...zone?.modifiers,
       rarityTier: ecology.habitat.rarityTier,
       rareProbabilityBonus: equipment.rareProbabilityBonus ?? 0,
       legendaryProbabilityBonus: equipment.legendaryProbabilityBonus ?? 0,
+      bobberAcceptanceByRarity: bobber.acceptanceByRarity,
       nonFishWeightMultiplier: equipment.nonFishWeightMultiplier ?? 1,
       shinyChanceMultiplier: equipment.shinyChanceMultiplier ?? 1,
       specimenSizeBias: (zone?.modifiers?.specimenSizeBias ?? 0) + (equipment.specimenSizeBias ?? 0),

@@ -2,13 +2,14 @@ import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 10;
+export const PROGRESSION_SCHEMA_VERSION = 11;
 export const HAND_EQUIPMENT_IDS = Object.freeze(['ice-axe']);
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
   'creek-reel',
   'standard-line',
   'plain-spoon',
+  'trail-bobber',
   'trail-boots',
   'trail-gloves',
   'trail-kit',
@@ -21,6 +22,7 @@ export const DEFAULT_EQUIPPED = Object.freeze({
   reel: 'creek-reel',
   line: 'standard-line',
   lure: 'plain-spoon',
+  bobber: 'trail-bobber',
   boots: 'trail-boots',
   gloves: 'trail-gloves',
   climbingTool: 'trail-kit',

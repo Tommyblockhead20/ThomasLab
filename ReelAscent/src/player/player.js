@@ -1380,6 +1380,9 @@ export class Player {
         this.horizontalVelocity.z
       );
       this.climbing.begin(this.gripCandidate, incomingVelocity);
+      this.clearContactMotionLock();
+      this.lastSideCollisionNormal = null;
+      this.sideCollisionMemoryFrames = 0;
       this.resetSlideState();
       this.movementState = 'climbing';
       this.canGrip = false;
@@ -1600,15 +1603,22 @@ export class Player {
       if (collision?.normal1) currentCollisionNormals.push(collision.normal1);
     }
     const collisionNormals = [...currentCollisionNormals];
-    if (this.sideCollisionMemoryFrames > 0 && this.lastSideCollisionNormal) {
+    if (!options.climbing && this.sideCollisionMemoryFrames > 0 && this.lastSideCollisionNormal) {
       collisionNormals.push(this.lastSideCollisionNormal);
     }
 
-    const stabilizedMovement = stabilizeWedgeMovement(
-      desiredMovement,
-      computedMovement,
-      collisionNormals
-    );
+    // Climbing intentionally moves along intersecting faces. Locomotion's opposing-contact
+    // hard lock interprets those same wall contacts as a wedge and can freeze valid climbs.
+    const stabilizedMovement = options.climbing
+      ? {
+          x: computedMovement.x,
+          y: computedMovement.y,
+          z: computedMovement.z,
+          stabilized: false,
+          opposingContacts: false,
+          blocked: false
+        }
+      : stabilizeWedgeMovement(desiredMovement, computedMovement, collisionNormals);
     // A player-requested escape from an already frozen contact is different from ordinary
     // locomotion: keep Rapier's collision-limited horizontal slide, forcibly delete all Y
     // correction, and let the caller decide whether that is enough progress to unlock. Running
@@ -1634,7 +1644,10 @@ export class Player {
         }
       : stabilizedMovement;
     const currentSideNormal = currentCollisionNormals.find((normal) => Math.hypot(normal.x, normal.z) > .35);
-    if (currentSideNormal) {
+    if (options.climbing) {
+      this.lastSideCollisionNormal = null;
+      this.sideCollisionMemoryFrames = 0;
+    } else if (currentSideNormal) {
       this.lastSideCollisionNormal = { x: currentSideNormal.x, y: currentSideNormal.y, z: currentSideNormal.z };
       this.sideCollisionMemoryFrames = 3;
     } else {
@@ -1657,7 +1670,7 @@ export class Player {
       && correctionY * this.lastCollisionCorrectionY < 0;
     this.lastCollisionCorrectionY = correctionY;
 
-    const shouldHardLock = !options.topOut && (correctedMovement.stabilized
+    const shouldHardLock = !options.topOut && !options.climbing && (correctedMovement.stabilized
       || (verticalCorrectionReversed && correctedMovement.opposingContacts)
       || (correctedMovement.opposingContacts && hasSideContact && this.contactStateFlipCount >= 2));
 
@@ -1756,7 +1769,10 @@ export class Player {
       this.horizontalVelocity.set(0, 0, 0);
       this.grounded = false;
       this.movementState = 'climbing';
-      this.applyKinematicMovement(output.movement);
+      this.applyKinematicMovement(output.movement, { climbing: true, ignoreContactLock: true });
+      // Rapier can report walkable support while the capsule is pressed into a wall/ledge.
+      // Active grip owns the state until the controller explicitly lands or detaches.
+      this.grounded = false;
       return;
     }
 
@@ -1773,10 +1789,13 @@ export class Player {
       this.horizontalVelocity.set(0, 0, 0);
       this.movementState = 'grounded';
       this.applyKinematicMovement({ x: 0, y: -0.02, z: 0 });
+      this.grounded = true;
       return;
     }
 
     this.movementState = 'airborne';
+    this.lastSideCollisionNormal = null;
+    this.sideCollisionMemoryFrames = 0;
     if (output.type === 'pushOff') {
       this.horizontalVelocity.set(
         output.pushVelocity.x,
