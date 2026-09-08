@@ -4,6 +4,7 @@ export const AQUARIUM_PAYOUT_INTERVAL_SECONDS = 5 * 60;
 export const AQUARIUM_PAYOUT_RATE = .01;
 export const AQUARIUM_TANK_CAPACITY = 30;
 export const AQUARIUM_MAX_TANKS = 10;
+export const AQUARIUM_TANK_UPGRADES = Object.freeze([
   Object.freeze({ tankCount: 1, capacity: 30, price: 0 }),
   Object.freeze({ tankCount: 2, capacity: 60, price: 2500 }),
   Object.freeze({ tankCount: 3, capacity: 90, price: 5000 }),
