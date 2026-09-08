@@ -179,6 +179,15 @@ export const BLUEWATER_SIDE_SEAT_CONFIG = Object.freeze({
   forward: 1.75,
   interactionDistance: 2.4
 });
+export const ISLAND_UNDERWATER_PROFILE = Object.freeze({
+  radiusFactors: Object.freeze([2.35, 1.65, 1]),
+  intermediateDepth: 1.35
+});
+export const ROCK_COLLISION_PROXY_CONFIG = Object.freeze({
+  kind: 'rounded-box',
+  halfExtentScale: .42,
+  borderScale: .045
+});
 export const FRACTURED_ROCK_FORM_KINDS = Object.freeze([
   'chunk', 'chunk', 'spire', 'spire', 'blade', 'lean', 'wedge', 'column',
   'needle', 'shelfblade', 'crooked', 'shard', 'hook', 'knuckle', 'slab',
@@ -1182,9 +1191,12 @@ export class MountainWorld extends TestWorld {
     const segments = 36;
     // End at a real center vertex. The old .035-radius 36-vertex micro-ring produced
     // near-degenerate center triangles; on Basalt Hollow those could stretch into spikes.
-    const ringFactors = [1.2, 1, .68, .2];
-    const ringHeights = [oceanFloorHeightAt(location.radius) + .12, OCEAN_SURFACE_Y - .08,
-      location.elevation + .06, location.elevation + .16];
+    // Broad submerged aprons replace the old near-vertical 1.2→1.0 shoreline drop.
+    // Everything at/above the waterline keeps its authored footprint and elevation.
+    const ringFactors = [...ISLAND_UNDERWATER_PROFILE.radiusFactors, .68, .2];
+    const ringHeights = [oceanFloorHeightAt(location.radius) + .12,
+      OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth,
+      OCEAN_SURFACE_Y - .08, location.elevation + .06, location.elevation + .16];
     const vertices = [];
     for (let ring = 0; ring < ringFactors.length; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
@@ -1195,11 +1207,11 @@ export class MountainWorld extends TestWorld {
           + Math.sin(segment * .79 + location.worldPosition.z * .013) * .014;
         // Underwater skirts are slightly softened, while the shoreline/top rings preserve
         // the destination's actual distinctive silhouette for future map simplification.
-        const footprintScale = lerp(1, identityScale, ring === 0 ? .72 : 1) * microWobble;
+        const footprintScale = lerp(1, identityScale, ring <= 1 ? .72 : 1) * microWobble;
         const vertexX = location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * footprintScale;
         const vertexZ = location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * footprintScale;
         let vertexY = ringHeights[ring] + (ring >= 2 ? Math.sin(segment * 1.91) * .035 : 0);
-        if (location.id === 'cold-island' && ring >= 2) {
+        if (location.id === 'cold-island' && ring >= 3) {
           const lakeRadius = Math.hypot(
             (vertexX - location.worldPosition.x) / 6.35,
             (vertexZ - location.worldPosition.z) / 5.05
@@ -1216,7 +1228,7 @@ export class MountainWorld extends TestWorld {
         const next = (segment + 1) % segments;
         const localAngle = segment * 360 / segments;
         const openingDelta = angularDistance(localAngle, location.id === 'cave-fishing-island' ? location.angle : -180);
-        if (location.id === 'cave-fishing-island' && ring >= 1 && ring <= 2 && openingDelta < 15) continue;
+        if (location.id === 'cave-fishing-island' && ring >= 2 && ring <= 3 && openingDelta < 15) continue;
         const outer = ring * segments + segment;
         const inner = (ring + 1) * segments + segment;
         const outerNext = ring * segments + next;
@@ -1478,6 +1490,20 @@ export class MountainWorld extends TestWorld {
         index % 3 ? this.materials.ice : this.materials.snow,
         { y: index * 29, z: index % 2 ? 3 : -3 }, { castShadows: false });
       }
+    } else if (location.id === 'veiled-athenaeum') {
+      // Exterior-only destination seed: a readable archive silhouette with no interior
+      // promises. Travel remains locked by registry metadata.
+      this.addBox('Veiled Athenaeum stone plinth', { x, y: y + .24, z },
+        { x: 13.5, y: .48, z: 10.5 }, this.materials.islandRock, { y: 8 });
+      this.addBox('Veiled Athenaeum archive hall', { x, y: y + 2.55, z: z + .2 },
+        { x: 9.8, y: 4.5, z: 7.4 }, this.materials.cave, { y: 8 });
+      this.addBox('Veiled Athenaeum shadowed door', { x, y: y + 1.55, z: z - 3.58 },
+        { x: 1.8, y: 2.65, z: .16 }, this.materials.deepRock, { y: 8 }, false);
+      this.addBox('Veiled Athenaeum roof', { x, y: y + 5.05, z: z + .2 },
+        { x: 11.2, y: .55, z: 8.8 }, this.materials.cabinRoof, { x: 2, y: 8, z: -2 });
+      for (const side of [-1, 1]) this.addCylinder(`Veiled Athenaeum column ${side}`,
+        { x: x + side * 3.25, y: y + 2.15, z: z - 3.55 },
+        { x: .48, y: 3.75, z: .48 }, this.materials.rockLight);
     }
   }
 
@@ -1806,8 +1832,10 @@ export class MountainWorld extends TestWorld {
     }
     // Center from the left hinge after the -72° swing. The old center drove half the door
     // back through the front wall, producing z-fighting along the doorway.
-    this.addCabinBox('Trail cabin open door', { x: -.63, y: 1.36, z: 4.08 },
-      { x: 1.42, y: 2.67, z: .13 }, this.materials.woodLight, { y: -72 }, false);
+    // The open panel is fully forward of the facade/jamb volume. At this 82° swing its
+    // near edge finishes 3 cm beyond the left jamb instead of intersecting it.
+    this.addCabinBox('Trail cabin open door', { x: -1.05, y: 1.36, z: 4.35 },
+      { x: 1.42, y: 2.67, z: .13 }, this.materials.woodLight, { y: -82 }, false);
     for (const [index, x] of [-3.35, -1.75, 1.75, 3.35].entries()) {
       this.addCabinBox(`Trail cabin floor board ${index + 1}`, { x, y: .012, z: 0 },
         { x: .035, y: .025, z: config.depth - .18 }, this.materials.cabinTrim, {}, false);
@@ -2645,12 +2673,21 @@ export class MountainWorld extends TestWorld {
     this.buildTarget.addChild(entity);
     if (options.solid === false) return entity;
 
+    const useRoundedProxy = options.collisionProxy === ROCK_COLLISION_PROXY_CONFIG.kind;
     const points = new Float32Array(form.hull.flatMap((vertex) => [
       vertex[0] * size.x,
       vertex[1] * size.y,
       vertex[2] * size.z
     ]));
-    const colliderDesc = this.RAPIER.ColliderDesc.convexHull(points);
+    const proxyBorder = Math.min(size.x, size.y, size.z) * ROCK_COLLISION_PROXY_CONFIG.borderScale;
+    const colliderDesc = useRoundedProxy
+      ? this.RAPIER.ColliderDesc.roundCuboid(
+          Math.max(.05, size.x * ROCK_COLLISION_PROXY_CONFIG.halfExtentScale - proxyBorder),
+          Math.max(.05, size.y * ROCK_COLLISION_PROXY_CONFIG.halfExtentScale - proxyBorder),
+          Math.max(.05, size.z * ROCK_COLLISION_PROXY_CONFIG.halfExtentScale - proxyBorder),
+          proxyBorder
+        )
+      : this.RAPIER.ColliderDesc.convexHull(points);
     if (!colliderDesc) {
       entity.destroy();
       this.rejectedRocks.push(`${name} (invalid collider hull)`);
@@ -2687,7 +2724,7 @@ export class MountainWorld extends TestWorld {
       contactCount: placement.support.contactCount,
       maximumExposure: placement.exposure?.maximum ?? null,
       visibleFraction: placement.exposure?.visibleFraction ?? null,
-      supportKind: 'mountain-core',
+      supportKind: useRoundedProxy ? 'mountain-core-rounded-proxy' : 'mountain-core',
       climbMaterial: climbMaterial ?? null,
       grippable: Boolean(this.climbSurfaces.get(entity.physicsCollider.handle))
     });
@@ -4426,7 +4463,11 @@ export class MountainWorld extends TestWorld {
             pitch: -6 - sizeUnit * 8,
             roll: (sizeUnit - .5) * 12,
             climbMaterial: 'rough',
-            formKind: sizeUnit > .52 ? 'wedge' : 'chunk'
+            formKind: sizeUnit > .52 ? 'wedge' : 'chunk',
+            // These secondary infill rocks are the high-count snag source. A slightly
+            // inset rounded proxy preserves their broad climb shape while eliminating
+            // tiny decorative hull corners from character collision.
+            collisionProxy: 'rounded-box'
           });
         if (entity) added += 1;
       }

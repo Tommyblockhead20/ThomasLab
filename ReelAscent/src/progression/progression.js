@@ -319,6 +319,12 @@ export class ProgressionSystem {
     return serializeProgress(this.saveSystem.getSnapshot());
   }
 
+  exportProgressForSlot(slotId) {
+    const snapshot = this.saveSystem.getSlotSnapshot(slotId);
+    if (!snapshot) throw new Error('That save slot is empty.');
+    return serializeProgress(snapshot, this.saveSystem.getSlotMetadata(slotId));
+  }
+
   previewProgressImport(input) {
     return validateProgressImport(input);
   }
@@ -338,7 +344,7 @@ export class ProgressionSystem {
 
   importProgressToSlot(input, slotId) {
     const result = validateProgressImport(input);
-    if (!this.saveSystem.replaceSlotData(slotId, result.save)) {
+    if (!this.saveSystem.replaceSlotData(slotId, result.save, result.saveMetadata)) {
       throw new Error('Progress was valid, but the destination slot could not be saved.');
     }
     return result.summary;

@@ -6,6 +6,7 @@ import {
   setKeyBinding
 } from '../player/movement.js';
 import { getAudioSettings, setAudioSettings } from '../audio/settings.js';
+import { createProgressDownload, decodeProgressBackup } from '../persistence/progress-backup.js';
 
 const SETTINGS_KEY = 'reel-ascent-ui-settings-v1';
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -18,30 +19,25 @@ const formatDuration = (seconds) => {
   const secs = total % 60;
   return hours ? `${hours}h ${minutes}m ${secs}s` : `${minutes}m ${secs}s`;
 };
-const downloadProgressJson = (text, prefix = 'reel-ascent-progress') => {
-  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${prefix}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
-};
-
 export class PauseMenu {
-  constructor(progression, { getStats = () => ({}), onResume = () => {}, onMultiplayer = () => {} } = {}) {
+  constructor(progression, {
+    getStats = () => ({}), onResume = () => {}, onCabin = () => {},
+    onMultiplayer = () => {}, onCloseMultiplayer = () => {}
+  } = {}) {
     this.progression = progression;
     this.getStats = getStats;
     this.onResume = onResume;
+    this.onCabin = onCabin;
     this.onMultiplayer = onMultiplayer;
+    this.onCloseMultiplayer = onCloseMultiplayer;
     this.screen = document.querySelector('#pause-menu');
     this.content = document.querySelector('#pause-content');
     this.status = document.querySelector('#pause-status');
     this.resumeButton = document.querySelector('#pause-resume');
     this.tabs = document.querySelector('#pause-tabs');
     this.fileInput = document.querySelector('#pause-progress-file');
+    this.multiplayerPanel = document.querySelector('#multiplayer-menu');
+    this.multiplayerPanelHome = this.multiplayerPanel?.parentElement ?? null;
     this.multiplayerButton = this.tabs?.querySelector('[data-pause-open-multiplayer]') ?? null;
     if (!this.multiplayerButton && this.tabs) {
       this.multiplayerButton = document.createElement('button');
@@ -51,6 +47,7 @@ export class PauseMenu {
       this.tabs.appendChild(this.multiplayerButton);
     }
     this.activeTab = 'stats';
+    this.pendingImport = null;
     this.isOpen = false;
     this.awaitingBinding = null;
     this.previousFocus = null;
@@ -80,13 +77,15 @@ export class PauseMenu {
     };
     this.onFileChange = async () => {
       const file = this.fileInput?.files?.[0];
-      const textarea = this.screen?.querySelector('#pause-progress-text');
-      if (!file || !textarea) return;
+      if (!file) return;
       try {
-        textarea.value = await file.text();
-        const result = this.progression.previewProgressImport(textarea.value);
-        this.status.textContent = `Ready to import: ${result.summary.discovered} discovered • $${result.summary.money}.`;
+        const text = await decodeProgressBackup(await file.arrayBuffer());
+        const result = this.progression.previewProgressImport(text);
+        this.pendingImport = { text, name: file.name, summary: result.summary };
+        this.status.textContent = `Validated ${file.name}: ${result.summary.discovered} discoveries • $${result.summary.money}. Choose a destination and approve import.`;
+        this.render();
       } catch (error) {
+        this.pendingImport = null;
         this.status.textContent = error instanceof Error ? error.message : 'Could not read progress file.';
       }
       this.fileInput.value = '';
@@ -135,12 +134,14 @@ export class PauseMenu {
     this.screen.hidden = !next;
     document.body.classList.toggle('pause-open', next);
     if (next) {
+      if (this.activeTab === 'multiplayer') this.activeTab = 'stats';
       this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       document.exitPointerLock?.();
       this.status.textContent = 'Local gameplay paused. Multiplayer players continue normally.';
       this.render();
       this.resumeButton?.focus({ preventScroll: true });
     } else {
+      this.restoreMultiplayerPanel();
       this.awaitingBinding = null;
       (this.previousFocus?.isConnected ? this.previousFocus : document.querySelector('#game-canvas'))?.focus({ preventScroll: true });
       this.previousFocus = null;
@@ -148,13 +149,27 @@ export class PauseMenu {
   }
 
   handleClick(event) {
+    if (event.target.closest('[data-pause-action="cabin"]')) {
+      this.onCabin();
+      return;
+    }
     if (event.target.closest('[data-pause-open-multiplayer]')) {
+      this.restoreMultiplayerPanel();
+      this.activeTab = 'multiplayer';
+      this.render();
       this.onMultiplayer();
+      const host = this.content?.querySelector('[data-pause-multiplayer-host]');
+      if (host && this.multiplayerPanel) {
+        this.multiplayerPanel.classList.add('is-pause-embedded');
+        host.appendChild(this.multiplayerPanel);
+      }
       return;
     }
     const tab = event.target.closest('[data-pause-tab]');
     if (tab) {
+      this.restoreMultiplayerPanel();
       this.activeTab = tab.dataset.pauseTab;
+      this.onCloseMultiplayer();
       this.awaitingBinding = null;
       this.render();
       return;
@@ -204,11 +219,13 @@ export class PauseMenu {
     for (const button of this.tabs?.querySelectorAll('[data-pause-tab]') ?? []) {
       button.setAttribute('aria-pressed', String(button.dataset.pauseTab === this.activeTab));
     }
+    this.multiplayerButton?.setAttribute('aria-pressed', String(this.activeTab === 'multiplayer'));
     this.content.innerHTML = ({
       stats: () => this.renderStats(),
-      'save-data': () => this.renderSaveData(),
+      saves: () => this.renderSaveData(),
       settings: () => this.renderSettings(),
-      keybinds: () => this.renderKeybinds()
+      controls: () => this.renderKeybinds(),
+      multiplayer: () => '<div class="pause-multiplayer-host" data-pause-multiplayer-host></div>'
     })[this.activeTab]?.() ?? this.renderStats();
   }
 
@@ -234,17 +251,19 @@ export class PauseMenu {
     const slotCards = this.progression.saveSystem.getSlotSummaries().map((slot) => {
       const date = slot.updatedAt ? new Date(slot.updatedAt).toLocaleString() : 'Unused';
       if (slot.empty) return `<article class="save-slot-card"><header><strong>${slot.label}</strong><span>EMPTY</span></header><button data-pause-slot-action="create" data-slot-id="${slot.id}">CREATE SAVE</button></article>`;
-      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'CURRENT' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} creatures</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} catches • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions">${slot.active ? '' : `<button data-pause-slot-action="select" data-slot-id="${slot.id}">LOAD</button>`}<button data-pause-slot-action="${slot.active ? 'reset' : 'delete'}" data-slot-id="${slot.id}">${slot.active ? 'RESET CURRENT SAVE' : 'DELETE'}</button></div></article>`;
+      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'ACTIVE SAVE' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} creatures</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} catches • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions"><button data-pause-slot-action="select" data-slot-id="${slot.id}" ${slot.active ? 'disabled' : ''}>PLAY THIS SAVE</button><button data-pause-slot-action="download" data-slot-id="${slot.id}">DOWNLOAD PROGRESS</button><button data-pause-slot-action="reset" data-slot-id="${slot.id}">RESET SAVE</button></div></article>`;
     }).join('');
     const options = this.progression.saveSystem.getSlotSummaries().map((slot) => `<option value="${slot.id}" ${slot.active ? 'selected' : ''}>${slot.label}${slot.empty ? ' (empty)' : slot.active ? ' (current)' : ''}</option>`).join('');
-    return `<div class="save-data-content">${slotCards}</div><section class="progress-transfer"><header><h3>PORTABLE PROGRESS</h3><strong>EXPORT / IMPORT</strong></header><p>Export durable progress or import it into a chosen local slot.</p><textarea id="pause-progress-text" maxlength="8000000" spellcheck="false" placeholder="Exported progress appears here, or paste progress JSON here."></textarea><div class="progress-transfer-actions"><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="download">DOWNLOAD PROGRESS</button><button data-pause-progress-action="file">LOAD FILE</button><button data-pause-progress-action="import">IMPORT PROGRESS</button></div></section>`;
+    const pending = this.pendingImport
+      ? `<p class="import-ready"><strong>${escapeHtml(this.pendingImport.name)}</strong> is valid: ${this.pendingImport.summary.discovered} discoveries, ${this.pendingImport.summary.inventory} carried, ${this.pendingImport.summary.aquarium} in Aquarium, $${this.pendingImport.summary.money}.</p><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="import">APPROVE IMPORT</button>`
+      : '';
+    return `<p class="save-local-note">Progress autosaves in this browser and device. Download a backup to move it elsewhere or protect it before clearing browser data.</p><div class="save-data-content">${slotCards}</div><section class="progress-import"><header><h3>IMPORT PROGRESS</h3><strong>.REELASCENT / JSON</strong></header><p>Select one compressed Reel Ascent backup or a current/legacy JSON export. The file is validated before any slot is overwritten.</p><button data-pause-progress-action="file">IMPORT PROGRESS</button>${pending}</section>`;
   }
 
   renderSettings() {
     const audioSlider = (key, label) => `<label class="pause-volume"><span>${label}</span><input type="range" min="0" max="100" step="1" value="${Math.round(this.audioSettings[key] * 100)}" data-audio-setting="${key}"><output>${Math.round(this.audioSettings[key] * 100)}%</output></label>`;
     return `<div class="pause-setting-list">
       <h3>GAMEPLAY &amp; INTERFACE</h3>
-      <label><input type="checkbox" data-pause-preference="showControlHints" ${this.preferences.showControlHints ? 'checked' : ''}> Show the always-on control hint card</label>
       <h3>SOUND</h3>
       ${audioSlider('master', 'Master Volume')}
       ${audioSlider('rhythm', 'Music / Rhythm Volume')}
@@ -272,37 +291,34 @@ export class PauseMenu {
   handleSlotAction(action, slotId) {
     const saves = this.progression.saveSystem;
     if (action === 'create') { if (saves.createSlot(slotId)) this.render(); return; }
+    if (action === 'download') {
+      void createProgressDownload(this.progression.exportProgressForSlot(slotId), `reel-ascent-${slotId}`);
+      this.status.textContent = 'Save backup downloaded.';
+      return;
+    }
     if (action === 'select') {
       if (!globalThis.confirm?.('Load this save slot? The page will reload and leave any current multiplayer room.')) return;
       if (saves.selectSlot(slotId)) globalThis.location?.reload();
       return;
     }
     const summary = saves.getSlotSummaries().find((slot) => slot.id === slotId);
-    const phrase = `RESET ${summary?.label?.toUpperCase() ?? 'SAVE SLOT'}`;
-    if (globalThis.prompt?.(`This permanently clears only ${summary?.label}. Type ${phrase} to confirm.`) !== phrase) return;
-    const ok = action === 'delete' ? saves.deleteSlot(slotId) : saves.resetSlot(slotId);
+    if (!globalThis.confirm?.(`Reset ${summary?.label ?? 'this save slot'}? This permanently replaces only that slot with a new save.`)) return;
+    const ok = saves.resetSlot(slotId);
     if (!ok) return;
     if (summary?.active) globalThis.location?.reload(); else this.render();
   }
 
   async handleProgressTransfer(action) {
-    const textarea = this.screen?.querySelector('#pause-progress-text');
     if (action === 'file') return this.fileInput?.click();
-    if (action === 'download') {
-      const text = this.progression.exportProgress();
-      if (textarea) textarea.value = text;
-      downloadProgressJson(text);
-      this.status.textContent = 'Current save downloaded as versioned JSON.';
-      return;
-    }
-    if (action !== 'import' || !textarea) return;
+    if (action !== 'import' || !this.pendingImport) return;
     try {
-      const preview = this.progression.previewProgressImport(textarea.value);
+      const preview = this.progression.previewProgressImport(this.pendingImport.text);
       const slotId = this.screen?.querySelector('#pause-progress-slot')?.value ?? this.progression.saveSystem.activeSlotId;
       const summary = this.progression.saveSystem.getSlotSummaries().find((slot) => slot.id === slotId);
       if (!globalThis.confirm?.(`Overwrite ${summary?.label ?? slotId} with ${preview.summary.discovered} discoveries and $${preview.summary.money}?`)) return;
-      downloadProgressJson(this.progression.exportProgress(), 'reel-ascent-backup-before-import');
-      this.progression.importProgressToSlot(textarea.value, slotId);
+      await createProgressDownload(this.progression.exportProgressForSlot(slotId), 'reel-ascent-backup-before-import').catch(() => null);
+      this.progression.importProgressToSlot(this.pendingImport.text, slotId);
+      this.pendingImport = null;
       this.status.textContent = 'Backup downloaded. Import complete.';
       if (summary?.active) globalThis.setTimeout(() => globalThis.location?.reload(), 180); else this.render();
     } catch (error) {
@@ -310,7 +326,15 @@ export class PauseMenu {
     }
   }
 
+  restoreMultiplayerPanel() {
+    if (!this.multiplayerPanel || !this.multiplayerPanelHome
+      || this.multiplayerPanel.parentElement === this.multiplayerPanelHome) return;
+    this.multiplayerPanel.classList.remove('is-pause-embedded');
+    this.multiplayerPanelHome.appendChild(this.multiplayerPanel);
+  }
+
   destroy() {
+    this.restoreMultiplayerPanel();
     this.screen?.removeEventListener('click', this.onClick);
     this.screen?.removeEventListener('change', this.onChange);
     this.screen?.removeEventListener('input', this.onChange);

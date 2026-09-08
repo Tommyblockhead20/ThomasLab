@@ -15,7 +15,9 @@ export const PLAYER_CONFIG = Object.freeze({
   staminaSupportProbeRadius: 0.27,
   staminaSupportProbeExtra: 0.38,
   staminaMinimumSupportFraction: 0.44,
-  staminaPartialSupportFraction: 0.33,
+  // Two nearby samples out of the nine-point sole pattern are enough for a narrow but
+  // plausible ledge. One isolated point still cannot count as rest support.
+  staminaPartialSupportFraction: 0.22,
   staminaPartialSupportExtra: 0.14,
   staminaPartialSupportMaximumSpeed: 0.16,
   staminaMaximumSupportSlopeDegrees: 55,
@@ -61,11 +63,15 @@ export const PLAYER_CONFIG = Object.freeze({
   stationaryContactMaximumSpeed: 0.12,
   stationaryContactProbeExtra: 0.16,
   stationaryContactMinimumSamples: 2,
+  contactLockEscapeSeconds: 0.3,
   momentumDeflectMinimumSpeed: 5.6,
   momentumDeflectBlockedRatio: 0.5,
   momentumDeflectUpSpeed: 2.4,
   momentumDeflectRetention: 0.88,
-  stepHeight: 0.42,
+  // One shared tolerance owns ordinary curb/rock-lip traversal. Keep it below a real
+  // climbing step so it smooths mesh seams without becoming free mantle height.
+  microLipHeight: 0.46,
+  microLipMinimumWidth: 0.16,
   respawnHeight: -14
 });
 
@@ -84,6 +90,9 @@ export const NORMAL_JUMP_APEX_METERS = PLAYER_CONFIG.jumpSpeed ** 2 / (2 * PLAYE
 export const CLIMBING_CONFIG = Object.freeze({
   gripDistance: 1.05,
   gripProbeSideOffset: 0.27,
+  gripProbeVerticalOffset: 0.24,
+  gripProbeFanAmount: 0.16,
+  gripCandidateContinuityBonus: 0.13,
   gripFacingDotMaximum: -0.18,
   wallDistance: 0.52,
   trackingDistance: 1.3,
@@ -132,6 +141,8 @@ export const CLIMBING_CONFIG = Object.freeze({
   // capsule center already being near the platform. It works from both climbing and jumps.
   mantleFaceReach: 1.75,
   mantleFaceProbeHeights: Object.freeze([0.02, 0.24, 0.46, 0.68]),
+  mantleFaceProbeSideOffsets: Object.freeze([0, -0.18, 0.18]),
+  mantleLandingSlopeAllowanceDegrees: 3,
   mantleHeadProbeHeight: 0.82,
   mantleTopProbeUp: 1.82,
   mantleProbeInsets: Object.freeze([0.42, 0.62, 0.84, 1.08, 1.36, 1.68, 2.02, 2.38, 2.78]),

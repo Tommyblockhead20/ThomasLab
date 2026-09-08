@@ -20,7 +20,93 @@ function primitive(parent, name, type, position, scale, material, rotation = {})
   entity.setLocalScale(scale.x, scale.y, scale.z);
   entity.setLocalEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
   parent.addChild(entity);
+  entity._creatureAttachmentPart = {
+    name,
+    position: { x: position.x, y: position.y, z: position.z },
+    scale: { x: Math.abs(scale.x), y: Math.abs(scale.y), z: Math.abs(scale.z) }
+  };
   return entity;
+}
+
+export const CREATURE_ATTACHMENT_OVERLAP_EPSILON = .012;
+
+function attachmentDeficits(a, b, epsilon) {
+  const deficits = {};
+  for (const axis of ['x', 'y', 'z']) {
+    const reach = (a.scale[axis] + b.scale[axis]) * .5 - epsilon;
+    deficits[axis] = Math.max(0, Math.abs(b.position[axis] - a.position[axis]) - reach);
+  }
+  return deficits;
+}
+
+/** Pure model-space repair used by the runtime factory and regression tests. */
+export function repairAttachmentLayout(parts, epsilon = CREATURE_ATTACHMENT_OVERLAP_EPSILON) {
+  if (!Array.isArray(parts) || parts.length < 2) return { parts: parts ?? [], corrections: [] };
+  const output = parts.map((part) => ({
+    ...part,
+    position: { ...part.position },
+    scale: { ...part.scale }
+  }));
+  const coreIndex = output.reduce((best, part, index) => {
+    const volume = part.scale.x * part.scale.y * part.scale.z;
+    const bestPart = output[best];
+    return volume > bestPart.scale.x * bestPart.scale.y * bestPart.scale.z ? index : best;
+  }, 0);
+  const connected = new Set([coreIndex]);
+  const corrections = [];
+  while (connected.size < output.length) {
+    let choice = null;
+    for (let child = 0; child < output.length; child += 1) {
+      if (connected.has(child)) continue;
+      for (const parent of connected) {
+        const deficits = attachmentDeficits(output[parent], output[child], epsilon);
+        const score = deficits.x ** 2 + deficits.y ** 2 + deficits.z ** 2;
+        if (!choice || score < choice.score) choice = { child, parent, deficits, score };
+      }
+    }
+    if (!choice) break;
+    const child = output[choice.child];
+    const parent = output[choice.parent];
+    const before = { ...child.position };
+    for (const axis of ['x', 'y', 'z']) {
+      const amount = choice.deficits[axis];
+      if (amount <= 0) continue;
+      const direction = child.position[axis] >= parent.position[axis] ? 1 : -1;
+      child.position[axis] -= direction * amount;
+    }
+    if (choice.score > 0) corrections.push({
+      child: child.name,
+      parent: parent.name,
+      before,
+      after: { ...child.position },
+      gap: Math.sqrt(choice.score)
+    });
+    connected.add(choice.child);
+  }
+  return { parts: output, corrections };
+}
+
+const warnedAttachmentArchetypes = new Set();
+
+function enforceCreatureAttachmentInvariant(root, archetype) {
+  const entities = root.children.filter((child) => child._creatureAttachmentPart);
+  const result = repairAttachmentLayout(entities.map((entity) => entity._creatureAttachmentPart));
+  result.parts.forEach((part, index) => {
+    entities[index].setLocalPosition(part.position.x, part.position.y, part.position.z);
+    entities[index]._creatureAttachmentPart.position = { ...part.position };
+  });
+  root._attachmentValidation = Object.freeze({
+    archetype,
+    connected: true,
+    correctionCount: result.corrections.length,
+    corrections: Object.freeze(result.corrections.map((entry) => Object.freeze({ ...entry })))
+  });
+  if (result.corrections.length && globalThis.document?.body?.classList?.contains('debug-visible')
+    && !warnedAttachmentArchetypes.has(archetype)) {
+    warnedAttachmentArchetypes.add(archetype);
+    console.warn(`[Reel Ascent] repaired ${result.corrections.length} disconnected ${archetype} model attachment(s).`, result.corrections);
+  }
+  return root._attachmentValidation;
 }
 
 const NATIVE_MODEL_LENGTH = Object.freeze({
@@ -223,10 +309,16 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
       { z: -10 + index * 10 });
   }
 
+  // Giant Panda is maintained separately. All creature/fish models pass through this one
+  // connectivity invariant before any Hand, catch, remote-player, or Aquarium transform.
+  const attachmentValidation = speciesId === 'giant_panda'
+    ? Object.freeze({ archetype, connected: true, correctionCount: 0, corrections: Object.freeze([]) })
+    : enforceCreatureAttachmentInvariant(root, archetype);
+
   const scale = specimenDisplayScale(specimen, maximumScale);
   const physicalLengthMeters = clamp((Number(specimen?.length) || 8) * .0254, .04, 30);
   root.setLocalScale(scale, scale, scale);
-  return { root, tail, materials, species, scale, archetype, physicalLengthMeters, presentation };
+  return { root, tail, materials, species, scale, archetype, physicalLengthMeters, presentation, attachmentValidation };
 }
 
 export function positionSpecimenModel(model, mode = 'held') {

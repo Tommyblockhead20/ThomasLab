@@ -1,5 +1,6 @@
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 import { formatInputCode } from '../player/movement.js';
+import { GAME_VERSION } from '../version.js';
 
 function formatRunTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
@@ -10,6 +11,8 @@ const DEBUG_LANE_LABELS = Object.freeze({ A: 'LEFT', W: 'UP', S: 'DOWN', D: 'RIG
 
 export class Hud {
   constructor() {
+    const version = document.querySelector('#pause-version');
+    if (version) version.textContent = GAME_VERSION;
     this.root = document.querySelector('#hud');
     this.staminaPanel = document.querySelector('.stamina-panel');
     this.staminaTrack = document.querySelector('.stamina-track');
@@ -18,14 +21,6 @@ export class Hud {
     this.debugPanel = document.querySelector('#debug-panel');
     this.gripPrompt = document.querySelector('#grip-prompt');
     this.fishPrompt = document.querySelector('#fish-prompt');
-    const multiplayerHints = new Set([
-      ...document.querySelectorAll('[data-control-hint="multiplayer"]'),
-      ...[...document.querySelectorAll('.controls-card > span')].filter((hint) => /multiplayer/i.test(hint.textContent ?? ''))
-    ]);
-    for (const hint of multiplayerHints) {
-      hint.dataset.controlHint = 'settings';
-      hint.innerHTML = '<kbd>Esc</kbd> Settings';
-    }
     this.controlHints = Object.fromEntries(['move', 'sprint', 'jump', 'slide', 'grip', 'fish', 'inventory', 'journal', 'settings', 'emotes', 'map'].map((id) => [
       id, [...document.querySelectorAll(`[data-control-hint="${id}"] kbd, [data-control-key="${id}"]`)]
     ]));

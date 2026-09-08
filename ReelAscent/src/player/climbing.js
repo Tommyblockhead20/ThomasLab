@@ -52,6 +52,7 @@ export class ClimbingController {
     this.debugCandidates = [];
     this.lastGripRejection = 'no probe hit';
     this.lastSurfaceSwitch = 'none';
+    this.lastGripHandle = null;
     this.output = {
       type: 'climbing',
       movement: new pc.Vec3(),
@@ -99,13 +100,30 @@ export class ClimbingController {
     direction.y = clamp(direction.y, -0.2, 0.2);
     direction.normalize();
     const side = new pc.Vec3(-direction.z, 0, direction.x).normalize();
-    const probes = [
-      { height: this.probeHeights[0], side: -CLIMBING_CONFIG.gripProbeSideOffset, priority: 0 },
-      { height: this.probeHeights[0], side: 0, priority: 0.01 },
-      { height: this.probeHeights[0], side: CLIMBING_CONFIG.gripProbeSideOffset, priority: 0 },
-      { height: this.probeHeights[1], side: 0, priority: 0.05 },
-      { height: this.probeHeights[2], side: 0, priority: 0.12 }
+    // These origins and slightly fanned directions approximate a hand/torso volume while
+    // retaining ray-cast determinism. A thin seam can no longer fall between one center ray.
+    const sideOffsets = [
+      -CLIMBING_CONFIG.gripProbeSideOffset,
+      0,
+      CLIMBING_CONFIG.gripProbeSideOffset
     ];
+    const heightOffsets = [
+      this.probeHeights[0] + CLIMBING_CONFIG.gripProbeVerticalOffset,
+      this.probeHeights[0],
+      this.probeHeights[1],
+      this.probeHeights[2]
+    ];
+    const probes = heightOffsets.flatMap((height, heightIndex) => sideOffsets.flatMap((sideOffset) => {
+      const fans = sideOffset === 0
+        ? [0]
+        : [0, Math.sign(sideOffset) * CLIMBING_CONFIG.gripProbeFanAmount];
+      return fans.map((fan, fanIndex) => ({
+        height,
+        side: sideOffset,
+        fan,
+        priority: heightIndex * .025 + Math.abs(sideOffset) * .035 + fanIndex * .012
+      }));
+    }));
     const candidates = new Map();
 
     for (const probe of probes) {
@@ -114,7 +132,10 @@ export class ClimbingController {
         y: position.y + probe.height,
         z: position.z + side.z * probe.side
       };
-      const ray = new this.RAPIER.Ray(origin, direction);
+      const probeDirection = direction.clone()
+        .add(side.clone().mulScalar(probe.fan))
+        .normalize();
+      const ray = new this.RAPIER.Ray(origin, probeDirection);
       const hit = this.physicsWorld.castRayAndGetNormal(
         ray,
         maximumDistance * MAX_GRIP_QUALITY,
@@ -157,7 +178,7 @@ export class ClimbingController {
         hitDebug.reason = material.grippable ? 'unsupported overhang' : 'ungrippable material';
         continue;
       }
-      const facingDot = direction.dot(normal);
+      const facingDot = probeDirection.dot(normal);
       if (facingDot > CLIMBING_CONFIG.gripFacingDotMaximum) {
         hitDebug.reason = 'not facing surface';
         continue;
@@ -168,13 +189,15 @@ export class ClimbingController {
         distance: hit.timeOfImpact,
         normal,
         point: new pc.Vec3(
-          origin.x + direction.x * hit.timeOfImpact,
-          origin.y + direction.y * hit.timeOfImpact,
-          origin.z + direction.z * hit.timeOfImpact
+          origin.x + probeDirection.x * hit.timeOfImpact,
+          origin.y + probeDirection.y * hit.timeOfImpact,
+          origin.z + probeDirection.z * hit.timeOfImpact
         ),
         surface,
         facingDot,
         score: hit.timeOfImpact + probe.priority + (facingDot + 1) * 0.08
+          - (hit.collider.handle === this.lastGripHandle
+            ? CLIMBING_CONFIG.gripCandidateContinuityBonus : 0)
       };
       hitDebug.accepted = true;
       hitDebug.reason = 'candidate';
@@ -197,6 +220,7 @@ export class ClimbingController {
     this.lastGripRejection = best
       ? 'accepted'
       : this.debugProbeHits.at(-1)?.reason ?? 'no climbable probe hit';
+    if (best) this.lastGripHandle = best.collider.handle;
     return best;
   }
 
@@ -360,14 +384,22 @@ export class ClimbingController {
     }
     approach.normalize();
     const side = new pc.Vec3(-approach.z, 0, approach.x).normalize();
-    const walkableNormalY = Math.cos(PLAYER_CONFIG.maxSlopeDegrees * Math.PI / 180);
+    const walkableNormalY = Math.cos(
+      (PLAYER_CONFIG.maxSlopeDegrees + CLIMBING_CONFIG.mantleLandingSlopeAllowanceDegrees)
+      * Math.PI / 180
+    );
     const feetOffset = PLAYER_CONFIG.capsuleHalfHeight + PLAYER_CONFIG.radius;
 
     // First locate a nearby front face at torso height. Jump mantles require this explicit
     // lip; climbing mantles may use the already-tracked wall even after its top ray disappears.
     let face = null;
     for (const height of CLIMBING_CONFIG.mantleFaceProbeHeights) {
-      const origin = { x: position.x, y: position.y + height, z: position.z };
+      for (const sideOffset of CLIMBING_CONFIG.mantleFaceProbeSideOffsets) {
+      const origin = {
+        x: position.x + side.x * sideOffset,
+        y: position.y + height,
+        z: position.z + side.z * sideOffset
+      };
       const ray = new this.RAPIER.Ray(origin, approach);
       const hit = this.physicsWorld.castRayAndGetNormal(
         ray,
@@ -398,6 +430,7 @@ export class ClimbingController {
             origin.z + approach.z * hit.timeOfImpact
           )
         };
+      }
       }
     }
 

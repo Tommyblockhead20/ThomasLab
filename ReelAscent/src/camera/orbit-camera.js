@@ -81,9 +81,9 @@ export class OrbitCamera {
 
     this.onMouseMove = (event) => {
       if (document.pointerLockElement !== this.canvas && !this.dragging) return;
-      // A primary hold is Grip/fishing ownership, not a second camera gesture. Ordinary
-      // pointer-lock look and un-pointerlocked drag both work while no primary action owns it.
-      if (this.player.input.primaryHeld) return;
+      // Looking is independent from action ownership. In pointer lock the same primary
+      // hold may own Grip, but relative mouse motion must continue to orbit the camera.
+      // Outside pointer lock the initial primary press still owns the ordinary drag orbit.
       if (this.dragging) {
         this.dragDistance += Math.abs(event.movementX) + Math.abs(event.movementY);
       }

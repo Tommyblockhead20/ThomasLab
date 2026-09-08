@@ -535,6 +535,16 @@ export class SaveSystem {
     return this.slotStore.slots.map((slot) => summarizeSlot(slot, this.activeSlotId));
   }
 
+  getSlotSnapshot(id) {
+    const slot = this.slotStore.slots.find((entry) => entry.id === id && entry.data);
+    return slot ? copy(migrate(slot.data)) : null;
+  }
+
+  getSlotMetadata(id) {
+    const slot = this.slotStore.slots.find((entry) => entry.id === id && entry.data);
+    return slot ? { createdAt: slot.createdAt, updatedAt: slot.updatedAt } : null;
+  }
+
   createSlot(id) {
     const slot = this.slotStore.slots.find((entry) => entry.id === id);
     if (!slot || slot.data) return false;
@@ -575,14 +585,16 @@ export class SaveSystem {
     }
   }
 
-  replaceSlotData(id, value) {
+  replaceSlotData(id, value, importedMetadata = null) {
     const slot = this.slotStore.slots.find((entry) => entry.id === id);
     if (!slot) return false;
     const previous = { data: slot.data, createdAt: slot.createdAt, updatedAt: slot.updatedAt };
     const now = Date.now();
     slot.data = migrate(value);
-    slot.createdAt ||= now;
-    slot.updatedAt = now;
+    const importedCreatedAt = finiteNumber(importedMetadata?.createdAt);
+    const importedUpdatedAt = finiteNumber(importedMetadata?.updatedAt);
+    slot.createdAt = importedCreatedAt > 0 ? importedCreatedAt : (slot.createdAt || now);
+    slot.updatedAt = importedUpdatedAt > 0 ? importedUpdatedAt : now;
     try {
       this.writeSlotStore();
       if (id === this.activeSlotId) this.data = migrate(slot.data);

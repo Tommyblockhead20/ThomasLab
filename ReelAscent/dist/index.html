@@ -8,31 +8,8 @@
       content="Reel Ascent is an original low-poly climbing and fishing adventure prototype."
     />
     <title>Reel Ascent — Climbing & Fishing Prototype</title>
-    <style>
-      #return-home {
-        position: fixed;
-        left: 12px;
-        top: max(7rem, calc(env(safe-area-inset-top) + 7rem));
-        z-index: 40;
-        pointer-events: auto;
-        border: 1px solid rgba(255,255,255,.24);
-        border-radius: 9px;
-        padding: 7px 10px;
-        background: rgba(38, 70, 67, .82);
-        color: #fff8c9;
-        font: 700 11px/1 system-ui, sans-serif;
-        letter-spacing: .04em;
-        cursor: pointer;
-        backdrop-filter: blur(4px);
-      }
-      #return-home:hover, #return-home:focus-visible {
-        background: rgba(49, 88, 83, .96);
-        outline: 2px solid rgba(255, 225, 113, .7);
-        outline-offset: 2px;
-      }
-    </style>
-    <script type="module" crossorigin src="./assets/index-Dv2mKbke.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-B3ChD-9T.css">
+    <script type="module" crossorigin src="./assets/index-Dqv0kyut.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BEMSgzDN.css">
   </head>
   <body>
     <main id="game-shell">
@@ -59,21 +36,6 @@
         </div>
 
         <div id="currency-indicator" class="currency-indicator" aria-label="Current money">$0</div>
-
-        <button id="return-home" type="button" title="Return to your cabin on Home Island">⌂ HOME</button>
-
-        <div class="controls-card">
-          <span data-control-hint="move"><kbd>WASD / Arrows</kbd> Move</span>
-          <span data-control-hint="sprint"><kbd>Shift</kbd> Sprint</span>
-          <span data-control-hint="jump"><kbd>Space</kbd> Jump / Push off</span>
-          <span data-control-hint="slide"><kbd>C</kbd> Slide</span>
-          <span data-control-hint="grip"><kbd>Click / G</kbd> Grip</span>
-          <span data-control-hint="fish"><kbd>F</kbd> Fish</span>
-          <span><kbd>J</kbd> Journal</span>
-          <span><kbd>I</kbd> Inventory</span>
-          <span data-control-hint="settings"><kbd>Esc</kbd> Settings</span>
-          <span><kbd>E</kbd> Emotes</span>
-        </div>
 
         <section id="multiplayer-catch-feed" class="multiplayer-catch-feed" hidden aria-live="polite" aria-label="Remote catches"></section>
         <aside id="home-interaction-prompt" class="home-interaction-prompt" hidden aria-live="polite">
@@ -197,19 +159,24 @@
 
       <section id="pause-menu" class="pause-menu" role="dialog" aria-modal="true" hidden aria-labelledby="pause-title">
         <header class="pause-header">
-          <div><span class="eyebrow">REEL ASCENT</span><h2 id="pause-title">Paused</h2></div>
+          <div><span class="eyebrow">REEL ASCENT <small id="pause-version" class="game-version"></small></span><h2 id="pause-title">Paused</h2></div>
           <button id="pause-resume" type="button">RESUME <kbd>Esc</kbd></button>
         </header>
-        <nav id="pause-tabs" class="pause-tabs" aria-label="Pause sections">
-          <button type="button" data-pause-tab="stats" aria-pressed="true">STATS</button>
-          <button type="button" data-pause-tab="save-data" aria-pressed="false">SAVE / DATA</button>
-          <button type="button" data-pause-tab="settings" aria-pressed="false">SETTINGS / ACCESSIBILITY</button>
-          <button type="button" data-pause-tab="keybinds" aria-pressed="false">KEY REBINDING</button>
-          <button type="button" data-pause-open-multiplayer>MULTIPLAYER</button>
-        </nav>
-        <p id="pause-status" class="pause-status" aria-live="polite"></p>
-        <div id="pause-content" class="pause-content"></div>
-        <input id="pause-progress-file" type="file" accept="application/json,.json" hidden />
+        <div class="pause-workspace">
+          <nav id="pause-tabs" class="pause-tabs" aria-label="Pause sections">
+            <button type="button" data-pause-action="cabin">CABIN</button>
+            <button type="button" data-pause-open-multiplayer aria-pressed="false">MULTIPLAYER</button>
+            <button type="button" data-pause-tab="saves" aria-pressed="false">SAVES</button>
+            <button type="button" data-pause-tab="settings" aria-pressed="false">SETTINGS</button>
+            <button type="button" data-pause-tab="stats" aria-pressed="true">STATS</button>
+            <button type="button" data-pause-tab="controls" aria-pressed="false">CONTROLS</button>
+          </nav>
+          <div class="pause-main">
+            <p id="pause-status" class="pause-status" aria-live="polite"></p>
+            <div id="pause-content" class="pause-content"></div>
+          </div>
+        </div>
+        <input id="pause-progress-file" type="file" accept="application/json,application/gzip,.json,.reelascent" hidden />
       </section>
 
       <section id="fish-journal" class="fish-journal" role="dialog" aria-modal="true" hidden aria-labelledby="journal-title" tabindex="-1">

@@ -152,25 +152,6 @@ body {
   letter-spacing: 0.2em;
 }
 
-.controls-card {
-  position: absolute;
-  top: max(1.1rem, env(safe-area-inset-top));
-  right: max(1.1rem, env(safe-area-inset-right));
-  display: flex;
-  gap: 0.55rem 0.8rem;
-  max-width: 33rem;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  padding: 0.72rem 0.85rem;
-  color: rgb(255 255 255 / 90%);
-  font-size: 0.69rem;
-  font-weight: 700;
-  background: rgb(15 47 46 / 52%);
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 0.8rem;
-  backdrop-filter: blur(8px);
-}
-
 .multiplayer-catch-feed {
   position: absolute;
   top: max(6.2rem, calc(env(safe-area-inset-top) + 6.2rem));
@@ -1676,7 +1657,6 @@ body.fish-danger #game-shell::after {
   text-shadow: none;
 }
 
-body.mobile-mode .controls-card,
 body.mobile-mode .mouse-hint,
 body.mobile-mode .grip-prompt,
 body.mobile-mode .fish-prompt {
@@ -1870,15 +1850,6 @@ body.mobile-mode .rhythm-panel {
 }
 
 @media (max-width: 700px) {
-  .controls-card {
-    top: auto;
-    right: 0.8rem;
-    bottom: 0.8rem;
-    left: 0.8rem;
-    justify-content: center;
-    max-width: none;
-  }
-
   .stamina-panel {
     bottom: 5.2rem;
   }
@@ -2336,7 +2307,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .emote-menu button { padding: .52rem .65rem; color: #153a36; background: #edd58c; border: 0; border-radius: .4rem; font-size: .58rem; font-weight: 950; cursor: pointer; }
 .mountain-map-layout { display: grid; grid-template-columns: minmax(22rem, 2fr) minmax(13rem, .62fr); gap: 1rem; align-items: center; }
 .mountain-map-graphic { width: 100%; max-height: min(80vh, 52rem); border: 1px solid rgb(239 217 139 / 30%); border-radius: .6rem; }
-.map-paper { fill: #d9d0a8; }
+.map-paper { fill: #76aeb1; }
 .map-ocean { fill: #76aeb1; stroke: #2c7475; stroke-width: 2; }
 .map-shore { fill: #c6ba88; }
 .map-elevation { stroke: none; }
@@ -2518,7 +2489,7 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
   display: grid;
   width: min(58rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: .72rem;
   padding: 1rem;
   overflow: hidden;
@@ -2554,11 +2525,24 @@ body.pause-open #game-shell::after {
   border-radius: .45rem;
   cursor: pointer;
 }
-.pause-tabs { display: flex; gap: .38rem; flex-wrap: wrap; }
+.pause-workspace { display: grid; min-height: 0; grid-template-columns: 10rem minmax(0, 1fr); gap: .8rem; }
+.pause-main { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: .55rem; }
+.pause-tabs { display: grid; align-content: start; gap: .38rem; }
 .pause-tabs button { color: #e8f1e9; background: rgb(255 255 255 / 8%); border: 1px solid rgb(255 255 255 / 8%); }
 .pause-tabs button[aria-pressed="true"] { color: #153a36; background: #edd58c; border-color: #edd58c; }
 .pause-status { min-height: 1rem; margin: 0; color: rgb(234 244 231 / 64%); font-size: .6rem; font-weight: 750; }
 .pause-content { min-height: 0; overflow: auto; padding: .08rem .2rem .25rem .05rem; scrollbar-color: #d9bb66 rgb(255 255 255 / 8%); }
+.pause-multiplayer-host { min-height: 0; }
+.multiplayer-menu.is-pause-embedded { position: relative; z-index: auto; inset: auto; width: 100%; padding: .7rem; translate: none; box-shadow: none; }
+.game-version { margin-left: .2rem; color: #e4c96f; font: 800 .48rem ui-monospace, monospace; letter-spacing: .04em; opacity: .72; }
+.save-local-note { margin: 0 0 .65rem; padding: .55rem .65rem; color: rgb(234 244 231 / 72%); font-size: .58rem; line-height: 1.45; background: rgb(255 255 255 / 4%); border-radius: .45rem; }
+.progress-import { margin-top: .7rem; padding: .7rem; background: rgb(0 0 0 / 14%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .55rem; }
+.progress-import header { display: flex; align-items: center; justify-content: space-between; }
+.progress-import h3 { margin: 0; color: #efd98b; font-size: .62rem; }
+.progress-import p, .import-ready { color: rgb(234 244 231 / 70%); font-size: .58rem; line-height: 1.45; }
+.progress-import label { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; font-size: .56rem; font-weight: 900; }
+.progress-import select { min-width: 9rem; padding: .4rem; color: #edf6e9; background: #153a36; border: 1px solid rgb(239 217 139 / 42%); border-radius: .38rem; }
+.save-slot-actions button:disabled { opacity: .45; cursor: default; }
 .pause-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
 .pause-stats-grid article { display: grid; gap: .2rem; min-height: 4.1rem; align-content: center; padding: .62rem; background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .52rem; }
 .pause-stats-grid small,
@@ -2584,7 +2568,6 @@ body.pause-open #game-shell::after {
 .keybind-row small { color: rgb(234 244 231 / 53%); font-size: .49rem; }
 .keybind-row kbd { min-width: 4.4rem; text-align: center; }
 .pause-secondary-action { margin-top: .55rem; }
-body.hide-control-hints .controls-card { display: none; }
 body[data-ui-scale="compact"] :is(.pause-menu, .progression-shop, .mountain-map, .appearance-menu, .multiplayer-menu, .emote-menu) { font-size: .9em; }
 body.large-ui .pause-menu,
 body.large-ui .progression-shop,
@@ -2617,7 +2600,7 @@ body.rhythm-high-contrast .rhythm-note { filter: saturate(1.4) contrast(1.45); o
 .held-minimap header strong { overflow: hidden; font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
 .held-minimap header span { color: #efd98b; font-size: .43rem; font-weight: 950; white-space: nowrap; }
 .held-minimap svg { display: block; width: 100%; border-radius: .42rem; }
-.minimap-paper { fill: #d9d0a8; }
+.minimap-paper { fill: #5d9fa8; }
 .minimap-island { fill: #7d9a66; stroke: #315b45; stroke-width: 2; }
 .minimap-cold-island { fill: #e4efea; stroke: #78aeb9; }
 .minimap-cave-island { fill: #777a70; }
@@ -2700,16 +2683,22 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .boat-map-main-island .boat-map-footprint { width: 3.75rem; height: 2.55rem; color: #f2e4b0; font-size: 1.45rem; background: #789264; border-radius: 42% 52% 40% 55%; }
 .boat-map-cold-island .boat-map-footprint { background: #e8f4ec; border-color: #9fd0df; }
 .boat-map-cave-island .boat-map-footprint { background: #777a70; border-color: #4e544d; }
+.boat-map-mythical-library-island .boat-map-footprint { color: #e8d99d; background: #4d5064; border-color: #d4bd70; }
+.boat-map-large-island-foundation .boat-map-footprint { background: #6f8762; border-color: #405d47; }
 .boat-map-developed-island .boat-map-footprint { background: #9ca66b; }
 .boat-map-aquarium-island .boat-map-footprint { background: #82ae79; }
 .boat-map-fishing-island .boat-map-footprint { background: #76a667; }
 .boat-map-open-water-boat .boat-map-footprint { width: 2.8rem; height: 2rem; color: #f5e5ad; font-size: 1.3rem; background: #336e82; border-color: #174858; clip-path: none !important; }
 .boat-map-island.is-current { box-shadow: 0 0 0 3px #fff5b6; }
 .boat-map-island.is-selected { outline: 3px solid #f2bd45; outline-offset: 1px; }
+.boat-map-island:disabled { opacity: .78; }
+.boat-map-lock { display: block; max-width: 8.5rem; color: #f5dda0; font-size: .42rem; line-height: 1.25; }
 
 .map-islands :is(ellipse, polygon) { fill: #6f9958; stroke: #2d5c45; stroke-width: 1.4; }
 .map-island-cold-island :is(ellipse, polygon) { fill: #e4efea; stroke: #78aeb9; }
 .map-island-cave-island :is(ellipse, polygon) { fill: #777a70; }
+.map-island-mythical-library-island :is(ellipse, polygon) { fill: #56586d; stroke: #d4bd70; }
+.map-island-large-island-foundation :is(ellipse, polygon) { fill: #6f8762; stroke: #405d47; }
 .map-open-water-boat path,
 .minimap-open-water-boat path { fill: #366f82; stroke: #f7e4a7; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .map-open-water-boat path + path,
@@ -2721,8 +2710,7 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 @media (max-width: 760px) {
   .pause-menu { width: calc(100vw - 1rem); max-height: calc(100vh - 1rem); padding: .75rem; }
   .pause-header { align-items: stretch; }
-  .pause-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pause-tabs button:last-child { grid-column: 1 / -1; }
+  .pause-workspace { grid-template-columns: 7rem minmax(0, 1fr); }
   .pause-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .keybind-row { grid-template-columns: minmax(0, 1fr) auto; }
   .keybind-row button { grid-column: 1 / -1; }

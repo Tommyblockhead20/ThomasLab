@@ -143,7 +143,11 @@ export class Player {
 
     this.controller = this.physicsWorld.createCharacterController(0.025);
     this.controller.setSlideEnabled(true);
-    this.controller.enableAutostep(PLAYER_CONFIG.stepHeight, 0.2, false);
+    this.controller.enableAutostep(
+      PLAYER_CONFIG.microLipHeight,
+      PLAYER_CONFIG.microLipMinimumWidth,
+      false
+    );
     this.controller.enableSnapToGround(0.22);
     this.controller.setMaxSlopeClimbAngle(PLAYER_CONFIG.maxSlopeDegrees * Math.PI / 180);
     this.controller.setMinSlopeSlideAngle(PLAYER_CONFIG.slideSlopeDegrees * Math.PI / 180);
@@ -1169,6 +1173,9 @@ export class Player {
       && groundSurface?.slopeDegrees <= PLAYER_CONFIG.staminaMaximumSupportSlopeDegrees);
     if (!this.climbing.active && ['climbing', 'mantling'].includes(this.movementState)
       && (legalGroundSupport || footSupport.stable) && !hasMoveInput) {
+      this.climbing.detach(0);
+      this.clearContactMotionLock();
+      this.grounded = true;
       this.movementState = 'grounded';
     }
     const normalFootRecovery = Boolean(this.grounded
@@ -1308,7 +1315,14 @@ export class Player {
       if (jumpPressed || this.input.gripHeld) {
         this.clearContactMotionLock();
       } else if (hasMoveInput) {
-        const escapeSpeed = PLAYER_CONFIG.walkSpeed * .82;
+        const escapeProgress = clamp(
+          this.contactLockEscapeTimer / PLAYER_CONFIG.contactLockEscapeSeconds,
+          0,
+          1
+        );
+        // Ramp the solver-owned escape from a careful nudge to normal walking authority.
+        // This preserves agency without producing the old one-frame sideways pop.
+        const escapeSpeed = PLAYER_CONFIG.walkSpeed * lerp(.42, .92, escapeProgress);
         const desiredEscape = {
           x: this.moveDirection.x * escapeSpeed * dt,
           y: 0,
@@ -1339,7 +1353,7 @@ export class Player {
         // most recent non-opposing-contact transform. This is a deterministic one-time recovery,
         // not a force that can alternate and recreate the old jitter.
         this.contactLockEscapeTimer += dt;
-        if (this.contactLockEscapeTimer >= .14) {
+        if (this.contactLockEscapeTimer >= PLAYER_CONFIG.contactLockEscapeSeconds) {
           this.recoverFromContactTrap();
           return;
         }

@@ -34,7 +34,9 @@ export const ISLAND_OUTLINES = Object.freeze({
   'aquarium-island': outlineFromScales([1.07, 1.01, .96, 1.03, 1.08, 1.01, .95, 1.02, 1.08, 1.01, .96, 1.02]),
   'cave-fishing-island': outlineFromScales([1.19, .93, 1.11, .86, 1.23, .91, 1.09, .84, 1.18, .96, 1.13, .88]),
   'normal-fishing-island': outlineFromScales([1.13, 1.04, .92, .88, .98, 1.11, 1.17, 1.03, .91, .95, 1.08, 1.15]),
-  'cold-island': outlineFromScales([1.22, .88, 1.17, .91, 1.25, .87, 1.13, .9, 1.23, .89, 1.16, .9])
+  'cold-island': outlineFromScales([1.22, .88, 1.17, .91, 1.25, .87, 1.13, .9, 1.23, .89, 1.16, .9]),
+  'veiled-athenaeum': outlineFromScales([1.16, .92, 1.08, 1.2, .88, 1.11, .95, 1.18, .9, 1.05, 1.14, .94]),
+  'skyreach-foundation': outlineFromScales([1.12, .96, 1.18, .9, 1.08, 1.16, .94, 1.13, .89, 1.19, .97, 1.08])
 });
 
 function ellipseRadiusAlong(radii, direction) {
@@ -56,7 +58,8 @@ function outlineScaleAt(locationId, angleDegrees) {
 
 function islandLocation({
   id, displayName, type, angle, radius, radii, elevation, theme, functions = [],
-  mapClass = type, dockLength = 12.5, dockSide = 'mountain'
+  mapClass = type, dockLength = 12.5, dockSide = 'mountain',
+  destinationEnabled = true, lockMessage = ''
 }) {
   const direction = { x: Math.cos(radians(angle)), z: Math.sin(radians(angle)) };
   const center = {
@@ -88,7 +91,7 @@ function islandLocation({
     alwaysLoaded: false,
     coordinateSpace: 'global-world',
     mapRepresentation: Object.freeze({ className: mapClass, label: displayName }),
-    destination: Object.freeze({ enabled: true, order: 1 }),
+    destination: Object.freeze({ enabled: destinationEnabled, order: 1, lockMessage }),
     dock: Object.freeze({
       id: `${id}-dock`,
       worldPosition: Object.freeze({
@@ -145,7 +148,10 @@ function openWaterBoatLocation({ id, displayName, angle, radius }) {
   });
 }
 
-export const SMALL_ISLAND_LOCATIONS = Object.freeze([
+// Generic satellite registry: entries may be compact activity islands, large future
+// foundations, structures, or virtual craft. Keep the legacy alias below for callers that
+// predate v14; new systems should consume SATELLITE_WORLD_LOCATIONS or WORLD_LOCATIONS.
+export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
   islandLocation({
     id: 'home-island', displayName: 'Hearthward Isle', type: 'home-island',
     angle: 222, radius: 980, radii: { x: 22, z: 18 }, elevation: .72,
@@ -182,10 +188,26 @@ export const SMALL_ISLAND_LOCATIONS = Object.freeze([
     angle: 270, radius: 1540, radii: { x: 22, z: 18 }, elevation: .76,
     theme: 'polar', functions: ['cold-fishing']
   }),
+  islandLocation({
+    id: 'veiled-athenaeum', displayName: 'The Veiled Athenaeum', type: 'mythical-library-island',
+    angle: 246, radius: 1435, radii: { x: 31, z: 25 }, elevation: .88,
+    theme: 'mythical-archive', functions: ['future-library', 'lore'], dockLength: 15,
+    destinationEnabled: false,
+    lockMessage: 'A veil of old tide-magic seals the Athenaeum. Its archive will open in a future expedition.'
+  }),
+  islandLocation({
+    id: 'skyreach-foundation', displayName: 'Skyreach Foundation', type: 'large-island-foundation',
+    angle: 66, radius: 1650, radii: { x: 48, z: 39 }, elevation: .64,
+    theme: 'future-parkour-foundation', functions: ['future-tower', 'future-parkour'], dockLength: 18,
+    destinationEnabled: false,
+    lockMessage: 'Survey stakes mark a future tower climb. The island is not yet open for travel.'
+  }),
   openWaterBoatLocation({
     id: 'bluewater-reach', displayName: 'Bluewater Reach', angle: 196, radius: 1640
   })
 ]);
+
+export const SMALL_ISLAND_LOCATIONS = SATELLITE_WORLD_LOCATIONS;
 
 export const MAIN_WORLD_LOCATION = Object.freeze({
   // Keep the durable id for old saves/server messages; only the destination name changes.
@@ -206,7 +228,7 @@ export const MAIN_WORLD_LOCATION = Object.freeze({
 
 export const WORLD_LOCATIONS = Object.freeze([
   MAIN_WORLD_LOCATION,
-  ...SMALL_ISLAND_LOCATIONS.map((location, index) => Object.freeze({
+  ...SATELLITE_WORLD_LOCATIONS.map((location, index) => Object.freeze({
     ...location,
     destination: Object.freeze({ ...location.destination, order: index + 1 })
   }))

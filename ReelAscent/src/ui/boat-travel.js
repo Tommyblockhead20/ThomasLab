@@ -73,7 +73,17 @@ export class BoatTravelMenu {
       const label = document.createElement('b');
       label.textContent = location.displayName;
       button.append(footprint, label);
-      button.title = location.displayName;
+      const lockMessage = location.destination?.enabled === false
+        ? location.destination.lockMessage || 'This destination is not open yet.'
+        : '';
+      if (lockMessage) {
+        const lock = document.createElement('small');
+        lock.className = 'boat-map-lock';
+        lock.textContent = `LOCKED • ${lockMessage}`;
+        button.appendChild(lock);
+        button.setAttribute('aria-description', lockMessage);
+      }
+      button.title = lockMessage ? `${location.displayName} — ${lockMessage}` : location.displayName;
       return button;
     }));
   }

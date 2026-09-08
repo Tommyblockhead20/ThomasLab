@@ -41,13 +41,10 @@ export class RunManager {
     this.summary = null;
     this.debugQueue = [];
     this.newRunButton = document.querySelector('#start-new-run');
-    this.homeButton = document.querySelector('#return-home');
     this.onNewRunClick = () => {
       if (this.status === 'ended') this.debugQueue.push({ type: 'new-run' });
     };
     this.newRunButton?.addEventListener('click', this.onNewRunClick);
-    this.onHomeClick = () => this.debugQueue.push({ type: 'home' });
-    this.homeButton?.addEventListener('click', this.onHomeClick);
 
     this.onKeyDown = (event) => {
       if (event.repeat) return;
@@ -89,6 +86,10 @@ export class RunManager {
 
   get paused() {
     return this.status === 'ended';
+  }
+
+  returnToCabin() {
+    this.debugQueue.push({ type: 'home' });
   }
 
   update(dt) {
@@ -234,6 +235,5 @@ export class RunManager {
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     this.newRunButton?.removeEventListener('click', this.onNewRunClick);
-    this.homeButton?.removeEventListener('click', this.onHomeClick);
   }
 }

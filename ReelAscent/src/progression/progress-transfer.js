@@ -3,7 +3,7 @@ import { normalizeProgressionState } from './progression-save.js';
 import { SAVE_SCHEMA_VERSION, normalizeSave } from '../persistence/save-system.js';
 
 export const PROGRESS_EXPORT_FORMAT = 'reel-ascent-progress';
-export const PROGRESS_EXPORT_VERSION = 2;
+export const PROGRESS_EXPORT_VERSION = 3;
 const MAX_SPECIMENS = 2000;
 const MAX_COLLECTION_ENTRIES = 2000;
 
@@ -11,14 +11,21 @@ function copy(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-export function createProgressExport(saveSnapshot) {
+function normalizeSaveMetadata(value = {}) {
+  return {
+    createdAt: Math.max(0, Number.isFinite(value.createdAt) ? value.createdAt : 0),
+    updatedAt: Math.max(0, Number.isFinite(value.updatedAt) ? value.updatedAt : 0)
+  };
+}
+
+export function createProgressExport(saveSnapshot, saveMetadata = {}) {
   const save = normalizeSave(saveSnapshot);
   return {
     format: PROGRESS_EXPORT_FORMAT,
     exportVersion: PROGRESS_EXPORT_VERSION,
     schemaVersion: SAVE_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
-    player: copy(save.progression.player),
+    saveMetadata: normalizeSaveMetadata(saveMetadata),
     progression: {
       collection: copy(save.collection),
       lifetime: copy(save.lifetime),
@@ -29,8 +36,10 @@ export function createProgressExport(saveSnapshot) {
   };
 }
 
-export function serializeProgress(saveSnapshot) {
-  return JSON.stringify(createProgressExport(saveSnapshot), null, 2);
+export function serializeProgress(saveSnapshot, saveMetadata = {}) {
+  // Backups contain one canonical, compact state tree. UI summaries and other derived
+  // values are rebuilt after import instead of being duplicated in the file.
+  return JSON.stringify(createProgressExport(saveSnapshot, saveMetadata));
 }
 
 function parseDocument(input) {
@@ -51,9 +60,6 @@ export function validateProgressImport(input) {
   if (!Number.isInteger(document.schemaVersion) || document.schemaVersion < 1 || document.schemaVersion > SAVE_SCHEMA_VERSION) {
     throw new Error(`Unsupported save schema version: ${document.schemaVersion}.`);
   }
-  if (!document.player || typeof document.player.id !== 'string' || !document.player.id.trim()) {
-    throw new Error('The export is missing a durable player ID.');
-  }
   const portable = document.progression;
   if (!portable || typeof portable !== 'object' || Array.isArray(portable)) throw new Error('The export is missing progression data.');
   const collectionCount = portable.collection && typeof portable.collection === 'object'
@@ -62,6 +68,10 @@ export function validateProgressImport(input) {
   if (collectionCount > MAX_COLLECTION_ENTRIES) throw new Error('The collection contains too many entries.');
   const economy = portable.economy;
   if (!economy || typeof economy !== 'object' || Array.isArray(economy)) throw new Error('The export is missing economy data.');
+  const player = document.player ?? economy.player;
+  if (!player || typeof player.id !== 'string' || !player.id.trim()) {
+    throw new Error('The export is missing a durable player ID.');
+  }
   if (!Number.isFinite(economy.money) || economy.money < 0) throw new Error('Money must be a finite nonnegative number.');
   if ((economy.inventory?.length ?? 0) > MAX_SPECIMENS || (economy.aquarium?.length ?? 0) > MAX_SPECIMENS) {
     throw new Error('The export contains too many specimen records.');
@@ -72,7 +82,7 @@ export function validateProgressImport(input) {
     : [];
   const normalizedEconomy = normalizeProgressionState({
     ...economy,
-    player: document.player,
+    player,
     ownedEquipment: knownOwned,
     equipped: Object.fromEntries(
       Object.entries(economy.equipped ?? {}).filter(([, id]) => knownOwned.includes(id) && EQUIPMENT_BY_ID.has(id))
@@ -87,8 +97,9 @@ export function validateProgressImport(input) {
     progression: normalizedEconomy
   });
   return {
-    document: createProgressExport(normalizedSave),
+    document: createProgressExport(normalizedSave, document.saveMetadata),
     save: normalizedSave,
+    saveMetadata: normalizeSaveMetadata(document.saveMetadata),
     summary: {
       playerId: normalizedSave.progression.player.id,
       discovered: Object.values(normalizedSave.collection).filter((entry) => entry.discovered).length,

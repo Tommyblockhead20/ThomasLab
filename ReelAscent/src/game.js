@@ -195,10 +195,14 @@ export class Game {
     this.pauseMenu = new PauseMenu(this.progression, {
       getStats: () => this.getLifetimeStats(),
       onResume: () => this.setLocalPause(false),
-      onMultiplayer: () => {
+      onCabin: () => {
+        this.runManager.returnToCabin();
         this.setLocalPause(false);
+      },
+      onMultiplayer: () => {
         this.multiplayerMenu.open();
-      }
+      },
+      onCloseMultiplayer: () => this.multiplayerMenu.close()
     });
 
     this.onResize = () => this.app.resizeCanvas();
@@ -395,6 +399,7 @@ export class Game {
     }
     this.localPause.active = false;
     this.localPause.openedAt = null;
+    this.multiplayerMenu?.close();
     this.pauseMenu?.setOpen(false);
   }
 
