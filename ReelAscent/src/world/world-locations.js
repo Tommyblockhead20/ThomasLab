@@ -169,8 +169,8 @@ export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
   }),
   islandLocation({
     id: 'aquarium-island', displayName: 'Glasswater Isle', type: 'aquarium-island',
-    angle: 95, radius: 1320, radii: { x: 23, z: 18 }, elevation: .7,
-    theme: 'landscaped-attraction', functions: ['aquarium-inspect', 'aquarium-manage']
+    angle: 95, radius: 1320, radii: { x: 82, z: 64 }, elevation: .7,
+    theme: 'landscaped-attraction', functions: ['aquarium-inspect', 'aquarium-manage'], dockLength: 19
   }),
   islandLocation({
     id: 'cave-fishing-island', displayName: 'Basalt Hollow', type: 'cave-island',

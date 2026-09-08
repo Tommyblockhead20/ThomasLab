@@ -138,13 +138,22 @@ export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
   angle: AQUARIUM_WORLD_LOCATION?.angle ?? 103,
   radius: AQUARIUM_WORLD_LOCATION?.radius ?? 278,
   floorY: (AQUARIUM_WORLD_LOCATION?.elevation ?? .7) + .28,
-  width: 21,
-  depth: 13.5,
-  tankHeight: 7,
+  width: 74,
+  depth: 42,
+  tankWidth: 12,
+  tankDepth: 14.5,
+  tankHeight: 8.8,
+  tankSpacingX: 13.4,
+  tankRowZ: 9,
+  glassThickness: .24,
+  waterFloorY: 1.08,
+  waterlineY: 9.42,
+  waterInset: .72,
   interactionDistance: 2.65,
   visibleResidentLimit: 300,
   separateFromCabin: true
 });
+export const DOCK_DECK_LOWERING = .22;
 export const CAVE_TOPOLOGY_CONFIG = Object.freeze({
   tunnelSegments: 12,
   minimumDepth: 20,
@@ -344,6 +353,31 @@ export function createIslandOutline(location, samples = location?.outline?.lengt
   return points;
 }
 
+function pointToSegmentDistance2D(point, start, end) {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const lengthSquared = dx * dx + dz * dz;
+  const t = lengthSquared > 0
+    ? clamp(((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSquared, 0, 1)
+    : 0;
+  return Math.hypot(point.x - (start.x + dx * t), point.z - (start.z + dz * t));
+}
+
+export function distanceFromPolygonSafeEdge(point, polygon = []) {
+  if (![point?.x, point?.z].every(Number.isFinite) || polygon.length < 3) return Infinity;
+  let inside = false;
+  let edgeDistance = Infinity;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const a = polygon[previous];
+    const b = polygon[index];
+    edgeDistance = Math.min(edgeDistance, pointToSegmentDistance2D(point, a, b));
+    const crosses = (a.z > point.z) !== (b.z > point.z)
+      && point.x < (b.x - a.x) * (point.z - a.z) / ((b.z - a.z) || Number.EPSILON) + a.x;
+    if (crosses) inside = !inside;
+  }
+  return inside ? 0 : edgeDistance;
+}
+
 // These broad fields shape one continuous mountain rather than creating altitude rings.
 // The values are intentionally low-frequency so the silhouette reads as ridges/valleys,
 // while authored route rocks provide the local traversal detail.
@@ -454,7 +488,7 @@ const FISHING_LAYOUT = Object.freeze([
     id: 'hearthward-pond', label: 'Hearthward Tutorial Pond', tier: 'lower', waterType: 'pond',
     theme: 'fernwood', ecologyThemes: ['sunwash', 'fernwood'], offshore: 'home-island',
     angle: HOME_WORLD_LOCATION?.angle ?? 222, radius: HOME_WORLD_LOCATION?.radius ?? 980,
-    localOffset: { x: 9.5, z: -3.5 }, waterY: .91, radii: [4.1, 3.15], depth: 'shallow', basinDepth: .5,
+    localOffset: { x: 7.8, z: 8.25 }, waterY: .91, radii: [4.1, 3.15], depth: 'shallow', basinDepth: .5,
     fish: ['bluegill', 'pumpkinseed', 'golden-shiner'], allowedRarities: ['Common'],
     size: .9, rarityBias: -.4, trophyChance: .7, biteRate: 1.3, tutorialWater: true
   }),
@@ -1142,7 +1176,6 @@ export class MountainWorld extends TestWorld {
     }
     // The heavy saved-fish display follows Aquarium Island's load group. Physics/world
     // metadata stays globally valid even when that render group is inactive.
-    if (this.aquariumResidentRoot) this.aquariumResidentRoot.enabled = nextId === 'aquarium-island';
     return nextId;
   }
 
@@ -1561,7 +1594,8 @@ export class MountainWorld extends TestWorld {
     const buildDock = (id, label, position, angle, length, destinationId) => {
       const yaw = inwardYaw(angle);
       const loadGroup = this.locationLoadGroups.get(destinationId) ?? null;
-      const deck = this.addBox(`${label} dock deck`, position, { x: 3.4, y: .28, z: length }, this.materials.woodLight, { y: yaw });
+      const deckPosition = { ...position, y: position.y - DOCK_DECK_LOWERING };
+      const deck = this.addBox(`${label} dock deck`, deckPosition, { x: 3.4, y: .28, z: length }, this.materials.woodLight, { y: yaw });
       if (loadGroup) loadGroup.addChild(deck);
       for (const side of [-1, 1]) for (const end of [-1, 1]) {
         const theta = degreesToRadians(angle);
@@ -1577,7 +1611,7 @@ export class MountainWorld extends TestWorld {
       }
       this.homeInteractions.push({
         id, label: `BOARD BOAT • ${label}`, action: 'boat', destinationId,
-        position: { x: position.x, y: position.y + .14, z: position.z }, range: 2.5
+        position: { x: deckPosition.x, y: deckPosition.y + .14, z: deckPosition.z }, range: 2.5
       });
     };
     for (const start of START_LOCATIONS) buildDock(
@@ -1721,14 +1755,25 @@ export class MountainWorld extends TestWorld {
     for (const location of WORLD_LOCATIONS) {
       const dx = point.x - location.worldPosition.x;
       const dz = point.z - location.worldPosition.z;
-      const radii = location.radii ?? { x: 1, z: 1 };
-      const direction = Math.atan2(dz, dx);
-      const edgeRadius = 1 / Math.hypot(Math.cos(direction) / radii.x, Math.sin(direction) / radii.z);
-      nearest = Math.min(nearest, Math.max(0, Math.hypot(dx, dz) - edgeRadius));
+      // Stoneveil's rendered beach/shallow-water join is 221 m, not the old 208 m
+      // registry radius. Satellite islands and Bluewater use their authored shoreline
+      // polygons, so protruding beaches cannot accidentally be treated as open ocean.
+      const shoreDistance = location.id === MAIN_WORLD_LOCATION.id
+        ? Math.max(0, Math.hypot(dx, dz) - OCEAN_WATER_INNER_RADIUS)
+        : distanceFromPolygonSafeEdge(point, createIslandOutline(location));
+      nearest = Math.min(nearest, shoreDistance);
       const dock = location.dock?.worldPosition;
-      if (dock) nearest = Math.min(nearest, Math.max(0, Math.hypot(point.x - dock.x, point.z - dock.z) - 4));
+      if (dock) {
+        const theta = degreesToRadians(location.angle ?? 0);
+        const halfLength = Math.max(0, Number(location.dock.length) || 0) * .5;
+        const start = { x: dock.x - Math.cos(theta) * halfLength, z: dock.z - Math.sin(theta) * halfLength };
+        const end = { x: dock.x + Math.cos(theta) * halfLength, z: dock.z + Math.sin(theta) * halfLength };
+        nearest = Math.min(nearest, Math.max(0, pointToSegmentDistance2D(point, start, end) - 4.5));
+      }
     }
-    return nearest;
+    // Count a modest band of authored shallows as part of the safe edge. The shark's own
+    // 15 m threshold is applied after this value, so it cannot arm on land or at the beach.
+    return Math.max(0, nearest - 2.5);
   }
 
   chooseTravelArrival(destinationId, rng = Math.random) {
@@ -1819,13 +1864,11 @@ export class MountainWorld extends TestWorld {
       { x: 1.55, y: 1.275, z: .3 }, this.materials.cabinWall);
     this.addCabinBox('Trail cabin front window header wall', { x: 2.55, y: 2.9875, z: config.depth * .5 },
       { x: 1.55, y: .925, z: .3 }, this.materials.cabinWall);
-    this.addCabinBox('Trail cabin doorway header', { x: 0, y: 3.08, z: config.depth * .5 },
-      { x: doorWidth, y: .74, z: .3 }, this.materials.cabinTrim);
-    for (const side of [-1, 1]) {
-      this.addCabinBox(`Trail cabin door jamb ${side < 0 ? 'left' : 'right'}`,
-        { x: side * (doorWidth * .5 + .07), y: 1.36, z: config.depth * .5 },
-        { x: .15, y: 2.72, z: .3 }, this.materials.cabinTrim);
-    }
+    // v15.1 deliberately uses one plain wall course above a literal opening. The old
+    // decorative header, jambs, and angled leaf all intersected the facade at different
+    // viewing angles. Removing that layered assembly leaves one coherent front/back wall.
+    this.addCabinBox('Trail cabin front wall above doorway', { x: 0, y: 3.085, z: config.depth * .5 },
+      { x: doorWidth, y: .73, z: .3 }, this.materials.cabinWall);
 
     // Close the previously open triangular gable above the front wall with stepped timber
     // courses. They meet rather than overlap the wall below, avoiding coplanar surfaces.
@@ -1886,10 +1929,8 @@ export class MountainWorld extends TestWorld {
       this.addCabinBox(`Trail cabin side window crossbar ${y}`, { x: -config.width * .5 - .22, y, z: -.6 },
         { x: .07, y: .07, z: 1.78 }, this.materials.cabinTrim, {}, false);
     }
-    // A perpendicular open leaf begins beyond the shared facade plane. The door, jambs,
-    // and front wall no longer occupy overlapping/coplanar topology.
-    this.addCabinBox('Trail cabin open door', { x: -.985, y: 1.36, z: 4.42 },
-      { x: 1.42, y: 2.67, z: .13 }, this.materials.woodLight, { y: -90 }, false);
+    // Keep the doorway permanently and cleanly open. There is intentionally no separate
+    // door leaf or decorative frame surface to intersect either side of the facade.
     for (const [index, x] of [-3.35, -1.75, 1.75, 3.35].entries()) {
       this.addCabinBox(`Trail cabin floor board ${index + 1}`, { x, y: .012, z: 0 },
         { x: .035, y: .025, z: config.depth - .18 }, this.materials.cabinTrim, {}, false);
@@ -2010,18 +2051,18 @@ export class MountainWorld extends TestWorld {
       x: -1.1 + side * .42, y: 2.18, z: -3.24
     }, { x: .08, y: .28, z: .18 }, this.materials.deepRock, { x: -18 }, false);
 
-    // Hearthward's beginner pond sits east of the cabin. A short bank deck, reeds, stones,
-    // flowers, and a fish-facing bench make the small common-only water easy to read/use.
-    this.addCabinBox('Hearthward pond short fishing deck', { x: 5.75, y: -.015, z: -3.5 },
+    // Hearthward's beginner pond now sits diagonally in front of the cabin (+local Z),
+    // visible from the porch instead of hidden behind the rear wall.
+    this.addCabinBox('Hearthward pond short fishing deck', { x: 4.75, y: -.015, z: 8.25 },
       { x: 2.9, y: .16, z: 1.35 }, this.materials.woodLight);
-    this.addCabinBox('Hearthward pond bench seat', { x: 9.5, y: .48, z: .55 },
+    this.addCabinBox('Hearthward pond bench seat', { x: 7.8, y: .48, z: 4.55 },
       { x: 2.2, y: .18, z: .72 }, this.materials.woodLight);
-    this.addCabinBox('Hearthward pond bench back', { x: 9.5, y: 1.02, z: 1.02 },
-      { x: 2.2, y: .82, z: .14 }, this.materials.cabinTrim, { x: -7 });
+    this.addCabinBox('Hearthward pond bench back', { x: 7.8, y: 1.02, z: 4.08 },
+      { x: 2.2, y: .82, z: .14 }, this.materials.cabinTrim, { x: 7 });
     for (let index = 0; index < 12; index += 1) {
       const angle = index * Math.PI * 2 / 12;
-      const localX = 9.5 + Math.cos(angle) * (4.45 + (index % 2) * .25);
-      const localZ = -3.5 + Math.sin(angle) * (3.45 + (index % 3) * .16);
+      const localX = 7.8 + Math.cos(angle) * (4.45 + (index % 2) * .25);
+      const localZ = 8.25 + Math.sin(angle) * (3.45 + (index % 3) * .16);
       const point = this.homePoint(localX, .27 + (index % 3) * .06, localZ);
       this.createPrimitive(`Hearthward pond reed ${index + 1}`, 'cone', point,
         { x: .12, y: .72 + (index % 3) * .12, z: .12 }, this.materials.shrubLight,
@@ -2052,9 +2093,9 @@ export class MountainWorld extends TestWorld {
       },
       {
         id: 'hearthward-pond-bench', label: 'SIT', action: 'rest', seatKind: 'fishing bench',
-        position: this.homePoint(9.5, PLAYER_FOOT_OFFSET + .08, 1.3),
-        seatPosition: this.homePoint(9.5, .58 + PLAYER_FOOT_OFFSET, .55),
-        exitPosition: this.homePoint(7.8, PLAYER_FOOT_OFFSET + .08, .8),
+        position: this.homePoint(7.8, PLAYER_FOOT_OFFSET + .08, 4.15),
+        seatPosition: this.homePoint(7.8, .58 + PLAYER_FOOT_OFFSET, 4.55),
+        exitPosition: this.homePoint(5.95, PLAYER_FOOT_OFFSET + .08, 4.55),
         facingYaw: cabinYaw + 180,
         fishingFacing: 'hearthward-pond', range: 2.2
       },
@@ -2071,140 +2112,113 @@ export class MountainWorld extends TestWorld {
     this.aquariumResidents = [];
     this.aquariumResidentSignature = '';
 
-    // The aquarium is a separate shoreline pavilion, not another room or prop inside the
-    // cabin. A broad deck, framed glass tank, roof, and steps make it a destination.
-    this.addAquariumBox('Shoreline aquarium foundation', { x: 0, y: -.2, z: 0 },
-      { x: config.width + 3, y: .4, z: config.depth + 3 }, this.materials.wood);
-    this.addAquariumBox('Shoreline aquarium front step', { x: 0, y: -.38, z: config.depth * .5 + 1.1 },
-      { x: Math.min(7, config.width * .42), y: .28, z: 1.05 }, this.materials.cabinTrim);
-    this.addAquariumBox('Shoreline aquarium tank base', { x: 0, y: .34, z: -.35 },
-      { x: config.width, y: .68, z: config.depth }, this.materials.deepRock);
-    this.addAquariumBox('Shoreline aquarium tank floor', { x: 0, y: .72, z: -.35 },
-      { x: config.width - .35, y: .16, z: config.depth - .35 }, this.materials.waterEdge);
-
-    const tankCenterY = .76 + config.tankHeight * .5;
-    const tankCenterZ = -.35;
-    this.addAquariumBox('Shoreline aquarium front glass',
-      { x: 0, y: tankCenterY, z: tankCenterZ + config.depth * .5 },
-      { x: config.width, y: config.tankHeight, z: .16 }, this.materials.cabinGlass);
-    this.addAquariumBox('Shoreline aquarium rear glass',
-      { x: 0, y: tankCenterY, z: tankCenterZ - config.depth * .5 },
-      { x: config.width, y: config.tankHeight, z: .16 }, this.materials.cabinGlass);
+    // A broad public hall spans two exhibit wings with a clear central circulation aisle.
+    // The greatly enlarged island leaves landscaped breathing room around this footprint.
+    this.addAquariumBox('Glasswater Aquarium broad stone foundation', { x: 0, y: -.24, z: 0 },
+      { x: config.width + 8, y: .48, z: config.depth + 10 }, this.materials.deepRock);
+    this.addAquariumBox('Glasswater Aquarium public promenade', { x: 0, y: .04, z: 0 },
+      { x: config.width + 2, y: .18, z: config.depth + 3 }, this.materials.woodLight);
+    this.addAquariumBox('Glasswater Aquarium central aisle', { x: 0, y: .16, z: 0 },
+      { x: config.width - 3, y: .12, z: 4.4 }, this.materials.cabinTrim);
     for (const side of [-1, 1]) {
-      this.addAquariumBox(`Shoreline aquarium ${side < 0 ? 'left' : 'right'} glass`,
-        { x: side * config.width * .5, y: tankCenterY, z: tankCenterZ },
-        { x: .16, y: config.tankHeight, z: config.depth }, this.materials.cabinGlass);
-      for (const depthSide of [-1, 1]) {
-        this.addAquariumBox(
-          `Shoreline aquarium ${side < 0 ? 'left' : 'right'} ${depthSide < 0 ? 'rear' : 'front'} frame post`,
-          { x: side * config.width * .5, y: tankCenterY, z: tankCenterZ + depthSide * config.depth * .5 },
-          { x: .22, y: config.tankHeight + .3, z: .22 }, this.materials.cabinTrim
-        );
-        this.addAquariumBox(
-          `Shoreline aquarium ${side < 0 ? 'left' : 'right'} ${depthSide < 0 ? 'rear' : 'front'} pavilion post`,
-          { x: side * (config.width * .5 + 1.05), y: (config.tankHeight + 2.4) * .5, z: tankCenterZ + depthSide * (config.depth * .5 + 1.05) },
-          { x: .24, y: config.tankHeight + 2.4, z: .24 }, this.materials.cabinTrim
-        );
-      }
+      this.addAquariumBox(`Glasswater Aquarium ${side < 0 ? 'west' : 'east'} wing canopy`,
+        { x: 0, y: config.waterlineY + 2.35, z: side * 10.1 },
+        { x: config.width + 1, y: .3, z: 18.2 }, this.materials.cabinRoof, { x: side * 2 });
     }
-    for (const depthSide of [-1, 1]) {
-      this.addAquariumBox(`Shoreline aquarium ${depthSide < 0 ? 'rear' : 'front'} upper frame`,
-        { x: 0, y: .8 + config.tankHeight, z: tankCenterZ + depthSide * config.depth * .5 },
-        { x: config.width + .25, y: .22, z: .22 }, this.materials.cabinTrim);
+    for (const x of [-35, -21, -7, 7, 21, 35]) for (const z of [-20.2, 20.2]) {
+      this.addAquariumBox(`Glasswater Aquarium hall post ${x}:${z}`, { x, y: 5.45, z },
+        { x: .38, y: 10.9, z: .38 }, this.materials.cabinTrim);
     }
+    this.addAquariumBox('Glasswater Aquarium entrance step', { x: 0, y: -.38, z: config.depth * .5 + 2.2 },
+      { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
+    this.addAquariumBox('Glasswater Aquarium rear approach step', { x: 0, y: -.38, z: -config.depth * .5 - 2.2 },
+      { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
+    this.addAquariumBox('Glasswater Aquarium collection sign', { x: 0, y: config.waterlineY + 1.15, z: config.depth * .5 + 1.1 },
+      { x: 8.8, y: 1.15, z: .18 }, this.materials.woodLight, {}, false);
+
+    // Low garden beds and paths make the expanded grounds feel intentional without adding
+    // expensive simulation. They remain outside the exhibit/viewing circulation.
     for (const side of [-1, 1]) {
-      this.addAquariumBox(`Shoreline aquarium ${side < 0 ? 'left' : 'right'} upper frame`,
-        { x: side * config.width * .5, y: .8 + config.tankHeight, z: tankCenterZ },
-        { x: .22, y: .22, z: config.depth + .25 }, this.materials.cabinTrim);
-      this.addAquariumBox(`Shoreline aquarium canopy ${side < 0 ? 'west' : 'east'} pitch`,
-        { x: side * config.width * .255, y: config.tankHeight + 2.1, z: tankCenterZ },
-        { x: config.width * .56, y: .24, z: config.depth + 2.4 },
-        this.materials.cabinRoof, { z: -side * 16 });
-    }
-    this.addAquariumBox('Shoreline aquarium canopy ridge', { x: 0, y: config.tankHeight + 3.45, z: tankCenterZ },
-      { x: .24, y: .22, z: config.depth + 2.55 }, this.materials.cabinTrim);
-    this.addAquariumBox('Shoreline aquarium collection sign', { x: 0, y: config.tankHeight + 1.25, z: tankCenterZ + config.depth * .5 + 1.08 },
-      { x: 4.7, y: .78, z: .12 }, this.materials.woodLight, {}, false);
-
-    const water = this.addAquariumBox('Shoreline aquarium water',
-      { x: 0, y: tankCenterY - .08, z: tankCenterZ },
-      { x: config.width - .32, y: config.tankHeight - .28, z: config.depth - .32 },
-      this.materials.aquariumWater, {}, false);
-    water.render.castShadows = false;
-
-    for (let index = 0; index < 20; index += 1) {
-      const x = -config.width * .42 + (index % 10) * (config.width * .84 / 9);
-      const z = tankCenterZ - config.depth * .31 + Math.floor(index / 10) * config.depth * .62;
-      this.createPrimitive(`Shoreline aquarium habitat stone ${index + 1}`, 'sphere',
-        this.aquariumPoint(x, .88 + (index % 2) * .08, z),
-        { x: .68 + (index % 3) * .18, y: .32 + (index % 2) * .14, z: .55 },
-        index % 2 ? this.materials.rockLight : this.materials.rock,
-        { x: index * 9, y: inwardYaw(config.angle) + index * 31, z: index % 2 ? 7 : -5 },
-        { castShadows: false });
-      this.createPrimitive(`Shoreline aquarium plant ${index + 1}`, 'cone',
-        this.aquariumPoint(x + .35, 1.22, z + .2),
-        { x: .16, y: .95 + (index % 3) * .2, z: .16 },
-        index % 2 ? this.materials.shrubLight : this.materials.foliage,
-        { x: 0, y: index * 43, z: index % 2 ? 10 : -10 }, { castShadows: false });
-    }
-
-    // v15 replaces the old monolithic display volume with ten independently enabled
-    // modules. Remove the superseded tank colliders as well as hiding their render meshes;
-    // otherwise an invisible one-piece tank would still block the aisles.
-    const obsoletePart = /tank base|tank floor|front glass|rear glass|left glass|right glass|frame post|upper frame|aquarium water/i;
-    for (const child of [...this.publicAquariumRoot.children]) {
-      if (!obsoletePart.test(child.name)) continue;
-      child.enabled = false;
-      if (child.physicsCollider) {
-        this.physicsWorld.removeCollider(child.physicsCollider, true);
-        child.physicsCollider = null;
-      }
+      this.addAquariumBox(`Glasswater ${side < 0 ? 'west' : 'east'} garden bed`,
+        { x: side * (config.width * .5 + 2.4), y: .18, z: 0 },
+        { x: 3.2, y: .36, z: config.depth - 4 }, this.materials.rockLight);
+      for (let index = 0; index < 7; index += 1) this.addAquariumBox(
+        `Glasswater ${side < 0 ? 'west' : 'east'} garden planting ${index + 1}`,
+        { x: side * (config.width * .5 + 2.4), y: .75, z: -15 + index * 5 },
+        { x: .35 + (index % 2) * .18, y: 1.1 + (index % 3) * .22, z: .35 },
+        index % 2 ? this.materials.shrubLight : this.materials.foliage, { z: side * (6 + index) }, false);
     }
 
     this.aquariumTankRoots = [];
     this.aquariumTankCells = [];
     this.aquariumTankLabels = [];
-    const tankWidth = 3.55;
-    const tankDepth = 5.15;
-    const tankHeight = 3.35;
     for (let index = 0; index < 10; index += 1) {
       const column = index % 5;
       const row = Math.floor(index / 5);
-      const centerX = (column - 2) * 4.05;
-      const centerZ = row === 0 ? -3.15 : 3.05;
+      const centerX = (column - 2) * config.tankSpacingX;
+      const centerZ = row === 0 ? -config.tankRowZ : config.tankRowZ;
       const root = new pc.Entity(`Aquarium Tank ${index + 1} module`);
+      root.setLocalPosition(centerX, 0, centerZ);
       this.publicAquariumRoot.addChild(root);
-      const addTankBox = (suffix, position, size, material) => this.addStructureBox(
-        root, `Aquarium Tank ${index + 1} ${suffix}`, position, size, material, {}, false
+      const addTankBox = (suffix, position, size, material, rotation = {}) => this.addStructureBox(
+        root, `Aquarium Tank ${index + 1} ${suffix}`, position, size, material, rotation, false
       );
-      addTankBox('stone base', { x: centerX, y: .35, z: centerZ }, { x: tankWidth + .25, y: .7, z: tankDepth + .25 }, this.materials.deepRock);
-      addTankBox('floor', { x: centerX, y: .76, z: centerZ }, { x: tankWidth, y: .14, z: tankDepth }, this.materials.waterEdge);
-      addTankBox('front glass', { x: centerX, y: .78 + tankHeight * .5, z: centerZ + tankDepth * .5 }, { x: tankWidth, y: tankHeight, z: .11 }, this.materials.cabinGlass);
-      addTankBox('rear glass', { x: centerX, y: .78 + tankHeight * .5, z: centerZ - tankDepth * .5 }, { x: tankWidth, y: tankHeight, z: .11 }, this.materials.cabinGlass);
-      addTankBox('left glass', { x: centerX - tankWidth * .5, y: .78 + tankHeight * .5, z: centerZ }, { x: .11, y: tankHeight, z: tankDepth }, this.materials.cabinGlass);
-      addTankBox('right glass', { x: centerX + tankWidth * .5, y: .78 + tankHeight * .5, z: centerZ }, { x: .11, y: tankHeight, z: tankDepth }, this.materials.cabinGlass);
-      const tankWater = addTankBox('water', { x: centerX, y: .78 + tankHeight * .5, z: centerZ }, { x: tankWidth - .16, y: tankHeight - .18, z: tankDepth - .16 }, this.materials.aquariumWater);
+      const waterBounds = Object.freeze({
+        minX: -config.tankWidth * .5 + config.waterInset,
+        maxX: config.tankWidth * .5 - config.waterInset,
+        minY: config.waterFloorY + .42,
+        maxY: config.waterlineY - .58,
+        minZ: -config.tankDepth * .5 + config.waterInset,
+        maxZ: config.tankDepth * .5 - config.waterInset,
+        floorY: config.waterFloorY,
+        waterlineY: config.waterlineY,
+        safeInset: config.waterInset
+      });
+      const glassCenterY = config.waterFloorY + config.tankHeight * .5;
+      addTankBox('stone plinth', { x: 0, y: .48, z: 0 },
+        { x: config.tankWidth + .55, y: .96, z: config.tankDepth + .55 }, this.materials.deepRock);
+      addTankBox('sand substrate', { x: 0, y: config.waterFloorY, z: 0 },
+        { x: config.tankWidth, y: .25, z: config.tankDepth }, this.materials.waterEdge);
+      addTankBox('front viewing glass', { x: 0, y: glassCenterY, z: config.tankDepth * .5 },
+        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass);
+      addTankBox('rear viewing glass', { x: 0, y: glassCenterY, z: -config.tankDepth * .5 },
+        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass);
+      addTankBox('left glass', { x: -config.tankWidth * .5, y: glassCenterY, z: 0 },
+        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass);
+      addTankBox('right glass', { x: config.tankWidth * .5, y: glassCenterY, z: 0 },
+        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass);
+      const tankWater = addTankBox('bounded water volume',
+        { x: 0, y: (config.waterFloorY + config.waterlineY) * .5, z: 0 },
+        { x: config.tankWidth - config.glassThickness * 2, y: config.waterlineY - config.waterFloorY, z: config.tankDepth - config.glassThickness * 2 },
+        this.materials.aquariumWater);
       tankWater.render.castShadows = false;
-      addTankBox('number plaque', { x: centerX, y: .42, z: centerZ + tankDepth * .5 + .2 }, { x: 1.15, y: .36, z: .12 }, this.materials.woodLight);
+      for (let decor = 0; decor < 6; decor += 1) {
+        const decorX = -4.2 + (decor % 3) * 4.2;
+        const decorZ = -4.7 + Math.floor(decor / 3) * 9.4;
+        addTankBox(`habitat stone ${decor + 1}`, { x: decorX, y: config.waterFloorY + .28, z: decorZ },
+          { x: 1.25 + (decor % 2) * .4, y: .58 + (decor % 3) * .18, z: 1.05 },
+          decor % 2 ? this.materials.rockLight : this.materials.rock, { x: decor * 7, y: decor * 29, z: decor % 2 ? 8 : -6 });
+        addTankBox(`habitat plant ${decor + 1}`, { x: decorX + .7, y: config.waterFloorY + .85, z: decorZ - .35 },
+          { x: .2, y: 1.55 + (decor % 3) * .38, z: .2 },
+          decor % 2 ? this.materials.shrubLight : this.materials.foliage, { z: decor % 2 ? 12 : -12 });
+      }
       const labelMaterial = this.createAquariumLabelMaterial(`Tank ${index + 1}`);
-      const label = addTankBox('owner name label', { x: centerX, y: 4.42, z: centerZ + tankDepth * .5 + .08 }, { x: 2.9, y: .72, z: .08 }, labelMaterial);
+      const label = addTankBox('owner name label',
+        { x: 0, y: config.waterlineY + .72, z: config.tankDepth * .5 + .2 },
+        { x: 5.6, y: 1.05, z: .14 }, labelMaterial);
       label._labelText = `Tank ${index + 1}`;
       label._labelMaterial = labelMaterial;
       root.enabled = index === 0;
       this.aquariumTankRoots.push(root);
-      this.aquariumTankCells.push({ centerX, centerZ, width: tankWidth, depth: tankDepth, height: tankHeight });
+      this.aquariumTankCells.push({ root, label, waterBounds, centerX, centerZ });
       this.aquariumTankLabels.push(label);
     }
 
-    this.aquariumResidentRoot = new pc.Entity('Saved aquarium swimming residents');
-    this.aquariumResidentRoot.setLocalPosition(0, 0, 0);
-    this.publicAquariumRoot.addChild(this.aquariumResidentRoot);
-
     const managementPoints = [
-      ['front', 0, tankCenterZ + config.depth * .5 + 1.45],
-      ['rear', 0, tankCenterZ - config.depth * .5 - 1.45],
-      ['left', -config.width * .5 - 1.45, tankCenterZ],
-      ['right', config.width * .5 + 1.45, tankCenterZ]
+      ['front', 0, config.depth * .5 + 2.25],
+      ['rear', 0, -config.depth * .5 - 2.25],
+      ['left', -config.width * .5 - 2.25, 0],
+      ['right', config.width * .5 + 2.25, 0]
     ];
     for (const [side, localX, localZ] of managementPoints) this.homeInteractions.push({
       id: side === 'front' ? 'shoreline-aquarium' : `shoreline-aquarium-${side}`,
@@ -2220,7 +2234,17 @@ export class MountainWorld extends TestWorld {
     const stored = progression.aquarium ?? [];
     const byId = new Map(stored.map((specimen) => [specimen.specimenId, specimen]));
     const multiplayerDisplays = Array.isArray(socialShowcases) && socialShowcases.length
-      ? socialShowcases.slice(0, 10).map((entry) => ({ owner: entry.displayName, specimens: (entry.specimens ?? []).slice(0, 30) }))
+      ? socialShowcases.slice(0, 10).map((entry) => {
+          const seen = new Set();
+          return {
+            owner: entry.displayName,
+            specimens: (entry.specimens ?? []).filter((specimen) => {
+              if (!specimen?.specimenId || seen.has(specimen.specimenId)) return false;
+              seen.add(specimen.specimenId);
+              return true;
+            }).slice(0, 30)
+          };
+        })
       : null;
     const soloCount = Math.max(1, Math.min(10, Number(progression.aquariumTankCount) || 1));
     const soloDisplays = Array.from({ length: soloCount }, (_, tankIndex) => ({
@@ -2236,12 +2260,16 @@ export class MountainWorld extends TestWorld {
       const row = layoutCount <= 4 ? 0 : Math.floor(index / galleryColumns);
       const countInRow = layoutCount <= 4 ? layoutCount : Math.min(galleryColumns, layoutCount - row * galleryColumns);
       const column = layoutCount <= 4 ? index : index % galleryColumns;
-      const desiredX = (column - (countInRow - 1) * .5) * 4.05;
-      const desiredZ = layoutCount <= 4 ? 0 : (row - .5) * 6.2;
+      const desiredX = (column - (countInRow - 1) * .5) * PUBLIC_AQUARIUM_CONFIG.tankSpacingX;
+      const desiredZ = layoutCount <= 4 ? 0 : (row === 0 ? -1 : 1) * PUBLIC_AQUARIUM_CONFIG.tankRowZ;
       const cell = this.aquariumTankCells[index];
-      root.setLocalPosition(desiredX - cell.centerX, 0, desiredZ - cell.centerZ);
-      cell.activeCenterX = desiredX;
-      cell.activeCenterZ = desiredZ;
+      root.setLocalPosition(desiredX, 0, desiredZ);
+      cell.centerX = desiredX;
+      cell.centerZ = desiredZ;
+      const viewSide = layoutCount <= 4 || row === 0 ? 1 : -1;
+      cell.label.setLocalPosition(0, PUBLIC_AQUARIUM_CONFIG.waterlineY + .72,
+        viewSide * (PUBLIC_AQUARIUM_CONFIG.tankDepth * .5 + .2));
+      cell.label.setLocalEulerAngles(0, viewSide > 0 ? 0 : 180, 0);
     });
     this.aquariumTankLabels?.forEach((label, index) => {
       const text = multiplayerDisplays ? (displays[index]?.owner || `Player ${index + 1}`) : `Tank ${index + 1}`;
@@ -2253,7 +2281,9 @@ export class MountainWorld extends TestWorld {
       label._labelMaterial = material;
       label._labelText = text;
     });
-    const visible = displays.flatMap((display, tankIndex) => display.specimens.map((specimen) => ({ specimen, tankIndex, owner: display.owner })))
+    const visible = displays.flatMap((display, tankIndex) => display.specimens.map((specimen, slotIndex) => ({
+      specimen, tankIndex, slotIndex, owner: display.owner
+    })))
       .slice(0, PUBLIC_AQUARIUM_CONFIG.visibleResidentLimit);
     const signature = `layout:${layoutCount}:${displays.map((display) => display.owner).join(',')}|${visible.map(({ specimen, tankIndex, owner }) => (
       `${tankIndex}:${owner}:${specimen.specimenId}:${specimen.length}:${specimen.weight}:${specimen.shiny ? 1 : 0}`
@@ -2264,25 +2294,53 @@ export class MountainWorld extends TestWorld {
     this.aquariumResidentSignature = signature;
 
     for (const [index, entry] of visible.entries()) {
-      const { specimen, tankIndex } = entry;
+      const { specimen, tankIndex, slotIndex } = entry;
+      const cell = this.aquariumTankCells[tankIndex];
+      if (!cell?.root?.enabled) continue;
       const unit = stableUnit(`aquarium:${specimen.specimenId}`);
       const model = createSpecimenModel(specimen, {
-        name: `Aquarium resident ${specimen.name} ${index + 1}`
+        name: `Tank ${tankIndex + 1} resident ${specimen.name} ${slotIndex + 1}`,
+        maximumScale: 4.25
       });
-      this.aquariumResidentRoot.addChild(model.root);
-      const cell = this.aquariumTankCells[tankIndex] ?? this.aquariumTankCells[0];
-      const depthLane = ((index * 5) % 11) / 10;
-      const heightLane = ((index * 7) % 9) / 8;
+      // Ownership is structural: a resident is a child of exactly one tank module. Moving
+      // or hiding that module therefore cannot strand the creature in world/midair space.
+      cell.root.addChild(model.root);
+      const bounds = cell.waterBounds;
+      const visualHalfLength = Math.min(3.8, Math.max(.28, (model.physicalLengthMeters ?? .6) * .5));
+      const bodyRadius = Math.min(1.65, Math.max(.28, model.scale * .45));
+      const largeCreature = visualHalfLength > 1.65 || bodyRadius > 1.15;
+      const bottomDweller = ['penguin', 'polar_bear', 'giant_panda'].includes(specimen.speciesId);
+      const motionBounds = Object.freeze({
+        minX: bounds.minX + visualHalfLength,
+        maxX: bounds.maxX - visualHalfLength,
+        minY: bounds.minY + bodyRadius,
+        maxY: bounds.maxY - bodyRadius,
+        minZ: bounds.minZ + bodyRadius,
+        maxZ: bounds.maxZ - bodyRadius
+      });
+      const depthLane = slotIndex % 5 / 4;
+      const heightLane = Math.floor(slotIndex / 5) % 6 / 5;
+      const centerZ = lerp(motionBounds.minZ, motionBounds.maxZ, depthLane);
+      const centerY = bottomDweller
+        ? motionBounds.minY + .18
+        : lerp(motionBounds.minY, motionBounds.maxY, heightLane);
       const resident = {
         model,
+        tankIndex,
+        tankRoot: cell.root,
+        bounds,
+        motionBounds,
         phase: unit * Math.PI * 2 + index * .71,
-        speed: .32 + (index % 7) * .035 + unit * .08,
-        centerX: cell.activeCenterX ?? cell.centerX,
-        range: Math.max(.35, cell.width * .42 - Math.min(1.4, model.physicalLengthMeters ?? 1) * .35),
-        centerZ: (cell.activeCenterZ ?? cell.centerZ) - cell.depth * .32 + depthLane * cell.depth * .64,
-        centerY: 1.15 + heightLane * (cell.height - .85),
-        vertical: .12 + (index % 3) * .045
+        speed: (largeCreature ? .18 : .3) + (index % 7) * .025 + unit * .055,
+        centerX: 0,
+        range: Math.max(.18, (motionBounds.maxX - motionBounds.minX) * .5),
+        centerZ,
+        zRange: Math.min(1.15, Math.max(.18, (bounds.maxZ - bounds.minZ) * .08)),
+        centerY,
+        vertical: bottomDweller ? .035 : (largeCreature ? .1 : .18 + (index % 3) * .035),
+        roll: bottomDweller ? 0 : (largeCreature ? 1.2 : 2.5)
       };
+      model.root.setLocalPosition(0, centerY, centerZ);
       this.aquariumResidents.push(resident);
     }
     return this.aquariumResidents.length;
@@ -2291,18 +2349,22 @@ export class MountainWorld extends TestWorld {
   updateAquariumSwimming() {
     if (this.activeLocationId !== 'aquarium-island') return;
     for (const [index, resident] of this.aquariumResidents.entries()) {
+      if (!resident.tankRoot?.enabled || resident.model.root.parent !== resident.tankRoot) continue;
       const t = this.elapsed * resident.speed + resident.phase;
       // At 300 residents, update one of three cohorts per frame; every fish still animates
       // smoothly enough at the Aquarium while avoiding a 300-model full-frame transform pass.
       if (this.aquariumResidents.length > 120 && index % 3 !== Math.floor(this.elapsed * 30) % 3) continue;
-      const x = resident.centerX + Math.sin(t) * resident.range;
-      const z = resident.centerZ + Math.sin(t * .63 + resident.phase) * .42;
-      const y = resident.centerY + Math.sin(t * .82 + resident.phase * .5) * resident.vertical;
+      const x = clamp(resident.centerX + Math.sin(t) * resident.range,
+        resident.motionBounds.minX, resident.motionBounds.maxX);
+      const z = clamp(resident.centerZ + Math.sin(t * .63 + resident.phase) * resident.zRange,
+        resident.motionBounds.minZ, resident.motionBounds.maxZ);
+      const y = clamp(resident.centerY + Math.sin(t * .82 + resident.phase * .5) * resident.vertical,
+        resident.motionBounds.minY, resident.motionBounds.maxY);
       const velocityX = Math.cos(t) * resident.range;
-      const velocityZ = Math.cos(t * .63 + resident.phase) * .265;
+      const velocityZ = Math.cos(t * .63 + resident.phase) * resident.zRange * .63;
       const yaw = Math.atan2(-velocityZ, velocityX) * 180 / Math.PI;
       resident.model.root.setLocalPosition(x, y, z);
-      resident.model.root.setLocalEulerAngles(0, yaw, Math.sin(t * .9) * 2.5);
+      resident.model.root.setLocalEulerAngles(0, yaw, Math.sin(t * .9) * resident.roll);
       if (resident.model.tail) {
         const base = resident.model.tailBaseEuler ?? resident.model.tail.getLocalEulerAngles().clone();
         resident.model.tailBaseEuler = base;
@@ -3820,7 +3882,7 @@ export class MountainWorld extends TestWorld {
     const cabinCenter = this.point(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius, this.homeCabinFloorY);
     if (Math.hypot(point.x - cabinCenter.x, point.z - cabinCenter.z) < 12.5) return false;
     const aquariumCenter = this.point(PUBLIC_AQUARIUM_CONFIG.angle, PUBLIC_AQUARIUM_CONFIG.radius, this.publicAquariumFloorY);
-    if (Math.hypot(point.x - aquariumCenter.x, point.z - aquariumCenter.z) < 12) return false;
+    if (Math.hypot(point.x - aquariumCenter.x, point.z - aquariumCenter.z) < PUBLIC_AQUARIUM_CONFIG.width * .58) return false;
     return !this.rockPlacements.some((rock) => (
       Math.abs(rock.position.y - point.y) < 5
       && Math.hypot(rock.position.x - point.x, rock.position.z - point.z)
