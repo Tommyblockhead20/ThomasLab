@@ -32,6 +32,8 @@ import { PauseMenu } from './ui/pause-menu.js';
 import { resolveGlobalWorldPosition, WORLD_LOCATIONS } from './world/world-locations.js';
 import { TrailBadgeSystem } from './progression/trail-badges.js';
 import { TrailBadgeMenu } from './ui/trail-badges.js';
+import { TutorialSystem } from './tutorial/tutorial-system.js';
+import { OceanSharkHazard } from './world/ocean-shark-hazard.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -101,6 +103,7 @@ export class Game {
     this.hud = new Hud();
     this.saveSystem = new SaveSystem();
     this.progression = new ProgressionSystem(this.saveSystem);
+    this.tutorials = new TutorialSystem(this.saveSystem, this.hud);
     this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
     this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot());
     this.lastHomeProgressRevision = this.saveSystem.revision;
@@ -131,7 +134,10 @@ export class Game {
     this.appearanceMenu = new AppearanceMenu(this.progression, this.player);
     this.homeInteraction = new HomeInteractionController(this.world, this.player, this.progression, this.hud, this.camera);
     this.shopMenu = new ShopMenu(this.progression);
-    this.aquariumMenu = new AquariumMenu(this.progression);
+    this.aquariumMenu = new AquariumMenu(this.progression, {
+      getSocialShowcases: () => this.getAquariumSocialShowcases(),
+      onShowcaseChanged: () => this.sendAquariumShowcase(true)
+    });
     const mountainMapData = this.world.getMapData();
     this.totalMapWaters = mountainMapData.waters?.length ?? 0;
     this.saveSystem.recordDestinationVisit(this.currentLocationId);
@@ -162,6 +168,7 @@ export class Game {
       () => this.player.canStartEmote()
     );
     this.activeMultiplayerSeed = null;
+    this.lastAquariumShowcaseSignature = '';
     this.lastMultiplayerFishingActive = false;
     this.activeCatchPresentation = null;
     this.remoteCatchNotices = new Map();
@@ -188,12 +195,22 @@ export class Game {
     );
     this.player.setRunManager(this.runManager);
     this.runManager.startRun(initialStart, false);
+    this.sharkHazard = new OceanSharkHazard(this.app, this.hud, {
+      getExposureDistance: (point) => this.world.getOceanSafetyDistance?.(point) ?? 0,
+      onAttack: () => {
+        this.fishing.exitFishing?.({ releasePointerLock: true });
+        this.player.exitFishing?.({ releasePointerLock: true });
+        this.runManager.returnToCabin();
+        this.hud.showToast?.('Rescued at Hearthward Cabin. Your run and progress are safe.', 4);
+      }
+    });
     this.persistedCatches = new WeakSet();
     this.lastSummitReached = false;
     this.lastRunStatus = this.runManager.status;
     this.camera.update(1 / 60, true);
     this.pauseMenu = new PauseMenu(this.progression, {
       getStats: () => this.getLifetimeStats(),
+      onBeforeSaveSwitch: () => this.flushActivePlaytime(),
       onResume: () => this.setLocalPause(false),
       onCabin: () => {
         this.runManager.returnToCabin();
@@ -312,17 +329,20 @@ export class Game {
       }
     }
     if (!localGameplayPaused) this.updateSessionStats(dt);
+    if (!localGameplayPaused) this.sharkHazard.update(dt, this.player.getPosition());
     this.syncPersistentProgress();
     if (this.lastHomeProgressRevision !== this.saveSystem.revision) {
       const unlocked = this.trailBadges.evaluate();
       if (unlocked.length) this.hud.showToast?.(`Trail Badge unlocked • ${unlocked.length} new`);
       this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
-      this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot());
+      this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot(), this.getAquariumSocialShowcases());
+      this.sendAquariumShowcase();
       this.lastHomeProgressRevision = this.saveSystem.revision;
     }
     this.world.update(dt);
     const multiplayerPlayerState = this.player.getState();
     this.contextualAction = this.resolveContextualAction(multiplayerPlayerState);
+    this.tutorials.update(dt, this.contextualAction);
     this.homeInteraction.setPromptAllowed(this.contextualAction?.kind === 'interact');
     this.homeInteraction.update();
     const globalPosition = this.getLocalGlobalPosition(multiplayerPlayerState.position);
@@ -636,6 +656,17 @@ export class Game {
   }
 
   handleMultiplayerMessage(message) {
+    if (message?.type === MESSAGE_TYPES.ROOM_STATE) {
+      this.sendAquariumShowcase(true);
+      this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot(), this.getAquariumSocialShowcases());
+      this.aquariumMenu.render?.(true);
+      return;
+    }
+    if (message?.type === MESSAGE_TYPES.AQUARIUM_SHOWCASE) {
+      this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot(), this.getAquariumSocialShowcases());
+      this.aquariumMenu.render?.(true);
+      return;
+    }
     if (message?.type !== MESSAGE_TYPES.CATCH_EVENT) return;
     const catchData = message.payload ?? {};
     if (catchData.active === false) {
@@ -658,6 +689,31 @@ export class Game {
       expiresAt: Date.now() + 22_000
     });
     this.renderRemoteCatchNotices();
+  }
+
+  getAquariumSocialShowcases() {
+    if (this.multiplayer?.state !== 'in_room') return [];
+    return [...this.multiplayer.room.roster.values()].slice(0, 10).map((player) => ({
+      playerId: player.id,
+      isLocal: player.id === this.multiplayer.playerId,
+      displayName: player.displayName || player.name || (player.id === this.multiplayer.playerId ? this.multiplayer.displayName : 'Player'),
+      connected: player.connected !== false,
+      specimens: player.id === this.multiplayer.playerId
+        ? this.progression.getAquariumShowcasePresentation()
+        : (Array.isArray(player.aquariumShowcase) ? player.aquariumShowcase.slice(0, 30) : [])
+    }));
+  }
+
+  sendAquariumShowcase(force = false) {
+    if (this.multiplayer?.state !== 'in_room') return false;
+    const specimens = this.progression.getAquariumShowcasePresentation();
+    const signature = specimens.map((entry) => `${entry.specimenId}:${entry.length}:${entry.weight}:${entry.shiny ? 1 : 0}`).join('|');
+    if (!force && signature === this.lastAquariumShowcaseSignature) return false;
+    if (!this.multiplayer.sendAquariumShowcase(specimens)) return false;
+    this.lastAquariumShowcaseSignature = signature;
+    const local = this.multiplayer.room.roster.get(this.multiplayer.playerId);
+    if (local) this.multiplayer.room.roster.set(this.multiplayer.playerId, { ...local, aquariumShowcase: specimens });
+    return true;
   }
 
   updateRemoteCatchNotices(now = Date.now()) {
@@ -781,6 +837,7 @@ export class Game {
     this.multiplayer.destroy();
     this.camera.destroy();
     this.runManager.destroy();
+    this.sharkHazard?.destroy();
     this.journal.destroy();
     this.hud.destroy();
     window.removeEventListener('resize', this.onResize);

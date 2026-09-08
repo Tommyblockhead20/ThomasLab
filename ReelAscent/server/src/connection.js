@@ -66,6 +66,9 @@ export class ClientConnection {
       case MESSAGE_TYPES.CATCH_EVENT:
         this.handleCatchEvent(message.payload);
         break;
+      case MESSAGE_TYPES.AQUARIUM_SHOWCASE:
+        this.handleAquariumShowcase(message.payload);
+        break;
       default:
         sendError(this.socket, 'invalid_message', 'That message type is server-only.');
         break;
@@ -166,6 +169,33 @@ export class ClientConnection {
       serverTime: Date.now()
     };
     this.session.room.broadcast(MESSAGE_TYPES.CATCH_EVENT, event, this.session.playerId);
+  }
+
+  handleAquariumShowcase(payload = {}) {
+    if (!this.session.room || !this.rateLimit('aquarium_showcase', 8, 10_000)) return;
+    const source = Array.isArray(payload.specimens) ? payload.specimens.slice(0, 30) : [];
+    const specimens = source.flatMap((entry) => {
+      const speciesId = safeString(entry?.speciesId, 100);
+      const specimenId = safeString(entry?.specimenId, 140);
+      if (!speciesId || !specimenId) return [];
+      return [{
+        specimenId,
+        speciesId,
+        name: safeString(entry.name, 100) || speciesId,
+        rarity: safeString(entry.rarity, 24) || 'Common',
+        length: Math.max(0, Math.min(10000, Number(entry.length) || 0)),
+        weight: Math.max(0, Math.min(100000, Number(entry.weight) || 0)),
+        sizeFraction: Math.max(0, Math.min(1, Number(entry.sizeFraction) || 0)),
+        shiny: Boolean(entry.shiny),
+        value: Math.max(0, Math.min(1_000_000_000, Math.floor(Number(entry.value) || 0)))
+      }];
+    });
+    this.session.aquariumShowcase = specimens;
+    this.session.room.broadcast(MESSAGE_TYPES.AQUARIUM_SHOWCASE, {
+      playerId: this.session.playerId,
+      specimens,
+      serverTime: Date.now()
+    }, this.session.playerId);
   }
 
   handleClose() {

@@ -1,8 +1,14 @@
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
+import {
+  AQUARIUM_MAX_TANKS,
+  aquariumTankCountFromLegacy,
+  highestValueSpecimenIds,
+  normalizeAquariumTankDisplays
+} from './aquarium.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 11;
+export const PROGRESSION_SCHEMA_VERSION = 12;
 export const HAND_EQUIPMENT_IDS = Object.freeze(['ice-axe']);
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
@@ -46,7 +52,11 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     money: 0,
     inventory: [],
     aquarium: [],
-    aquariumCapacityTier: 0,
+    aquariumTankCount: 1,
+    aquariumTankDisplays: [[]],
+    aquariumTankManual: [false],
+    aquariumShowcaseSpecimenIds: [],
+    aquariumShowcaseManual: false,
     aquariumIncome: { bankedActiveSeconds: 0, lastObservedActiveSeconds: null, lifetimePaid: 0 },
     heldSpecimenId: null,
     ownedItems: [],
@@ -123,6 +133,19 @@ export function normalizeProgressionState(value = {}) {
   const inventoryIds = new Set(inventory.map((specimen) => specimen.specimenId));
   const aquarium = normalizeSpecimenList(legacyAquarium, persistedPlayerId)
     .filter((specimen) => !inventoryIds.has(specimen.specimenId));
+  const suppliedTankCount = Number.isFinite(value.aquariumTankCount)
+    ? Math.floor(value.aquariumTankCount)
+    : aquariumTankCountFromLegacy(value.aquariumCapacityTier, aquarium.length);
+  const aquariumTankCount = Math.max(1, Math.min(AQUARIUM_MAX_TANKS,
+    Math.max(suppliedTankCount, Math.ceil(aquarium.length / 30))));
+  const tankState = normalizeAquariumTankDisplays(
+    aquarium, aquariumTankCount, value.aquariumTankDisplays, value.aquariumTankManual
+  );
+  const aquariumIds = new Set(aquarium.map((specimen) => specimen.specimenId));
+  const showcaseManual = Boolean(value.aquariumShowcaseManual);
+  const selectedShowcase = [...new Set(Array.isArray(value.aquariumShowcaseSpecimenIds)
+    ? value.aquariumShowcaseSpecimenIds.filter((id) => typeof id === 'string' && aquariumIds.has(id))
+    : [])].slice(0, 30);
   const equipped = { ...DEFAULT_EQUIPPED };
   for (const category of Object.keys(equipped)) {
     const selected = value.equipped?.[category];
@@ -166,7 +189,13 @@ export function normalizeProgressionState(value = {}) {
     money: Math.max(0, Math.floor(finite(value.money))),
     inventory,
     aquarium,
-    aquariumCapacityTier: Math.max(0, Math.min(6, Math.floor(finite(value.aquariumCapacityTier)))),
+    aquariumTankCount,
+    aquariumTankDisplays: tankState.displays,
+    aquariumTankManual: tankState.manual,
+    aquariumShowcaseSpecimenIds: showcaseManual
+      ? selectedShowcase
+      : highestValueSpecimenIds(aquarium, 30),
+    aquariumShowcaseManual: showcaseManual,
     aquariumIncome: {
       bankedActiveSeconds: Math.max(0, finite(value.aquariumIncome?.bankedActiveSeconds)),
       lastObservedActiveSeconds: Number.isFinite(value.aquariumIncome?.lastObservedActiveSeconds)

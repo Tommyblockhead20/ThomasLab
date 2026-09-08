@@ -109,6 +109,15 @@ export class RoomState {
     return true;
   }
 
+  consumeAquariumShowcase(payload) {
+    if (!payload?.playerId || !this.roster.has(payload.playerId)) return false;
+    this.roster.set(payload.playerId, {
+      ...this.roster.get(payload.playerId),
+      aquariumShowcase: Array.isArray(payload.specimens) ? payload.specimens.slice(0, 30) : []
+    });
+    return true;
+  }
+
   getPlayerPresentation(playerId) {
     return this.roster.get(playerId) ?? null;
   }

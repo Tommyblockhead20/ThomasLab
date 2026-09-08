@@ -46,6 +46,7 @@ export class Room {
         posture: player.lastSnapshot?.posture ?? 'standing',
         fishingState: player.lastSnapshot?.fishingState ?? player.fishingState ?? null,
         heldItem: player.lastSnapshot?.heldItem ?? null,
+        aquariumShowcase: player.aquariumShowcase ?? [],
         locationId: player.lastSnapshot?.locationId ?? 'main-mountain',
         coordinateSpace: player.lastSnapshot?.coordinateSpace ?? 'global-world',
         globalPosition: player.lastSnapshot?.globalPosition ?? player.lastSnapshot?.position ?? null

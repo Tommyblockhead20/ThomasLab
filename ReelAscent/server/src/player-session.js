@@ -13,6 +13,8 @@ export class PlayerSession {
     this.lastSequence = -1;
     this.lastSnapshot = null;
     this.fishingState = null;
+    // Presentation-only, rate-limited metadata. Ownership and economy never leave clients.
+    this.aquariumShowcase = [];
     this.displayName = '';
     this.rateLimiter = new RateLimiter();
   }

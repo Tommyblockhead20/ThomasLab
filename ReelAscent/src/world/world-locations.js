@@ -190,7 +190,8 @@ export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
   }),
   islandLocation({
     id: 'veiled-athenaeum', displayName: 'The Veiled Athenaeum', type: 'mythical-library-island',
-    angle: 246, radius: 1435, radii: { x: 31, z: 25 }, elevation: .88,
+    // Same southwest chart quadrant, but pushed toward the map corner as a remote landmark.
+    angle: 246, radius: 1620, radii: { x: 31, z: 25 }, elevation: .88,
     theme: 'mythical-archive', functions: ['future-library', 'lore'], dockLength: 15,
     destinationEnabled: false,
     lockMessage: 'A veil of old tide-magic seals the Athenaeum. Its archive will open in a future expedition.'

@@ -22,7 +22,7 @@ const formatDuration = (seconds) => {
 export class PauseMenu {
   constructor(progression, {
     getStats = () => ({}), onResume = () => {}, onCabin = () => {},
-    onMultiplayer = () => {}, onCloseMultiplayer = () => {}
+    onMultiplayer = () => {}, onCloseMultiplayer = () => {}, onBeforeSaveSwitch = () => {}
   } = {}) {
     this.progression = progression;
     this.getStats = getStats;
@@ -30,6 +30,7 @@ export class PauseMenu {
     this.onCabin = onCabin;
     this.onMultiplayer = onMultiplayer;
     this.onCloseMultiplayer = onCloseMultiplayer;
+    this.onBeforeSaveSwitch = onBeforeSaveSwitch;
     this.screen = document.querySelector('#pause-menu');
     this.content = document.querySelector('#pause-content');
     this.status = document.querySelector('#pause-status');
@@ -197,6 +198,12 @@ export class PauseMenu {
       this.status.textContent = 'Gameplay bindings reset to defaults.';
       this.render();
     }
+    if (event.target.closest('[data-reset-tutorials]')) {
+      const reset = this.progression.resetTutorials();
+      this.status.textContent = reset
+        ? 'Fishing, climbing, and boat tutorials reset for this save only.'
+        : 'Tutorials could not be reset in browser storage.';
+    }
   }
 
   handlePreferenceChange(event) {
@@ -274,6 +281,7 @@ export class PauseMenu {
       <label><input type="checkbox" data-pause-preference="reduceMotion" ${this.preferences.reduceMotion ? 'checked' : ''}> Reduce non-gameplay UI animation</label>
       <label><input type="checkbox" data-pause-preference="rhythmHighContrast" ${this.preferences.rhythmHighContrast ? 'checked' : ''}> High-contrast rhythm lanes and notes</label>
       <label><input type="checkbox" data-pause-preference="largeContextPrompts" ${this.preferences.largeContextPrompts ? 'checked' : ''}> Larger contextual action prompts</label>
+      <button class="pause-secondary-action" data-reset-tutorials>RESET TUTORIALS FOR THIS SAVE</button>
     </div>`;
   }
 
@@ -298,11 +306,13 @@ export class PauseMenu {
     }
     if (action === 'select') {
       if (!globalThis.confirm?.('Load this save slot? The page will reload and leave any current multiplayer room.')) return;
+      this.onBeforeSaveSwitch();
       if (saves.selectSlot(slotId)) globalThis.location?.reload();
       return;
     }
     const summary = saves.getSlotSummaries().find((slot) => slot.id === slotId);
     if (!globalThis.confirm?.(`Reset ${summary?.label ?? 'this save slot'}? This permanently replaces only that slot with a new save.`)) return;
+    if (summary?.active) this.onBeforeSaveSwitch();
     const ok = saves.resetSlot(slotId);
     if (!ok) return;
     if (summary?.active) globalThis.location?.reload(); else this.render();
@@ -316,6 +326,7 @@ export class PauseMenu {
       const slotId = this.screen?.querySelector('#pause-progress-slot')?.value ?? this.progression.saveSystem.activeSlotId;
       const summary = this.progression.saveSystem.getSlotSummaries().find((slot) => slot.id === slotId);
       if (!globalThis.confirm?.(`Overwrite ${summary?.label ?? slotId} with ${preview.summary.discovered} discoveries and $${preview.summary.money}?`)) return;
+      if (summary?.active) this.onBeforeSaveSwitch();
       await createProgressDownload(this.progression.exportProgressForSlot(slotId), 'reel-ascent-backup-before-import').catch(() => null);
       this.progression.importProgressToSlot(this.pendingImport.text, slotId);
       this.pendingImport = null;

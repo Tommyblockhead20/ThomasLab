@@ -21,6 +21,8 @@ export class Hud {
     this.debugPanel = document.querySelector('#debug-panel');
     this.gripPrompt = document.querySelector('#grip-prompt');
     this.fishPrompt = document.querySelector('#fish-prompt');
+    this.tutorialToast = document.querySelector('#tutorial-toast');
+    this.tutorialToastTime = 0;
     this.controlHints = Object.fromEntries(['move', 'sprint', 'jump', 'slide', 'grip', 'fish', 'inventory', 'journal', 'settings', 'emotes', 'map'].map((id) => [
       id, [...document.querySelectorAll(`[data-control-hint="${id}"] kbd, [data-control-key="${id}"]`)]
     ]));
@@ -123,6 +125,10 @@ export class Hud {
   }
 
   update(dt, playerState) {
+    if (this.tutorialToastTime > 0) {
+      this.tutorialToastTime = Math.max(0, this.tutorialToastTime - dt);
+      if (this.tutorialToastTime === 0 && this.tutorialToast) this.tutorialToast.hidden = true;
+    }
     const percentage = Math.round(playerState.stamina * 100);
     this.root.dataset.position = [
       playerState.position.x.toFixed(3),
@@ -443,6 +449,14 @@ export class Hud {
       void receptor.offsetWidth;
       receptor.classList.add('is-pressed', feedback.correct ? 'is-input-correct' : 'is-input-error');
     }
+  }
+
+  showToast(message, seconds = 4) {
+    if (!this.tutorialToast) return false;
+    this.tutorialToast.textContent = String(message ?? '');
+    this.tutorialToast.hidden = false;
+    this.tutorialToastTime = Math.max(1, Number(seconds) || 4);
+    return true;
   }
 
   destroy() {

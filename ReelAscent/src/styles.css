@@ -2131,7 +2131,7 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .aquarium-content h3 { color: #efd98b; font-size: .64rem; letter-spacing: .08em; }
 .aquarium-menu { width: min(76rem, calc(100vw - 2rem)); height: min(46rem, calc(100vh - 3rem)); max-height: none; overflow: hidden; grid-template-rows: auto auto minmax(0, 1fr); }
 .aquarium-menu:not([hidden]) { display: grid; }
-.aquarium-menu .aquarium-content { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .65rem; }
+.aquarium-menu .aquarium-content { min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: .65rem; }
 .aquarium-summary-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .45rem; }
 .aquarium-summary-bar > div { min-width: 0; display: grid; gap: .12rem; align-content: center; min-height: 3.55rem; padding: .5rem; background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .45rem; }
 .aquarium-summary-bar small { color: #efd98b; font-size: .46rem; font-weight: 950; letter-spacing: .06em; }
@@ -2141,6 +2141,16 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .aquarium-selected button { padding: .45rem .55rem; color: #153a36; font-size: .5rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .38rem; cursor: pointer; }
 .aquarium-summary-bar button:disabled,
 .aquarium-selected button:disabled { opacity: .42; cursor: default; }
+.aquarium-view-tabs, .aquarium-tank-selector { display: flex; gap: .35rem; overflow-x: auto; padding-bottom: .15rem; }
+.aquarium-view-tabs button, .aquarium-tank-selector button, .aquarium-section-heading button, .aquarium-detail-actions button { flex: 0 0 auto; padding: .42rem .55rem; color: #dcece8; font-size: .49rem; font-weight: 900; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 13%); border-radius: .38rem; cursor: pointer; }
+.aquarium-view-tabs button.is-active, .aquarium-tank-selector button.is-active { color: #153a36; background: #edd58c; }
+.aquarium-tank-selector button small { display: block; margin-top: .12rem; font-size: .42rem; opacity: .7; }
+.aquarium-section-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.aquarium-section-heading h3 { margin-bottom: .12rem; }
+.aquarium-section-heading small { color: rgb(234 244 231 / 58%); font-size: .47rem; }
+.aquarium-detail-actions { display: grid; gap: .35rem; }
+.aquarium-creature-card [data-aquarium-action] { color: #efd98b; font-weight: 900; text-decoration: underline; }
+.aquarium-showcase-workspace { grid-template-columns: minmax(0, 1fr) 17rem; }
 .aquarium-workspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: .65rem; }
 .aquarium-collection { min-height: 0; overflow: auto; display: grid; gap: .7rem; align-content: start; padding-right: .3rem; }
 .aquarium-collection h3 { margin: 0 0 .35rem; }
@@ -2535,6 +2545,7 @@ body.pause-open #game-shell::after {
 .pause-multiplayer-host { min-height: 0; }
 .multiplayer-menu.is-pause-embedded { position: relative; z-index: auto; inset: auto; width: 100%; padding: .7rem; translate: none; box-shadow: none; }
 .game-version { margin-left: .2rem; color: #e4c96f; font: 800 .48rem ui-monospace, monospace; letter-spacing: .04em; opacity: .72; }
+.tutorial-toast { position: absolute; left: 50%; bottom: max(7rem, calc(env(safe-area-inset-bottom) + 7rem)); translate: -50% 0; width: min(34rem, calc(100vw - 2rem)); padding: .8rem 1rem; color: #f7f3d4; font-size: .72rem; font-weight: 750; line-height: 1.45; text-align: center; background: rgb(9 42 42 / 92%); border: 1px solid rgb(239 217 139 / 55%); border-radius: .65rem; box-shadow: 0 .8rem 2rem rgb(0 0 0 / 28%); }
 .save-local-note { margin: 0 0 .65rem; padding: .55rem .65rem; color: rgb(234 244 231 / 72%); font-size: .58rem; line-height: 1.45; background: rgb(255 255 255 / 4%); border-radius: .45rem; }
 .progress-import { margin-top: .7rem; padding: .7rem; background: rgb(0 0 0 / 14%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .55rem; }
 .progress-import header { display: flex; align-items: center; justify-content: space-between; }

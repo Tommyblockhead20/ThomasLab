@@ -160,6 +160,14 @@ export class MultiplayerClient extends EventTarget {
     }));
   }
 
+  sendAquariumShowcase(specimens = []) {
+    if (this.state !== 'in_room') return false;
+    return this.transport.send(createProtocolMessage(MESSAGE_TYPES.AQUARIUM_SHOWCASE, {
+      playerId: this.playerId,
+      specimens: Array.isArray(specimens) ? specimens.slice(0, 30) : []
+    }));
+  }
+
   handleMessage(value) {
     const message = parseProtocolMessage(value);
     if (!message) return;
@@ -184,6 +192,8 @@ export class MultiplayerClient extends EventTarget {
       this.room.consumeFishingState(message.payload);
     } else if (message.type === MESSAGE_TYPES.CATCH_EVENT) {
       this.room.consumeCatchEvent(message.payload);
+    } else if (message.type === MESSAGE_TYPES.AQUARIUM_SHOWCASE) {
+      this.room.consumeAquariumShowcase(message.payload);
     } else if (message.type === MESSAGE_TYPES.ERROR) {
       const code = String(message.payload.code ?? 'server_error');
       const text = String(message.payload.message ?? 'Multiplayer service error.');

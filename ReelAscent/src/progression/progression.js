@@ -1,10 +1,14 @@
 import { getCatchValue } from './economy.js';
 import { EQUIPMENT_BY_ID, EQUIPMENT_CATALOG, EquipmentManager } from './equipment.js';
 import {
-  AQUARIUM_CAPACITY_TIERS,
+  AQUARIUM_MAX_TANKS,
   AQUARIUM_PAYOUT_INTERVAL_SECONDS,
-  aquariumCapacityForTier,
+  AQUARIUM_TANK_CAPACITY,
+  AQUARIUM_TANK_UPGRADES,
+  aquariumCapacityForTankCount,
   aquariumExhibitedValue,
+  highestValueSpecimenIds,
+  normalizeAquariumTankDisplays,
   aquariumPayoutForValue,
   removeAquariumSpecimen,
   storeAquariumSpecimen
@@ -116,6 +120,7 @@ export class ProgressionSystem {
     }
     this.state.inventory.splice(index, 1);
     if (this.state.heldSpecimenId === specimenId) this.state.heldSpecimenId = null;
+    this.refreshAquariumDisplays();
     this.commit();
     return { ok: true, specimen, amount: 0 };
   }
@@ -128,36 +133,158 @@ export class ProgressionSystem {
       return { ok: false, reason: 'Specimen is already in Inventory' };
     }
     this.state.inventory.push(specimen);
+    this.refreshAquariumDisplays();
     this.commit();
     return { ok: true, specimen };
   }
 
   getAquariumCapacity() {
-    return aquariumCapacityForTier(this.state.aquariumCapacityTier);
+    return aquariumCapacityForTankCount(this.state.aquariumTankCount);
+  }
+
+  refreshAquariumDisplays() {
+    const normalized = normalizeAquariumTankDisplays(
+      this.state.aquarium,
+      this.state.aquariumTankCount,
+      this.state.aquariumTankDisplays,
+      this.state.aquariumTankManual
+    );
+    this.state.aquariumTankDisplays = normalized.displays;
+    this.state.aquariumTankManual = normalized.manual;
+    const valid = new Set(this.state.aquarium.map((specimen) => specimen.specimenId));
+    this.state.aquariumShowcaseSpecimenIds = this.state.aquariumShowcaseManual
+      ? this.state.aquariumShowcaseSpecimenIds.filter((id) => valid.has(id)).slice(0, AQUARIUM_TANK_CAPACITY)
+      : highestValueSpecimenIds(this.state.aquarium, AQUARIUM_TANK_CAPACITY);
+  }
+
+  getAquariumTankDisplays() {
+    this.refreshAquariumDisplays();
+    return this.state.aquariumTankDisplays.map((ids) => [...ids]);
+  }
+
+  assignAquariumSpecimenToTank(specimenId, tankIndex = 0) {
+    const index = Math.max(0, Math.min(this.state.aquariumTankCount - 1, Math.floor(Number(tankIndex) || 0)));
+    if (!this.state.aquarium.some((specimen) => specimen.specimenId === specimenId)) return { ok: false, reason: 'Specimen is not stored in this Aquarium' };
+    this.refreshAquariumDisplays();
+    const target = this.state.aquariumTankDisplays[index];
+    if (!target.includes(specimenId) && target.length >= AQUARIUM_TANK_CAPACITY) return { ok: false, reason: `Tank ${index + 1} is full` };
+    for (const ids of this.state.aquariumTankDisplays) {
+      const at = ids.indexOf(specimenId);
+      if (at >= 0) ids.splice(at, 1);
+    }
+    target.push(specimenId);
+    this.state.aquariumTankManual[index] = true;
+    this.commit();
+    return { ok: true, tankIndex: index };
+  }
+
+  removeAquariumSpecimenFromDisplay(specimenId, tankIndex = 0) {
+    const index = Math.max(0, Math.min(this.state.aquariumTankCount - 1, Math.floor(Number(tankIndex) || 0)));
+    this.refreshAquariumDisplays();
+    const at = this.state.aquariumTankDisplays[index].indexOf(specimenId);
+    if (at < 0) return { ok: false, reason: `Specimen is not displayed in Tank ${index + 1}` };
+    this.state.aquariumTankDisplays[index].splice(at, 1);
+    this.state.aquariumTankManual[index] = true;
+    this.commit();
+    return { ok: true, tankIndex: index };
+  }
+
+  autoFillAquariumTank(tankIndex = 0) {
+    const index = Math.max(0, Math.min(this.state.aquariumTankCount - 1, Math.floor(Number(tankIndex) || 0)));
+    this.state.aquariumTankDisplays[index] = [];
+    this.state.aquariumTankManual[index] = false;
+    this.refreshAquariumDisplays();
+    this.commit();
+    return { ok: true, tankIndex: index, count: this.state.aquariumTankDisplays[index].length };
+  }
+
+  setAquariumShowcase(specimenId, displayed) {
+    if (!this.state.aquarium.some((specimen) => specimen.specimenId === specimenId)) return { ok: false, reason: 'Specimen is not stored in this Aquarium' };
+    const ids = this.state.aquariumShowcaseSpecimenIds.filter((id) => id !== specimenId);
+    if (displayed) {
+      if (ids.length >= AQUARIUM_TANK_CAPACITY) return { ok: false, reason: 'Showcase is full (30 creatures)' };
+      ids.push(specimenId);
+    }
+    this.state.aquariumShowcaseSpecimenIds = ids;
+    this.state.aquariumShowcaseManual = true;
+    this.commit();
+    return { ok: true };
+  }
+
+  autoFillAquariumShowcase() {
+    this.state.aquariumShowcaseManual = false;
+    this.state.aquariumShowcaseSpecimenIds = highestValueSpecimenIds(this.state.aquarium, AQUARIUM_TANK_CAPACITY);
+    this.commit();
+    return { ok: true, count: this.state.aquariumShowcaseSpecimenIds.length };
+  }
+
+  getAquariumShowcasePresentation() {
+    this.refreshAquariumDisplays();
+    const selected = new Set(this.state.aquariumShowcaseSpecimenIds);
+    return this.state.aquarium.filter((specimen) => selected.has(specimen.specimenId)).slice(0, AQUARIUM_TANK_CAPACITY).map((specimen) => ({
+      specimenId: specimen.specimenId,
+      speciesId: specimen.speciesId,
+      name: specimen.name,
+      rarity: specimen.rarity,
+      length: specimen.length,
+      weight: specimen.weight,
+      sizeFraction: specimen.sizeFraction,
+      shiny: Boolean(specimen.shiny),
+      value: specimen.value
+    }));
   }
 
   getAquariumEconomy() {
-    const value = aquariumExhibitedValue(this.state.aquarium);
-    const nextTier = AQUARIUM_CAPACITY_TIERS[this.state.aquariumCapacityTier + 1] ?? null;
+    this.refreshAquariumDisplays();
+    const specimenById = new Map(this.state.aquarium.map((specimen) => [specimen.specimenId, specimen]));
+    const tanks = this.state.aquariumTankDisplays.map((ids, index) => {
+      const specimens = ids.map((id) => specimenById.get(id)).filter(Boolean);
+      const exhibitedValue = aquariumExhibitedValue(specimens);
+      return {
+        tankIndex: index,
+        displayedCount: specimens.length,
+        exhibitedValue,
+        payout: aquariumPayoutForValue(exhibitedValue)
+      };
+    });
+    const displayedIds = new Set(this.state.aquariumTankDisplays.flat());
+    const displayed = this.state.aquarium.filter((specimen) => displayedIds.has(specimen.specimenId));
+    const value = aquariumExhibitedValue(displayed);
+    const collectionValue = aquariumExhibitedValue(this.state.aquarium);
+    let unallocatedPayout = aquariumPayoutForValue(value) - tanks.reduce((total, tank) => total + tank.payout, 0);
+    for (const tank of tanks) {
+      if (unallocatedPayout <= 0) break;
+      if (tank.exhibitedValue <= 0) continue;
+      tank.payout += 1;
+      unallocatedPayout -= 1;
+    }
+    const nextTier = AQUARIUM_TANK_UPGRADES[this.state.aquariumTankCount] ?? null;
     return {
       capacity: this.getAquariumCapacity(),
-      capacityTier: this.state.aquariumCapacityTier,
+      tankCount: this.state.aquariumTankCount,
+      tankCapacity: AQUARIUM_TANK_CAPACITY,
+      displayedCount: displayed.length,
       exhibitedValue: value,
+      collectionValue,
       payout: aquariumPayoutForValue(value),
       intervalSeconds: AQUARIUM_PAYOUT_INTERVAL_SECONDS,
       bankedActiveSeconds: this.state.aquariumIncome.bankedActiveSeconds,
       lifetimePaid: this.state.aquariumIncome.lifetimePaid,
+      tanks,
       nextTier
     };
   }
 
   purchaseAquariumCapacityUpgrade() {
-    const nextTier = AQUARIUM_CAPACITY_TIERS[this.state.aquariumCapacityTier + 1];
+    const nextTier = AQUARIUM_TANK_UPGRADES[this.state.aquariumTankCount];
     if (!nextTier) return { ok: false, reason: 'Aquarium is already at maximum capacity' };
     if (!this.spend(nextTier.price)) return { ok: false, reason: `Need $${nextTier.price}` };
-    this.state.aquariumCapacityTier += 1;
+    this.state.aquariumTankCount = Math.min(AQUARIUM_MAX_TANKS, this.state.aquariumTankCount + 1);
+    this.state.aquariumTankDisplays.push([]);
+    this.state.aquariumTankManual.push(false);
+    this.refreshAquariumDisplays();
     this.commit();
-    return { ok: true, capacity: nextTier.capacity, price: nextTier.price };
+    return { ok: true, capacity: nextTier.capacity, tankCount: this.state.aquariumTankCount, price: nextTier.price };
   }
 
   processAquariumIncome(activePlaytimeSeconds = this.saveSystem.data.lifetime?.activePlaytimeSeconds) {
@@ -170,7 +297,9 @@ export class ProgressionSystem {
     const intervals = Math.floor(income.bankedActiveSeconds / AQUARIUM_PAYOUT_INTERVAL_SECONDS);
     if (!intervals) return { paid: 0, intervals: 0 };
     income.bankedActiveSeconds -= intervals * AQUARIUM_PAYOUT_INTERVAL_SECONDS;
-    const paid = aquariumPayoutForValue(aquariumExhibitedValue(this.state.aquarium)) * intervals;
+    const displayedIds = new Set(this.getAquariumTankDisplays().flat());
+    const displayed = this.state.aquarium.filter((specimen) => displayedIds.has(specimen.specimenId));
+    const paid = aquariumPayoutForValue(aquariumExhibitedValue(displayed)) * intervals;
     if (paid) {
       this.state.money += paid;
       income.lifetimePaid += paid;
@@ -187,6 +316,7 @@ export class ProgressionSystem {
     const specimen = removeAquariumSpecimen(this.state.aquarium, specimenId);
     if (!specimen) return { ok: false, reason: 'Specimen not found' };
     this.state.money += specimen.value;
+    this.refreshAquariumDisplays();
     this.commit();
     if (specimen.provenance?.legitimate !== false) this.saveSystem.recordLegitimateEarnings?.(specimen.value);
     this.saveSystem.recordSpeciesSold?.([specimen]);
@@ -227,8 +357,8 @@ export class ProgressionSystem {
     const purchasableWorldItems = MAP_ITEMS.filter((item) => item.price > 0);
     const purchased = purchasableEquipment.filter((item) => this.state.ownedEquipment.includes(item.id)).length
       + purchasableWorldItems.filter((item) => this.state.ownedItems.includes(item.id)).length
-      + this.state.aquariumCapacityTier;
-    const total = purchasableEquipment.length + purchasableWorldItems.length + AQUARIUM_CAPACITY_TIERS.length - 1;
+      + Math.max(0, this.state.aquariumTankCount - 1);
+    const total = purchasableEquipment.length + purchasableWorldItems.length + AQUARIUM_TANK_UPGRADES.length - 1;
     return { purchased, total, percent: total ? purchased / total * 100 : 100 };
   }
 
@@ -295,6 +425,10 @@ export class ProgressionSystem {
     this.state.appearance = next;
     this.commit();
     return this.getAppearance();
+  }
+
+  resetTutorials() {
+    return this.saveSystem.resetTutorials();
   }
 
   getSnapshot() {

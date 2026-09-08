@@ -1,7 +1,7 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 10;
+export const SAVE_SCHEMA_VERSION = 11;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -10,6 +10,8 @@ export const SAVE_SLOT_COUNT = 4;
 
 const QUALITY_RANK = Object.freeze({ GOOD: 1, GREAT: 2, PERFECT: 3 });
 const CANONICAL_RARITIES = new Set(['Common', 'Uncommon', 'Rare', 'Legendary']);
+const createSaveId = () => `save-${globalThis.crypto?.randomUUID?.()
+  ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
 
 export function normalizeRarity(value) {
   const renamed = value === 'Epic' ? 'Legendary' : value;
@@ -19,6 +21,8 @@ export function normalizeRarity(value) {
 export function defaultSave() {
   return {
     version: SAVE_SCHEMA_VERSION,
+    saveId: createSaveId(),
+    tutorials: { fishing: false, climbing: false, dock: false },
     collection: {},
     lifetime: {
       fishCaught: 0,
@@ -100,6 +104,14 @@ function mergeEntries(left, right) {
 
 export function normalizeSave(value = {}) {
   const normalized = defaultSave();
+  normalized.saveId = typeof value.saveId === 'string' && value.saveId.trim()
+    ? value.saveId.slice(0, 180)
+    : normalized.saveId;
+  normalized.tutorials = {
+    fishing: Boolean(value.tutorials?.fishing),
+    climbing: Boolean(value.tutorials?.climbing),
+    dock: Boolean(value.tutorials?.dock)
+  };
   const collection = value.collection && typeof value.collection === 'object' ? value.collection : {};
   for (const [speciesId, entry] of Object.entries(collection)) {
     const canonicalId = canonicalSpeciesId(speciesId);
@@ -212,6 +224,13 @@ const MIGRATIONS = Object.freeze({
     trailBadges: value.trailBadges ?? {},
     progression: normalizeProgressionState(value.progression),
     lifetime: value.lifetime ?? {}
+  }),
+  10: (value) => ({
+    ...value,
+    version: 11,
+    saveId: typeof value.saveId === 'string' && value.saveId ? value.saveId : createSaveId(),
+    tutorials: value.tutorials ?? { fishing: false, climbing: false, dock: false },
+    progression: normalizeProgressionState(value.progression)
   })
 });
 
@@ -531,6 +550,21 @@ export class SaveSystem {
     return copy(this.data.lifetime ?? {});
   }
 
+  hasSeenTutorial(kind) {
+    return Boolean(this.data.tutorials?.[kind]);
+  }
+
+  markTutorialSeen(kind) {
+    if (!['fishing', 'climbing', 'dock'].includes(kind) || this.hasSeenTutorial(kind)) return false;
+    this.data.tutorials = { ...this.data.tutorials, [kind]: true };
+    return this.save();
+  }
+
+  resetTutorials() {
+    this.data.tutorials = { fishing: false, climbing: false, dock: false };
+    return this.save();
+  }
+
   getSlotSummaries() {
     return this.slotStore.slots.map((slot) => summarizeSlot(slot, this.activeSlotId));
   }
@@ -591,6 +625,9 @@ export class SaveSystem {
     const previous = { data: slot.data, createdAt: slot.createdAt, updatedAt: slot.updatedAt };
     const now = Date.now();
     slot.data = migrate(value);
+    const duplicateId = this.slotStore.slots.some((entry) => entry !== slot
+      && entry.data?.saveId && entry.data.saveId === slot.data.saveId);
+    if (duplicateId) slot.data.saveId = createSaveId();
     const importedCreatedAt = finiteNumber(importedMetadata?.createdAt);
     const importedUpdatedAt = finiteNumber(importedMetadata?.updatedAt);
     slot.createdAt = importedCreatedAt > 0 ? importedCreatedAt : (slot.createdAt || now);

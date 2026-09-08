@@ -141,25 +141,31 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
   const speciesId = presentation.canonicalId;
   let tail = null;
 
-  if (speciesId === 'giant_panda') {
-    primitive(root, `${name} panda body`, 'sphere', { x: -.12, y: 0, z: 0 },
-      { x: .58, y: .38, z: .34 }, base);
-    primitive(root, `${name} panda shoulders`, 'sphere', { x: .23, y: .08, z: 0 },
-      { x: .38, y: .36, z: .35 }, accent);
-    primitive(root, `${name} panda head`, 'sphere', { x: .54, y: .25, z: 0 },
-      { x: .3, y: .3, z: .29 }, base);
+  if (speciesId === 'penguin') {
+    primitive(root, `${name} penguin upright body`, 'sphere', { x: 0, y: .02, z: 0 }, { x: .35, y: .62, z: .34 }, dark);
+    primitive(root, `${name} penguin white belly`, 'sphere', { x: .25, y: -.04, z: 0 }, { x: .16, y: .44, z: .27 }, base);
+    primitive(root, `${name} penguin head`, 'sphere', { x: .03, y: .55, z: 0 }, { x: .29, y: .29, z: .29 }, dark);
+    primitive(root, `${name} penguin beak`, 'cone', { x: .34, y: .53, z: 0 }, { x: .2, y: .12, z: .11 }, accent, { z: -90 });
     for (const side of [-1, 1]) {
-      primitive(root, `${name} panda ear ${side}`, 'sphere', { x: .48, y: .48, z: side * .19 },
-        { x: .12, y: .13, z: .09 }, accent);
-      primitive(root, `${name} panda eye patch ${side}`, 'sphere', { x: .78, y: .3, z: side * .115 },
-        { x: .04, y: .09, z: .065 }, accent, { x: side * 18 });
-      primitive(root, `${name} panda foreleg ${side}`, 'cylinder', { x: .22, y: -.27, z: side * .24 },
-        { x: .11, y: .28, z: .11 }, accent, { z: 8 });
-      tail = primitive(root, `${name} panda hind leg ${side}`, 'sphere', { x: -.42, y: -.25, z: side * .23 },
-        { x: .22, y: .2, z: .16 }, accent);
+      primitive(root, `${name} penguin eye ${side}`, 'sphere', { x: .23, y: .64, z: side * .18 }, { x: .04, y: .04, z: .035 }, base);
+      primitive(root, `${name} penguin flipper ${side}`, 'sphere', { x: -.02, y: .05, z: side * .31 }, { x: .15, y: .46, z: .07 }, dark, { x: side * 11 });
+      primitive(root, `${name} penguin leg ${side}`, 'cylinder', { x: -.02, y: -.54, z: side * .14 }, { x: .065, y: .18, z: .065 }, accent);
+      tail = primitive(root, `${name} penguin foot ${side}`, 'sphere', { x: .09, y: -.68, z: side * .15 }, { x: .19, y: .055, z: .1 }, accent);
     }
-    primitive(root, `${name} panda nose`, 'sphere', { x: .81, y: .18, z: 0 },
-      { x: .055, y: .045, z: .055 }, dark);
+  } else if (['polar_bear', 'giant_panda'].includes(speciesId)) {
+    const kind = speciesId === 'giant_panda' ? 'panda' : 'polar bear';
+    primitive(root, `${name} ${kind} body`, 'sphere', { x: -.12, y: .02, z: 0 }, { x: .62, y: .37, z: .35 }, base);
+    primitive(root, `${name} ${kind} shoulders`, 'sphere', { x: .28, y: .09, z: 0 }, { x: .42, y: .35, z: .35 }, speciesId === 'giant_panda' ? accent : base);
+    primitive(root, `${name} ${kind} head`, 'sphere', { x: .58, y: .24, z: 0 }, { x: .31, y: .29, z: .28 }, base);
+    primitive(root, `${name} ${kind} muzzle`, 'sphere', { x: .82, y: .15, z: 0 }, { x: .18, y: .13, z: .17 }, base);
+    primitive(root, `${name} ${kind} nose`, 'sphere', { x: .96, y: .17, z: 0 }, { x: .06, y: .05, z: .055 }, dark);
+    for (const side of [-1, 1]) {
+      primitive(root, `${name} ${kind} ear ${side}`, 'sphere', { x: .52, y: .46, z: side * .19 }, { x: .12, y: .12, z: .085 }, speciesId === 'giant_panda' ? accent : base);
+      if (speciesId === 'giant_panda') primitive(root, `${name} panda eye patch ${side}`, 'sphere', { x: .79, y: .29, z: side * .12 }, { x: .045, y: .09, z: .07 }, accent, { x: side * 18 });
+      primitive(root, `${name} ${kind} eye ${side}`, 'sphere', { x: .81, y: .31, z: side * .16 }, { x: .042, y: .042, z: .034 }, dark);
+      primitive(root, `${name} ${kind} foreleg ${side}`, 'cylinder', { x: .27, y: -.25, z: side * .25 }, { x: .115, y: .3, z: .115 }, speciesId === 'giant_panda' ? accent : base, { z: 7 });
+      tail = primitive(root, `${name} ${kind} hind leg ${side}`, 'sphere', { x: -.43, y: -.25, z: side * .24 }, { x: .23, y: .21, z: .17 }, speciesId === 'giant_panda' ? accent : base);
+    }
   } else if (['shark', 'dogfish'].includes(archetype)) {
     primitive(root, `${name} shark body`, 'sphere', { x: -.03, y: 0, z: 0 },
       { x: .68, y: .24, z: .22 }, base);
@@ -299,7 +305,8 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
     serpent: [.69, .14, .15], dragon: [.69, .14, .15], plesiosaur: [.69, .14, .15], waterhorse: [.69, .14, .15], eel: [.69, .14, .15]
   };
   const eye = eyeProfiles[archetype] ?? [.53 * clamp(visual.lengthScale ?? 1, .58, 1.55), .08, .2 * clamp(visual.width ?? 1, .5, 1.5)];
-  if (!['clam', 'oyster', 'mussel', 'scallop', 'bivalve', 'nautilus', 'starfish', 'urchin', 'anemone', 'wisp'].includes(archetype)) {
+  if (!['penguin', 'polar_bear', 'giant_panda'].includes(speciesId)
+    && !['clam', 'oyster', 'mussel', 'scallop', 'bivalve', 'nautilus', 'starfish', 'urchin', 'anemone', 'wisp'].includes(archetype)) {
     for (const side of [-1, 1]) primitive(root, `${name} ${side < 0 ? 'far' : 'near'} eye`, 'sphere',
       { x: eye[0], y: eye[1], z: side * eye[2] }, { x: .046, y: .046, z: .035 }, dark);
   }
@@ -309,11 +316,9 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
       { z: -10 + index * 10 });
   }
 
-  // Giant Panda is maintained separately. All creature/fish models pass through this one
-  // connectivity invariant before any Hand, catch, remote-player, or Aquarium transform.
-  const attachmentValidation = speciesId === 'giant_panda'
-    ? Object.freeze({ archetype, connected: true, correctionCount: 0, corrections: Object.freeze([]) })
-    : enforceCreatureAttachmentInvariant(root, archetype);
+  // Every species, including the dedicated bear and penguin models, shares the same
+  // connectivity repair before Hand, catch, remote-player, or Aquarium transforms.
+  const attachmentValidation = enforceCreatureAttachmentInvariant(root, archetype);
 
   const scale = specimenDisplayScale(specimen, maximumScale);
   const physicalLengthMeters = clamp((Number(specimen?.length) || 8) * .0254, .04, 30);

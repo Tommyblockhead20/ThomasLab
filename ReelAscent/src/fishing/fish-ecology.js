@@ -1,7 +1,7 @@
 import { FISH_SPECIES, getWeightedSpeciesTable } from './fish-data.js';
 
 export const ECOLOGY_TARGETS = Object.freeze({
-  waters: 27,
+  waters: 28,
   species: 300,
   // The v7.1 summit promotions and v8 replacement roster intentionally moved four
   // creatures from the shared pool into location-specific discoveries. Individual
@@ -119,9 +119,17 @@ export function getHabitatWeight(fish, habitat) {
 
 export function getEcologySelection(zone, point = zone.center) {
   const habitat = getZoneHabitat(zone, point);
+  const allowedIds = Array.isArray(zone.allowedFishIds) && zone.allowedFishIds.length
+    ? new Set(zone.allowedFishIds)
+    : null;
+  const allowedRarities = Array.isArray(zone.allowedRarities) && zone.allowedRarities.length
+    ? new Set(zone.allowedRarities)
+    : null;
   const entries = FISH_SPECIES
     .map((fish) => ({ fish, weight: getHabitatWeight(fish, habitat) }))
-    .filter((entry) => entry.weight > 0);
+    .filter((entry) => entry.weight > 0
+      && (!allowedIds || allowedIds.has(entry.fish.id))
+      && (!allowedRarities || allowedRarities.has(entry.fish.rarity)));
   return Object.freeze({
     habitat,
     fishIds: Object.freeze(entries.map((entry) => entry.fish.id)),

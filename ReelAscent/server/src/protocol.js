@@ -9,6 +9,7 @@ export const MESSAGE_TYPES = Object.freeze({
   PLAYER_SNAPSHOT: 'player_snapshot',
   CATCH_EVENT: 'catch_event',
   FISHING_STATE: 'fishing_state',
+  AQUARIUM_SHOWCASE: 'aquarium_showcase',
   ERROR: 'error'
 });
 
