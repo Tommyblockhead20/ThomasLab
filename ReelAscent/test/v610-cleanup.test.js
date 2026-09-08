@@ -64,7 +64,8 @@ test('F6 fishing debug remains live but is hidden from the normal controls card'
   assert.match(html, /id="performance-candidates"/);
   assert.doesNotMatch(controls, /<kbd>F\d+<\/kbd>/);
   assert.match(controls, /<kbd>I<\/kbd> Inventory/);
-  assert.match(controls, /<kbd>M<\/kbd> Multiplayer/);
+  // Multiplayer moved from a direct M binding into the Escape menu in v11.
+  assert.match(html, /data-pause-open-multiplayer>MULTIPLAYER/);
 });
 
 test('ocean water and radius are nonfatal while a below-world fall still fails', () => {

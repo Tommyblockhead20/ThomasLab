@@ -22,10 +22,10 @@ test('bobber wait ranges and Ocean rarity shifts match the centralized settings'
   const trophy = SELECTIVE_BOBBER_SETTINGS.trophy;
   assert.deepEqual([
     sampleBobberBiteDelay(selective, 0), sampleBobberBiteDelay(selective, 1)
-  ], [22.5, 37.5]);
+  ], [21, 35]);
   assert.deepEqual([
     sampleBobberBiteDelay(trophy, 0), sampleBobberBiteDelay(trophy, 1)
-  ], [96, 144]);
+  ], [58.5, 91.5]);
   const selectiveProfile = getRarityProfile({
     rarityProfile: PHYSICAL_WATER_RARITY_PROFILES.ocean,
     bobberAcceptanceByRarity: selective.acceptanceByRarity
@@ -34,8 +34,9 @@ test('bobber wait ranges and Ocean rarity shifts match the centralized settings'
     rarityProfile: PHYSICAL_WATER_RARITY_PROFILES.ocean,
     bobberAcceptanceByRarity: trophy.acceptanceByRarity
   });
-  assert.ok(selectiveProfile.Rare + selectiveProfile.Legendary > .30);
-  assert.ok(trophyProfile.Rare + trophyProfile.Legendary > .58);
+  assert.ok(selectiveProfile.Rare + selectiveProfile.Legendary > .22);
+  assert.ok(trophyProfile.Rare + trophyProfile.Legendary > .29);
+  assert.ok(trophyProfile.Rare + trophyProfile.Legendary < .34);
   assert.ok(trophyProfile.Common > 0);
 });
 

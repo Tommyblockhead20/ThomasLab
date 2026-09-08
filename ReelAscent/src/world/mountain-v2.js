@@ -173,6 +173,12 @@ export const HOME_CABIN_CONFIG = Object.freeze({
   wallHeight: 3.45,
   interactionDistance: 2.15
 });
+export const MAIN_ISLAND_DOCK_CONFIG = Object.freeze({ centerRadius: 216, length: 21 });
+export const BLUEWATER_SIDE_SEAT_CONFIG = Object.freeze({
+  side: -2.65,
+  forward: 1.75,
+  interactionDistance: 2.4
+});
 export const FRACTURED_ROCK_FORM_KINDS = Object.freeze([
   'chunk', 'chunk', 'spire', 'spire', 'blade', 'lean', 'wedge', 'column',
   'needle', 'shelfblade', 'crooked', 'shard', 'hook', 'knuckle', 'slab',
@@ -868,7 +874,7 @@ export function createMountainMapData() {
 export const START_LOCATIONS = Object.freeze([
   ...[352, 54, 111, 181, 254, 309].map((angle, index) => {
     const arrivalRadius = 205.6;
-    const dockRadius = 214.1;
+    const dockRadius = MAIN_ISLAND_DOCK_CONFIG.centerRadius;
     const terrainY = terrainHeightAt(angle, arrivalRadius);
     const arrivalY = Math.max(OCEAN_SURFACE_Y + PLAYER_FOOT_OFFSET + .45, terrainY + PLAYER_FOOT_OFFSET + .18);
     const position = radialPoint(angle, arrivalRadius, arrivalY);
@@ -1291,6 +1297,44 @@ export class MountainWorld extends TestWorld {
     }
     this.addCylinder('Bluewater Reach mast', { ...wheelhouse, y: OCEAN_SURFACE_Y + 3.15 },
       { x: .14, y: 3.5, z: .14 }, this.materials.deepRock);
+
+    // A compact helm station makes this read as the travel boat instead of another dock.
+    // The fishing bench lives separately along the port rail and faces open water.
+    const helm = localPoint(0, .05);
+    this.addBox('Bluewater Reach travel helm console', { ...helm, y: OCEAN_SURFACE_Y + .96 },
+      { x: 1.9, y: .9, z: .68 }, this.materials.cabinTrim, { y: yaw });
+    this.addCylinder('Bluewater Reach steering wheel', { ...localPoint(0, .43), y: OCEAN_SURFACE_Y + 1.48 },
+      { x: .62, y: .09, z: .62 }, this.materials.cabinWarm, { x: 90, y: yaw });
+    this.addCylinder('Bluewater Reach helm hub', { ...localPoint(0, .38), y: OCEAN_SURFACE_Y + 1.48 },
+      { x: .14, y: .16, z: .14 }, this.materials.deepRock, { x: 90, y: yaw });
+    const pilotSeat = localPoint(0, 1.35);
+    this.addBox('Bluewater Reach pilot seat', { ...pilotSeat, y: OCEAN_SURFACE_Y + .72 },
+      { x: 1.1, y: .18, z: .8 }, this.materials.cabinFabric, { y: yaw });
+    this.addBox('Bluewater Reach pilot seat back', { ...localPoint(0, 1.72), y: OCEAN_SURFACE_Y + 1.18 },
+      { x: 1.1, y: .84, z: .16 }, this.materials.cabinFabric, { x: -6, y: yaw });
+
+    const fishingSeat = localPoint(BLUEWATER_SIDE_SEAT_CONFIG.side, BLUEWATER_SIDE_SEAT_CONFIG.forward);
+    const fishingSeatSurfaceY = OCEAN_SURFACE_Y + .81;
+    this.addBox('Bluewater Reach portside fishing seat', { ...fishingSeat, y: OCEAN_SURFACE_Y + .72 },
+      { x: .72, y: .18, z: 2.35 }, this.materials.woodLight, { y: yaw });
+    for (const forwardOffset of [-.82, .82]) {
+      const leg = localPoint(BLUEWATER_SIDE_SEAT_CONFIG.side, BLUEWATER_SIDE_SEAT_CONFIG.forward + forwardOffset);
+      this.addBox(`Bluewater Reach fishing seat leg ${forwardOffset < 0 ? 'aft' : 'fore'}`,
+        { ...leg, y: OCEAN_SURFACE_Y + .5 }, { x: .44, y: .48, z: .22 }, this.materials.wood, { y: yaw });
+    }
+    const fishingSeatExit = localPoint(-1.45, BLUEWATER_SIDE_SEAT_CONFIG.forward);
+    this.homeInteractions.push({
+      id: 'bluewater-side-fishing-seat',
+      label: 'SIT & FISH OFF THE PORT SIDE',
+      action: 'bench',
+      seatKind: 'boat fishing seat',
+      position: { ...fishingSeat, y: fishingSeatSurfaceY },
+      seatPosition: { ...fishingSeat, y: fishingSeatSurfaceY + PLAYER_FOOT_OFFSET + .03 },
+      exitPosition: { ...fishingSeatExit, y: OCEAN_SURFACE_Y + .5 + PLAYER_FOOT_OFFSET + .12 },
+      facingYaw: yaw - 90,
+      fishingFacing: 'bluewater-reach-water',
+      range: BLUEWATER_SIDE_SEAT_CONFIG.interactionDistance
+    });
     const boardingPosition = { ...localPoint(0, 3.25), y: OCEAN_SURFACE_Y + 1.68 };
     for (const side of [-1, 1]) {
       const ladderCenter = localPoint(side * 3.7, 3.25);
@@ -1317,9 +1361,9 @@ export class MountainWorld extends TestWorld {
       center: { x, z }, forward, sideward, boardingPosition, facingYaw: yaw
     };
     this.homeInteractions.push({
-      id: `${location.id}-boat`, label: 'OPEN BLUEWATER CHART', action: 'boat',
+      id: `${location.id}-boat`, label: 'USE HELM • TRAVEL / GO HOME', action: 'boat',
       destinationId: location.id,
-      position: { x, y: OCEAN_SURFACE_Y + .5, z }, range: 3.2
+      position: { ...helm, y: OCEAN_SURFACE_Y + .72 }, range: 3.2
     });
     this.islandEntities.set(location.id, deck);
     this.buildTarget = previousTarget;
@@ -1470,7 +1514,10 @@ export class MountainWorld extends TestWorld {
         position: { x: position.x, y: position.y + .14, z: position.z }, range: 2.5
       });
     };
-    for (const start of START_LOCATIONS) buildDock(`${start.id}-boat`, start.label, start.dockPosition, start.angle, 13, MAIN_WORLD_LOCATION.id);
+    for (const start of START_LOCATIONS) buildDock(
+      `${start.id}-boat`, start.label, start.dockPosition, start.angle,
+      MAIN_ISLAND_DOCK_CONFIG.length, MAIN_WORLD_LOCATION.id
+    );
     for (const location of SMALL_ISLAND_LOCATIONS) {
       if (location.type === 'open-water-boat') continue;
       buildDock(`${location.id}-boat`, location.displayName, location.dock.worldPosition, location.angle,
@@ -1698,6 +1745,18 @@ export class MountainWorld extends TestWorld {
         { x: .15, y: 2.72, z: .38 }, this.materials.cabinTrim);
     }
 
+    // Close the previously open triangular gable above the front wall with stepped timber
+    // courses. They meet rather than overlap the wall below, avoiding coplanar surfaces.
+    [
+      { y: 3.585, width: 8.05 },
+      { y: 3.855, width: 6.85 },
+      { y: 4.125, width: 5.65 },
+      { y: 4.395, width: 4.45 },
+      { y: 4.665, width: 3.2 }
+    ].forEach((course, index) => this.addCabinBox(`Trail cabin front gable course ${index + 1}`,
+      { x: 0, y: course.y, z: config.depth * .5 },
+      { x: course.width, y: .27, z: .3 }, this.materials.cabinWall));
+
     for (const side of [-1, 1]) {
       this.addCabinBox(`Trail cabin roof ${side < 0 ? 'west' : 'east'} pitch`,
         { x: side * 2.16, y: 4.05, z: 0 }, { x: 4.85, y: .24, z: 7.65 },
@@ -1745,7 +1804,9 @@ export class MountainWorld extends TestWorld {
       this.addCabinBox(`Trail cabin side window crossbar ${y}`, { x: -config.width * .5 - .22, y, z: -.6 },
         { x: .07, y: .07, z: 1.78 }, this.materials.cabinTrim, {}, false);
     }
-    this.addCabinBox('Trail cabin open door', { x: -.92, y: 1.36, z: 3.94 },
+    // Center from the left hinge after the -72° swing. The old center drove half the door
+    // back through the front wall, producing z-fighting along the doorway.
+    this.addCabinBox('Trail cabin open door', { x: -.63, y: 1.36, z: 4.08 },
       { x: 1.42, y: 2.67, z: .13 }, this.materials.woodLight, { y: -72 }, false);
     for (const [index, x] of [-3.35, -1.75, 1.75, 3.35].entries()) {
       this.addCabinBox(`Trail cabin floor board ${index + 1}`, { x, y: .012, z: 0 },

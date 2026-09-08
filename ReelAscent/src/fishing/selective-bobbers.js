@@ -7,15 +7,15 @@ export const SELECTIVE_BOBBER_SETTINGS = Object.freeze({
   }),
   selective: Object.freeze({
     id: 'selective',
-    targetWaitSeconds: 30,
+    targetWaitSeconds: 28,
     delayVariance: 0.25,
-    acceptanceByRarity: Object.freeze({ Common: 0.42, Uncommon: 0.72, Rare: 0.96, Legendary: 1 })
+    acceptanceByRarity: Object.freeze({ Common: 0.42, Uncommon: 0.58, Rare: 0.64, Legendary: 0.68 })
   }),
   trophy: Object.freeze({
     id: 'trophy',
-    targetWaitSeconds: 120,
-    delayVariance: 0.2,
-    acceptanceByRarity: Object.freeze({ Common: 0.08, Uncommon: 0.30, Rare: 0.82, Legendary: 1 })
+    targetWaitSeconds: 75,
+    delayVariance: 0.22,
+    acceptanceByRarity: Object.freeze({ Common: 0.18, Uncommon: 0.32, Rare: 0.40, Legendary: 0.46 })
   })
 });
 

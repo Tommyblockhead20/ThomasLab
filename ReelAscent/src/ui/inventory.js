@@ -1,4 +1,4 @@
-import { resolveSpecies } from '../fishing/fish-data.js';
+import { resolveCreaturePresentation } from '../fishing/creature-presentation.js';
 import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
 import { MAP_ITEM_BY_ID } from '../world/world-locations.js';
 import { isBoundActionCode } from '../player/movement.js';
@@ -19,10 +19,10 @@ function colorCss(color = [.45, .62, .55]) {
 const SPECIMEN_PREVIEW_CACHE = new Map();
 
 export function specimenPreview(specimen) {
-  const species = resolveSpecies(specimen.speciesId);
-  const [primary, accent] = species?.visual?.colors ?? [[.45, .62, .55], [.82, .72, .38]];
-  const archetype = species?.visual?.archetype ?? 'panfish';
-  const key = `${species?.id ?? specimen.speciesId}:${archetype}:${specimen.shiny ? 1 : 0}`;
+  const presentation = resolveCreaturePresentation(specimen, { context: 'inventory preview' });
+  const { visual, archetype } = presentation;
+  const [primary, accent] = visual.colors;
+  const key = `${presentation.canonicalId}:${archetype}:${specimen.shiny ? 1 : 0}`;
   let drawing = SPECIMEN_PREVIEW_CACHE.get(key);
   const p = colorCss(primary);
   const a = colorCss(accent);

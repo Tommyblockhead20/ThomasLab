@@ -1,5 +1,5 @@
 import * as pc from 'playcanvas';
-import { resolveSpecies } from './fish-data.js';
+import { resolveCreaturePresentation } from './creature-presentation.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -35,16 +35,15 @@ const NATIVE_MODEL_LENGTH = Object.freeze({
 });
 
 export function specimenDisplayScale(specimen, maximum = Number.POSITIVE_INFINITY) {
-  const species = resolveSpecies(specimen?.speciesId, true);
-  const archetype = species?.visual?.archetype ?? 'panfish';
+  const { archetype } = resolveCreaturePresentation(specimen, { context: 'display scale' });
   const lengthMeters = clamp((Number(specimen?.length) || 8) * .0254, .04, 30);
   const exactScale = lengthMeters / (NATIVE_MODEL_LENGTH[archetype] ?? 1.45);
   return Math.min(Math.max(.025, exactScale), Number.isFinite(maximum) ? maximum : exactScale);
 }
 
 export function createSpecimenModel(specimen, { name = 'Specimen display', maximumScale = Number.POSITIVE_INFINITY } = {}) {
-  const species = resolveSpecies(specimen?.speciesId, true);
-  const visual = species?.visual ?? {};
+  const presentation = resolveCreaturePresentation(specimen, { context: name });
+  const { species, visual, archetype } = presentation;
   const colors = visual.colors ?? [[.3, .66, .48], [.84, .56, .22]];
   const materials = [
     surface(colors[0] ?? [.3, .66, .48], { shiny: Boolean(specimen?.shiny) }),
@@ -53,8 +52,7 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
   ];
   const [base, accent, dark] = materials;
   const root = new pc.Entity(name);
-  const archetype = visual.archetype ?? 'panfish';
-  const speciesId = species?.canonicalId ?? species?.id ?? specimen?.speciesId;
+  const speciesId = presentation.canonicalId;
   let tail = null;
 
   if (speciesId === 'giant_panda') {
@@ -228,7 +226,7 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
   const scale = specimenDisplayScale(specimen, maximumScale);
   const physicalLengthMeters = clamp((Number(specimen?.length) || 8) * .0254, .04, 30);
   root.setLocalScale(scale, scale, scale);
-  return { root, tail, materials, species, scale, archetype, physicalLengthMeters };
+  return { root, tail, materials, species, scale, archetype, physicalLengthMeters, presentation };
 }
 
 export function positionSpecimenModel(model, mode = 'held') {

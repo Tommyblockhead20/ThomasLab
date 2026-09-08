@@ -174,14 +174,15 @@ export class HomeInteractionController {
     }
     if (interaction.action === 'bench') {
       if (!this.player.grounded || !['grounded', 'sliding'].includes(this.player.movementState)) {
-        this.hud.showToast?.('Stand beside the summit bench to sit.');
+        this.hud.showToast?.('Stand beside the seat to sit.');
         return false;
       }
       this.player.cancelEmote();
       this.player.setBenchSeat(interaction);
       this.camera?.setYaw?.(interaction.facingYaw);
       this.pendingSeat = { expiresAt: performance.now() + 1800 };
-      this.hud.showToast?.('Seated facing Stoneveil Tarn • press F to fish • click the prompt to get up.');
+      const destination = interaction.seatKind === 'boat fishing seat' ? 'open water' : 'Stoneveil Tarn';
+      this.hud.showToast?.(`Seated facing ${destination} • press F to fish • click the prompt to get up.`);
       return true;
     }
     return false;

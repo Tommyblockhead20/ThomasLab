@@ -28,11 +28,11 @@ export const EQUIPMENT_CATALOG = Object.freeze([
   item('prism-lure', 'lure', 'Prism Lure', 10000, 'Fishing songs play 20% faster.', { tempoMultiplier: 1.20 }),
 
   item('trail-bobber', 'bobber', 'Trail Bobber', 0, 'Responsive starter float.', {}, { bobberMode: 'standard' }),
-  item('selective-drift-bobber', 'bobber', 'Selective Drift Bobber', 3500,
-    'Selective float. Bites average about 30 seconds, but weak catches often fail to trigger it.', {},
+  item('selective-drift-bobber', 'bobber', 'Selective Drift Bobber', 1800,
+    'A patient cedar float that ignores nervous taps and settles only for a confident pull.', {},
     { bobberMode: 'selective' }),
-  item('trophy-sentinel-bobber', 'bobber', 'Trophy Sentinel Bobber', 11000,
-    'Extremely selective trophy float. Bites average about two minutes, with much better catches.', {},
+  item('trophy-sentinel-bobber', 'bobber', 'Trophy Sentinel Bobber', 4500,
+    'A brass-eyed deepwater float, slow to stir and hard to impress.', {},
     { bobberMode: 'trophy' }),
 
   item('common-field-notes', 'guide', 'Common Field Notes', 400, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),

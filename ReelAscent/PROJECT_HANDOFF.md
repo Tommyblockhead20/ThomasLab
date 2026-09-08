@@ -1,3 +1,55 @@
+# Reel Ascent v13 update handoff
+
+Status: the focused v13 cleanup/polish pass is implemented in the current project tree. No commit, push, deployment, or server mutation was performed. Validation stayed light: the production frontend build and 22 focused creature/avatar/world/fishing checks passed. This section supersedes older notes wherever behavior differs.
+
+## v13 focused cleanup / polish pass
+
+1. **Files changed** — New `test/v13-focused.test.js`; `src/fishing/creature-presentation.js`, `fishing.js`, `selective-bobbers.js`, and `specimen-model.js`; `src/player/character-model.js`; `src/progression/equipment.js`; `src/ui/home-interaction.js` and `inventory.js`; `src/world/mountain-v2.js`; superseded expectations in `test/v12-focused.test.js` and `test/v610-cleanup.test.js`; this handoff; and rebuilt `dist/index.html` plus `dist/assets/index-Dv2mKbke.js` (replacing `index-isYWBpy9.js`). CSS content/hash did not change.
+
+2. **Cabin door z-fighting root cause and fix** — The open door's center/rotation put roughly half of its thin panel back through the front wall and jamb plane. Its center is now derived from the left-side hinge after the existing -72° outward swing (`x -0.63, z 4.08`), keeping the panel outside while retaining a slight physical hinge intersection. The non-solid open panel and solid doorway frame remain aligned with cabin entry collision.
+
+3. **Cabin doorway/top-gap fix** — The front wall stopped at the eaves while the pitched roof rose to the ridge, leaving the entire front gable open and making the void above the door look like a doorway defect. Five touching, progressively narrower timber courses now close that triangular gable without coplanar overlaps; the existing lintel still closes the small area directly above the door.
+
+4. **Creature model consistency architecture** — `resolveCreaturePresentation()` is now the canonical species-ID → species → validated archetype → visual-data gateway. Both the shared 3D specimen factory and 2D inventory preview consume it. Catch reveal, local Hand, aquarium residents, remote Hand/catch, and the gallery already consume the 3D factory, so those contexts now converge on one resolution decision.
+
+5. **Model gallery root cause and fix** — Model mode selected a valid representative species, then replaced its canonical ID with a synthetic `gallery-model-${archetype}` ID. That ID could never resolve, so `createSpecimenModel()` correctly but silently produced the same panfish fallback. Gallery entries now keep the representative's canonical species ID and store only a non-authoritative `galleryArchetype` label; all 300 species and all model-mode representatives therefore use the normal renderer.
+
+6. **Shared creature presentation/model resolution path** — `src/fishing/creature-presentation.js` owns the supported-archetype catalog, canonical resolver, defaults, and warning policy. `specimenDisplayScale()`, `createSpecimenModel()`, catch reveal color/dimension setup, and `specimenPreview()` use that result. Existing aquarium/local/remote display paths continue to call `createSpecimenModel()` rather than duplicating geometry selection.
+
+7. **Fallback behavior** — All 300 active species validate with no fallback. A genuinely unknown/retired-unresolvable saved ID uses documented generic panfish geometry and fallback colors. A known species with a missing/unsupported archetype uses panfish geometry but preserves its authored colors/dimensions. Each unique missing-ID or invalid-archetype problem warns once for the session, never once per frame.
+
+8. **Avatar attachment/overlap system changes** — `AVATAR_ATTACHMENT_SPEC` now centrally defines torso/head and animated arm/leg anchor dimensions; `AVATAR_ATTACHMENT_OVERLAP_EPSILON` establishes a 0.02 model-unit minimum; and `validateAvatarAttachmentSpec()` audits every core chain. Eyewear was moved slightly into the head surface and the backpack now intersects the torso by a meaningful depth.
+
+9. **Disconnected-parts prevention** — Upper/lower torso, torso/neck, neck/head, upper/lower arms, lower arms/hands, lower torso/upper legs, upper/lower legs, and lower legs/boots all overlap by at least the shared epsilon at neutral transforms. Limb pieces extend through their rotation anchors, so normal bends do not expose the previous exact-edge seams. Shoulder caps, hair/hats, face features, and carried attachments retain their intersecting anchors.
+
+10. **Local/multiplayer/preview consistency** — Yes. Local play, remote multiplayer avatars, and the wardrobe preview all instantiate `createCharacterModel()`; the preview intentionally uses the remote-avatar wrapper. Seated, emote, held-item, and fishing states animate/attach to joints returned by that same factory, so the new overlap spec applies to every context.
+
+11. **Waterfall bobber-above-head root cause and fix** — Fallglass is one sloped path whose sampled points have different Y values, but cast, waiting, bite, rhythm, and ripple code repeatedly replaced the local sampled height with the zone's one center `surfaceY`. Lower-cascade casts could therefore jump toward the center's much higher elevation. Every water-state write now calls `zone.resolveSurfaceY()` at the bobber/landing point; flat ponds still return their unchanged constant height.
+
+12. **Main-island dock changes** — All six Stoneveil docks now use a 21 m deck centered at radius 216 m, spanning approximately radius 205.5–226.5. They connect to shore at the existing safe arrival side and extend about 5.5 m into rendered ocean beyond radius 221, instead of ending as 13 m stubs just short of the water.
+
+13. **Travel-boat readability additions** — Bluewater Reach now has a low-poly control console, steering wheel/hub, and separate upholstered pilot seat. The nearby action reads `USE HELM • TRAVEL / GO HOME`, and its interaction point is located at the helm rather than the boat's generic center.
+
+14. **Side fishing seat addition** — A supported port-side bench with two legs now sits inside the rail, visibly separate from the pilot position. It exposes the existing click/Interact bench behavior, faces open Bluewater water, keeps seated fishing behavior, and has a safe deck-side exit point.
+
+15. **Both bobber final prices** — Selective Drift Bobber: **$1,800** (was $3,500). Trophy Sentinel Bobber: **$4,500** (was $11,000).
+
+16. **Both updated descriptions** — Selective Drift: “A patient cedar float that ignores nervous taps and settles only for a confident pull.” Trophy Sentinel: “A brass-eyed deepwater float, slow to stir and hard to impress.” Exact odds and timers are intentionally no longer exposed in shop prose.
+
+17. **Bobber rebalance** — Selective Drift now targets 28 s ±25% (21–35 s) and accepts Common/Uncommon/Rare/Legendary at 42/58/64/68%. Trophy Sentinel targets 75 s ±22% (58.5–91.5 s) and accepts 18/32/40/46%. On the representative Outer Ocean profile, normal is 62.00/20.00/11.00/7.00%; Drift becomes **52.67/23.46/14.24/9.63%** and Sentinel **44.32/25.42/17.47/12.79%**. Common bites are clearly suppressed, while Rare+Legendary rises modestly from 18.00% to 23.87%/30.26%, far below the former 30.28%/59.38% spikes. Lure composition/order is unchanged.
+
+18. **Other omitted pre-v12 items** — No additional item was implemented: comparison of the v12 request and its completed handoff found no clearly pending, low-risk requirement outside this v13 list. Ambiguous work was deliberately not expanded into deferred caves/accounts/export/instruments/song-voting/cosmetic systems.
+
+19. **Save schema** — **Unchanged.** Progression remains schema 11 and outer saves remain schema 10. Existing bobber IDs, ownership, equipment slots, specimen IDs, and aquarium data remain compatible; only prices/descriptions/runtime tuning changed.
+
+20. **Multiplayer protocol** — **Unchanged.** No room, player-cap, message, snapshot, appearance, fishing, or server field changed. Remote creature/avatar presentation improves client-side through the existing payloads.
+
+21. **Frontend rebuild** — **Required and completed.** `npm run build` transformed 1,281 modules and produced `dist/assets/index-Dv2mKbke.js`; `dist/assets/index-B3ChD-9T.css` remains current. Only the existing PlayCanvas worker-externalization notices and large-chunk warning remain. The 22 focused creature/avatar/world/fishing checks passed.
+
+22. **Short manual test checklist** — Enter/leave the cabin and inspect the open door plus front gable from inside/outside; cycle gallery species/model modes across fish, shark, ray, crab, frog, mammal, jelly, and wisp; compare a catch, inventory preview/Hand, aquarium resident, and remote held catch; inspect local/preview/remote avatars while walking, sitting, emoting, and fishing; cast at low/middle/high Fallglass points; walk all six longer main docks; use the Bluewater helm to go home/travel; click the port bench, fish without standing, then click/Interact to exit; buy/equip both bobbers and spot-check their longer, more selective cadence.
+
+---
+
 # Reel Ascent v12 update handoff
 
 Status: the focused v12 core-gameplay reliability pass is implemented in the current project tree. No commit, push, deployment, or production mutation was performed. Final validation stayed light: a production frontend build plus 26 targeted climbing/world/v12 checks, all passing. This section supersedes older notes wherever behavior differs.

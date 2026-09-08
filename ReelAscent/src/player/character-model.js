@@ -8,6 +8,48 @@ import {
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
+// Full primitive scales and joint-local anchors. Each child reaches slightly through its
+// attachment anchor so ordinary pose animation cannot reveal daylight between body pieces.
+export const AVATAR_ATTACHMENT_OVERLAP_EPSILON = .02;
+export const AVATAR_ATTACHMENT_SPEC = Object.freeze({
+  upperTorso: Object.freeze({ position: Object.freeze({ x: 0, y: .06, z: 0 }), scale: Object.freeze({ x: .7, y: .62, z: .42 }) }),
+  lowerTorso: Object.freeze({ position: Object.freeze({ x: 0, y: -.28, z: 0 }), scale: Object.freeze({ x: .55, y: .24, z: .38 }) }),
+  neck: Object.freeze({ position: Object.freeze({ x: 0, y: .45, z: 0 }), scale: Object.freeze({ x: .17, y: .22, z: .17 }) }),
+  head: Object.freeze({ position: Object.freeze({ x: 0, y: .7, z: -.015 }), scale: Object.freeze({ x: .47, y: .54, z: .46 }) }),
+  shoulder: Object.freeze({ y: .27, upperCenterY: -.17, upperLength: .38, elbowY: -.36, lowerCenterY: -.15, lowerLength: .34, handY: -.34, handLength: .2 }),
+  hip: Object.freeze({ y: -.37, upperCenterY: -.15, upperLength: .34, kneeY: -.3, lowerCenterY: -.135, lowerLength: .31, bootY: -.27, bootLength: .18 })
+});
+
+const interval = (center, size) => [center - size * .5, center + size * .5];
+const intervalOverlap = (a, b) => Math.min(a[1], b[1]) - Math.max(a[0], b[0]);
+
+export function validateAvatarAttachmentSpec(spec = AVATAR_ATTACHMENT_SPEC) {
+  const upperTorso = interval(spec.upperTorso.position.y, spec.upperTorso.scale.y);
+  const lowerTorso = interval(spec.lowerTorso.position.y, spec.lowerTorso.scale.y);
+  const neck = interval(spec.neck.position.y, spec.neck.scale.y);
+  const head = interval(spec.head.position.y, spec.head.scale.y);
+  const upperArm = interval(spec.shoulder.y + spec.shoulder.upperCenterY, spec.shoulder.upperLength);
+  const lowerArm = interval(spec.shoulder.y + spec.shoulder.elbowY + spec.shoulder.lowerCenterY, spec.shoulder.lowerLength);
+  const hand = interval(spec.shoulder.y + spec.shoulder.elbowY + spec.shoulder.handY, spec.shoulder.handLength);
+  const upperLeg = interval(spec.hip.y + spec.hip.upperCenterY, spec.hip.upperLength);
+  const lowerLeg = interval(spec.hip.y + spec.hip.kneeY + spec.hip.lowerCenterY, spec.hip.lowerLength);
+  const boot = interval(spec.hip.y + spec.hip.kneeY + spec.hip.bootY, spec.hip.bootLength);
+  const links = Object.freeze({
+    'upper/lower torso': intervalOverlap(upperTorso, lowerTorso),
+    'torso/neck': intervalOverlap(upperTorso, neck),
+    'neck/head': intervalOverlap(neck, head),
+    'upper/lower arm': intervalOverlap(upperArm, lowerArm),
+    'lower arm/hand': intervalOverlap(lowerArm, hand),
+    'lower torso/upper leg': intervalOverlap(lowerTorso, upperLeg),
+    'upper/lower leg': intervalOverlap(upperLeg, lowerLeg),
+    'lower leg/boot': intervalOverlap(lowerLeg, boot)
+  });
+  return {
+    valid: Object.values(links).every((value) => value >= AVATAR_ATTACHMENT_OVERLAP_EPSILON - 1e-9),
+    links
+  };
+}
+
 function surface(color, gloss = .24) {
   const result = new pc.StandardMaterial();
   result.diffuse = new pc.Color(...color);
@@ -46,25 +88,27 @@ function group(parent, name) {
 }
 
 function buildLimb(parent, side, materials) {
+  const arm = AVATAR_ATTACHMENT_SPEC.shoulder;
+  const leg = AVATAR_ATTACHMENT_SPEC.hip;
   const direction = side === 'Left' ? -1 : 1;
-  const shoulder = joint(parent, `${side} shoulder`, { x: direction * .41, y: .27, z: 0 });
-  primitive(shoulder, `${side} upper arm`, 'box', { x: 0, y: -.18, z: 0 },
-    { x: .18, y: .36, z: .2 }, materials.jacket);
-  const elbow = joint(shoulder, `${side} elbow`, { x: 0, y: -.36, z: 0 });
-  primitive(elbow, `${side} lower arm`, 'box', { x: 0, y: -.16, z: 0 },
-    { x: .155, y: .32, z: .175 }, materials.jacket);
-  primitive(elbow, `${side} hand`, 'sphere', { x: 0, y: -.35, z: 0 },
-    { x: .16, y: .19, z: .16 }, materials.skin);
-  const handAnchor = joint(elbow, `${side} hand attachment`, { x: 0, y: -.35, z: 0 });
+  const shoulder = joint(parent, `${side} shoulder`, { x: direction * .41, y: arm.y, z: 0 });
+  primitive(shoulder, `${side} upper arm`, 'box', { x: 0, y: arm.upperCenterY, z: 0 },
+    { x: .18, y: arm.upperLength, z: .2 }, materials.jacket);
+  const elbow = joint(shoulder, `${side} elbow`, { x: 0, y: arm.elbowY, z: 0 });
+  primitive(elbow, `${side} lower arm`, 'box', { x: 0, y: arm.lowerCenterY, z: 0 },
+    { x: .155, y: arm.lowerLength, z: .175 }, materials.jacket);
+  primitive(elbow, `${side} hand`, 'sphere', { x: 0, y: arm.handY, z: 0 },
+    { x: .16, y: arm.handLength, z: .16 }, materials.skin);
+  const handAnchor = joint(elbow, `${side} hand attachment`, { x: 0, y: arm.handY, z: 0 });
 
-  const hip = joint(parent, `${side} hip`, { x: direction * .19, y: -.35, z: 0 });
-  primitive(hip, `${side} upper leg`, 'box', { x: 0, y: -.15, z: 0 },
-    { x: .23, y: .3, z: .27 }, materials.trousers);
-  const knee = joint(hip, `${side} knee`, { x: 0, y: -.3, z: 0 });
-  primitive(knee, `${side} lower leg`, 'box', { x: 0, y: -.135, z: 0 },
-    { x: .2, y: .27, z: .23 }, materials.trousers);
-  primitive(knee, `${side} boot`, 'box', { x: 0, y: -.26, z: -.075 },
-    { x: .25, y: .16, z: .41 }, materials.boots);
+  const hip = joint(parent, `${side} hip`, { x: direction * .19, y: leg.y, z: 0 });
+  primitive(hip, `${side} upper leg`, 'box', { x: 0, y: leg.upperCenterY, z: 0 },
+    { x: .23, y: leg.upperLength, z: .27 }, materials.trousers);
+  const knee = joint(hip, `${side} knee`, { x: 0, y: leg.kneeY, z: 0 });
+  primitive(knee, `${side} lower leg`, 'box', { x: 0, y: leg.lowerCenterY, z: 0 },
+    { x: .2, y: leg.lowerLength, z: .23 }, materials.trousers);
+  primitive(knee, `${side} boot`, 'box', { x: 0, y: leg.bootY, z: -.075 },
+    { x: .25, y: leg.bootLength, z: .41 }, materials.boots);
   return { shoulder, elbow, handAnchor, hip, knee };
 }
 
@@ -85,30 +129,30 @@ function buildEyewear(humanRig, materials) {
 
   const rounds = make('round-glasses', 'Round glasses');
   for (const x of [-.13, .13]) primitive(rounds, `Round glasses ${x < 0 ? 'left' : 'right'} lens`,
-    'sphere', { x, y: .73, z: -.26 }, { x: .145, y: .145, z: .028 }, glass);
-  primitive(rounds, 'Round glasses bridge', 'box', { x: 0, y: .73, z: -.27 }, { x: .08, y: .022, z: .02 }, frame);
+    'sphere', { x, y: .73, z: -.24 }, { x: .145, y: .145, z: .028 }, glass);
+  primitive(rounds, 'Round glasses bridge', 'box', { x: 0, y: .73, z: -.248 }, { x: .08, y: .022, z: .02 }, frame);
 
   const aviators = make('aviators', 'Aviator sunglasses');
   for (const x of [-.13, .13]) primitive(aviators, `Aviator ${x < 0 ? 'left' : 'right'} lens`,
-    'sphere', { x, y: .71, z: -.267 }, { x: .17, y: .145, z: .032 }, dark, { z: x < 0 ? -6 : 6 });
-  primitive(aviators, 'Aviator bridge', 'box', { x: 0, y: .755, z: -.276 }, { x: .09, y: .025, z: .02 }, frame);
+    'sphere', { x, y: .71, z: -.242 }, { x: .17, y: .145, z: .032 }, dark, { z: x < 0 ? -6 : 6 });
+  primitive(aviators, 'Aviator bridge', 'box', { x: 0, y: .755, z: -.25 }, { x: .09, y: .025, z: .02 }, frame);
 
   const sports = make('sport-shades', 'Sport shades');
-  primitive(sports, 'Sport shades visor', 'box', { x: 0, y: .73, z: -.275 }, { x: .39, y: .13, z: .035 }, dark, { x: -4 });
-  primitive(sports, 'Sport shades upper rim', 'box', { x: 0, y: .81, z: -.268 }, { x: .42, y: .035, z: .035 }, frame);
+  primitive(sports, 'Sport shades visor', 'box', { x: 0, y: .73, z: -.245 }, { x: .39, y: .13, z: .035 }, dark, { x: -4 });
+  primitive(sports, 'Sport shades upper rim', 'box', { x: 0, y: .81, z: -.24 }, { x: .42, y: .035, z: .035 }, frame);
 
   const clear = make('clear-spectacles', 'Clear spectacles');
   for (const x of [-.13, .13]) primitive(clear, `Clear spectacles ${x < 0 ? 'left' : 'right'} lens`,
-    'box', { x, y: .73, z: -.26 }, { x: .18, y: .14, z: .024 }, glass);
-  primitive(clear, 'Clear spectacles bridge', 'box', { x: 0, y: .73, z: -.267 }, { x: .08, y: .02, z: .018 }, materials.silver);
+    'box', { x, y: .73, z: -.24 }, { x: .18, y: .14, z: .024 }, glass);
+  primitive(clear, 'Clear spectacles bridge', 'box', { x: 0, y: .73, z: -.247 }, { x: .08, y: .02, z: .018 }, materials.silver);
 
   const snow = make('snow-glasses', 'Snow glasses');
-  primitive(snow, 'Snow glasses lens', 'box', { x: 0, y: .74, z: -.285 }, { x: .39, y: .16, z: .045 }, glass, { x: -3 });
-  primitive(snow, 'Snow glasses rim', 'box', { x: 0, y: .74, z: -.275 }, { x: .44, y: .205, z: .025 }, frame);
+  primitive(snow, 'Snow glasses lens', 'box', { x: 0, y: .74, z: -.25 }, { x: .39, y: .16, z: .045 }, glass, { x: -3 });
+  primitive(snow, 'Snow glasses rim', 'box', { x: 0, y: .74, z: -.24 }, { x: .44, y: .205, z: .025 }, frame);
 
   const goggles = make('goggles', 'Summit goggles');
   for (const x of [-.14, .14]) primitive(goggles, `Summit goggles ${x < 0 ? 'left' : 'right'} lens`,
-    'sphere', { x, y: .75, z: -.285 }, { x: .17, y: .13, z: .045 }, dark);
+    'sphere', { x, y: .75, z: -.25 }, { x: .17, y: .13, z: .045 }, dark);
   primitive(goggles, 'Summit goggles strap', 'cylinder', { x: 0, y: .76, z: 0 }, { x: .47, y: .055, z: .47 }, frame);
   return result;
 }
@@ -131,13 +175,13 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   const humanRig = group(parent, `${name} human avatar`);
   const blobRig = group(parent, `${name} Blue Blob avatar`);
 
-  primitive(humanRig, 'Tapered upper torso', 'box', { x: 0, y: .06, z: 0 }, { x: .7, y: .58, z: .42 }, materials.jacket);
-  primitive(humanRig, 'Lower torso', 'box', { x: 0, y: -.28, z: 0 }, { x: .55, y: .18, z: .38 }, materials.accent);
+  primitive(humanRig, 'Tapered upper torso', 'box', AVATAR_ATTACHMENT_SPEC.upperTorso.position, AVATAR_ATTACHMENT_SPEC.upperTorso.scale, materials.jacket);
+  primitive(humanRig, 'Lower torso', 'box', AVATAR_ATTACHMENT_SPEC.lowerTorso.position, AVATAR_ATTACHMENT_SPEC.lowerTorso.scale, materials.accent);
   primitive(humanRig, 'Jacket collar', 'box', { x: 0, y: .34, z: -.04 }, { x: .38, y: .12, z: .47 }, materials.accent);
-  primitive(humanRig, 'Neck', 'cylinder', { x: 0, y: .46, z: 0 }, { x: .17, y: .2, z: .17 }, materials.skin);
+  primitive(humanRig, 'Neck', 'cylinder', AVATAR_ATTACHMENT_SPEC.neck.position, AVATAR_ATTACHMENT_SPEC.neck.scale, materials.skin);
   primitive(humanRig, 'Left shoulder cap', 'sphere', { x: -.37, y: .27, z: 0 }, { x: .25, y: .25, z: .27 }, materials.jacket);
   primitive(humanRig, 'Right shoulder cap', 'sphere', { x: .37, y: .27, z: 0 }, { x: .25, y: .25, z: .27 }, materials.jacket);
-  primitive(humanRig, 'Head', 'sphere', { x: 0, y: .7, z: -.015 }, { x: .47, y: .52, z: .46 }, materials.skin);
+  primitive(humanRig, 'Head', 'sphere', AVATAR_ATTACHMENT_SPEC.head.position, AVATAR_ATTACHMENT_SPEC.head.scale, materials.skin);
   primitive(humanRig, 'Left eye', 'sphere', { x: -.105, y: .73, z: -.235 }, { x: .05, y: .06, z: .04 }, materials.dark);
   primitive(humanRig, 'Right eye', 'sphere', { x: .105, y: .73, z: -.235 }, { x: .05, y: .06, z: .04 }, materials.dark);
   primitive(humanRig, 'Nose', 'cone', { x: 0, y: .64, z: -.27 }, { x: .065, y: .11, z: .065 }, materials.skin, { x: 90 });
@@ -202,7 +246,7 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   [-.3, -.15, 0, .15, .3].forEach((x, index) => primitive(flowers, `Flower crown bloom ${index + 1}`, 'sphere',
     { x, y: .96 + index % 2 * .03, z: -.23 + Math.abs(x) * .14 }, { x: .1, y: .1, z: .08 }, materials.accessory));
 
-  const backpackBody = primitive(humanRig, 'Backpack', 'box', { x: 0, y: -.03, z: .34 }, { x: .55, y: .66, z: .27 }, materials.pack, { x: -7 });
+  const backpackBody = primitive(humanRig, 'Backpack', 'box', { x: 0, y: -.03, z: .33 }, { x: .55, y: .66, z: .31 }, materials.pack, { x: -7 });
   const backpackFlap = primitive(humanRig, 'Backpack flap', 'box', { x: 0, y: .15, z: .495 }, { x: .45, y: .18, z: .05 }, materials.pack, { x: -7 });
   const backAccessoryRoots = new Map([['backpack', [backpackBody, backpackFlap]]]);
   const leftLimb = buildLimb(humanRig, 'Left', materials);

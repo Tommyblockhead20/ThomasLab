@@ -14,6 +14,7 @@ import { getAudioGain } from '../audio/settings.js';
 import { hasSeenHookTutorial, markHookTutorialSeen } from './tutorial-state.js';
 import { createFishingRodModel } from './rod-model.js';
 import { createSpecimenModel, destroySpecimenModel, positionSpecimenModel } from './specimen-model.js';
+import { resolveCreaturePresentation } from './creature-presentation.js';
 import { getSelectiveBobberSettings, sampleBobberBiteDelay } from './selective-bobbers.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -1747,7 +1748,9 @@ export class FishingController {
       const genericName = archetype.replaceAll('-', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
       // Model mode is a disposable visual specimen. It never enters createCatchRecord(),
       // catchHistory, seenSpecies, bestBySpecies, or any journal persistence path.
-      this.selectedFish = { ...specimen, name: `Generic ${genericName}`, speciesId: `gallery-model-${archetype}` };
+      // Keep the representative's canonical ID. The former synthetic `gallery-model-*` ID
+      // could not resolve and forced every entry through the same generic panfish fallback.
+      this.selectedFish = { ...specimen, name: `Generic ${genericName}`, galleryArchetype: archetype };
     } else {
       this.selectedFish = specimen;
     }
@@ -1886,10 +1889,13 @@ export class FishingController {
     const playerPosition = this.player.getPosition();
     const target = new pc.Vec3(
       playerPosition.x + this.aimDirection.x * distance,
-      this.zone.surfaceY,
+      0,
       playerPosition.z + this.aimDirection.z * distance
     );
     const landingZone = this.world.findFishingZoneAt(target);
+    // Flat ponds resolve to their one fixed height. Path-shaped water (Fallglass) resolves
+    // at the actual horizontal landing point, avoiding the old center-height sky bobber.
+    target.y = (landingZone ?? this.zone).resolveSurfaceY(target);
     const duration = Math.max(
       this.config.minimumCastSeconds,
       distance * this.config.castSecondsPerMeter
@@ -1945,7 +1951,8 @@ export class FishingController {
 
   updateWaiting(dt) {
     this.biteTimer -= dt;
-    this.bobberPosition.y = this.zone.surfaceY + 0.03 + Math.sin(this.visualTime * 3.1) * 0.025;
+    this.bobberPosition.y = this.zone.resolveSurfaceY(this.bobberPosition)
+      + 0.03 + Math.sin(this.visualTime * 3.1) * 0.025;
     if (this.biteTimer <= 0) this.beginBite();
   }
 
@@ -2023,7 +2030,7 @@ export class FishingController {
     });
     this.bobberPosition.set(
       waterPoint.x,
-      this.zone.surfaceY - .27 - Math.abs(Math.sin(this.stateTime * 18)) * .08,
+      this.zone.resolveSurfaceY(waterPoint) - .27 - Math.abs(Math.sin(this.stateTime * 18)) * .08,
       waterPoint.z
     );
     if (this.biteSplashTimer <= 0) {
@@ -2146,7 +2153,7 @@ export class FishingController {
     });
     this.bobberPosition.set(
       waterPoint.x,
-      this.zone.surfaceY - intensity * 0.08 + Math.sin(this.visualTime * 9) * 0.025,
+      this.zone.resolveSurfaceY(waterPoint) - intensity * 0.08 + Math.sin(this.visualTime * 9) * 0.025,
       waterPoint.z
     );
     if (Math.sin(this.visualTime * (nearLoss ? 17 : 10)) > (nearLoss ? .82 : .96)) {
@@ -2862,7 +2869,8 @@ export class FishingController {
 
   showCaughtFish() {
     const fish = this.selectedFish;
-    const [bodyColor, accentColor] = fish.visual.colors;
+    const { visual } = resolveCreaturePresentation(fish, { context: this.gallery.active ? 'model gallery' : 'catch reveal' });
+    const [bodyColor, accentColor] = visual.colors;
     const shiny = fish.shiny;
     const body = shiny ? [Math.min(1, bodyColor[2] + .22), Math.min(1, bodyColor[0] + .28), Math.min(1, bodyColor[1] + .3)] : bodyColor;
     const accent = shiny ? [.95, .45, .88] : accentColor;
@@ -2877,9 +2885,9 @@ export class FishingController {
 
     const displayMetrics = getFishDisplayMetrics(fish);
     const displayedLength = displayMetrics.displayedLength;
-    const bodyLength = displayedLength * .7 * fish.visual.lengthScale;
-    const girth = displayedLength * .24 * fish.visual.depth * displayMetrics.girthMultiplier;
-    const width = displayedLength * .24 * fish.visual.depth * fish.visual.width
+    const bodyLength = displayedLength * .7 * visual.lengthScale;
+    const girth = displayedLength * .24 * visual.depth * displayMetrics.girthMultiplier;
+    const width = displayedLength * .24 * visual.depth * visual.width
       * displayMetrics.widthMultiplier;
     // Catch, Inventory Hand, remote Hand/catch, and Aquarium all use this canonical factory.
     // Keep the older authored rigs available to the developer gallery, but never substitute
@@ -2969,7 +2977,7 @@ export class FishingController {
   triggerRipple(position) {
     this.rippleAge = 0;
     this.ripple.enabled = true;
-    const surfaceY = this.zone ? this.zone.surfaceY + 0.018 : position.y;
+    const surfaceY = this.zone ? this.zone.resolveSurfaceY(position) + 0.018 : position.y;
     this.ripple.setPosition(position.x, surfaceY, position.z);
   }
 
