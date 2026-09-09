@@ -1,6 +1,7 @@
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 import { formatInputCode } from '../player/movement.js';
 import { GAME_VERSION } from '../version.js';
+import { SongVoteStore } from '../fishing/song-votes.js';
 
 function formatRunTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
@@ -54,8 +55,21 @@ export class Hud {
     this.catchQualityStars = document.querySelector('#catch-quality-stars');
     this.catchRecord = document.querySelector('#catch-record');
     this.catchHint = document.querySelector('#catch-hint');
+    this.songFeedback = document.querySelector('#song-feedback');
+    this.songVoteStore = new SongVoteStore();
+    this.onSongFeedbackClick = (event) => {
+      const button = event.target.closest?.('[data-song-vote]');
+      const songId = this.songFeedback?.dataset.songId;
+      if (!button || !songId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.songVoteStore.toggle(songId, button.dataset.songVote);
+      this.renderSongFeedbackSelection(songId);
+    };
+    this.songFeedback?.addEventListener('click', this.onSongFeedbackClick);
     this.mobileControls = document.querySelector('#mobile-controls');
-    this.touchGrip = document.querySelector('#touch-grip');
+    this.touchContextAction = document.querySelector('#touch-context-action');
+    this.touchMovementAction = document.querySelector('#touch-movement-action');
     this.runStatus = document.querySelector('#run-status');
     this.currencyIndicator = document.querySelector('#currency-indicator');
     this.runSector = document.querySelector('#run-sector');
@@ -71,7 +85,8 @@ export class Hud {
     this.runEndStart = document.querySelector('#run-end-next-start');
     this.debugVisible = false;
     this.smoothedFps = 60;
-    this.lastTouchGripLabel = '';
+    this.lastTouchContextLabel = '';
+    this.lastTouchMovementLabel = '';
 
     this.onKeyDown = (event) => {
       if (event.code !== 'F3' || event.repeat || !isCheatsEnabled()) return;
@@ -227,11 +242,20 @@ export class Hud {
 
     this.bitePrompt.hidden = playerState.fishing.state !== 'bite' || !playerState.fishing.showHookTutorial;
 
-    // Fishing uses the directional pad (↓ to hook, arrows for rhythm); keep Grip semantically stable.
-    const touchGripLabel = 'Grip';
-    if (this.touchGrip && touchGripLabel !== this.lastTouchGripLabel) {
-      this.touchGrip.textContent = touchGripLabel;
-      this.lastTouchGripLabel = touchGripLabel;
+    const touchContextLabel = ({ fish: 'Fish', grip: 'Grip', interact: 'Interact' })[
+      playerState.mobileActions?.context
+    ] ?? 'Interact';
+    if (this.touchContextAction && touchContextLabel !== this.lastTouchContextLabel) {
+      this.touchContextAction.textContent = touchContextLabel;
+      this.touchContextAction.setAttribute('aria-label', touchContextLabel);
+      this.lastTouchContextLabel = touchContextLabel;
+    }
+    this.touchContextAction?.classList.toggle('is-unavailable', !playerState.mobileActions?.contextAvailable);
+    const touchMovementLabel = playerState.mobileActions?.movement === 'slide' ? 'Slide' : 'Sprint';
+    if (this.touchMovementAction && touchMovementLabel !== this.lastTouchMovementLabel) {
+      this.touchMovementAction.textContent = touchMovementLabel;
+      this.touchMovementAction.setAttribute('aria-label', touchMovementLabel);
+      this.lastTouchMovementLabel = touchMovementLabel;
     }
 
     const rhythm = playerState.fishing.rhythm;
@@ -308,6 +332,15 @@ export class Hud {
         this.catchHint.hidden = !this.catchHint.textContent;
       }
     }
+    const songFeedback = playerState.fishing.songFeedback;
+    const feedbackVisible = Boolean(songFeedback?.songId
+      && ['caught', 'result'].includes(playerState.fishing.state));
+    this.songFeedback.hidden = !feedbackVisible;
+    if (feedbackVisible) {
+      this.songFeedback.dataset.songId = songFeedback.songId;
+      this.songFeedback.title = `${songFeedback.speciesName} • ${songFeedback.songId}`;
+      this.renderSongFeedbackSelection(songFeedback.songId);
+    } else if (this.songFeedback) delete this.songFeedback.dataset.songId;
     this.staminaPanel.hidden = playerState.fishing.state !== 'inactive';
     this.staminaFill.style.transform = `scaleX(${playerState.stamina})`;
     this.staminaValue.textContent = String(percentage);
@@ -463,6 +496,15 @@ export class Hud {
     return true;
   }
 
+  renderSongFeedbackSelection(songId) {
+    const selected = this.songVoteStore.get(songId);
+    for (const button of this.songFeedback?.querySelectorAll('[data-song-vote]') ?? []) {
+      const active = button.dataset.songVote === selected;
+      button.classList.toggle('is-selected', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+
   setRockDebugLabel(rock, enabled) {
     if (!this.rockDebugLabel) return;
     this.rockDebugLabel.hidden = !enabled;
@@ -473,6 +515,7 @@ export class Hud {
 
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
+    this.songFeedback?.removeEventListener('click', this.onSongFeedbackClick);
     document.body.classList.remove('debug-visible');
     document.body.classList.remove('fish-danger');
     this.rockDebugLabel?.remove();

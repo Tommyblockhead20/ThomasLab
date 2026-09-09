@@ -23,7 +23,7 @@ const RARITY_PAGES = [
 
 const OTHER_MODAL_OPEN = () => [
   'fish-gallery', 'inventory-open', 'multiplayer-open', 'mountain-map-open', 'emote-menu-open', 'appearance-open',
-  'trail-badges-open'
+  'shop-open', 'aquarium-open', 'boat-travel-open', 'trail-badges-open', 'pause-open'
 ].some((name) => document.body.classList.contains(name));
 
 export class FishJournal {
@@ -57,7 +57,17 @@ export class FishJournal {
       this.toggle();
     };
     this.onCloseClick = () => this.close();
-    this.onOpenClick = () => this.open();
+    this.onOpenClick = (event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      this.open();
+    };
+    this.onMobilePointerDown = (event) => {
+      if (event.pointerType === 'mouse') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.open();
+    };
     this.onTabClick = (event) => {
       const button = event.target.closest('[data-journal-rarity]');
       if (!button) return;
@@ -74,6 +84,7 @@ export class FishJournal {
     window.addEventListener('keydown', this.onKeyDown, true);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.mobileButton?.addEventListener('click', this.onOpenClick);
+    this.mobileButton?.addEventListener('pointerdown', this.onMobilePointerDown);
     this.tabs?.addEventListener('click', this.onTabClick);
     this.grid?.addEventListener('click', this.onGridClick);
     this.grid?.addEventListener('keydown', this.onGridKeyDown);
@@ -201,6 +212,7 @@ export class FishJournal {
     window.removeEventListener('keydown', this.onKeyDown, true);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.mobileButton?.removeEventListener('click', this.onOpenClick);
+    this.mobileButton?.removeEventListener('pointerdown', this.onMobilePointerDown);
     this.tabs?.removeEventListener('click', this.onTabClick);
     this.grid?.removeEventListener('click', this.onGridClick);
     this.grid?.removeEventListener('keydown', this.onGridKeyDown);

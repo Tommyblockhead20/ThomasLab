@@ -1,7 +1,7 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 11;
+export const SAVE_SCHEMA_VERSION = 12;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -230,6 +230,11 @@ const MIGRATIONS = Object.freeze({
     version: 11,
     saveId: typeof value.saveId === 'string' && value.saveId ? value.saveId : createSaveId(),
     tutorials: value.tutorials ?? { fishing: false, climbing: false, dock: false },
+    progression: normalizeProgressionState(value.progression)
+  }),
+  11: (value) => ({
+    ...value,
+    version: 12,
     progression: normalizeProgressionState(value.progression)
   })
 });

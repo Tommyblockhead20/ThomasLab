@@ -60,15 +60,19 @@ export class HomeInteractionController {
     // Never steal a Grip edge from active climbing. Outside climbing, consume the one-frame
     // interaction edge unconditionally: a press made out of range must not be banked and
     // replayed when the player later walks into a trigger.
-    if (['climbing', 'mantling'].includes(this.player.movementState)) return false;
+    if (['climbing', 'mantling'].includes(this.player.movementState)) {
+      this.player.input.consumeMobileInteraction?.();
+      return false;
+    }
     const gripPressed = this.player.input.consumeGripInteraction?.();
     const clickPressed = this.player.input.consumeDeliberateClick?.();
+    const mobilePressed = this.player.input.consumeMobileInteraction?.();
     // A seated player exits only through X/Interact, Jump, explicit Sit cancellation, or
     // clicking the visible prompt. Fishing/rhythm/camera mouse input never reaches this
     // generic world-interaction path.
     if (this.player.benchSeat && this.player.fishing?.active) return false;
     this.refreshCurrent();
-    if (!this.current || (!gripPressed && !clickPressed)) return false;
+    if (!this.current || (!gripPressed && !clickPressed && !mobilePressed)) return false;
     const handled = this.interact();
     if (handled) this.player.input.suppressGripUntilRelease?.();
     return handled;

@@ -5,6 +5,7 @@ import {
   normalizeAppearance,
   resolveAppearance
 } from './appearance.js';
+import { COSMETIC_BY_ID } from '../progression/cosmetics.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -157,6 +158,96 @@ function buildEyewear(humanRig, materials) {
   return result;
 }
 
+function buildGeneratedCosmetic(parent, cosmetic, materials, blob = false) {
+  const root = group(parent, `${blob ? 'Blob ' : ''}${cosmetic.label}`);
+  const size = blob ? 1.16 : 1;
+  const headY = blob ? 1.17 : .94;
+  const frontZ = blob ? -.48 : -.25;
+  const add = (name, type, position, scale, material = materials.accessory, rotation = {}) => primitive(
+    root, `${cosmetic.label} ${name}`, type,
+    { x: position.x * size, y: position.y, z: position.z * size },
+    { x: scale.x * size, y: scale.y * size, z: scale.z * size }, material, rotation
+  );
+  const visual = cosmetic.visual;
+  if (cosmetic.slot === 'headwear') {
+    if (['crown', 'crest'].includes(visual)) {
+      add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .5, y: .1, z: .5 });
+      for (const x of [-.3, 0, .3]) add(`point ${x}`, 'cone', { x, y: headY + .22 + (x ? 0 : .06), z: -.05 }, { x: .13, y: .36, z: .13 });
+    } else if (visual === 'top-hat') {
+      add('brim', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .62, y: .06, z: .62 });
+      add('crown', 'cylinder', { x: 0, y: headY + .3, z: 0 }, { x: .42, y: .58, z: .42 });
+    } else if (visual === 'wizard') {
+      add('brim', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .62, y: .06, z: .62 });
+      add('crooked cone', 'cone', { x: .08, y: headY + .35, z: .02 }, { x: .43, y: .75, z: .43 }, materials.accessory, { z: -11 });
+    } else if (['cowboy', 'bucket'].includes(visual)) {
+      add('brim', visual === 'cowboy' ? 'box' : 'cylinder', { x: 0, y: headY, z: -.03 }, { x: .7, y: .06, z: .62 });
+      add('crown', 'cylinder', { x: 0, y: headY + .18, z: .02 }, { x: .43, y: .32, z: .43 });
+    } else if (visual === 'propeller') {
+      add('cap', 'sphere', { x: 0, y: headY + .08, z: 0 }, { x: .49, y: .22, z: .47 });
+      add('stem', 'cylinder', { x: 0, y: headY + .28, z: 0 }, { x: .05, y: .18, z: .05 });
+      add('propeller', 'box', { x: 0, y: headY + .39, z: 0 }, { x: .72, y: .04, z: .12 }, materials.accessory, { y: 18 });
+    } else if (visual === 'halo') {
+      for (let index = 0; index < 10; index += 1) {
+        const angle = index / 10 * Math.PI * 2;
+        add(`halo ${index}`, 'sphere', { x: Math.cos(angle) * .42, y: headY + .38, z: Math.sin(angle) * .42 }, { x: .1, y: .055, z: .1 });
+      }
+    } else if (visual === 'horn') {
+      add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .48, y: .07, z: .48 });
+      add('horn', 'cone', { x: 0, y: headY + .34, z: -.12 }, { x: .16, y: .62, z: .16 }, materials.accessory, { x: -10 });
+    } else if (visual === 'gills') {
+      add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .49, y: .055, z: .49 });
+      for (const side of [-1, 1]) for (let index = 0; index < 3; index += 1) add(`gill ${side} ${index}`, 'capsule',
+        { x: side * (.48 + index * .035), y: headY + .03 - index * .08, z: .02 }, { x: .055, y: .28, z: .055 }, materials.accessory, { z: side * (28 + index * 7) });
+    } else if (visual === 'tentacle') {
+      add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .5, y: .08, z: .5 });
+      for (const x of [-.34, -.17, 0, .17, .34]) add(`tentacle ${x}`, 'capsule', { x, y: headY + .3 + Math.abs(x) * .2, z: .02 }, { x: .07, y: .48, z: .07 }, materials.accessory, { z: x * -45 });
+    } else if (['hood', 'beanie', 'cap', 'headlamp'].includes(visual)) {
+      add('crown', visual === 'beanie' ? 'cone' : 'sphere', { x: 0, y: headY + .08, z: .03 }, { x: .5, y: .28, z: .48 });
+      if (visual === 'cap') add('bill', 'box', { x: 0, y: headY, z: -.35 }, { x: .48, y: .055, z: .34 });
+      if (visual === 'headlamp') add('lamp', 'sphere', { x: 0, y: headY + .04, z: -.4 }, { x: .13, y: .12, z: .1 }, materials.silver);
+    } else {
+      add('headband', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .49, y: .08, z: .49 });
+    }
+  } else if (cosmetic.slot === 'eyewear') {
+    const wide = ['visor', 'hammer', 'electric'].includes(visual);
+    if (wide) add('visor', 'box', { x: 0, y: blob ? .85 : .73, z: frontZ }, { x: visual === 'hammer' ? .68 : .42, y: .14, z: .04 }, materials.dark);
+    else for (const x of [-.14, .14]) add(`lens ${x}`, visual === 'round' || visual === 'sun' ? 'sphere' : 'box',
+      { x, y: blob ? .85 : .73, z: frontZ }, { x: .16, y: .14, z: .035 }, materials.glass);
+    add('bridge', 'box', { x: 0, y: blob ? .85 : .73, z: frontZ - .01 }, { x: .1, y: .025, z: .025 });
+    if (visual === 'electric') for (const side of [-1, 1]) add(`spark ${side}`, 'box', { x: side * .43, y: blob ? .91 : .79, z: frontZ }, { x: .16, y: .035, z: .035 }, materials.silver, { z: side * 48 });
+  } else if (cosmetic.slot === 'faceAccessory') {
+    const neckY = blob ? .44 : .45;
+    if (['scarf', 'serpent'].includes(visual)) {
+      add('collar', 'cylinder', { x: 0, y: neckY, z: 0 }, { x: blob ? .5 : .33, y: .17, z: blob ? .5 : .33 });
+      add('tail', 'box', { x: .18, y: neckY - .31, z: .25 }, { x: .18, y: .55, z: .1 }, materials.accessory, { x: -12, z: -8 });
+    } else if (['collar', 'puff', 'whirlpool', 'gaiter'].includes(visual)) {
+      add('collar', 'cylinder', { x: 0, y: neckY, z: 0 }, { x: visual === 'puff' ? .52 : .36, y: visual === 'gaiter' ? .24 : .14, z: visual === 'puff' ? .52 : .36 });
+    } else {
+      add('cord', 'cylinder', { x: 0, y: neckY, z: -.12 }, { x: .24, y: .035, z: .24 });
+      add('charm', 'sphere', { x: 0, y: neckY - .12, z: -.25 }, { x: .09, y: .12, z: .04 });
+    }
+  } else {
+    const backY = blob ? .05 : -.03;
+    if (['cape', 'wings'].includes(visual)) {
+      for (const side of (visual === 'wings' ? [-1, 1] : [0])) add(`panel ${side}`, 'box',
+        { x: side * .34, y: backY, z: blob ? .49 : .36 }, { x: visual === 'wings' ? .42 : .68, y: .9, z: .07 }, materials.accessory, { z: side * -17, x: -7 });
+    } else if (['fin', 'flag'].includes(visual)) {
+      add('spine', 'box', { x: 0, y: backY + .2, z: blob ? .52 : .38 }, { x: .08, y: .9, z: .08 });
+      add('fin', visual === 'flag' ? 'box' : 'cone', { x: .22, y: backY + .38, z: blob ? .52 : .4 }, { x: .45, y: .58, z: .08 }, materials.accessory, { z: -20 });
+    } else if (['tentacle', 'hydra', 'claws'].includes(visual)) {
+      for (const x of [-.32, 0, .32]) add(`arm ${x}`, 'capsule', { x, y: backY + .04, z: blob ? .55 : .4 }, { x: .09, y: .85, z: .09 }, materials.accessory, { z: x * -45 });
+    } else if (visual === 'shell') {
+      add('spiral shell', 'sphere', { x: 0, y: backY, z: blob ? .56 : .43 }, { x: .58, y: .58, z: .2 });
+      add('spiral center', 'cylinder', { x: 0, y: backY, z: blob ? .73 : .59 }, { x: .2, y: .05, z: .2 }, materials.dark, { x: 90 });
+    } else {
+      add('pack', 'box', { x: 0, y: backY, z: blob ? .5 : .35 }, { x: .58, y: .7, z: .3 }, cosmetic.id === 'backpack' ? materials.pack : materials.accessory, { x: -7 });
+      if (['tank', 'atlas', 'emblem'].includes(visual)) add('badge', visual === 'tank' ? 'sphere' : 'box', { x: 0, y: backY + .08, z: blob ? .7 : .53 }, { x: .3, y: .3, z: .05 }, materials.silver);
+    }
+  }
+  root.enabled = false;
+  return root;
+}
+
 export function createCharacterModel(parent, { name = 'Character' } = {}) {
   const materials = {
     jacket: surface(LEGACY_CHARACTER_PALETTE.player),
@@ -249,6 +340,8 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   const backpackBody = primitive(humanRig, 'Backpack', 'box', { x: 0, y: -.03, z: .33 }, { x: .55, y: .66, z: .31 }, materials.pack, { x: -7 });
   const backpackFlap = primitive(humanRig, 'Backpack flap', 'box', { x: 0, y: .15, z: .495 }, { x: .45, y: .18, z: .05 }, materials.pack, { x: -7 });
   const backAccessoryRoots = new Map([['backpack', [backpackBody, backpackFlap]]]);
+  const blobAccessories = new Map();
+  const blobBackAccessoryRoots = new Map();
   const leftLimb = buildLimb(humanRig, 'Left', materials);
   const rightLimb = buildLimb(humanRig, 'Right', materials);
 
@@ -274,8 +367,29 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     for (const [id, root] of hairStyles) root.enabled = hairVisibility.root && id === appearance.hairStyle;
     for (const part of hairTopParts.get(appearance.hairStyle) ?? []) part.enabled = hairVisibility.top;
     const worn = new Set([appearance.headwear, appearance.eyewear, appearance.faceAccessory]);
+    if (appearance.avatarType === 'human') {
+      for (const id of worn) if (id !== 'none' && !accessories.has(id)) {
+        const cosmetic = COSMETIC_BY_ID.get(id);
+        if (cosmetic) accessories.set(id, buildGeneratedCosmetic(humanRig, cosmetic, materials));
+      }
+      if (appearance.backAccessory !== 'none' && !backAccessoryRoots.has(appearance.backAccessory)) {
+        const cosmetic = COSMETIC_BY_ID.get(appearance.backAccessory);
+        if (cosmetic) backAccessoryRoots.set(cosmetic.id, [buildGeneratedCosmetic(humanRig, cosmetic, materials)]);
+      }
+    } else {
+      for (const id of worn) if (id !== 'none' && !blobAccessories.has(id)) {
+        const cosmetic = COSMETIC_BY_ID.get(id);
+        if (cosmetic) blobAccessories.set(id, buildGeneratedCosmetic(blobRig, cosmetic, materials, true));
+      }
+      if (appearance.backAccessory !== 'none' && !blobBackAccessoryRoots.has(appearance.backAccessory)) {
+        const cosmetic = COSMETIC_BY_ID.get(appearance.backAccessory);
+        if (cosmetic) blobBackAccessoryRoots.set(cosmetic.id, [buildGeneratedCosmetic(blobRig, cosmetic, materials, true)]);
+      }
+    }
     for (const [id, root] of accessories) root.enabled = worn.has(id);
     for (const [id, roots] of backAccessoryRoots) for (const root of roots) root.enabled = id === appearance.backAccessory;
+    for (const [id, root] of blobAccessories) root.enabled = worn.has(id);
+    for (const [id, roots] of blobBackAccessoryRoots) for (const root of roots) root.enabled = id === appearance.backAccessory;
     return normalizeAppearance(appearance);
   };
 

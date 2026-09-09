@@ -621,6 +621,7 @@ export class FishingController {
     this.lastRhythmBeat = -1;
     this.lastJudgmentTime = -1;
     this.lastFishingFailure = null;
+    this.lastSongFeedback = null;
     this.lastStrongBobberRefusal = null;
     this.catchCard = null;
     this.catchGroundLift = 0;
@@ -2132,6 +2133,7 @@ export class FishingController {
         escapeGain: this.progression?.getModifier('escapeGain') ?? 1
       }
     );
+    this.lastSongFeedback = null;
     this.rhythmDebugAttempt = this.rhythm.getDebugState();
     this.rhythmStartup = null;
       this.performanceEncounterSequence += 1;
@@ -2211,6 +2213,7 @@ export class FishingController {
 
   landCatch() {
     this.player.input.endRhythmCapture();
+    const songId = this.rhythm?.pattern?.songId ?? null;
     const perfectSong = this.rhythm?.perfectPerformance ?? false;
     const qualityRank = { GOOD: 1, GREAT: 2, PERFECT: 3 };
     const earnedQuality = this.rhythm?.quality ?? 'GOOD';
@@ -2244,6 +2247,11 @@ export class FishingController {
       perfectSong,
       showRecastHint
     };
+    this.lastSongFeedback = songId ? {
+      songId,
+      speciesName: this.selectedFish.name,
+      outcome: 'caught'
+    } : null;
     // End the rhythm state before catch presentation so the challenge panel cannot cover the fish.
     this.rhythmDebugAttempt = this.rhythm?.getDebugState() ?? this.rhythmDebugAttempt;
     this.rhythm = null;
@@ -2259,11 +2267,14 @@ export class FishingController {
 
   loseFish(message, failureReason = this.rhythm?.getFailureReason() ?? 'fish escaped') {
     this.lastFishingFailure = failureReason;
+    const songId = this.rhythm?.pattern?.songId ?? null;
+    const speciesName = this.selectedFish?.name ?? 'Unknown creature';
     this.recordPerformanceEncounter('escaped');
     this.player.input.endRhythmCapture();
     this.selectedFish = null;
     this.rhythmDebugAttempt = this.rhythm?.getDebugState() ?? this.rhythmDebugAttempt;
     this.rhythm = null;
+    this.lastSongFeedback = songId ? { songId, speciesName, outcome: 'escaped' } : null;
     this.rhythmStartup = null;
     this.showHookTutorial = false;
     this.resultTimer = this.config.resultHoldSeconds;
@@ -3228,6 +3239,7 @@ export class FishingController {
         debug: this.rhythm.getDebugState()
       } : null,
       catchCard: this.catchCard,
+      songFeedback: this.lastSongFeedback,
       gallery: this.gallery.active ? {
         mode: this.gallery.mode,
         index: this.gallery.mode === 'models' ? this.gallery.modelIndex + 1 : this.gallery.speciesIndex + 1,

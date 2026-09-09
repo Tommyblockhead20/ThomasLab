@@ -1,3 +1,5 @@
+import { COSMETIC_BY_ID, COSMETICS_BY_SLOT } from '../progression/cosmetics.js';
+
 export const AVATAR_TYPES = Object.freeze([
   Object.freeze({ id: 'human', label: 'Human' }),
   Object.freeze({ id: 'blob', label: 'Trail Blob' })
@@ -90,37 +92,14 @@ export const HAIR_COLORS = Object.freeze([
   Object.freeze({ id: 'auburn', label: 'Auburn', color: [0.42, 0.12, 0.055] })
 ]);
 
-export const ACCESSORIES = Object.freeze([
-  Object.freeze({ id: 'none', label: 'None' }),
-  Object.freeze({ id: 'beanie', label: 'Beanie', color: [0.99, 0.82, 0.33] }),
-  Object.freeze({ id: 'glasses', label: 'Trail Glasses' }),
-  Object.freeze({ id: 'round-glasses', label: 'Round Glasses' }),
-  Object.freeze({ id: 'aviators', label: 'Aviator Sunglasses' }),
-  Object.freeze({ id: 'sport-shades', label: 'Sport Shades' }),
-  Object.freeze({ id: 'clear-spectacles', label: 'Clear Spectacles' }),
-  Object.freeze({ id: 'snow-glasses', label: 'Snow Glasses' }),
-  Object.freeze({ id: 'trail-hat', label: 'Trail Hat' }),
-  Object.freeze({ id: 'fishing-cap', label: 'Fishing Cap' }),
-  Object.freeze({ id: 'headlamp', label: 'Headlamp' }),
-  Object.freeze({ id: 'scarf', label: 'Trail Scarf' }),
-  Object.freeze({ id: 'bandana', label: 'Bandana' }),
-  Object.freeze({ id: 'neck-gaiter', label: 'Neck Gaiter' }),
-  Object.freeze({ id: 'necklace', label: 'Summit Necklace' }),
-  Object.freeze({ id: 'flower-crown', label: 'Flower Crown' }),
-  Object.freeze({ id: 'goggles', label: 'Summit Goggles' })
-]);
-
-export const HEADWEAR = Object.freeze(ACCESSORIES.filter((entry) => (
-  ['none', 'beanie', 'trail-hat', 'fishing-cap', 'headlamp', 'flower-crown'].includes(entry.id)
-)));
-export const EYEWEAR = Object.freeze(ACCESSORIES.filter((entry) => (
-  ['none', 'glasses', 'goggles', 'round-glasses', 'aviators', 'sport-shades', 'clear-spectacles', 'snow-glasses'].includes(entry.id)
-)));
-export const FACE_ACCESSORIES = Object.freeze(ACCESSORIES.filter((entry) => ['none', 'scarf', 'bandana', 'neck-gaiter', 'necklace'].includes(entry.id)));
-export const BACK_ACCESSORIES = Object.freeze([
-  Object.freeze({ id: 'backpack', label: 'Trail Backpack' }),
-  Object.freeze({ id: 'none', label: 'None' })
-]);
+const NONE_COSMETIC = Object.freeze({ id: 'none', label: 'None', supports: Object.freeze(['human', 'blob']), source: Object.freeze({ type: 'starter', hint: 'Starter' }) });
+export const HEADWEAR = Object.freeze([NONE_COSMETIC, ...COSMETICS_BY_SLOT.headwear]);
+export const EYEWEAR = Object.freeze([NONE_COSMETIC, ...COSMETICS_BY_SLOT.eyewear]);
+export const FACE_ACCESSORIES = Object.freeze([NONE_COSMETIC, ...COSMETICS_BY_SLOT.faceAccessory]);
+export const BACK_ACCESSORIES = Object.freeze([NONE_COSMETIC, ...COSMETICS_BY_SLOT.backAccessory]);
+export const ACCESSORIES = Object.freeze([NONE_COSMETIC, ...new Map([
+  ...HEADWEAR, ...EYEWEAR, ...FACE_ACCESSORIES
+].map((entry) => [entry.id, entry])).values()]);
 
 export const BACKPACK_COLORS = Object.freeze([
   Object.freeze({ id: 'classic-teal', label: 'Classic Teal', color: [0.18, 0.39, 0.34] }),
@@ -156,7 +135,10 @@ export const BLOB_COLORS = Object.freeze([
 
 // Full-crown hats replace the hair cap instead of occupying the same volume. Face and
 // neck accessories intentionally leave the selected hair visible.
-export const HAIR_CONCEALING_ACCESSORIES = Object.freeze(['beanie', 'trail-hat', 'fishing-cap']);
+export const HAIR_CONCEALING_ACCESSORIES = Object.freeze([
+  'beanie', 'trail-hat', 'fishing-cap',
+  ...COSMETICS_BY_SLOT.headwear.filter((entry) => ['beanie', 'cowboy', 'cap', 'bucket', 'wizard', 'hood', 'top-hat'].includes(entry.visual)).map((entry) => entry.id)
+]);
 
 export function accessoryConcealsHair(accessory) {
   return HAIR_CONCEALING_ACCESSORIES.includes(accessory);
@@ -273,11 +255,13 @@ export function resolveAppearance(value = {}) {
     if (!appearance[tintKey]) continue;
     resolved[targetKey] = { ...resolved[targetKey], color: hexToColor(appearance[tintKey]) };
   }
-  const accessoryOption = ACCESSORIES.find((entry) => entry.id === appearance.headwear)
-    ?? ACCESSORIES.find((entry) => entry.id === appearance.eyewear)
-    ?? ACCESSORIES.find((entry) => entry.id === appearance.faceAccessory);
+  const accessoryOption = COSMETIC_BY_ID.get(appearance.headwear)
+    ?? COSMETIC_BY_ID.get(appearance.eyewear)
+    ?? COSMETIC_BY_ID.get(appearance.faceAccessory);
   const accessoryPreset = accessoryOption?.color
-    ?? resolved.shirtColorValue.color.map((component) => Math.min(1, component * .72 + .08));
+    ?? (appearance.headwear === 'beanie'
+      ? [0.99, 0.82, 0.33]
+      : resolved.shirtColorValue.color.map((component) => Math.min(1, component * .72 + .08)));
   resolved.accessoryColor = hexToColor(appearance.accessoryTint, accessoryPreset);
   resolved.backpackColorValue = resolved.backpackColorValue ?? BACKPACK_COLORS[0];
   const classicTrailLook = appearance.shirtColor === 'classic-orange'

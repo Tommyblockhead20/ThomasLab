@@ -25,7 +25,7 @@ export const DEFAULT_KEY_BINDINGS = Object.freeze(Object.fromEntries(
 ));
 // Pause and hidden playtest/debug controls remain intentionally unavailable here.
 const RESERVED_BINDING_CODES = new Set([
-  'Escape', 'Home', 'F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10',
+  'Escape', 'Home', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10',
   'KeyB', 'KeyN', 'Digit0', 'Digit7', 'Digit8', 'Digit9'
 ]);
 
@@ -170,7 +170,7 @@ export class RhythmLaneInputState {
 }
 
 export function touchActionHeld(pointerMap, action) {
-  return [...pointerMap.values()].some((entry) => entry.action === action);
+  return [...pointerMap.values()].some((entry) => (entry.effectiveAction ?? entry.action) === action);
 }
 
 export class PlayerInput {
@@ -186,6 +186,7 @@ export class PlayerInput {
     this.held = new Set();
     this.jumpQueued = false;
     this.fishingToggleQueued = false;
+    this.mobileInteractionQueued = false;
     this.cancelQueued = false;
     this.forceBiteQueued = false;
     this.debugFishQueued = null;
@@ -205,6 +206,8 @@ export class PlayerInput {
     this.rhythmLaneInput = new RhythmLaneInputState();
     this.touchPointers = new Map();
     this.touchActions = new Set();
+    this.mobileContextAction = 'interact';
+    this.mobileMovementAction = 'sprint';
     this.mobileControls = document.querySelector('#mobile-controls');
     this.forceMobile = new URLSearchParams(window.location.search).get('mobile') === '1';
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
@@ -362,25 +365,30 @@ export class PlayerInput {
       event.stopPropagation();
       this.setMobileMode(true);
       const action = event.currentTarget.dataset.touchAction;
-      const alreadyHeld = this.touchActions.has(action);
+      const effectiveAction = action === 'context-action'
+        ? this.mobileContextAction
+        : action === 'movement-action' ? this.mobileMovementAction : action;
+      const alreadyHeld = this.touchActions.has(effectiveAction);
       const rhythmPress = this.rhythmCapture && TOUCH_DIRECTIONS.has(action);
       const rhythmSource = `touch:${event.pointerId}`;
       const rhythmLane = TOUCH_RHYTHM_LANES[action];
       this.rhythmLaneInput.press(rhythmSource, rhythmLane, performance.now() / 1000);
-      this.touchPointers.set(event.pointerId, { action, rhythmPress, rhythmSource });
+      this.touchPointers.set(event.pointerId, { action, effectiveAction, rhythmPress, rhythmSource, button: event.currentTarget });
       event.currentTarget.setPointerCapture?.(event.pointerId);
+      event.currentTarget.classList.add('is-held');
 
       if (rhythmPress) {
         this.touchActions.add(action);
         return;
       }
 
-      this.touchActions.add(action);
+      this.touchActions.add(effectiveAction);
       if (action === 'up' && !alreadyHeld) this.fishingCastPressed = true;
       if (action === 'down' && !alreadyHeld) this.fishingHookPressed = true;
       if (action === 'jump' && !alreadyHeld) this.jumpQueued = true;
-      if (action === 'fish' && !alreadyHeld) this.fishingToggleQueued = true;
-      if (action === 'grip') this.pressPrimary(`touch-${event.pointerId}`, false);
+      if (effectiveAction === 'fish' && !alreadyHeld) this.fishingToggleQueued = true;
+      if (effectiveAction === 'interact' && !alreadyHeld) this.mobileInteractionQueued = true;
+      if (effectiveAction === 'grip') this.pressPrimary(`touch-${event.pointerId}`, false);
     };
     this.onTouchActionUp = (event) => {
       const pointer = this.touchPointers.get(event.pointerId);
@@ -389,11 +397,12 @@ export class PlayerInput {
       event.stopPropagation();
       this.touchPointers.delete(event.pointerId);
       this.rhythmLaneInput.release(pointer.rhythmSource);
-      if (pointer.action === 'grip') this.releasePrimary(`touch-${event.pointerId}`);
-      const stillHeld = touchActionHeld(this.touchPointers, pointer.action);
+      pointer.button?.classList.remove('is-held');
+      if (pointer.effectiveAction === 'grip') this.releasePrimary(`touch-${event.pointerId}`);
+      const stillHeld = touchActionHeld(this.touchPointers, pointer.effectiveAction);
       if (!stillHeld) {
         if (pointer.action === 'up') this.fishingCastReleased = true;
-        this.touchActions.delete(pointer.action);
+        this.touchActions.delete(pointer.effectiveAction);
       }
     };
     for (const button of this.mobileButtons) {
@@ -411,6 +420,10 @@ export class PlayerInput {
   }
 
   clearTouchActions() {
+    for (const [pointerId, pointer] of this.touchPointers) {
+      pointer.button?.classList.remove('is-held');
+      if (pointer.effectiveAction === 'grip') this.releasePrimary(`touch-${pointerId}`);
+    }
     this.touchPointers.clear();
     this.touchActions.clear();
     for (const source of [...this.rhythmLaneInput.activeSources.keys()]) {
@@ -496,6 +509,12 @@ export class PlayerInput {
     return queued;
   }
 
+  consumeMobileInteraction() {
+    const queued = this.mobileInteractionQueued;
+    this.mobileInteractionQueued = false;
+    return queued;
+  }
+
   consumeFishingCastPressed() {
     const queued = this.fishingCastPressed;
     this.fishingCastPressed = false;
@@ -559,6 +578,10 @@ export class PlayerInput {
   hasDeliberateClick() { return this.deliberateClickQueued; }
   discardDeliberateClick() { this.deliberateClickQueued = false; }
   setFishingActive(active) { this.fishingActive = Boolean(active); }
+  setMobileActionModes({ context = 'interact', movement = 'sprint' } = {}) {
+    this.mobileContextAction = ['interact', 'grip', 'fish'].includes(context) ? context : 'interact';
+    this.mobileMovementAction = movement === 'slide' ? 'slide' : 'sprint';
+  }
 
   suppressGripUntilRelease() {
     this.gripInteractionSuppressed = this.rawGripHeld;
@@ -582,6 +605,7 @@ export class PlayerInput {
     this.primaryReleased = false;
     this.primarySuppressed = false;
     this.gripInteractionQueued = false;
+    this.mobileInteractionQueued = false;
     this.gripInteractionSuppressed = false;
     this.deliberateClickQueued = false;
     this.mouseGesture = null;

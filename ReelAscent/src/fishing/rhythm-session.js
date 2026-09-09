@@ -422,6 +422,7 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
   );
   const finalNote = notes.at(-1);
   return {
+    songId: `song:${fish.canonicalId ?? fish.speciesId ?? fish.id}:authored-${motifIndex + 1}`,
     bpm,
     interNoteGap,
     motifIndex,
@@ -801,6 +802,7 @@ export class RhythmSession {
     const next = this.pattern.notes.find((note) => note.status === 'pending' || note.status === 'holding');
     return {
       patternId: `${this.fish.speciesId ?? this.fish.id}:motif-${this.pattern.motifIndex + 1}`,
+      songId: this.pattern.songId,
       eventIndex: Math.min(this.completedNotes + 1, this.pattern.totalEvents),
       eventTotal: this.pattern.totalEvents,
       expectedLanes: next ? this.expectedGroup(next.hitTime).map((note) => note.lane) : [],

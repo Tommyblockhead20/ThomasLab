@@ -1,5 +1,6 @@
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
+import { COSMETIC_BY_ID } from './cosmetics.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 import {
   AQUARIUM_MAX_TANKS,
@@ -8,7 +9,7 @@ import {
   normalizeAquariumTankDisplays
 } from './aquarium.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 12;
+export const PROGRESSION_SCHEMA_VERSION = 13;
 export const HAND_EQUIPMENT_IDS = Object.freeze(['ice-axe']);
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
@@ -62,6 +63,7 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     ownedItems: [],
     heldItemId: null,
     appearance: { ...DEFAULT_APPEARANCE },
+    ownedCosmetics: [],
     ownedEquipment: [...STARTER_EQUIPMENT_IDS],
     equipped: { ...DEFAULT_EQUIPPED }
   };
@@ -126,6 +128,16 @@ export function normalizeProgressionState(value = {}) {
     ? value.player.id.slice(0, 160)
     : createDurableId('player');
   const defaults = defaultProgressionState(persistedPlayerId);
+  const appearance = !value.appearance
+    ? { ...DEFAULT_APPEARANCE }
+    : normalizeAppearance(value.appearance);
+  const ownedCosmetics = new Set((Array.isArray(value.ownedCosmetics) ? value.ownedCosmetics : [])
+    .filter((id) => typeof id === 'string' && COSMETIC_BY_ID.has(id)));
+  // If an older save was already wearing an item whose source changed in v16, that save
+  // keeps it. This is deliberately per-save and does not grant the item to other slots.
+  for (const key of ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']) {
+    if (appearance[key] !== 'none' && COSMETIC_BY_ID.has(appearance[key])) ownedCosmetics.add(appearance[key]);
+  }
   const owned = new Set(Array.isArray(value.ownedEquipment) ? value.ownedEquipment.filter((id) => typeof id === 'string') : []);
   STARTER_EQUIPMENT_IDS.forEach((id) => owned.add(id));
   const inventory = normalizeSpecimenList(value.inventory, persistedPlayerId);
@@ -208,9 +220,8 @@ export function normalizeProgressionState(value = {}) {
     heldItemId,
     // Only genuinely absent appearance data receives the legacy v1-v7 default. Existing
     // selections are normalized/migrated but never guessed to be an "old default" and reset.
-    appearance: !value.appearance
-      ? { ...DEFAULT_APPEARANCE }
-      : normalizeAppearance(value.appearance),
+    appearance,
+    ownedCosmetics: [...ownedCosmetics],
     ownedEquipment: [...owned],
     equipped
   };

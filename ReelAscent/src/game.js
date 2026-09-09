@@ -8,6 +8,7 @@ import { SaveSystem } from './persistence/save-system.js';
 import { ProgressionSystem } from './progression/progression.js';
 import { Player } from './player/player.js';
 import { loadKeyBindings } from './player/movement.js';
+import { stabilizeMobileContext } from './player/mobile-actions.js';
 import { FishJournal } from './ui/fish-journal.js';
 import { EcologyGuidePanel } from './ui/ecology-guide.js';
 import { FishingPerformanceMenu } from './ui/fishing-performance.js';
@@ -100,6 +101,7 @@ export class Game {
     };
     this.pendingPersistentPlaytime = 0;
     this.contextualAction = null;
+    this.mobileContextState = { current: null, candidate: null, candidateSince: 0, lastSeenAt: 0 };
     this.rockDebugEnabled = false;
     this.rockDebugTarget = null;
     this.hud = new Hud();
@@ -247,8 +249,17 @@ export class Game {
       if (this.isEditableTarget(event.target)) return;
       if (event.code === 'F2') {
         event.preventDefault();
+        const enabled = this.progression.toggleCosmeticTestMode();
+        this.hud.showToast?.(enabled
+          ? 'COSMETIC TEST MODE — ALL UNLOCKED'
+          : 'Cosmetic Test Mode disabled', 3);
+        this.appearanceMenu.update();
+        return;
+      }
+      if (event.code === 'F5') {
+        event.preventDefault();
         this.rockDebugEnabled = !this.rockDebugEnabled;
-        this.hud.showToast?.(`Rock IDs ${this.rockDebugEnabled ? 'ON • L copies/logs nearest ID' : 'OFF'}`, 2.5);
+        this.hud.showToast?.(`Rock IDs ${this.rockDebugEnabled ? 'ON • L copies/logs nearest ID' : 'OFF'} (F5)`, 2.5);
         return;
       }
       if (event.code === 'KeyL' && this.rockDebugEnabled && this.rockDebugTarget?.id) {
@@ -308,8 +319,13 @@ export class Game {
       starts: START_LOCATIONS.map((start) => ({ id: start.id, label: start.label, ...start.position })),
       getSessionStats: () => this.getSessionStats(),
       getCurrentLocationId: () => this.currentLocationId,
+      openAquarium: () => this.aquariumMenu.open(),
+      getLocalSongVotes: () => this.hud.songVoteStore.exportSummary(),
       getTransientSession: () => describeTransientSession(this)
     });
+    const devUiPreview = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('ui') : null;
+    if (devUiPreview === 'aquarium') globalThis.setTimeout(() => this.aquariumMenu.open(), 0);
+    if (devUiPreview === 'appearance') globalThis.setTimeout(() => this.appearanceMenu.open(), 0);
   }
 
   createLighting() {
@@ -365,6 +381,21 @@ export class Game {
       : null;
     this.hud.setRockDebugLabel?.(this.rockDebugTarget, this.rockDebugEnabled);
     this.contextualAction = this.resolveContextualAction(multiplayerPlayerState);
+    const mobileContextCandidate = this.fishing.active
+      ? { kind: 'fish', priority: 110 }
+      : this.contextualAction;
+    this.mobileContextState = stabilizeMobileContext(
+      this.mobileContextState,
+      mobileContextCandidate,
+      performance.now()
+    );
+    const mobileMovementAction = multiplayerPlayerState.canSlide || multiplayerPlayerState.slideActive
+      ? 'slide'
+      : 'sprint';
+    this.player.input.setMobileActionModes?.({
+      context: this.mobileContextState.current?.kind ?? 'interact',
+      movement: mobileMovementAction
+    });
     this.tutorials.update(dt, this.contextualAction);
     this.homeInteraction.setPromptAllowed(this.contextualAction?.kind === 'interact');
     this.homeInteraction.update();
@@ -824,12 +855,18 @@ export class Game {
         globalPosition: this.getLocalGlobalPosition(playerState.position)
       },
       contextualAction: this.contextualAction ? { ...this.contextualAction } : null,
+      mobileActions: {
+        context: this.mobileContextState.current?.kind ?? 'interact',
+        contextAvailable: Boolean(this.mobileContextState.current),
+        movement: playerState.canSlide || playerState.slideActive ? 'slide' : 'sprint'
+      },
       keyBindings: loadKeyBindings(),
       pause: {
         active: this.localPause.active,
         multiplayerContinues: true
       },
       statsFoundation: this.getSessionStats(),
+      cosmeticTestMode: this.progression.isCosmeticTestMode(),
       performance: {
         drawCalls: this.app.stats.drawCalls?.total ?? 0,
         triangles: this.app.stats.scene?.triangles ?? 0,

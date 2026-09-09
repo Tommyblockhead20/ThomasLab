@@ -1,7 +1,10 @@
 import { EQUIPMENT_CATALOG } from './equipment.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
+import { SHOP_COSMETICS, BADGE_COSMETIC_REWARD_BY_ID } from './cosmetics.js';
 
-const badge = (id, name, description, kind, target = 1) => Object.freeze({ id, name, description, kind, target });
+const badge = (id, name, description, kind, target = 1) => Object.freeze({
+  id, name, description, kind, target, rewardCosmeticId: BADGE_COSMETIC_REWARD_BY_ID[id]
+});
 
 export const TRAIL_BADGE_DEFINITIONS = Object.freeze([
   badge('field-naturalist-1', 'Field Naturalist I', 'Catch 50 unique active creatures.', 'uniqueCreatures', 50),
@@ -62,9 +65,11 @@ export class TrailBadgeSystem {
     const fullKitCount = traversalCategories.filter((category) => (
       equipmentPurchases.some((item) => item.category === category && ownedEquipment.has(item.id))
     )).length;
-    const purchaseTotal = equipmentPurchases.length + mapPurchases.length;
+    const cosmeticPurchases = SHOP_COSMETICS;
+    const purchaseTotal = equipmentPurchases.length + mapPurchases.length + cosmeticPurchases.length;
     const purchaseCount = equipmentPurchases.filter((item) => ownedEquipment.has(item.id)).length
-      + mapPurchases.filter((item) => ownedItems.has(item.id)).length;
+      + mapPurchases.filter((item) => ownedItems.has(item.id)).length
+      + cosmeticPurchases.filter((item) => (save.progression?.ownedCosmetics ?? []).includes(item.id)).length;
     return {
       uniqueCreatures: activeCount(progress.uniqueSpeciesCaught),
       totalCatches: Number(save.lifetime?.fishCaught) || 0,

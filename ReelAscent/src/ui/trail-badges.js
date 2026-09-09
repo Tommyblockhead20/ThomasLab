@@ -1,3 +1,5 @@
+import { COSMETIC_BY_ID } from '../progression/cosmetics.js';
+
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[character]);
@@ -48,7 +50,7 @@ export class TrailBadgeMenu {
     if (!this.content) return;
     this.content.innerHTML = badges.map((entry) => `<article class="trail-badge-card ${entry.unlocked ? 'is-unlocked' : 'is-locked'}">
       <div class="trail-badge-medallion" aria-hidden="true">${entry.unlocked ? '✦' : '◇'}</div>
-      <div><small>${entry.unlocked ? 'UNLOCKED' : 'LOCKED'}</small><strong>${escapeHtml(entry.name)}</strong><p>${escapeHtml(entry.description)}</p></div>
+      <div><small>${entry.unlocked ? 'UNLOCKED' : 'LOCKED'}</small><strong>${escapeHtml(entry.name)}</strong><p>${escapeHtml(entry.description)}</p><p class="trail-badge-reward">WARDROBE • ${escapeHtml(COSMETIC_BY_ID.get(entry.rewardCosmeticId)?.label ?? 'Cosmetic reward')}</p></div>
       <output>${escapeHtml(entry.progressLabel)}</output>
     </article>`).join('');
   }

@@ -18,6 +18,7 @@ import { normalizeProgressionState } from './progression-save.js';
 import { serializeProgress, validateProgressImport } from './progress-transfer.js';
 import { normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEM_BY_ID, MAP_ITEMS } from '../world/world-locations.js';
+import { COSMETIC_BY_ID, cosmeticUnlocked } from './cosmetics.js';
 
 const copy = (value) => JSON.parse(JSON.stringify(value));
 
@@ -27,6 +28,7 @@ export class ProgressionSystem {
     this.state = normalizeProgressionState(saveSystem.data.progression);
     this.saveSystem.data.progression = this.state;
     this.revision = 0;
+    this.cosmeticTestMode = false;
     this.equipment = new EquipmentManager(() => this.state, () => this.commit(), {
       canAfford: (price) => this.canAfford(price),
       spend: (price) => this.spend(price)
@@ -399,6 +401,38 @@ export class ProgressionSystem {
     return normalizeAppearance(this.state.appearance);
   }
 
+  getCosmeticAccess(cosmeticId, avatarType = this.state.appearance?.avatarType ?? 'human') {
+    if (cosmeticId === 'none') return { unlocked: true, compatible: true, reason: 'Starter' };
+    const cosmetic = COSMETIC_BY_ID.get(cosmeticId);
+    if (!cosmetic) return { unlocked: false, compatible: false, reason: 'Unknown cosmetic' };
+    const compatible = cosmetic.supports.includes(avatarType);
+    return {
+      cosmetic,
+      compatible,
+      unlocked: compatible && cosmeticUnlocked(cosmetic, this.saveSystem.data, this.cosmeticTestMode),
+      reason: compatible ? cosmetic.source.hint : `Not available for ${avatarType === 'blob' ? 'Blob' : 'Human'}`
+    };
+  }
+
+  purchaseCosmetic(cosmeticId) {
+    const cosmetic = COSMETIC_BY_ID.get(cosmeticId);
+    if (!cosmetic || cosmetic.source.type !== 'shop') return { ok: false, reason: 'That cosmetic is not sold here' };
+    if (this.state.ownedCosmetics.includes(cosmetic.id)) return { ok: false, reason: 'Already owned' };
+    if (!this.spend(cosmetic.source.price)) return { ok: false, reason: `Need $${cosmetic.source.price}` };
+    this.state.ownedCosmetics.push(cosmetic.id);
+    this.commit();
+    return { ok: true, cosmetic };
+  }
+
+  toggleCosmeticTestMode() {
+    this.cosmeticTestMode = !this.cosmeticTestMode;
+    // Session-only: deliberately do not commit this override to a save slot.
+    this.revision += 1;
+    return this.cosmeticTestMode;
+  }
+
+  isCosmeticTestMode() { return this.cosmeticTestMode; }
+
   getHeldInventorySpecimen() {
     return this.state.inventory.find((entry) => entry.specimenId === this.state.heldSpecimenId) ?? null;
   }
@@ -419,7 +453,14 @@ export class ProgressionSystem {
   }
 
   setAppearance(value) {
-    const next = normalizeAppearance({ ...this.state.appearance, ...value });
+    const requested = { ...value };
+    const avatarType = requested.avatarType ?? this.state.appearance?.avatarType ?? 'human';
+    for (const key of ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']) {
+      if (!(key in requested) || requested[key] === 'none') continue;
+      const access = this.getCosmeticAccess(requested[key], avatarType);
+      if (!access.unlocked) delete requested[key];
+    }
+    const next = normalizeAppearance({ ...this.state.appearance, ...requested });
     const changed = Object.keys(next).some((key) => next[key] !== this.state.appearance?.[key]);
     if (!changed) return this.getAppearance();
     this.state.appearance = next;

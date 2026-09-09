@@ -144,12 +144,23 @@ export class InventoryMenu {
       this.render(true, true);
     };
     this.onCloseClick = () => this.close();
-    this.onOpenClick = () => { if (!OTHER_MODAL_OPEN()) this.open(); };
+    this.onOpenClick = (event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      if (!OTHER_MODAL_OPEN()) this.open();
+    };
+    this.onMobilePointerDown = (event) => {
+      if (event.pointerType === 'mouse') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!OTHER_MODAL_OPEN()) this.open();
+    };
     window.addEventListener('keydown', this.onKeyDown, true);
     this.screen?.addEventListener('click', this.onClick);
     this.screen?.addEventListener('change', this.onChange);
     this.closeButton?.addEventListener('click', this.onCloseClick);
     this.mobileButton?.addEventListener('click', this.onOpenClick);
+    this.mobileButton?.addEventListener('pointerdown', this.onMobilePointerDown);
   }
 
   handleClick(event) {
@@ -287,6 +298,7 @@ export class InventoryMenu {
     this.screen?.removeEventListener('change', this.onChange);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     this.mobileButton?.removeEventListener('click', this.onOpenClick);
+    this.mobileButton?.removeEventListener('pointerdown', this.onMobilePointerDown);
     document.body.classList.remove('inventory-open');
   }
 }

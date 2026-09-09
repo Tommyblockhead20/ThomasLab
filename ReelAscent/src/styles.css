@@ -662,6 +662,12 @@ body.fish-gallery .debug-panel {
 .catch-banner[data-rarity="rare"] { border-color: #62a0e9; }
 .catch-banner[data-rarity="legendary"] { border-color: #b26de0; }
 
+.song-feedback { position: absolute; z-index: 24; top: max(8.2rem, 21%); left: 50%; display: flex; gap: .35rem; align-items: center; translate: -50% 0; padding: .32rem .42rem .32rem .58rem; color: #f5e7b5; background: rgb(8 39 39 / 88%); border: 1px solid rgb(239 217 139 / 36%); border-radius: 999px; box-shadow: 0 5px 16px rgb(0 0 0 / 24%); pointer-events: auto; }
+.song-feedback[hidden] { display: none; }
+.song-feedback span { font-size: .47rem; font-weight: 950; letter-spacing: .08em; }
+.song-feedback button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; padding: 0; font-size: 1.05rem; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 14%); border-radius: 50%; cursor: pointer; touch-action: manipulation; }
+.song-feedback button.is-selected { background: #efd98b; border-color: #fff3c1; box-shadow: 0 0 0 2px rgb(239 217 139 / 25%); }
+
 .catch-banner span {
   color: #60746b;
   font-size: 0.58rem;
@@ -1116,6 +1122,9 @@ body.journal-open #game-shell::after {
   background: rgb(18 58 55 / 78%);
   border: 1px solid rgb(255 255 255 / 34%);
   border-radius: .55rem;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .fishing-performance {
@@ -1603,8 +1612,8 @@ body.fish-danger #game-shell::after {
 .mobile-dpad {
   left: max(1rem, env(safe-area-inset-left));
   display: grid;
-  width: 10.5rem;
-  height: 10.5rem;
+  width: 11.4rem;
+  height: 11.4rem;
   grid-template: repeat(3, 1fr) / repeat(3, 1fr);
   gap: 0.28rem;
 }
@@ -1617,9 +1626,9 @@ body.fish-danger #game-shell::after {
 .mobile-actions {
   right: max(1rem, env(safe-area-inset-right));
   display: grid;
-  width: 11.2rem;
-  grid-template: repeat(2, 4.7rem) / repeat(2, 4.7rem);
-  gap: 0.65rem;
+  width: 11.4rem;
+  grid-template: 4.9rem 5.3rem / repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
   justify-content: end;
 }
 
@@ -1645,10 +1654,13 @@ body.fish-danger #game-shell::after {
   letter-spacing: 0.04em;
 }
 
-.touch-jump,
-.touch-grip {
+.touch-jump {
+  grid-column: 1 / -1;
   background: rgb(116 83 32 / 76%);
 }
+
+.touch-context-action { background: rgb(116 83 32 / 76%); }
+.touch-context-action.is-unavailable { opacity: .68; }
 
 .touch-button:is(:active, .is-held) {
   scale: 0.94;
@@ -1792,19 +1804,6 @@ body.mobile-mode .fish-prompt {
 .specimen-row strong { font-size: .7rem; }
 .specimen-row small { color: rgb(234 244 231 / 58%); font-size: .55rem; }
 .shop-empty { padding: 1.2rem; color: rgb(234 244 231 / 64%); text-align: center; }
-
-.aquarium-content { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .45rem; }
-.aquarium-card { display: grid; gap: .42rem; padding: .62rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 10%); border-left: 3px solid #96a69a; border-radius: .48rem; }
-.aquarium-card[data-rarity="uncommon"] { border-left-color: #62c77e; }
-.aquarium-card[data-rarity="rare"] { border-left-color: #62a0e9; }
-.aquarium-card[data-rarity="legendary"] { border-left-color: #b26de0; }
-.aquarium-card > div { display: flex; justify-content: space-between; gap: .5rem; }
-.aquarium-card strong { font-size: .72rem; }
-.aquarium-card small { color: rgb(234 244 231 / 58%); font-size: .5rem; }
-.aquarium-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: .35rem; margin: 0; }
-.aquarium-card dl div { padding: .34rem; background: rgb(0 0 0 / 12%); }
-.aquarium-card dt { color: #efd98b; font-size: .44rem; font-weight: 950; }
-.aquarium-card dd { margin: .08rem 0 0; font-size: .55rem; }
 
 @media (max-width: 650px) {
   .progression-shop { inset: 2.5rem .5rem auto; width: calc(100vw - 1rem); max-height: calc(100vh - 5rem); }
@@ -2127,16 +2126,16 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .aquarium-expansion small { color: #efd98b; font-size: .47rem; font-weight: 950; letter-spacing: .07em; }
 .aquarium-expansion strong { font-size: .72rem; }
 .aquarium-expansion.is-max { opacity: .72; }
-.aquarium-menu { position: absolute; z-index: 70; inset: 50% auto auto 50%; box-sizing: border-box; width: min(88rem, calc(100vw - 2rem)); height: min(49rem, calc(100vh - 2rem)); padding: .82rem; color: #edf6e9; background: linear-gradient(145deg, rgb(7 34 34 / 99%), rgb(7 25 29 / 99%)); border: 1px solid rgb(239 217 139 / 46%); border-radius: .85rem; box-shadow: 0 1.6rem 5rem rgb(0 0 0 / 55%); transform: translate(-50%, -50%); overflow: hidden; }
+.aquarium-menu { position: fixed; z-index: 70; inset: 50% auto auto 50%; box-sizing: border-box; width: min(88rem, calc(100vw - 2rem)); height: min(49rem, calc(100vh - 2rem)); padding: .82rem; color: #edf6e9; background: linear-gradient(145deg, rgb(7 34 34 / 99%), rgb(7 25 29 / 99%)); border: 1px solid rgb(239 217 139 / 46%); border-radius: .85rem; box-shadow: 0 1.6rem 5rem rgb(0 0 0 / 55%); transform: translate(-50%, -50%); overflow: hidden; }
 .aquarium-menu[hidden] { display: none; }
 .aquarium-menu:not([hidden]) { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: .62rem; }
 .aquarium-topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 2.5rem; padding: 0 .12rem; }
-.aquarium-topbar h2 { margin: 0; color: #f2dda0; font-size: 1.3rem; }
+.aquarium-topbar h2 { min-width: 0; margin: 0; overflow: hidden; color: #f2dda0; font-size: 1.3rem; text-overflow: ellipsis; white-space: nowrap; }
 .aquarium-topbar > div { display: flex; align-items: center; gap: .72rem; }
 .aquarium-topbar strong { color: rgb(234 244 231 / 72%); font-size: .62rem; }
 .aquarium-topbar button, .aquarium-detail-actions button, .aquarium-auto-fill { padding: .5rem .64rem; color: #153a36; font-size: .52rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .4rem; cursor: pointer; }
-.aquarium-content { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: .58rem; }
-.aquarium-summary-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .4rem; }
+.aquarium-content { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: .58rem; }
+.aquarium-summary-row { display: grid; grid-template-columns: repeat(6, minmax(6.25rem, 9.375rem)); gap: .4rem; justify-content: space-between; }
 .aquarium-summary-row article { min-width: 0; min-height: 3.35rem; display: grid; align-content: center; gap: .1rem; padding: .46rem .55rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .46rem; }
 .aquarium-summary-row small, .aquarium-tank-rail header small, .aquarium-specimen-browser header small { color: #d9c675; font-size: .43rem; font-weight: 950; letter-spacing: .08em; }
 .aquarium-summary-row strong { overflow: hidden; font-size: .66rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -2199,11 +2198,23 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
   .aquarium-specimen-grid { grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); }
 }
 @media (max-width: 800px) {
-  .aquarium-menu { height: calc(100vh - 1rem); width: calc(100vw - 1rem); }
+  .aquarium-menu { width: calc(100vw - .5rem); height: calc(100vh - .5rem); padding: .55rem; }
+  .aquarium-topbar { position: sticky; top: 0; z-index: 5; min-height: calc(2.7rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: rgb(7 34 34 / 99%); }
+  .aquarium-topbar h2 { font-size: 1rem; }
   .aquarium-summary-row { grid-template-columns: repeat(3, 1fr); }
   .aquarium-desktop-layout { grid-template-columns: 1fr; overflow-y: auto; }
-  .aquarium-tank-rail, .aquarium-specimen-browser, .aquarium-detail-panel { min-height: 18rem; }
-  .aquarium-tank-list { max-height: 18rem; }
+  .aquarium-tank-rail { min-height: 9.5rem; grid-template-rows: auto auto auto; }
+  .aquarium-specimen-browser, .aquarium-detail-panel { min-height: 18rem; }
+  .aquarium-tank-list { display: flex; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 0 0 .25rem; }
+  .aquarium-tank-card, .aquarium-buy-tank { flex: 0 0 9.4rem; width: 9.4rem; }
+  .aquarium-specimen-grid { grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); }
+  .aquarium-status { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .mobile-dpad { width: 10.5rem; height: 10.5rem; }
+  .mobile-actions { width: 10.5rem; grid-template-rows: 4.4rem 4.9rem; }
+  .journal-mobile-button { top: max(.55rem, env(safe-area-inset-top)); }
 }
 
 .boat-travel { position: absolute; z-index: 70; inset: 50% auto auto 50%; display: grid; width: min(46rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 1rem; color: #edf6e9; background: #123e42; border: 2px solid #d9bb66; border-radius: 1rem; box-shadow: 0 1.4rem 5rem rgb(0 0 0 / 45%); transform: translate(-50%, -50%); }
@@ -2457,6 +2468,8 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-options button { display: flex; gap: .32rem; align-items: center; justify-content: center; min-height: 1.9rem; padding: .38rem .45rem; color: #dcece3; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 12%); }
 .appearance-options button:hover { background: rgb(255 255 255 / 13%); }
 .appearance-options button[aria-pressed="true"] { color: #143833; background: #efd98b; border-color: #fff0b8; box-shadow: 0 0 0 2px rgb(239 217 139 / 18%); }
+.appearance-options button.is-locked { color: rgb(220 236 227 / 62%); background: rgb(0 0 0 / 13%); border-style: dashed; }
+.appearance-options button.is-locked small { display: block; color: #d7c47d; font-size: .42rem; line-height: 1.2; }
 .appearance-options input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: #efd98b; }
 .appearance-tone-strip { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); height: 1.1rem; overflow: hidden; border: 1px solid rgb(255 255 255 / 28%); border-radius: 999px; }
 .appearance-tone-strip span { min-width: 0; }
@@ -2492,7 +2505,11 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
   .mountain-map-layout { grid-template-columns: 1fr; }
   .mountain-map-graphic { max-height: 52vh; }
   .appearance-content { grid-template-columns: 1fr; }
-  .appearance-menu { display: block; height: auto; overflow: auto; }
+  .appearance-menu { display: block; width: calc(100vw - 1rem); height: calc(100vh - 1rem); max-height: calc(100vh - 1rem); padding: .75rem; overflow-x: hidden; overflow-y: auto; }
+  .appearance-menu > header { flex-wrap: wrap; }
+  .appearance-menu > header > div:first-child { min-width: 0; }
+  .appearance-header-actions { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .appearance-header-actions button { min-width: 0; padding-inline: .35rem; }
   .appearance-layout { grid-template-columns: 1fr; }
   .appearance-preview { position: static; }
   .appearance-preview canvas { height: 15rem; }
@@ -2679,6 +2696,7 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .trail-badge-card small { display: block; color: #dfbd67; font-size: .48rem; letter-spacing: .08em; }
 .trail-badge-card strong { display: block; margin: .08rem 0; font-size: .7rem; }
 .trail-badge-card p { margin: 0; color: rgb(233 243 231 / 68%); font-size: .55rem; line-height: 1.35; }
+.trail-badge-card .trail-badge-reward { margin-top: .24rem; color: #e5cd7c; font-size: .46rem; font-weight: 900; }
 .trail-badge-card output { color: #f2dfa6; font-size: .58rem; font-weight: 900; white-space: nowrap; }
 @media (max-width: 850px) { .trail-badges-content { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 580px) { .trail-badges-content { grid-template-columns: 1fr; } }

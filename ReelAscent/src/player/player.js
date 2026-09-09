@@ -81,6 +81,7 @@ export class Player {
     this.momentumDeflectCooldown = 0;
     this.slideBraking = false;
     this.slideActive = false;
+    this.canSlide = false;
     this.slideEnterTimer = 0;
     this.slideExitTimer = 0;
     this.slidePoseTimer = 0;
@@ -1140,6 +1141,8 @@ export class Player {
       && this.input.slideHeld
       && surfaceNearFeet
       && groundSurface
+      && groundSurface.slopeDegrees >= PLAYER_CONFIG.manualSlideMinimumSlopeDegrees);
+    this.canSlide = Boolean(!this.benchSeat && surfaceNearFeet && groundSurface
       && groundSurface.slopeDegrees >= PLAYER_CONFIG.manualSlideMinimumSlopeDegrees);
     const slidingDownSlope = this.updateSlideState(dt, groundSurface, manualSlideRequested);
     const slideRecoveryActive = this.slideRecoveryTimer > 0;
@@ -2318,6 +2321,7 @@ export class Player {
       emote: this.currentEmote ? { ...this.currentEmote } : null,
       slideBraking: this.slideBraking,
       slideActive: this.slideActive,
+      canSlide: this.canSlide,
       slidePoseActive: this.slidePoseActive,
       slidePoseSeconds: this.slidePoseTimer,
       slideJamSeconds: this.slideJamTimer,

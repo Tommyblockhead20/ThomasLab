@@ -30,10 +30,10 @@ const GROUPS = Object.freeze([
   Object.freeze({ key: 'pantsColor', label: 'Pants / Bottom', options: PANTS_COLORS, human: true, swatches: true, section: 'body' }),
   Object.freeze({ key: 'hairStyle', label: 'Hair Style', options: HAIR_STYLES, human: true, section: 'body' }),
   Object.freeze({ key: 'hairColor', label: 'Hair Color', options: HAIR_COLORS, human: true, swatches: true, section: 'body' }),
-  Object.freeze({ key: 'headwear', label: 'Headwear / Hats', options: HEADWEAR, human: true, section: 'accessories' }),
-  Object.freeze({ key: 'eyewear', label: 'Eyewear', options: EYEWEAR, human: true, section: 'accessories' }),
-  Object.freeze({ key: 'faceAccessory', label: 'Face / Neck', options: FACE_ACCESSORIES, human: true, section: 'accessories' }),
-  Object.freeze({ key: 'backAccessory', label: 'Back', options: BACK_ACCESSORIES, human: true, section: 'accessories' }),
+  Object.freeze({ key: 'headwear', label: 'Headwear / Hats', options: HEADWEAR, cosmetic: true, section: 'accessories' }),
+  Object.freeze({ key: 'eyewear', label: 'Eyewear', options: EYEWEAR, cosmetic: true, section: 'accessories' }),
+  Object.freeze({ key: 'faceAccessory', label: 'Face / Neck', options: FACE_ACCESSORIES, cosmetic: true, section: 'accessories' }),
+  Object.freeze({ key: 'backAccessory', label: 'Back', options: BACK_ACCESSORIES, cosmetic: true, section: 'accessories' }),
   Object.freeze({ key: 'backpackColor', label: 'Backpack Color', options: BACKPACK_COLORS, human: true, swatches: true, section: 'accessories' })
 ]);
 
@@ -70,6 +70,11 @@ export class AppearanceMenu {
     this.onCloseClick = () => this.close();
     this.onRandomizeClick = () => {
       const randomized = randomizeAppearance();
+      for (const key of ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']) {
+        if (!this.progression.getCosmeticAccess(randomized[key], randomized.avatarType).unlocked) {
+          randomized[key] = key === 'backAccessory' ? 'backpack' : 'none';
+        }
+      }
       const appearance = this.progression.setAppearance(randomized);
       this.player.applyAppearance(appearance);
       this.preview.setAppearance(appearance);
@@ -109,7 +114,20 @@ export class AppearanceMenu {
       const key = option.dataset.appearanceKey;
       const value = option.dataset.appearanceValue;
       if (!GROUPS.some((group) => group.key === key && group.options.some((entry) => entry.id === value))) return;
+      const access = ['headwear', 'eyewear', 'faceAccessory', 'backAccessory'].includes(key)
+        ? this.progression.getCosmeticAccess(value, key === 'avatarType' ? value : this.progression.getAppearance().avatarType)
+        : null;
+      if (access && !access.unlocked) {
+        if (this.status) this.status.textContent = access.reason;
+        return;
+      }
       const patch = { [key]: value };
+      if (key === 'avatarType') {
+        const current = this.progression.getAppearance();
+        for (const cosmeticKey of ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']) {
+          if (!this.progression.getCosmeticAccess(current[cosmeticKey], value).compatible) patch[cosmeticKey] = 'none';
+        }
+      }
       if (TINT_BY_OPTION[key]) patch[TINT_BY_OPTION[key]] = null;
       const appearance = this.progression.setAppearance(patch);
       this.player.applyAppearance(appearance);
@@ -211,11 +229,17 @@ export class AppearanceMenu {
         return fieldset;
       }
       for (const entry of group.options) {
+        if (group.cosmetic && entry.supports && !entry.supports.includes(appearance.avatarType)) continue;
         const button = document.createElement('button');
         button.type = 'button';
         button.dataset.appearanceKey = group.key;
         button.dataset.appearanceValue = entry.id;
         button.setAttribute('aria-pressed', String(appearance[group.key] === entry.id));
+        const access = group.cosmetic
+          ? this.progression.getCosmeticAccess(entry.id, appearance.avatarType)
+          : { unlocked: true };
+        button.classList.toggle('is-locked', !access.unlocked);
+        button.setAttribute('aria-disabled', String(!access.unlocked));
         if (group.swatches) {
           const swatch = document.createElement('span');
           swatch.className = 'appearance-swatch';
@@ -225,6 +249,11 @@ export class AppearanceMenu {
         const label = document.createElement('span');
         label.textContent = entry.label;
         button.appendChild(label);
+        if (!access.unlocked) {
+          const hint = document.createElement('small');
+          hint.textContent = access.reason;
+          button.appendChild(hint);
+        }
         options.appendChild(button);
       }
       fieldset.append(legend, options);
@@ -232,6 +261,9 @@ export class AppearanceMenu {
     });
     this.content.replaceChildren(...groups);
     this.preview.setAppearance(appearance);
+    if (this.progression.isCosmeticTestMode?.() && this.status) {
+      this.status.textContent = 'COSMETIC TEST MODE — ALL UNLOCKED';
+    }
     this.renderedRevision = this.progression.revision;
   }
 

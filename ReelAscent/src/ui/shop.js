@@ -1,5 +1,6 @@
 import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
+import { SHOP_COSMETICS } from '../progression/cosmetics.js';
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -68,6 +69,13 @@ export class ShopMenu {
       if (worldItem) {
         const result = this.progression.purchaseWorldItem(worldItem.dataset.worldShop);
         this.status.textContent = result.ok ? `${result.item.name} added to Inventory.` : result.reason;
+        this.render(true);
+        return;
+      }
+      const cosmeticButton = event.target.closest('[data-cosmetic-shop]');
+      if (cosmeticButton) {
+        const result = this.progression.purchaseCosmetic(cosmeticButton.dataset.cosmeticShop);
+        this.status.textContent = result.ok ? `${result.cosmetic.label} added to your Wardrobe.` : result.reason;
         this.render(true);
         return;
       }
@@ -140,7 +148,7 @@ export class ShopMenu {
     }
     this.content.innerHTML = this.activeMode === 'sell'
       ? this.renderSales(state)
-      : `${this.renderWorldItems(state)}${this.renderEquipment(state)}`;
+      : `${this.renderCosmetics(state)}${this.renderWorldItems(state)}${this.renderEquipment(state)}`;
     this.renderedRevision = this.progression.revision;
   }
 
@@ -169,6 +177,15 @@ export class ShopMenu {
       return `<article class="shop-card ${owned ? 'is-equipped' : ''}"><div><strong>${escapeHtml(item.name)}</strong><small>${owned ? 'OWNED' : `$${item.price}`}</small></div><p>${escapeHtml(item.description)}</p><button type="button" data-world-shop="${item.id}" ${owned || !this.progression.canAfford(item.price) ? 'disabled' : ''}>${owned ? 'IN INVENTORY' : `BUY $${item.price}`}</button></article>`;
     }).join('');
     return `<section class="shop-category"><h3>MAPS</h3><div class="shop-card-row">${cards}</div></section>`;
+  }
+
+  renderCosmetics(state) {
+    const owned = new Set(state.ownedCosmetics ?? []);
+    const cards = SHOP_COSMETICS.map((cosmetic) => {
+      const isOwned = owned.has(cosmetic.id);
+      return `<article class="shop-card ${isOwned ? 'is-equipped' : ''}"><div><strong>${escapeHtml(cosmetic.label)}</strong><small>${isOwned ? 'OWNED' : `$${cosmetic.source.price}`}</small></div><p>${escapeHtml(cosmetic.slot.replace(/([A-Z])/g, ' $1'))} • ${cosmetic.supports.join(' + ')}</p><button type="button" data-cosmetic-shop="${cosmetic.id}" ${isOwned || !this.progression.canAfford(cosmetic.source.price) ? 'disabled' : ''}>${isOwned ? 'IN WARDROBE' : `BUY $${cosmetic.source.price}`}</button></article>`;
+    }).join('');
+    return `<section class="shop-category"><h3>WARDROBE COSMETICS</h3><p class="shop-note">Early and mid-trail fashion. Purchased looks belong to this save slot.</p><div class="shop-card-row">${cards}</div></section>`;
   }
 
   renderSales(state) {

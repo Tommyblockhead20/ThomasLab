@@ -49,24 +49,23 @@ test('Mangrove Lagoon sits below a carved bank and owns a seated fishing log int
   assert.doesNotMatch(source, /Mangrove Cay submerged warm mud shelf/);
 });
 
-test('Aquarium UI uses compact summary, tank and source grids with explicit move actions', async () => {
+test('Aquarium UI preserves compact management and explicit move actions in the rebuilt hierarchy', async () => {
   const source = await readFile(new URL('../src/ui/aquarium.js', import.meta.url), 'utf8');
-  assert.match(source, /aquarium-summary-bar/);
-  assert.match(source, /aquarium-tank-browser/);
-  assert.match(source, /data-list="displayed"/);
-  assert.match(source, /data-list="stored"/);
-  assert.match(source, /data-list="inventory"/);
+  assert.match(source, /aquarium-summary-row/);
+  assert.match(source, /aquarium-tank-rail/);
+  assert.match(source, /aquarium-specimen-browser/);
+  assert.match(source, /Browsing all retained and carried creatures/);
   assert.match(source, /MOVE TO TANK/);
   assert.match(source, /CURRENT PLACEMENT/);
 });
 
-test('Aquarium dock approach has a dedicated stepping-stone path and restrained controls', async () => {
+test('Aquarium dock approach has a dedicated low-profile path and restrained controls', async () => {
   const worldSource = await readFile(new URL('../src/world/mountain-v2.js', import.meta.url), 'utf8');
   const styles = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
-  assert.match(worldSource, /Glasswater dock path stone/);
+  assert.match(worldSource, /Glasswater packed dock path/);
   assert.match(worldSource, /dockArrivalDistance/);
-  assert.match(styles, /\.aquarium-tank-selector \{ display: grid/);
-  assert.match(styles, /\.aquarium-tank-selector button\.is-active \{ background: rgb\(239 217 139 \/ 11%\)/);
+  assert.match(styles, /\.aquarium-tank-list \{ min-height: 0; display: grid/);
+  assert.match(styles, /\.aquarium-tank-card\.is-selected \{ background: rgb\(239 217 139 \/ 8%\)/);
 });
 
 test('fish buyer copy no longer explains duplicate aquarium sale behavior', async () => {
