@@ -34,6 +34,9 @@ export class DisabledSongVoteStore {
   constructor(reason = 'DATABASE_URL is not configured') {
     this.available = false;
     this.durable = false;
+    this.postgresConnected = false;
+    this.schemaInitialized = false;
+    this.initializationStage = 'connection';
     this.reason = reason;
   }
   async initialize() {}
@@ -46,6 +49,8 @@ export class MemorySongVoteStore {
   constructor() {
     this.available = true;
     this.durable = false;
+    this.postgresConnected = false;
+    this.schemaInitialized = false;
     this.reason = 'Test-only memory adapter';
     this.votes = new Map();
   }
@@ -78,14 +83,27 @@ export class MemorySongVoteStore {
 }
 
 export class PostgresSongVoteStore {
-  constructor(databaseUrl, { ssl = false } = {}) {
+  constructor(databaseUrl, { ssl = false, logger = console } = {}) {
     this.available = false;
     this.durable = true;
+    this.postgresConnected = false;
+    this.schemaInitialized = false;
+    this.initializationStage = 'connection';
     this.reason = '';
-    this.pool = new Pool({ connectionString: databaseUrl, ssl: ssl ? { rejectUnauthorized: false } : false });
+    this.logger = logger;
+    // Let pg honor sslmode and other secure options embedded in DATABASE_URL. The
+    // optional legacy override remains available when a provider supplies a URL
+    // without its required SSL mode.
+    const poolConfig = { connectionString: databaseUrl, connectionTimeoutMillis: 8_000 };
+    if (ssl) poolConfig.ssl = { rejectUnauthorized: false };
+    this.pool = new Pool(poolConfig);
   }
 
   async initialize() {
+    await this.pool.query('SELECT 1');
+    this.postgresConnected = true;
+    this.logger.info('[reel-ascent] PostgreSQL connected');
+    this.initializationStage = 'schema';
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS reel_ascent_song_votes (
         voter_id VARCHAR(160) NOT NULL,
@@ -102,7 +120,10 @@ export class PostgresSongVoteStore {
       CREATE INDEX IF NOT EXISTS reel_ascent_song_votes_species_revision
       ON reel_ascent_song_votes (species_id, song_revision)
     `);
+    this.schemaInitialized = true;
     this.available = true;
+    this.initializationStage = 'ready';
+    this.logger.info('[reel-ascent] song-voting schema initialized successfully');
   }
 
   async setVote(value) {
@@ -111,6 +132,12 @@ export class PostgresSongVoteStore {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
+      // Serialize changes for one species/revision so each live aggregate is computed
+      // after prior writes to that same aggregate have committed.
+      await client.query(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
+        [`${record.speciesId}:${record.songRevision}`]
+      );
       if (record.vote === null) {
         await client.query(
           'DELETE FROM reel_ascent_song_votes WHERE voter_id = $1 AND species_id = $2 AND song_revision = $3',
@@ -177,14 +204,24 @@ export class PostgresSongVoteStore {
   async close() { await this.pool.end(); }
 }
 
-export async function createSongVoteStore({ databaseUrl = '', databaseSsl = false } = {}) {
-  if (!databaseUrl) return new DisabledSongVoteStore();
-  const store = new PostgresSongVoteStore(databaseUrl, { ssl: databaseSsl });
+export async function createSongVoteStore({ databaseUrl = '', databaseSsl = false, logger = console } = {}) {
+  if (!databaseUrl) {
+    logger.warn('[reel-ascent] PostgreSQL not configured; song-voting schema not initialized');
+    return new DisabledSongVoteStore();
+  }
+  let store = null;
   try {
+    store = new PostgresSongVoteStore(databaseUrl, { ssl: databaseSsl, logger });
     await store.initialize();
     return store;
   } catch (error) {
-    await store.close().catch(() => {});
-    return new DisabledSongVoteStore(`Database initialization failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    await store?.close().catch(() => {});
+    const diagnostic = typeof error?.code === 'string' ? ` (${error.code})` : '';
+    if (store?.initializationStage === 'schema') {
+      logger.error(`[reel-ascent] song-voting schema initialization failed; durable voting disabled${diagnostic}`);
+    } else {
+      logger.error(`[reel-ascent] PostgreSQL connection failed; song-voting schema not initialized${diagnostic}`);
+    }
+    return new DisabledSongVoteStore(`Database initialization failed${diagnostic}`);
   }
 }

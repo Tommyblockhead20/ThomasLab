@@ -1,3 +1,19 @@
+# REEL ASCENT v16.3
+
+Status: the Ohio/Neon production-readiness pass for durable live song voting is complete as **REEL ASCENT • v16.3**. PostgreSQL remains the only authoritative production vote store; credentials are read only from `process.env.DATABASE_URL` and no secret is present in the repository.
+
+1. **PostgreSQL package** — The multiplayer server uses `pg`/node-postgres `^8.23.0`, already present in `server/package.json` and its lockfile from the live-voting implementation.
+2. **Neon connection handling** — `PostgresSongVoteStore` now lets `pg` honor SSL and other secure connection options embedded in `DATABASE_URL`, which is the normal Neon connection-string behavior. The older optional `DATABASE_SSL=require` override remains available but is not required when the URL carries its SSL mode. The pool configuration no longer forces `ssl:false` when that override is absent.
+3. **Startup/schema initialization** — Startup first runs a PostgreSQL connectivity probe, then idempotently creates `reel_ascent_song_votes` and its species/revision index. Success logs are exactly `[reel-ascent] PostgreSQL connected` and `[reel-ascent] song-voting schema initialized successfully`.
+4. **Failure isolation** — A missing URL, failed connection, or failed schema initialization returns a disabled vote store instead of aborting server startup. Logs distinguish connection failure from schema failure without printing the connection URL. `/health` now exposes `postgresConnected` and `schemaInitialized` alongside the existing song-voting availability/durability flags.
+5. **Durable vote model** — The table stores voter ID, species ID, song ID, song revision, up/down vote, and created/updated timestamps. `(voter_id, species_id, song_revision)` is the primary key; `ON CONFLICT` changes the existing vote; clearing deletes it. Rows for older revisions remain independent and aggregate queries group by species/revision.
+6. **Live aggregate consistency** — Each vote transaction takes a PostgreSQL transaction-scoped advisory lock for its species/revision before changing the row and recalculating totals. Concurrent voters therefore cannot broadcast an aggregate calculated before an earlier write to that same song revision commits. RAM and Render's filesystem are never authoritative.
+7. **Environment template** — `server/.env.example` documents empty `DATABASE_URL`/optional `DATABASE_SSL` names only and explicitly warns against committing a real URL.
+8. **Files changed** — `src/version.js`; `server/src/{song-vote-store,server}.js`; `server/.env.example`; `test/{v16-1-focused,v16-3-focused}.test.js`; regenerated tracked `dist/`; and this handoff. No multiplayer message or gameplay protocol behavior changed.
+9. **Deployment** — Render must redeploy the multiplayer server to activate the corrected Neon connection handling, startup logs, health fields, and serialized aggregate writes. The frontend must also be rebuilt/redeployed for its visible v16.3 version; the production endpoint remains `wss://reel-ascent-multiplayer-ohio.onrender.com`.
+
+## Previous v16.1 handoff
+
 # REEL ASCENT v16.1
 
 Status: the focused mobile HUD, fishing-result controls, versioned song-feedback, durable live aggregation, and developer-dashboard pass is implemented as **REEL ASCENT • v16.1**. Focused automated checks and the production frontend build pass. The new server path starts cleanly without a database and explicitly disables voting; a configured PostgreSQL service is required before production can accept durable votes.

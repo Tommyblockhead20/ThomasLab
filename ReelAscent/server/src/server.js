@@ -18,7 +18,12 @@ const httpServer = http.createServer((request, response) => {
     response.end(JSON.stringify({
       ok: true,
       rooms: roomManager.rooms.size,
-      songVoting: { available: songVoteStore.available, durable: songVoteStore.durable }
+      songVoting: {
+        available: songVoteStore.available,
+        durable: songVoteStore.durable,
+        postgresConnected: songVoteStore.postgresConnected,
+        schemaInitialized: songVoteStore.schemaInitialized
+      }
     }));
     return;
   }
