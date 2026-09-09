@@ -2380,9 +2380,10 @@ export class MountainWorld extends TestWorld {
     this.addAquariumBox('Glasswater Aquarium collection sign', { x: 0, y: config.waterlineY + 1.15, z: config.depth * .5 + 1.1 },
       { x: 8.8, y: 1.15, z: .18 }, this.materials.woodLight, {}, false);
 
-    // A loose low-poly stepping-stone trail joins the outward-facing dock to the public
-    // entrance. Thin visual stones follow the island grade without introducing little
-    // collision lips that could snag a player walking in from the pier.
+    // A thin packed-earth trail follows the actual generated island profile from the public
+    // entrance to the inward end of the dock. It is deliberately inset into the ground and
+    // visual-only: the continuous island/dock colliders remain the walking surface, so there
+    // are no raised decorative blocks for the capsule to clip through.
     const dockArrival = AQUARIUM_WORLD_LOCATION?.dock?.arrivalPosition;
     const dockArrivalDistance = dockArrival
       ? Math.hypot(
@@ -2392,30 +2393,46 @@ export class MountainWorld extends TestWorld {
       : config.depth * .5 + 32;
     const pathStartZ = config.depth * .5 + 3.4;
     const pathEndZ = Math.max(pathStartZ + 12, dockArrivalDistance - 1.4);
-    const pathStoneCount = 15;
-    for (let index = 0; index < pathStoneCount; index += 1) {
-      const progress = index / (pathStoneCount - 1);
+    const shorelineDistance = dockArrivalDistance + 3.1;
+    const pathSurfaceY = (pathZ) => {
+      const footprintFactor = pathZ / Math.max(1, shorelineDistance);
+      if (footprintFactor <= .68) return lerp(
+        AQUARIUM_WORLD_LOCATION.elevation + .13,
+        AQUARIUM_WORLD_LOCATION.elevation + .06,
+        clamp((footprintFactor - .2) / .48, 0, 1)
+      );
+      return lerp(
+        AQUARIUM_WORLD_LOCATION.elevation + .06,
+        OCEAN_SURFACE_Y - .16,
+        clamp((footprintFactor - .68) / .32, 0, 1)
+      );
+    };
+    const pathSegmentCount = 22;
+    const segmentLength = (pathEndZ - pathStartZ) / (pathSegmentCount - 1) + .18;
+    for (let index = 0; index < pathSegmentCount; index += 1) {
+      const progress = index / (pathSegmentCount - 1);
       const pathZ = lerp(pathStartZ, pathEndZ, progress);
-      const pathX = Math.sin(index * 1.73) * .42;
-      this.addAquariumBox(`Glasswater dock path stone ${index + 1}`,
-        { x: pathX, y: -.06 + Math.sin(index * .9) * .018, z: pathZ },
-        { x: 2.75 + index % 3 * .28, y: .16, z: 2.05 + (index + 1) % 3 * .24 },
-        index % 4 === 0 ? this.materials.waterEdge : this.materials.rockLight,
-        { y: index % 2 ? 6 : -7 }, false);
+      const surfaceLocalY = pathSurfaceY(pathZ) - this.publicAquariumFloorY;
+      this.addAquariumBox(`Glasswater packed dock path ${index + 1}`,
+        { x: Math.sin(index * 1.31) * .08, y: surfaceLocalY - .015, z: pathZ },
+        { x: 4.1 + index % 3 * .12, y: .04, z: segmentLength },
+        this.materials.pondBank, { y: index % 2 ? 1.2 : -1.2 }, false);
     }
     for (const side of [-1, 1]) {
-      for (let index = 0; index < 6; index += 1) {
-        const pathZ = lerp(pathStartZ + 2, pathEndZ - 2, index / 5);
+      for (let index = 0; index < 4; index += 1) {
+        const pathZ = lerp(pathStartZ + 2, pathStartZ + (pathEndZ - pathStartZ) * .42, index / 3);
+        const plantHeight = .7 + index % 2 * .22;
         this.addAquariumBox(`Glasswater path edging plant ${side < 0 ? 'west' : 'east'} ${index + 1}`,
-          { x: side * (2.15 + index % 2 * .22), y: .28, z: pathZ },
-          { x: .42 + index % 3 * .08, y: .7 + index % 2 * .22, z: .42 },
+          { x: side * (2.15 + index % 2 * .22), y: pathSurfaceY(pathZ) - this.publicAquariumFloorY + plantHeight * .5, z: pathZ },
+          { x: .42 + index % 3 * .08, y: plantHeight, z: .42 },
           index % 2 ? this.materials.shrubLight : this.materials.foliage,
           { z: side * (5 + index * 2) }, false);
       }
     }
-    this.addAquariumBox('Glasswater dock path sign post', { x: -2.9, y: 1.05, z: pathStartZ + 4.2 },
+    const signGroundY = pathSurfaceY(pathStartZ + 4.2) - this.publicAquariumFloorY;
+    this.addAquariumBox('Glasswater dock path sign post', { x: -2.9, y: signGroundY + 1.05, z: pathStartZ + 4.2 },
       { x: .18, y: 2.1, z: .18 }, this.materials.wood, {}, false);
-    this.addAquariumBox('Glasswater dock path welcome sign', { x: -2.9, y: 1.72, z: pathStartZ + 4.2 },
+    this.addAquariumBox('Glasswater dock path welcome sign', { x: -2.9, y: signGroundY + 1.72, z: pathStartZ + 4.2 },
       { x: 2.3, y: .8, z: .16 }, this.materials.woodLight, { y: -4 }, false);
 
     // Low garden beds and paths make the expanded grounds feel intentional without adding
