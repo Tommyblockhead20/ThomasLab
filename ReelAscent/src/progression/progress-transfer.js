@@ -3,7 +3,7 @@ import { normalizeProgressionState } from './progression-save.js';
 import { SAVE_SCHEMA_VERSION, normalizeSave } from '../persistence/save-system.js';
 
 export const PROGRESS_EXPORT_FORMAT = 'reel-ascent-progress';
-export const PROGRESS_EXPORT_VERSION = 3;
+export const PROGRESS_EXPORT_VERSION = 4;
 const MAX_SPECIMENS = 2000;
 const MAX_COLLECTION_ENTRIES = 2000;
 
@@ -24,9 +24,11 @@ export function createProgressExport(saveSnapshot, saveMetadata = {}) {
     format: PROGRESS_EXPORT_FORMAT,
     exportVersion: PROGRESS_EXPORT_VERSION,
     schemaVersion: SAVE_SCHEMA_VERSION,
+    saveId: save.saveId,
     exportedAt: new Date().toISOString(),
     saveMetadata: normalizeSaveMetadata(saveMetadata),
     progression: {
+      tutorials: copy(save.tutorials),
       collection: copy(save.collection),
       lifetime: copy(save.lifetime),
       trailBadges: copy(save.trailBadges),
@@ -90,6 +92,8 @@ export function validateProgressImport(input) {
   });
   const normalizedSave = normalizeSave({
     version: document.schemaVersion,
+    saveId: document.saveId,
+    tutorials: portable.tutorials,
     collection: portable.collection,
     lifetime: portable.lifetime,
     trailBadges: portable.trailBadges,

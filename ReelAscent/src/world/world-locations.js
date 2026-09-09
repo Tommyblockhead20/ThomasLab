@@ -170,7 +170,10 @@ export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
   islandLocation({
     id: 'aquarium-island', displayName: 'Glasswater Isle', type: 'aquarium-island',
     angle: 95, radius: 1320, radii: { x: 82, z: 64 }, elevation: .7,
-    theme: 'landscaped-attraction', functions: ['aquarium-inspect', 'aquarium-manage'], dockLength: 19
+    theme: 'landscaped-attraction', functions: ['aquarium-inspect', 'aquarium-manage'], dockLength: 19,
+    // The public entrance/sign faces away from Mountain, so arrival belongs on that same
+    // side. This also keeps the generated dock, arrival point, and promenade on one axis.
+    dockSide: 'outward'
   }),
   islandLocation({
     id: 'cave-fishing-island', displayName: 'Basalt Hollow', type: 'cave-island',

@@ -511,13 +511,30 @@ export function oceanFloorHeightAt(radius, shorelineY = -.32) {
   });
 }
 
+export function createOceanShelfRingRadii(outerRadius = OCEAN_FLOOR_OUTER_RADIUS) {
+  const nearLimit = Math.min(270, outerRadius);
+  const ringRadii = [TERRAIN_OUTER_RADIUS];
+  for (let radius = TERRAIN_OUTER_RADIUS + 2; radius < nearLimit; radius += 2) ringRadii.push(radius);
+  for (const authoredRadius of [OCEAN_WATER_INNER_RADIUS, OCEAN_SHALLOW_WALK_END_RADIUS]) {
+    if (authoredRadius > TERRAIN_OUTER_RADIUS && authoredRadius < nearLimit) ringRadii.push(authoredRadius);
+  }
+  ringRadii.sort((left, right) => left - right);
+  for (let radius = Math.max(275, ringRadii.at(-1) + 5); radius < Math.min(360, outerRadius); radius += 5) {
+    ringRadii.push(radius);
+  }
+  for (const radius of [420, 520, 650, 800, 1000, 1250, 1500, outerRadius]) {
+    if (radius > ringRadii.at(-1) && radius <= outerRadius) ringRadii.push(radius);
+  }
+  return ringRadii;
+}
+
 const FISHING_LAYOUT = Object.freeze([
   // LOWER MOUNTAIN — 10 waters
   Object.freeze({
     id: 'hearthward-pond', label: 'Hearthward Tutorial Pond', tier: 'lower', waterType: 'pond',
     theme: 'fernwood', ecologyThemes: ['sunwash', 'fernwood'], offshore: 'home-island',
     angle: HOME_WORLD_LOCATION?.angle ?? 222, radius: HOME_WORLD_LOCATION?.radius ?? 980,
-    localOffset: { x: 7.8, z: 8.25 }, waterY: .84, radii: [4.1, 3.15], depth: 'shallow', basinDepth: .5,
+    localOffset: { x: 7.8, z: 8.25 }, waterY: .78, radii: [4.1, 3.15], depth: 'shallow', basinDepth: .5,
     fish: ['bluegill', 'pumpkinseed', 'golden-shiner'], allowedRarities: ['Common'],
     size: .9, rarityBias: -.4, trophyChance: .7, biteRate: 1.3, tutorialWater: true
   }),
@@ -1122,7 +1139,7 @@ export class MountainWorld extends TestWorld {
     // Opaque, depth-writing materials sit below the single global ocean surface. Using the
     // ordinary transparent ice material here caused the cold shelf and spikes to sort through
     // one another even when an exposed spike was physically in front.
-    this.materials.coldOceanBed = makeMaterial([.43, .67, .74], { gloss: .76, emissive: [.025, .075, .095], doubleSided: true });
+    this.materials.coldOceanBed = makeMaterial([.58, .76, .82], { gloss: .82, emissive: [.04, .1, .125], doubleSided: true });
     this.materials.solidIce = makeMaterial([.67, .86, .91], { gloss: .92, emissive: [.028, .07, .085] });
     this.materials.deepWater = makeMaterial([.14, .42, .51], { opacity: .78, gloss: .9, emissive: [.015, .07, .1], doubleSided: true });
     this.materials.waterfall = makeMaterial([.64, .86, .88], { opacity: .74, gloss: .9, emissive: [.04, .13, .14], doubleSided: true });
@@ -1240,6 +1257,18 @@ export class MountainWorld extends TestWorld {
     return entity;
   }
 
+  syncStructureCollider(entity, enabled = true) {
+    const collider = entity?.physicsCollider;
+    if (!collider) return false;
+    collider.setEnabled?.(enabled);
+    if (!enabled) return true;
+    const position = entity.getPosition();
+    const quaternion = entity.getRotation();
+    collider.setTranslation({ x: position.x, y: position.y, z: position.z });
+    collider.setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w });
+    return true;
+  }
+
   addCabinBox(name, localPosition, size, material, rotation = {}, solid = true) {
     return this.addStructureBox(this.homeCabinRoot, name, localPosition, size, material, rotation, solid);
   }
@@ -1302,15 +1331,22 @@ export class MountainWorld extends TestWorld {
     // near-degenerate center triangles; on Basalt Hollow those could stretch into spikes.
     // Broad submerged aprons replace the old near-vertical 1.2→1.0 shoreline drop.
     // Everything at/above the waterline keeps its authored footprint and elevation.
-    const ringFactors = [...ISLAND_UNDERWATER_PROFILE.radiusFactors, .68, .2];
+    // Hearthward gets enough interior rings for its small tutorial pond to be carved into
+    // the actual island mesh. Two broad top rings could only draw a flat triangle through it.
+    const topRingFactors = location.id === 'home-island' ? [.84, .68, .52, .36, .2] : [.68, .2];
+    const ringFactors = [...ISLAND_UNDERWATER_PROFILE.radiusFactors, ...topRingFactors];
     const ringHeights = [
       oceanFloorHeightAt(location.radius) + .12,
       OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * 1.7,
       OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * .68,
       OCEAN_SURFACE_Y - .16,
-      location.elevation + .06,
-      location.elevation + .16
+      ...topRingFactors.map((factor) => lerp(location.elevation + .06, location.elevation + .16,
+        1 - factor / Math.max(...topRingFactors)))
     ];
+    const homePondCenter = location.id === 'home-island'
+      ? radialPoint(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius + 8.25, HOME_CABIN_CONFIG.floorY, -7.8)
+      : null;
+    const homeRadians = degreesToRadians(HOME_CABIN_CONFIG.angle);
     const vertices = [];
     for (let ring = 0; ring < ringFactors.length; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
@@ -1330,6 +1366,21 @@ export class MountainWorld extends TestWorld {
           );
           const basinBlend = 1 - smoothstep(.72, 1.18, lakeRadius);
           vertexY = lerp(vertexY, .96 - .78, basinBlend);
+        }
+        if (homePondCenter && ring >= ISLAND_UNDERWATER_PROFILE.radiusFactors.length) {
+          const dx = vertexX - homePondCenter.x;
+          const dz = vertexZ - homePondCenter.z;
+          const pondLocalX = dx * Math.sin(homeRadians) - dz * Math.cos(homeRadians);
+          const pondLocalZ = dx * Math.cos(homeRadians) + dz * Math.sin(homeRadians);
+          const pondDistance = Math.hypot(pondLocalX / 4.95, pondLocalZ / 3.95);
+          if (pondDistance < 1.42) {
+            const basinFloor = HOME_CABIN_CONFIG.floorY - .32;
+            const shoreline = HOME_CABIN_CONFIG.floorY - .18;
+            const basinTarget = pondDistance <= .76
+              ? lerp(basinFloor, basinFloor + .04, smoothstep(0, .76, pondDistance))
+              : lerp(basinFloor + .04, shoreline, smoothstep(.76, 1.08, pondDistance));
+            vertexY = lerp(basinTarget, vertexY, smoothstep(1.08, 1.42, pondDistance));
+          }
         }
         vertices.push([vertexX, vertexY, vertexZ]);
       }
@@ -1616,6 +1667,23 @@ export class MountainWorld extends TestWorld {
         index % 3 ? this.materials.solidIce : this.materials.snow,
         { y: index * 29, z: index % 2 ? 3 : -3 }, { castShadows: false });
       }
+      // Sparse, low opaque slush plates extend the frozen-sea read well beyond the beach
+      // while leaving most of the surface visibly liquid. Opaque ice remains depth-writing,
+      // so the global transparent ocean cannot sort in front of exposed spikes or floes.
+      for (let index = 0; index < 36; index += 1) {
+        const theta = (index * 137.5 + 6) * Math.PI / 180;
+        const radius = 38 + index % 9 * 13.5;
+        this.createPrimitive(`Frosthook offshore slush plate ${index + 1}`, 'sphere', {
+          x: x + Math.cos(theta) * radius,
+          y: OCEAN_SURFACE_Y + .035,
+          z: z + Math.sin(theta) * radius * .86
+        }, {
+          x: 1.8 + index % 5 * .72,
+          y: .035 + index % 2 * .012,
+          z: .75 + index % 4 * .42
+        }, index % 5 === 0 ? this.materials.snow : this.materials.solidIce,
+        { y: index * 47, z: index % 2 ? 1.5 : -1.5 }, { castShadows: false });
+      }
     } else if (location.id === 'veiled-athenaeum') {
       // Exterior-only destination seed: a readable archive silhouette with no interior
       // promises. Travel remains locked by registry metadata.
@@ -1646,7 +1714,7 @@ export class MountainWorld extends TestWorld {
   addHomePondBank() {
     const segments = 40;
     const outer = { x: 4.95, z: 3.95, y: .02 };
-    const inner = { x: 4.18, z: 3.23, y: -.16 };
+    const inner = { x: 4.18, z: 3.23, y: -.22 };
     const center = { x: 7.8, z: 8.25 };
     const localVertices = [];
     const worldVertices = [];
@@ -1982,6 +2050,18 @@ export class MountainWorld extends TestWorld {
       { x: 0, y: course.y, z: config.depth * .5 },
       { x: course.width, y: .27, z: .3 }, this.materials.cabinWall));
 
+    // The rear had a full rectangular wall but no matching gable infill, leaving the
+    // triangular roof end visibly open. Mirror the clean front courses on the rear plane.
+    [
+      { y: 3.585, width: 8.05 },
+      { y: 3.855, width: 6.85 },
+      { y: 4.125, width: 5.65 },
+      { y: 4.395, width: 4.45 },
+      { y: 4.665, width: 3.2 }
+    ].forEach((course, index) => this.addCabinBox(`Trail cabin rear gable course ${index + 1}`,
+      { x: 0, y: course.y, z: -config.depth * .5 },
+      { x: course.width, y: .27, z: .3 }, this.materials.cabinWall));
+
     for (const side of [-1, 1]) {
       this.addCabinBox(`Trail cabin roof ${side < 0 ? 'west' : 'east'} pitch`,
         { x: side * 2.16, y: 4.05, z: 0 }, { x: 4.85, y: .24, z: 7.65 },
@@ -2292,23 +2372,28 @@ export class MountainWorld extends TestWorld {
       const root = new pc.Entity(`Aquarium Tank ${index + 1} module`);
       root.setLocalPosition(centerX, 0, centerZ);
       this.publicAquariumRoot.addChild(root);
-      const addTankBox = (suffix, position, size, material, rotation = {}) => this.addStructureBox(
-        root, `Aquarium Tank ${index + 1} ${suffix}`, position, size, material, rotation, false
-      );
+      const collisionEntities = [];
+      const addTankBox = (suffix, position, size, material, rotation = {}, solid = false) => {
+        const entity = this.addStructureBox(
+          root, `Aquarium Tank ${index + 1} ${suffix}`, position, size, material, rotation, solid
+        );
+        if (solid) collisionEntities.push(entity);
+        return entity;
+      };
       const waterBounds = deriveAquariumWaterBounds(config);
       const glassCenterY = config.waterFloorY + config.tankHeight * .5;
       addTankBox('stone plinth', { x: 0, y: .48, z: 0 },
-        { x: config.tankWidth + .55, y: .96, z: config.tankDepth + .55 }, this.materials.deepRock);
+        { x: config.tankWidth + .55, y: .96, z: config.tankDepth + .55 }, this.materials.deepRock, {}, true);
       addTankBox('sand substrate', { x: 0, y: config.waterFloorY, z: 0 },
         { x: config.tankWidth, y: .25, z: config.tankDepth }, this.materials.waterEdge);
       addTankBox('front viewing glass', { x: 0, y: glassCenterY, z: config.tankDepth * .5 },
-        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass);
+        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass, {}, true);
       addTankBox('rear viewing glass', { x: 0, y: glassCenterY, z: -config.tankDepth * .5 },
-        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass);
+        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass, {}, true);
       addTankBox('left glass', { x: -config.tankWidth * .5, y: glassCenterY, z: 0 },
-        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass);
+        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass, {}, true);
       addTankBox('right glass', { x: config.tankWidth * .5, y: glassCenterY, z: 0 },
-        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass);
+        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass, {}, true);
       for (const side of [-1, 1]) {
         addTankBox(`${side < 0 ? 'left' : 'right'} structural frame`,
           { x: side * config.tankWidth * .5, y: glassCenterY, z: 0 },
@@ -2337,9 +2422,19 @@ export class MountainWorld extends TestWorld {
         { x: 5.6, y: 1.05, z: .14 }, labelMaterial);
       label._labelText = `Tank ${index + 1}`;
       label._labelMaterial = labelMaterial;
+      const interaction = {
+        id: `aquarium-tank-${index + 1}`,
+        label: 'MANAGE AQUARIUM COLLECTION',
+        action: 'aquarium',
+        position: this.aquariumPoint(centerX, .6, centerZ + config.tankDepth * .5 + 1.25),
+        range: config.interactionDistance,
+        enabled: index === 0
+      };
+      this.homeInteractions.push(interaction);
       root.enabled = index === 0;
+      if (!root.enabled) for (const entity of collisionEntities) this.syncStructureCollider(entity, false);
       this.aquariumTankRoots.push(root);
-      this.aquariumTankCells.push({ root, label, waterBounds, centerX, centerZ });
+      this.aquariumTankCells.push({ root, label, interaction, collisionEntities, waterBounds, centerX, centerZ });
       this.aquariumTankLabels.push(label);
     }
 
@@ -2385,13 +2480,17 @@ export class MountainWorld extends TestWorld {
     const galleryColumns = layoutCount <= 4 ? layoutCount : Math.ceil(layoutCount / 2);
     this.aquariumTankRoots?.forEach((root, index) => {
       root.enabled = index < layoutCount;
-      if (!root.enabled) return;
+      const cell = this.aquariumTankCells[index];
+      cell.interaction.enabled = root.enabled;
+      if (!root.enabled) {
+        for (const entity of cell.collisionEntities) this.syncStructureCollider(entity, false);
+        return;
+      }
       const row = layoutCount <= 4 ? 0 : Math.floor(index / galleryColumns);
       const countInRow = layoutCount <= 4 ? layoutCount : Math.min(galleryColumns, layoutCount - row * galleryColumns);
       const column = layoutCount <= 4 ? index : index % galleryColumns;
       const desiredX = (column - (countInRow - 1) * .5) * PUBLIC_AQUARIUM_CONFIG.tankSpacingX;
       const desiredZ = layoutCount <= 4 ? 0 : (row === 0 ? -1 : 1) * PUBLIC_AQUARIUM_CONFIG.tankRowZ;
-      const cell = this.aquariumTankCells[index];
       root.setLocalPosition(desiredX, 0, desiredZ);
       cell.centerX = desiredX;
       cell.centerZ = desiredZ;
@@ -2399,6 +2498,10 @@ export class MountainWorld extends TestWorld {
       cell.label.setLocalPosition(0, PUBLIC_AQUARIUM_CONFIG.waterlineY + .72,
         viewSide * (PUBLIC_AQUARIUM_CONFIG.tankDepth * .5 + .2));
       cell.label.setLocalEulerAngles(0, viewSide > 0 ? 0 : 180, 0);
+      for (const entity of cell.collisionEntities) this.syncStructureCollider(entity, true);
+      cell.interaction.position = this.aquariumPoint(
+        desiredX, .6, desiredZ + viewSide * (PUBLIC_AQUARIUM_CONFIG.tankDepth * .5 + 1.25)
+      );
     });
     this.aquariumTankLabels?.forEach((label, index) => {
       const text = multiplayerDisplays ? (displays[index]?.owner || `Player ${index + 1}`) : `Tank ${index + 1}`;
@@ -2512,6 +2615,7 @@ export class MountainWorld extends TestWorld {
     let nearest = null;
     let nearestDistance = maximumDistance;
     for (const interaction of this.homeInteractions ?? []) {
+      if (interaction.enabled === false) continue;
       if (![interaction.position?.x, interaction.position?.y, interaction.position?.z].every(Number.isFinite)) continue;
       const distance = interaction.distanceTo
         ? interaction.distanceTo(point)
@@ -3188,11 +3292,10 @@ export class MountainWorld extends TestWorld {
     const innerRadius = TERRAIN_OUTER_RADIUS;
     const waterEdge = OCEAN_WATER_INNER_RADIUS;
     const outerRadius = OCEAN_FLOOR_OUTER_RADIUS;
-    const ringRadii = [innerRadius, OCEAN_SEABED_JOIN_RADIUS + 2.5, waterEdge];
-    for (let radius = waterEdge + 5; radius < Math.min(360, outerRadius); radius += 5) ringRadii.push(radius);
-    for (const radius of [420, 520, 650, 800, 1000, 1250, 1500, outerRadius]) {
-      if (radius > ringRadii.at(-1) && radius <= outerRadius) ringRadii.push(radius);
-    }
+    // A dense shared shoreline profile avoids a capsule-catching chord between the old
+    // 210.5 m seam and the 221 m water edge. It is still the same continuous collider;
+    // there is no new safety wall, and the deep-ocean hazard remains much farther out.
+    const ringRadii = createOceanShelfRingRadii(outerRadius);
     const vertices = [];
     const ringStarts = [];
     const segments = TERRAIN_SEGMENTS;

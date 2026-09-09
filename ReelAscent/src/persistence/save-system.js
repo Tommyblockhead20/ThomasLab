@@ -602,6 +602,11 @@ export class SaveSystem {
   selectSlot(id) {
     const slot = this.slotStore.slots.find((entry) => entry.id === id && entry.data);
     if (!slot) return false;
+    if (slot.id === this.activeSlotId) return true;
+    // SaveSystem is also used outside PauseMenu. Persist the complete current payload here
+    // instead of relying on one UI caller to flush before changing the active reference.
+    // This closes the last path where in-memory appearance/progression could be abandoned.
+    if (!this.save()) return false;
     const previous = this.activeSlotId;
     this.activeSlotId = slot.id;
     this.slotStore.activeSlotId = slot.id;
