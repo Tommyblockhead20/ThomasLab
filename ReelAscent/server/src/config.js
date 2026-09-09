@@ -9,6 +9,8 @@ export const SERVER_CONFIG = Object.freeze({
   reconnectWindowMs: integer(process.env.RECONNECT_WINDOW_MS, 25_000, 5_000, 120_000),
   heartbeatIntervalMs: integer(process.env.HEARTBEAT_INTERVAL_MS, 15_000, 5_000, 60_000),
   maxPayloadBytes: integer(process.env.MAX_PAYLOAD_BYTES, 32 * 1024, 4096, 256 * 1024),
+  databaseUrl: String(process.env.DATABASE_URL ?? '').trim(),
+  databaseSsl: String(process.env.DATABASE_SSL ?? '').trim().toLowerCase() === 'require',
   allowedOrigins: String(process.env.ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((value) => value.trim())

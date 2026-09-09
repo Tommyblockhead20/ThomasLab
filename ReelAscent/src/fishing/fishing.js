@@ -652,14 +652,8 @@ export class FishingController {
     this.hookTutorialSeen = hasSeenHookTutorial();
     this.showHookTutorial = false;
     this.biteSplashTimer = 0;
+    this.lastCastCharge = .65;
     this.buildVisuals();
-    this.catchContinueQueued = false;
-    this.onCatchContinueKeyDown = (event) => {
-      if (this.state !== 'caught' || event.repeat || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      this.catchContinueQueued = true;
-    };
     this.onDebugKeyDown = (event) => {
       if (event.repeat) return;
       const targetTag = event.target?.tagName?.toLowerCase?.() ?? '';
@@ -736,7 +730,6 @@ export class FishingController {
         this.refreshGalleryFish();
       }
     };
-    window.addEventListener('keydown', this.onCatchContinueKeyDown, true);
     window.addEventListener('keydown', this.onDebugKeyDown);
   }
 
@@ -1867,17 +1860,15 @@ export class FishingController {
         break;
       case 'caught':
         this.updateCaughtVisual();
-        // Successful catches are inspection moments with no timeout. Arrow keys are the
-        // primary mouse-free continue input; a primary mouse/grip click is a secondary option.
-        // The capture listener consumes arrow keydown before movement/fishing handlers see it.
-        if (this.catchContinueQueued || pressed) {
-          this.catchContinueQueued = false;
-          this.resetForNextCast('Ready to cast');
-        }
         break;
       case 'result':
-        this.resultTimer -= dt;
-        if (pressed || hookPressed || castPressed || this.resultTimer <= 0) this.resetForNextCast('Ready for another cast');
+        // A completed song failure is a real result state and waits for an explicit shared
+        // result action. Non-song notices (dry casts, missed hooks, bobber refusal) retain
+        // their short legacy reset behavior because there is no song to rate.
+        if (!this.lastSongFeedback) {
+          this.resultTimer -= dt;
+          if (pressed || hookPressed || castPressed || this.resultTimer <= 0) this.resetForNextCast('Ready for another cast');
+        }
         break;
       default:
         break;
@@ -1888,6 +1879,7 @@ export class FishingController {
   startCast() {
     const maximumCastDistance = this.config.maximumCastDistance
       * (this.progression?.getModifier('castDistance') ?? 1);
+    this.lastCastCharge = Math.max(.08, this.charge || this.lastCastCharge || .65);
     const distance = this.config.minimumCastDistance
       + this.charge * (maximumCastDistance - this.config.minimumCastDistance);
     const start = this.getRodTipPosition();
@@ -2248,7 +2240,9 @@ export class FishingController {
       showRecastHint
     };
     this.lastSongFeedback = songId ? {
+      speciesId: this.selectedFish.speciesId,
       songId,
+      songRevision: this.rhythm?.pattern?.songRevision ?? 1,
       speciesName: this.selectedFish.name,
       outcome: 'caught'
     } : null;
@@ -2256,8 +2250,8 @@ export class FishingController {
     this.rhythmDebugAttempt = this.rhythm?.getDebugState() ?? this.rhythmDebugAttempt;
     this.rhythm = null;
     this.resultTimer = 0;
-    this.catchContinueQueued = false;
-    this.setState('caught', ownership?.ok ? 'Added to Inventory • press any arrow to continue' : 'Catch landed • press any arrow to continue');
+    this.player.input.clearTouchActions?.();
+    this.setState('caught', ownership?.ok ? 'Added to Inventory' : 'Catch landed');
     this.rodRoot.enabled = false;
     this.lineEntity.enabled = false;
     this.bobberRoot.enabled = false;
@@ -2268,16 +2262,21 @@ export class FishingController {
   loseFish(message, failureReason = this.rhythm?.getFailureReason() ?? 'fish escaped') {
     this.lastFishingFailure = failureReason;
     const songId = this.rhythm?.pattern?.songId ?? null;
+    const speciesId = this.selectedFish?.speciesId ?? null;
     const speciesName = this.selectedFish?.name ?? 'Unknown creature';
+    const songRevision = this.rhythm?.pattern?.songRevision ?? 1;
     this.recordPerformanceEncounter('escaped');
     this.player.input.endRhythmCapture();
     this.selectedFish = null;
     this.rhythmDebugAttempt = this.rhythm?.getDebugState() ?? this.rhythmDebugAttempt;
     this.rhythm = null;
-    this.lastSongFeedback = songId ? { songId, speciesName, outcome: 'escaped' } : null;
+    this.lastSongFeedback = songId && speciesId
+      ? { speciesId, songId, songRevision, speciesName, outcome: 'escaped' }
+      : null;
     this.rhythmStartup = null;
     this.showHookTutorial = false;
     this.resultTimer = this.config.resultHoldSeconds;
+    this.player.input.clearTouchActions?.();
     this.setState('result', message);
     this.lineEntity.enabled = false;
     this.bobberRoot.enabled = false;
@@ -2291,6 +2290,7 @@ export class FishingController {
     this.player.input.endRhythmCapture();
     this.rhythm = null;
     this.catchCard = null;
+    this.lastSongFeedback = null;
     this.cast = null;
     this.charge = 0;
     this.castInputHeld = this.player.input.fishingCastHeld;
@@ -2300,6 +2300,22 @@ export class FishingController {
     this.hideWaterVisuals();
     this.showIdleLine();
     this.setState('ready', message);
+  }
+
+  get resultActive() {
+    return Boolean(this.lastSongFeedback && ['caught', 'result'].includes(this.state));
+  }
+
+  performResultAction(action) {
+    if (!this.resultActive || !['recast', 'stay'].includes(action)) return false;
+    const recastCharge = this.lastCastCharge;
+    this.resetForNextCast(action === 'recast' ? 'Recasting…' : 'Ready to cast');
+    if (action === 'recast') {
+      this.charge = recastCharge;
+      this.startCast();
+      return true;
+    }
+    return true;
   }
 
   setActiveCatchRig(key) {
@@ -3240,6 +3256,7 @@ export class FishingController {
       } : null,
       catchCard: this.catchCard,
       songFeedback: this.lastSongFeedback,
+      resultActive: this.resultActive,
       gallery: this.gallery.active ? {
         mode: this.gallery.mode,
         index: this.gallery.mode === 'models' ? this.gallery.modelIndex + 1 : this.gallery.speciesIndex + 1,
@@ -3256,7 +3273,6 @@ export class FishingController {
   }
 
   destroy() {
-    window.removeEventListener('keydown', this.onCatchContinueKeyDown, true);
     window.removeEventListener('keydown', this.onDebugKeyDown);
     delete window.REEL_ASCENT_CREATURE_GALLERY;
     document.body.classList.remove('fish-gallery');

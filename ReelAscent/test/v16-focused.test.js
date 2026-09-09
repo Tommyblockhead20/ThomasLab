@@ -113,7 +113,7 @@ test('v16 UI source has consolidated mobile actions and rebuilt Aquarium hierarc
   assert.match(movement, /effectiveAction === 'grip'/);
   assert.match(journal, /onMobilePointerDown/);
   assert.match(inventory, /onMobilePointerDown/);
-  assert.match(styles, /\.journal-mobile-button[\s\S]{0,500}pointer-events: auto/);
+  assert.match(styles, /\.mobile-utility-cluster[\s\S]{0,900}pointer-events: auto/);
   assert.match(aquarium, /aquarium-summary-row/);
   assert.match(aquarium, /aquarium-desktop-layout/);
   assert.match(aquarium, /aquarium-tank-rail/);

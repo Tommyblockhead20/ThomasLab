@@ -1,7 +1,7 @@
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 import { formatInputCode } from '../player/movement.js';
 import { GAME_VERSION } from '../version.js';
-import { SongVoteStore } from '../fishing/song-votes.js';
+import { SongVoteStore, songVoteKey } from '../fishing/song-votes.js';
 
 function formatRunTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
@@ -9,9 +9,12 @@ function formatRunTime(seconds) {
 }
 
 const DEBUG_LANE_LABELS = Object.freeze({ A: 'LEFT', W: 'UP', S: 'DOWN', D: 'RIGHT' });
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[character]);
 
 export class Hud {
-  constructor() {
+  constructor(voterId = '') {
     const version = document.querySelector('#pause-version');
     if (version) version.textContent = GAME_VERSION;
     this.root = document.querySelector('#hud');
@@ -55,18 +58,35 @@ export class Hud {
     this.catchQualityStars = document.querySelector('#catch-quality-stars');
     this.catchRecord = document.querySelector('#catch-record');
     this.catchHint = document.querySelector('#catch-hint');
+    this.fishingResultControls = document.querySelector('#fishing-result-controls');
+    this.fishingResultTitle = document.querySelector('#fishing-result-title');
     this.songFeedback = document.querySelector('#song-feedback');
-    this.songVoteStore = new SongVoteStore();
-    this.onSongFeedbackClick = (event) => {
-      const button = event.target.closest?.('[data-song-vote]');
-      const songId = this.songFeedback?.dataset.songId;
-      if (!button || !songId) return;
+    this.songFeedbackSummary = document.querySelector('#song-feedback-summary');
+    this.songVoteStore = new SongVoteStore(null, voterId);
+    this.songAggregates = new Map();
+    this.resultActionHandler = () => false;
+    this.feedbackPending = false;
+    this.feedbackError = '';
+    this.allowVoteChange = false;
+    this.currentSongFeedback = null;
+    this.currentSongFeedbackKey = '';
+    this.onFishingResultPointerDown = (event) => {
+      const button = event.target.closest?.('[data-fishing-result-action]');
+      if (!button || this.fishingResultControls?.hidden) return;
       event.preventDefault();
       event.stopPropagation();
-      this.songVoteStore.toggle(songId, button.dataset.songVote);
-      this.renderSongFeedbackSelection(songId);
+      const action = button.dataset.fishingResultAction;
+      if (action === 'vote-change') {
+        this.allowVoteChange = true;
+        this.feedbackError = '';
+        this.renderSongFeedback(this.currentSongFeedback);
+        return;
+      }
+      if (this.feedbackPending || (['up', 'down'].includes(action) && !this.canRateSong(this.currentSongFeedback))) return;
+      if (action === 'clear-vote' && !this.songVoteStore.hasRated(this.currentSongFeedback)) return;
+      this.resultActionHandler(action);
     };
-    this.songFeedback?.addEventListener('click', this.onSongFeedbackClick);
+    this.fishingResultControls?.addEventListener('pointerdown', this.onFishingResultPointerDown);
     this.mobileControls = document.querySelector('#mobile-controls');
     this.touchContextAction = document.querySelector('#touch-context-action');
     this.touchMovementAction = document.querySelector('#touch-movement-action');
@@ -87,6 +107,9 @@ export class Hud {
     this.smoothedFps = 60;
     this.lastTouchContextLabel = '';
     this.lastTouchMovementLabel = '';
+    this.mobileDirectionButtons = Object.fromEntries(['up', 'down', 'left', 'right'].map((direction) => [
+      direction, document.querySelector(`[data-touch-action="${direction}"]`)
+    ]));
 
     this.onKeyDown = (event) => {
       if (event.code !== 'F3' || event.repeat || !isCheatsEnabled()) return;
@@ -275,7 +298,10 @@ export class Hud {
     } else {
       this.rhythmPanel.hidden = true;
     }
-    if (this.mobileControls) this.mobileControls.dataset.mode = matchingMovement ? 'rhythm' : 'movement';
+    const fishingResultActive = Boolean(playerState.fishing.resultActive);
+    if (this.mobileControls) this.mobileControls.dataset.mode = matchingMovement
+      ? 'rhythm'
+      : fishingResultActive ? 'result' : 'movement';
     if (rhythm) {
       this.rhythmBpm.textContent = `${rhythm.bpm} BPM`;
       this.rhythmJudgment.textContent = rhythm.judgment;
@@ -328,19 +354,23 @@ export class Hud {
         this.catchRecord.hidden = !catchData.newRecord;
         this.catchRecord.textContent = 'NEW RECORD';
         this.catchHint.hidden = false;
-        this.catchHint.textContent = catchData.addedToInventory ? 'ADDED TO INVENTORY • Press any arrow to continue • Click also works' : '';
+        this.catchHint.textContent = catchData.addedToInventory ? 'ADDED TO INVENTORY' : '';
         this.catchHint.hidden = !this.catchHint.textContent;
       }
     }
-    const songFeedback = playerState.fishing.songFeedback;
-    const feedbackVisible = Boolean(songFeedback?.songId
-      && ['caught', 'result'].includes(playerState.fishing.state));
-    this.songFeedback.hidden = !feedbackVisible;
-    if (feedbackVisible) {
-      this.songFeedback.dataset.songId = songFeedback.songId;
-      this.songFeedback.title = `${songFeedback.speciesName} • ${songFeedback.songId}`;
-      this.renderSongFeedbackSelection(songFeedback.songId);
-    } else if (this.songFeedback) delete this.songFeedback.dataset.songId;
+    const songFeedback = fishingResultActive ? playerState.fishing.songFeedback : null;
+    this.fishingResultControls.hidden = !fishingResultActive;
+    if (fishingResultActive) {
+      this.fishingResultTitle.textContent = songFeedback?.outcome === 'escaped' ? 'FAILED TO CATCH' : 'CATCH LANDED';
+      this.renderSongFeedback(songFeedback);
+    } else {
+      this.currentSongFeedback = null;
+      this.currentSongFeedbackKey = '';
+      this.feedbackPending = false;
+      this.feedbackError = '';
+      this.allowVoteChange = false;
+    }
+    this.renderMobileDirections(fishingResultActive, songFeedback);
     this.staminaPanel.hidden = playerState.fishing.state !== 'inactive';
     this.staminaFill.style.transform = `scaleX(${playerState.stamina})`;
     this.staminaValue.textContent = String(percentage);
@@ -496,12 +526,93 @@ export class Hud {
     return true;
   }
 
-  renderSongFeedbackSelection(songId) {
-    const selected = this.songVoteStore.get(songId);
-    for (const button of this.songFeedback?.querySelectorAll('[data-song-vote]') ?? []) {
-      const active = button.dataset.songVote === selected;
-      button.classList.toggle('is-selected', active);
-      button.setAttribute('aria-pressed', String(active));
+  setFishingResultActionHandler(handler) {
+    this.resultActionHandler = typeof handler === 'function' ? handler : () => false;
+  }
+
+  canRateSong(feedback) {
+    return Boolean(feedback?.songId && !this.feedbackPending
+      && (!this.songVoteStore.hasRated(feedback) || this.allowVoteChange));
+  }
+
+  beginSongVote(feedback) {
+    if (this.feedbackPending || !feedback?.songId) return false;
+    this.feedbackPending = true;
+    this.feedbackError = '';
+    this.renderSongFeedback(feedback);
+    return true;
+  }
+
+  confirmSongVote(feedback, vote, aggregate = null) {
+    this.songVoteStore.set(feedback, vote);
+    if (aggregate) this.setSongAggregate(aggregate);
+    this.feedbackPending = false;
+    this.feedbackError = '';
+    this.allowVoteChange = false;
+    this.renderSongFeedback(feedback);
+  }
+
+  setSongVoteError(message = "Feedback couldn't be saved.") {
+    this.feedbackPending = false;
+    this.feedbackError = String(message || "Feedback couldn't be saved.");
+    this.renderSongFeedback(this.currentSongFeedback);
+  }
+
+  setSongAggregate(aggregate) {
+    const key = songVoteKey(aggregate);
+    if (!key) return false;
+    this.songAggregates.set(key, { ...aggregate });
+    if (key === this.currentSongFeedbackKey) this.renderSongFeedback(this.currentSongFeedback);
+    return true;
+  }
+
+  renderSongFeedback(feedback) {
+    const key = songVoteKey(feedback) ?? '';
+    if (key !== this.currentSongFeedbackKey) {
+      this.currentSongFeedbackKey = key;
+      this.feedbackPending = false;
+      this.feedbackError = '';
+      this.allowVoteChange = false;
+    }
+    this.currentSongFeedback = feedback;
+    if (!key || !this.songFeedback || !this.songFeedbackSummary) return;
+    const currentVote = this.songVoteStore.get(feedback);
+    const asking = !currentVote || this.allowVoteChange;
+    this.songFeedback.hidden = !asking;
+    this.songFeedback.title = `${feedback.speciesName} • ${feedback.songId} • revision ${feedback.songRevision}`;
+    for (const button of this.songFeedback.querySelectorAll('[data-fishing-result-action]')) {
+      button.classList.toggle('is-pending', this.feedbackPending);
+      button.disabled = this.feedbackPending;
+      if (button.dataset.fishingResultAction === 'clear-vote') button.hidden = !this.allowVoteChange || !currentVote;
+    }
+    const aggregate = this.songAggregates.get(key);
+    const aggregateText = aggregate
+      ? `<span><strong>${Math.round(Number(aggregate.approvalPercent) || 0)}% liked</strong> • ${Number(aggregate.totalVotes) || 0} votes • ${Number(aggregate.upVotes) || 0} 👍 / ${Number(aggregate.downVotes) || 0} 👎</span>`
+      : '<span>Live totals loading…</span>';
+    this.songFeedbackSummary.hidden = !currentVote && !this.feedbackError;
+    this.songFeedbackSummary.innerHTML = this.feedbackError
+      ? `<span>${escapeHtml(this.feedbackError)}</span>`
+      : currentVote ? `<span><strong>YOU: ${currentVote === 'up' ? '👍' : '👎'}</strong></span>${aggregateText}<button type="button" data-fishing-result-action="vote-change">CHANGE</button>` : '';
+    if (this.mobileControls) this.mobileControls.dataset.rated = String(Boolean(currentVote && !this.allowVoteChange));
+  }
+
+  renderMobileDirections(resultActive, feedback) {
+    const ordinary = {
+      up: ['↑', 'Move forward or rhythm up'], down: ['↓', 'Move backward or rhythm down'],
+      left: ['←', 'Move left or rhythm left'], right: ['→', 'Move right or rhythm right']
+    };
+    const result = {
+      up: ['↑<small>RECAST</small>', 'Recast'], down: ['↓<small>STAY</small>', 'Stay fishing'],
+      left: ['←<small>DISLIKE</small>', 'Dislike song'], right: ['→<small>LIKE</small>', 'Like song']
+    };
+    for (const [direction, button] of Object.entries(this.mobileDirectionButtons ?? {})) {
+      if (!button) continue;
+      const [markup, label] = (resultActive ? result : ordinary)[direction];
+      button.innerHTML = markup;
+      button.setAttribute('aria-label', label);
+    }
+    if (resultActive && this.mobileControls) {
+      this.mobileControls.dataset.rated = String(Boolean(this.songVoteStore.hasRated(feedback) && !this.allowVoteChange));
     }
   }
 
@@ -515,7 +626,7 @@ export class Hud {
 
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
-    this.songFeedback?.removeEventListener('click', this.onSongFeedbackClick);
+    this.fishingResultControls?.removeEventListener('pointerdown', this.onFishingResultPointerDown);
     document.body.classList.remove('debug-visible');
     document.body.classList.remove('fish-danger');
     this.rockDebugLabel?.remove();

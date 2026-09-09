@@ -3,6 +3,8 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { COLORS, PLAYER_CONFIG } from './config.js';
 import { OrbitCamera } from './camera/orbit-camera.js';
 import { FishingController } from './fishing/fishing.js';
+import { fishingResultActionForDirection } from './fishing/result-actions.js';
+import { songVoteKey } from './fishing/song-votes.js';
 import { FISH_SPECIES } from './fishing/fish-data.js';
 import { SaveSystem } from './persistence/save-system.js';
 import { ProgressionSystem } from './progression/progression.js';
@@ -35,6 +37,7 @@ import { TrailBadgeSystem } from './progression/trail-badges.js';
 import { TrailBadgeMenu } from './ui/trail-badges.js';
 import { TutorialSystem } from './tutorial/tutorial-system.js';
 import { OceanSharkHazard } from './world/ocean-shark-hazard.js';
+import { SongFeedbackDashboard } from './ui/song-feedback-dashboard.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -104,8 +107,8 @@ export class Game {
     this.mobileContextState = { current: null, candidate: null, candidateSince: 0, lastSeenAt: 0 };
     this.rockDebugEnabled = false;
     this.rockDebugTarget = null;
-    this.hud = new Hud();
     this.saveSystem = new SaveSystem();
+    this.hud = new Hud(this.saveSystem.multiplayerPlayerId);
     this.progression = new ProgressionSystem(this.saveSystem);
     this.tutorials = new TutorialSystem(this.saveSystem, this.hud);
     this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
@@ -186,6 +189,11 @@ export class Game {
     this.multiplayer.room.setLocalLocationId?.(this.currentLocationId);
     this.onMultiplayerMessage = (event) => this.handleMultiplayerMessage(event.detail);
     this.multiplayer.addEventListener('message', this.onMultiplayerMessage);
+    this.onSongVoteAggregate = (event) => this.hud.setSongAggregate(event.detail);
+    this.multiplayer.addEventListener('songvoteaggregate', this.onSongVoteAggregate);
+    this.lastSongVoteQueryKey = '';
+    this.songFeedbackDashboard = new SongFeedbackDashboard(this.multiplayer);
+    this.hud.setFishingResultActionHandler((action) => this.performFishingResultAction(action));
     this.multiplayerMenu = new MultiplayerMenu(this.multiplayer);
     this.player.setFishingController(this.fishing);
     this.runManager = new RunManager(
@@ -244,6 +252,30 @@ export class Game {
       event.preventDefault();
       event.stopImmediatePropagation();
     };
+    this.onFishingResultKeyDown = (event) => {
+      if (event.repeat || this.isEditableTarget(event.target) || !this.fishing.resultActive) return;
+      const action = fishingResultActionForDirection(event.code);
+      if (!action) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.performFishingResultAction(action);
+    };
+    this.onFishingResultPointerDown = (event) => {
+      if (!this.fishing.resultActive || event.button > 0) return;
+      const direction = event.target.closest?.('[data-touch-action]')?.dataset.touchAction;
+      const action = fishingResultActionForDirection(direction);
+      if (!action) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      this.performFishingResultAction(action);
+    };
+    this.mobilePauseButton = document.querySelector('#mobile-pause');
+    this.onMobilePausePointerDown = (event) => {
+      if (event.button > 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.setLocalPause(true);
+    };
     this.onDebugKeyDown = (event) => {
       if (event.repeat || !isCheatsEnabled()) return;
       if (this.isEditableTarget(event.target)) return;
@@ -254,6 +286,11 @@ export class Game {
           ? 'COSMETIC TEST MODE — ALL UNLOCKED'
           : 'Cosmetic Test Mode disabled', 3);
         this.appearanceMenu.update();
+        return;
+      }
+      if (event.code === 'F5' && event.shiftKey) {
+        event.preventDefault();
+        void this.songFeedbackDashboard.toggle();
         return;
       }
       if (event.code === 'F5') {
@@ -280,7 +317,10 @@ export class Game {
     window.addEventListener('resize', this.onResize);
     window.addEventListener('keydown', this.onPauseKeyDown, true);
     window.addEventListener('keydown', this.onPausedGameplayKeyDown, true);
+    window.addEventListener('keydown', this.onFishingResultKeyDown, true);
+    window.addEventListener('pointerdown', this.onFishingResultPointerDown, true);
     window.addEventListener('keydown', this.onDebugKeyDown, true);
+    this.mobilePauseButton?.addEventListener('pointerdown', this.onMobilePausePointerDown);
 
     this.app.on('update', (rawDt) => this.update(Math.min(rawDt, 0.05)));
     this.app.start();
@@ -323,9 +363,11 @@ export class Game {
       getLocalSongVotes: () => this.hud.songVoteStore.exportSummary(),
       getTransientSession: () => describeTransientSession(this)
     });
-    const devUiPreview = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('ui') : null;
-    if (devUiPreview === 'aquarium') globalThis.setTimeout(() => this.aquariumMenu.open(), 0);
-    if (devUiPreview === 'appearance') globalThis.setTimeout(() => this.appearanceMenu.open(), 0);
+    this.devUiPreview = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('ui') : null;
+    if (this.devUiPreview === 'aquarium') globalThis.setTimeout(() => this.aquariumMenu.open(), 0);
+    if (this.devUiPreview === 'appearance') globalThis.setTimeout(() => this.appearanceMenu.open(), 0);
+    if (this.devUiPreview === 'song-feedback') globalThis.setTimeout(() => this.songFeedbackDashboard.open(), 0);
+    this.ensureDeveloperFishingResultPreview();
   }
 
   createLighting() {
@@ -417,6 +459,17 @@ export class Game {
     this.syncMultiplayerCatchPresentation();
     this.updateRemoteCatchNotices();
     this.fishing.updateDebug(dt);
+    const songFeedback = this.fishing.lastSongFeedback;
+    const feedbackKey = songVoteKey(songFeedback) ?? '';
+    if (feedbackKey !== this.lastSongVoteQueryKey) {
+      this.lastSongVoteQueryKey = feedbackKey;
+      if (feedbackKey && this.hud.songVoteStore.hasRated(songFeedback)) {
+        const savedVote = this.hud.songVoteStore.get(songFeedback);
+        this.multiplayer.submitSongVote(songFeedback, savedVote)
+          .then((aggregate) => this.hud.confirmSongVote(songFeedback, savedVote, aggregate))
+          .catch(() => this.hud.setSongVoteError("Live feedback totals couldn't be loaded."));
+      }
+    }
     this.fishingPerformance.update(this.fishing.getFishingPerformanceState());
     const heldSpecimen = this.progression.getHeldInventorySpecimen();
     if ((this.player.heldInventorySpecimen?.specimenId ?? null) !== (heldSpecimen?.specimenId ?? null)) {
@@ -433,7 +486,25 @@ export class Game {
     this.appearanceMenu.update();
     this.ecologyGuide.update();
     this.camera.update(dt);
+    // Fishing's own initialization/update callbacks may run after Game construction.
+    // Reassert only the opt-in development fixture so narrow-screen result UI checks
+    // remain deterministic without altering production fishing state.
+    this.ensureDeveloperFishingResultPreview();
     this.hud.update(dt, this.getState());
+  }
+
+  ensureDeveloperFishingResultPreview() {
+    if (!['fishing-result-success', 'fishing-result-failure'].includes(this.devUiPreview)
+      || this.fishing.resultActive) return;
+    const failed = this.devUiPreview.endsWith('failure');
+    this.fishing.lastSongFeedback = {
+      speciesId: 'bluegill',
+      speciesName: 'Bluegill',
+      songId: 'song:bluegill:authored-1',
+      songRevision: 1,
+      outcome: failed ? 'escaped' : 'caught'
+    };
+    this.fishing.setState('result', failed ? 'The fish broke the rhythm and escaped' : 'Catch landed');
   }
 
   isEditableTarget(target) {
@@ -450,7 +521,7 @@ export class Game {
     return this.journal.isOpen || this.inventory.isOpen || this.multiplayerMenu.isOpen
       || this.mapMenu.isOpen || this.emoteMenu.isOpen || this.appearanceMenu.isOpen
       || this.shopMenu.isOpen || this.aquariumMenu.isOpen || this.boatTravel.isOpen
-      || this.trailBadgeMenu.isOpen;
+      || this.trailBadgeMenu.isOpen || this.songFeedbackDashboard?.isOpen;
   }
 
   hasEscapePriorityState() {
@@ -475,6 +546,24 @@ export class Game {
     this.localPause.openedAt = null;
     this.multiplayerMenu?.close();
     this.pauseMenu?.setOpen(false);
+  }
+
+  performFishingResultAction(action) {
+    if (!this.fishing.resultActive) return false;
+    if (action === 'recast' || action === 'stay') return this.fishing.performResultAction(action);
+    const clearing = action === 'clear-vote';
+    if ((!['up', 'down'].includes(action) && !clearing)
+      || (!clearing && !this.hud.canRateSong(this.fishing.lastSongFeedback))) return false;
+    const feedback = { ...this.fishing.lastSongFeedback };
+    const vote = clearing ? null : action;
+    if (!this.hud.beginSongVote(feedback)) return false;
+    this.multiplayer.submitSongVote(feedback, vote)
+      .then((aggregate) => this.hud.confirmSongVote(feedback, vote, aggregate))
+      .catch(() => {
+        this.hud.setSongVoteError("Feedback couldn't be saved.");
+        this.hud.showToast?.("Feedback couldn't be saved. Fishing is unaffected.", 3);
+      });
+    return true;
   }
 
   setCurrentLocation(locationId, coordinateSpace = 'global-world') {
@@ -887,6 +976,7 @@ export class Game {
     this.boatTravel.destroy();
     this.trailBadgeMenu.destroy();
     this.pauseMenu?.destroy();
+    this.songFeedbackDashboard?.destroy();
     window.removeEventListener('reel-ascent:open-boat', this.onOpenBoat);
     this.appearanceMenu.destroy();
     this.homeInteraction.destroy();
@@ -894,6 +984,7 @@ export class Game {
     this.emoteMenu.destroy();
     this.multiplayerMenu.destroy();
     this.multiplayer.removeEventListener('message', this.onMultiplayerMessage);
+    this.multiplayer.removeEventListener('songvoteaggregate', this.onSongVoteAggregate);
     this.multiplayer.destroy();
     this.camera.destroy();
     this.runManager.destroy();
@@ -903,7 +994,10 @@ export class Game {
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onPauseKeyDown, true);
     window.removeEventListener('keydown', this.onPausedGameplayKeyDown, true);
+    window.removeEventListener('keydown', this.onFishingResultKeyDown, true);
+    window.removeEventListener('pointerdown', this.onFishingResultPointerDown, true);
     window.removeEventListener('keydown', this.onDebugKeyDown, true);
+    this.mobilePauseButton?.removeEventListener('pointerdown', this.onMobilePausePointerDown);
     cheatGate.destroy();
     delete window.__reelAscent;
     this.app.destroy();

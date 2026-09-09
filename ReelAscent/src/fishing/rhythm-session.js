@@ -13,6 +13,10 @@ export const RHYTHM_SCALE_DEGREES = Object.freeze({
 export const RHYTHM_SCALE_SEMITONES = Object.freeze([0, 2, 4, 5, 7, 9, 11, 12]);
 export const SHINY_LANE_MIRROR = Object.freeze({ A: 'D', D: 'A', W: 'S', S: 'W' });
 
+// Increment an entry only when that species' authored song is materially changed. Old
+// revisions remain separate in durable feedback storage instead of being overwritten.
+export const SONG_REVISION_BY_SPECIES = Object.freeze({});
+
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const between = (range, rng) => range[0] + (range[1] - range[0]) * rng();
 
@@ -60,6 +64,11 @@ function speciesKey(fish) {
   return String(fish.canonicalId ?? fish.speciesId ?? fish.id ?? '')
     .trim().toLowerCase().replace(/[\s-]+/g, '_');
 }
+
+export const songRevisionForSpecies = (fish) => {
+  const id = speciesKey(fish);
+  return Math.max(1, Math.floor(Number(fish?.songRevision ?? SONG_REVISION_BY_SPECIES[id]) || 1));
+};
 
 function groupRhythmEvents(events) {
   const groups = [];
@@ -423,6 +432,7 @@ export function generateRhythmPattern(fish, rng = Math.random, config = RHYTHM_C
   const finalNote = notes.at(-1);
   return {
     songId: `song:${fish.canonicalId ?? fish.speciesId ?? fish.id}:authored-${motifIndex + 1}`,
+    songRevision: songRevisionForSpecies(fish),
     bpm,
     interNoteGap,
     motifIndex,

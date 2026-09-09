@@ -1,4 +1,4 @@
-import { MESSAGE_TYPES, parseMessage, sendError } from './protocol.js';
+import { MESSAGE_TYPES, parseMessage, send, sendError } from './protocol.js';
 import { PlayerSession } from './player-session.js';
 import { validateSnapshot } from './snapshot-validation.js';
 
@@ -6,11 +6,13 @@ const safeString = (value, max = 100) => typeof value === 'string' ? value.slice
 const safeDisplayName = (value) => safeString(value, 18).replace(/\s+/g, ' ').trim();
 
 export class ClientConnection {
-  constructor(socket, roomManager) {
+  constructor(socket, roomManager, { songVoteStore = null, broadcastSongAggregate = () => {} } = {}) {
     this.socket = socket;
     this.roomManager = roomManager;
     this.session = null;
     this.closed = false;
+    this.songVoteStore = songVoteStore;
+    this.broadcastSongAggregate = broadcastSongAggregate;
     this.malformedLimiter = null;
 
     socket.on('message', (raw) => this.handleRawMessage(raw));
@@ -18,10 +20,10 @@ export class ClientConnection {
     socket.on('error', () => {});
   }
 
-  rateLimit(name, limit, windowMs) {
+  rateLimit(name, limit, windowMs, { code = 'rate_limit', requestId = '' } = {}) {
     if (!this.session) return true;
     if (this.session.rateLimiter.allow(name, limit, windowMs)) return true;
-    sendError(this.socket, 'rate_limit', 'Too many multiplayer messages. Slow down and try again.');
+    sendError(this.socket, code, 'Too many multiplayer messages. Slow down and try again.', requestId ? { requestId } : {});
     return false;
   }
 
@@ -68,6 +70,12 @@ export class ClientConnection {
         break;
       case MESSAGE_TYPES.AQUARIUM_SHOWCASE:
         this.handleAquariumShowcase(message.payload);
+        break;
+      case MESSAGE_TYPES.SONG_VOTE_SET:
+        void this.handleSongVoteSet(message.payload);
+        break;
+      case MESSAGE_TYPES.SONG_VOTE_RESULTS_REQUEST:
+        void this.handleSongVoteResultsRequest(message.payload);
         break;
       default:
         sendError(this.socket, 'invalid_message', 'That message type is server-only.');
@@ -196,6 +204,53 @@ export class ClientConnection {
       specimens,
       serverTime: Date.now()
     }, this.session.playerId);
+  }
+
+  async handleSongVoteSet(payload = {}) {
+    const requestId = safeString(payload.requestId, 80);
+    if (!this.rateLimit('song_vote', 12, 60_000, { code: 'song_vote_rate_limit', requestId })) return;
+    if (!this.songVoteStore?.available || !this.songVoteStore?.durable) {
+      sendError(this.socket, 'song_vote_unavailable', "Feedback couldn't be saved.", { requestId });
+      return;
+    }
+    try {
+      const aggregate = await this.songVoteStore.setVote({
+        voterId: this.session.playerId,
+        speciesId: payload.speciesId,
+        songId: payload.songId,
+        songRevision: payload.songRevision,
+        vote: payload.vote ?? null
+      });
+      send(this.socket, MESSAGE_TYPES.SONG_VOTE_AGGREGATE, {
+        requestId,
+        aggregate,
+        yourVote: payload.vote ?? null
+      });
+      this.broadcastSongAggregate(aggregate, this.socket);
+    } catch (error) {
+      console.error('[reel-ascent] song vote write failed', error);
+      sendError(this.socket, 'song_vote_failed', "Feedback couldn't be saved.", { requestId });
+    }
+  }
+
+  async handleSongVoteResultsRequest(payload = {}) {
+    const requestId = safeString(payload.requestId, 80);
+    if (!this.rateLimit('song_vote_results', 8, 30_000, { code: 'song_vote_rate_limit', requestId })) return;
+    if (!this.songVoteStore?.available || !this.songVoteStore?.durable) {
+      sendError(this.socket, 'song_vote_unavailable', 'Song feedback storage is unavailable.', { requestId });
+      return;
+    }
+    try {
+      const results = await this.songVoteStore.listAggregates({
+        speciesId: safeString(payload.speciesId, 100),
+        songRevision: payload.songRevision === null || payload.songRevision === undefined
+          ? null : Number(payload.songRevision)
+      });
+      send(this.socket, MESSAGE_TYPES.SONG_VOTE_RESULTS, { requestId, results });
+    } catch (error) {
+      console.error('[reel-ascent] song vote query failed', error);
+      sendError(this.socket, 'song_vote_failed', 'Song feedback results are unavailable.', { requestId });
+    }
   }
 
   handleClose() {

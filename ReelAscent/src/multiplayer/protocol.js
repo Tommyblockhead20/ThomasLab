@@ -12,6 +12,10 @@ export const MESSAGE_TYPES = Object.freeze({
   CATCH_EVENT: 'catch_event',
   FISHING_STATE: 'fishing_state',
   AQUARIUM_SHOWCASE: 'aquarium_showcase',
+  SONG_VOTE_SET: 'song_vote_set',
+  SONG_VOTE_AGGREGATE: 'song_vote_aggregate',
+  SONG_VOTE_RESULTS_REQUEST: 'song_vote_results_request',
+  SONG_VOTE_RESULTS: 'song_vote_results',
   ERROR: 'error'
 });
 

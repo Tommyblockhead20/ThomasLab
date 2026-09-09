@@ -8,8 +8,8 @@
       content="Reel Ascent is an original low-poly climbing and fishing adventure prototype."
     />
     <title>Reel Ascent — Climbing & Fishing Prototype</title>
-    <script type="module" crossorigin src="./assets/index-Cf5fEMt8.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DmTH4c9B.css">
+    <script type="module" crossorigin src="./assets/index-DKStH6VN.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B-l4HUEg.css">
   </head>
   <body>
     <main id="game-shell">
@@ -107,11 +107,20 @@
           <span id="catch-record" class="catch-record">NEW RECORD</span>
           <small id="catch-hint" hidden></small>
         </div>
-        <aside id="song-feedback" class="song-feedback" hidden aria-label="Song feedback">
-          <span>SONG FEEDBACK</span>
-          <button type="button" data-song-vote="up" aria-label="Like this fishing song">👍</button>
-          <button type="button" data-song-vote="down" aria-label="Dislike this fishing song">👎</button>
-        </aside>
+        <section id="fishing-result-controls" class="fishing-result-controls" hidden aria-label="Fishing result actions">
+          <strong id="fishing-result-title">CATCH LANDED</strong>
+          <div class="fishing-result-navigation">
+            <button type="button" data-fishing-result-action="recast"><kbd>↑</kbd> RECAST</button>
+            <button type="button" data-fishing-result-action="stay"><kbd>↓</kbd> STAY FISHING</button>
+          </div>
+          <div id="song-feedback" class="song-feedback" aria-label="Song feedback">
+            <span>SONG FEEDBACK</span>
+            <button type="button" data-fishing-result-action="down" aria-label="Dislike this fishing song"><kbd>←</kbd> 👎</button>
+            <button type="button" data-fishing-result-action="up" aria-label="Like this fishing song"><kbd>→</kbd> 👍</button>
+            <button type="button" data-fishing-result-action="clear-vote" aria-label="Clear this song vote" hidden>CLEAR</button>
+          </div>
+          <div id="song-feedback-summary" class="song-feedback-summary" hidden aria-live="polite"></div>
+        </section>
 
         <aside id="ecology-guide" class="ecology-guide" hidden aria-label="Equipped ecology guide">
           <header><div><small id="ecology-guide-title">Field Notes</small><strong id="ecology-guide-zone">Nearby Water</strong></div><span>LIVE ODDS</span></header>
@@ -347,8 +356,11 @@
           <button id="touch-movement-action" class="touch-button touch-action touch-movement-action" type="button" data-touch-action="movement-action">Sprint</button>
           <button id="touch-context-action" class="touch-button touch-action touch-context-action" type="button" data-touch-action="context-action">Interact</button>
         </div>
-        <button id="open-journal" class="journal-mobile-button" type="button">Journal</button>
-        <button id="open-inventory" class="journal-mobile-button inventory-mobile-button" type="button">Inventory</button>
+        <nav class="mobile-utility-cluster" aria-label="Game utilities">
+          <button id="mobile-pause" type="button">Pause</button>
+          <button id="open-inventory" type="button">Inventory</button>
+          <button id="open-journal" type="button">Journal</button>
+        </nav>
       </section>
 
       <section id="error-panel" class="error-panel" hidden>

@@ -662,11 +662,38 @@ body.fish-gallery .debug-panel {
 .catch-banner[data-rarity="rare"] { border-color: #62a0e9; }
 .catch-banner[data-rarity="legendary"] { border-color: #b26de0; }
 
-.song-feedback { position: absolute; z-index: 24; top: max(8.2rem, 21%); left: 50%; display: flex; gap: .35rem; align-items: center; translate: -50% 0; padding: .32rem .42rem .32rem .58rem; color: #f5e7b5; background: rgb(8 39 39 / 88%); border: 1px solid rgb(239 217 139 / 36%); border-radius: 999px; box-shadow: 0 5px 16px rgb(0 0 0 / 24%); pointer-events: auto; }
-.song-feedback[hidden] { display: none; }
+.fishing-result-controls { position: absolute; z-index: 24; top: max(8.2rem, 20%); left: 50%; display: grid; min-width: min(25rem, calc(100vw - 1rem)); gap: .38rem; justify-items: center; translate: -50% 0; padding: .52rem; color: #f5e7b5; background: rgb(8 39 39 / 92%); border: 1px solid rgb(239 217 139 / 40%); border-radius: .72rem; box-shadow: 0 8px 22px rgb(0 0 0 / 28%); pointer-events: auto; }
+.fishing-result-controls[hidden], .song-feedback[hidden], .song-feedback-summary[hidden] { display: none; }
+.fishing-result-controls > strong { font-size: .58rem; letter-spacing: .11em; }
+.fishing-result-navigation, .song-feedback { display: flex; gap: .38rem; align-items: center; justify-content: center; }
+.fishing-result-navigation button, .song-feedback button, .song-feedback-summary button { min-height: 2.75rem; padding: .45rem .7rem; color: #f7ecc8; font-size: .58rem; font-weight: 950; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 16%); border-radius: .45rem; cursor: pointer; touch-action: manipulation; }
+.fishing-result-navigation button:first-child { color: #173d39; background: #efd98b; }
+.fishing-result-controls kbd { color: inherit; background: transparent; border: 0; box-shadow: none; }
+.song-feedback { padding-top: .08rem; }
 .song-feedback span { font-size: .47rem; font-weight: 950; letter-spacing: .08em; }
-.song-feedback button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; padding: 0; font-size: 1.05rem; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 14%); border-radius: 50%; cursor: pointer; touch-action: manipulation; }
-.song-feedback button.is-selected { background: #efd98b; border-color: #fff3c1; box-shadow: 0 0 0 2px rgb(239 217 139 / 25%); }
+.song-feedback button { min-width: 4.2rem; font-size: .8rem; }
+.song-feedback button.is-pending { opacity: .55; }
+.song-feedback-summary { display: flex; gap: .45rem; align-items: center; color: rgb(239 244 230 / 78%); font-size: .53rem; }
+.song-feedback-summary strong { color: #efd98b; }
+.song-feedback-summary button { min-height: 1.9rem; padding: .28rem .46rem; font-size: .46rem; }
+
+.song-feedback-dashboard { position: absolute; z-index: 86; inset: 50% auto auto 50%; display: grid; width: min(72rem, calc(100vw - 1rem)); max-height: calc(100vh - 1rem); grid-template-rows: auto auto auto minmax(0, 1fr); gap: .65rem; translate: -50% -50%; padding: .9rem; color: #edf6e9; background: rgb(7 31 33 / 98%); border: 1px solid rgb(239 217 139 / 46%); border-radius: .8rem; box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 58%); }
+.song-feedback-dashboard[hidden] { display: none; }
+.song-feedback-dashboard > header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.song-feedback-dashboard h2 { margin: .08rem 0 0; color: #efd98b; }
+.song-feedback-dashboard header small, .song-feedback-dashboard th { color: #d9c675; font-size: .5rem; letter-spacing: .08em; }
+.song-feedback-dashboard button, .song-feedback-dashboard select { min-height: 2.4rem; padding: .4rem .58rem; color: #173d39; font-size: .54rem; font-weight: 950; background: #efd98b; border: 0; border-radius: .42rem; }
+.song-dashboard-toolbar { display: flex; gap: .55rem; align-items: center; flex-wrap: wrap; }
+.song-dashboard-toolbar label { display: flex; gap: .4rem; align-items: center; color: rgb(234 244 231 / 74%); font-size: .54rem; font-weight: 900; }
+.song-dashboard-status { min-height: .8rem; margin: 0; color: rgb(234 244 231 / 62%); font-size: .55rem; }
+.song-dashboard-table-wrap { min-height: 0; overflow: auto; border: 1px solid rgb(255 255 255 / 10%); border-radius: .5rem; }
+.song-feedback-dashboard table { width: 100%; border-collapse: collapse; font-size: .58rem; }
+.song-feedback-dashboard :is(th, td) { padding: .48rem .55rem; text-align: left; border-bottom: 1px solid rgb(255 255 255 / 8%); }
+.song-feedback-dashboard thead { position: sticky; top: 0; background: #102f31; }
+.song-feedback-dashboard tbody th { color: #edf6e9; font-size: .58rem; letter-spacing: 0; }
+.song-feedback-dashboard tbody th small { display: block; margin-top: .12rem; color: rgb(234 244 231 / 42%); font-size: .42rem; }
+.song-feedback-dashboard code { color: rgb(234 244 231 / 72%); font-size: .5rem; }
+body.song-feedback-dashboard-open #game-shell::after { position: absolute; z-index: 85; inset: 0; content: ''; background: rgb(3 18 20 / 55%); }
 
 .catch-banner span {
   color: #60746b;
@@ -1109,22 +1136,6 @@ body.journal-open #game-shell::after {
   font-size: .51rem;
   font-weight: 900;
   letter-spacing: .12em;
-}
-
-.journal-mobile-button {
-  position: absolute;
-  top: max(4.2rem, calc(env(safe-area-inset-top) + 4.2rem));
-  right: max(.7rem, env(safe-area-inset-right));
-  padding: .55rem .7rem;
-  color: #fff9dc;
-  font-size: .66rem;
-  font-weight: 900;
-  background: rgb(18 58 55 / 78%);
-  border: 1px solid rgb(255 255 255 / 34%);
-  border-radius: .55rem;
-  pointer-events: auto;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .fishing-performance {
@@ -1601,6 +1612,32 @@ body.fish-danger #game-shell::after {
   display: none;
 }
 
+.mobile-utility-cluster {
+  position: fixed;
+  z-index: 12;
+  top: max(.6rem, env(safe-area-inset-top));
+  right: max(.6rem, env(safe-area-inset-right));
+  display: flex;
+  gap: .35rem;
+  pointer-events: auto;
+}
+
+.mobile-utility-cluster button {
+  min-width: 3.75rem;
+  min-height: 2.65rem;
+  padding: .38rem .5rem;
+  color: #fff9dc;
+  font-size: .55rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  background: rgb(18 58 55 / 84%);
+  border: 1px solid rgb(255 255 255 / 34%);
+  border-radius: .52rem;
+  box-shadow: 0 4px 12px rgb(7 34 34 / 22%);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .mobile-dpad,
 .mobile-actions {
   position: absolute;
@@ -1612,8 +1649,8 @@ body.fish-danger #game-shell::after {
 .mobile-dpad {
   left: max(1rem, env(safe-area-inset-left));
   display: grid;
-  width: 11.4rem;
-  height: 11.4rem;
+  width: min(12.8rem, calc(50vw - 1.4rem));
+  aspect-ratio: 1;
   grid-template: repeat(3, 1fr) / repeat(3, 1fr);
   gap: 0.28rem;
 }
@@ -1626,8 +1663,8 @@ body.fish-danger #game-shell::after {
 .mobile-actions {
   right: max(1rem, env(safe-area-inset-right));
   display: grid;
-  width: 11.4rem;
-  grid-template: 4.9rem 5.3rem / repeat(2, minmax(0, 1fr));
+  width: min(11.8rem, calc(50vw - 1.4rem));
+  grid-template: 5.2rem 5.6rem / repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
   justify-content: end;
 }
@@ -1668,6 +1705,10 @@ body.fish-danger #game-shell::after {
   background: rgb(255 225 121 / 92%);
   text-shadow: none;
 }
+
+.mobile-controls[data-mode="result"] .touch-button { font-size: 1.05rem; line-height: .9; }
+.mobile-controls[data-mode="result"] .touch-button small { display: block; margin-top: .16rem; font-size: .42rem; letter-spacing: .04em; }
+.mobile-controls[data-mode="result"][data-rated="true"] :is(.touch-left, .touch-right) { visibility: hidden; }
 
 body.mobile-mode .mouse-hint,
 body.mobile-mode .grip-prompt,
@@ -1873,14 +1914,14 @@ body.mobile-mode .rhythm-panel {
 
   .mobile-dpad {
     left: max(0.6rem, env(safe-area-inset-left));
-    width: 9.4rem;
-    height: 9.4rem;
+    width: min(12.8rem, calc(50vw - .9rem));
+    height: auto;
   }
 
   .mobile-actions {
     right: max(0.6rem, env(safe-area-inset-right));
-    width: 9.4rem;
-    grid-template: repeat(2, 4.35rem) / repeat(2, 4.35rem);
+    width: min(11.8rem, calc(50vw - .9rem));
+    grid-template: 5.2rem 5.6rem / repeat(2, minmax(0, 1fr));
     gap: 0.55rem;
   }
 
@@ -1892,13 +1933,13 @@ body.mobile-mode .rhythm-panel {
 
 @media (max-height: 520px) and (orientation: landscape) {
   .mobile-dpad {
-    width: 8.5rem;
-    height: 8.5rem;
+    width: 11rem;
+    height: auto;
   }
 
   .mobile-actions {
-    width: 8.5rem;
-    grid-template: repeat(2, 3.9rem) / repeat(2, 3.9rem);
+    width: 10.5rem;
+    grid-template: 4.5rem 4.9rem / repeat(2, minmax(0, 1fr));
   }
 
   body.mobile-mode .rhythm-panel {
@@ -2212,9 +2253,8 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
-  .mobile-dpad { width: 10.5rem; height: 10.5rem; }
-  .mobile-actions { width: 10.5rem; grid-template-rows: 4.4rem 4.9rem; }
-  .journal-mobile-button { top: max(.55rem, env(safe-area-inset-top)); }
+  .mobile-dpad { width: 11rem; height: auto; }
+  .mobile-actions { width: 10.5rem; grid-template-rows: 4.5rem 4.9rem; }
 }
 
 .boat-travel { position: absolute; z-index: 70; inset: 50% auto auto 50%; display: grid; width: min(46rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); padding: 1rem; color: #edf6e9; background: #123e42; border: 2px solid #d9bb66; border-radius: 1rem; box-shadow: 0 1.4rem 5rem rgb(0 0 0 / 45%); transform: translate(-50%, -50%); }
@@ -2297,7 +2337,6 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .inventory-actions button { padding: .52rem .58rem; color: #153a36; font-size: .58rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .42rem; cursor: pointer; }
 .inventory-actions button:last-child { background: #cce5d2; }
 .inventory-card[data-held="true"] { box-shadow: 0 0 0 2px rgb(239 217 139 / 32%); }
-.inventory-mobile-button { right: 7.2rem; }
 @media (max-width: 850px) {
   .inventory-content.inventory-gear { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .inventory-gear-group:has(.inventory-item-card) { grid-column: 1 / -1; }

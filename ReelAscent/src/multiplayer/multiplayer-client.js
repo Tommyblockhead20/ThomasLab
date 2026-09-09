@@ -10,6 +10,7 @@ export const MULTIPLAYER_ENDPOINT = String(import.meta.env?.VITE_MULTIPLAYER_END
 
 const SNAPSHOT_INTERVAL_MS = 1000 / 15;
 const RECONNECT_DELAYS_MS = Object.freeze([500, 1000, 2000, 3000, 4500, 6000]);
+const VOTE_REQUEST_TIMEOUT_MS = 8000;
 export const ROOM_CODE_LENGTH = 4;
 export const DISPLAY_NAME_MAX_LENGTH = 18;
 export const normalizeRoomCode = (value) => String(value ?? '').replace(/\D/g, '').slice(0, ROOM_CODE_LENGTH);
@@ -39,6 +40,8 @@ export class MultiplayerClient extends EventTarget {
     this.destroyed = false;
     this.pendingRoomRequest = null;
     this.displayName = '';
+    this.pendingVoteRequests = new Map();
+    this.songVoteAggregates = new Map();
     this.transport.onMessage = (value) => this.handleMessage(value);
     this.transport.onClose = () => this.handleClose();
   }
@@ -168,6 +171,53 @@ export class MultiplayerClient extends EventTarget {
     }));
   }
 
+  createVoteRequestId() {
+    return `vote-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+  }
+
+  async sendVoteRequest(type, payload = {}) {
+    if (!(await this.connect())) throw new Error(this.error || 'Song feedback service is unavailable.');
+    const requestId = this.createVoteRequestId();
+    return new Promise((resolve, reject) => {
+      const timer = globalThis.setTimeout(() => {
+        this.pendingVoteRequests.delete(requestId);
+        reject(new Error('Song feedback request timed out.'));
+      }, VOTE_REQUEST_TIMEOUT_MS);
+      this.pendingVoteRequests.set(requestId, { resolve, reject, timer });
+      const sent = this.transport.send(createProtocolMessage(type, { ...payload, requestId }));
+      if (!sent) {
+        globalThis.clearTimeout(timer);
+        this.pendingVoteRequests.delete(requestId);
+        reject(new Error('Song feedback service is unavailable.'));
+      }
+    });
+  }
+
+  submitSongVote(feedback, vote) {
+    return this.sendVoteRequest(MESSAGE_TYPES.SONG_VOTE_SET, {
+      speciesId: String(feedback?.speciesId ?? '').slice(0, 100),
+      songId: String(feedback?.songId ?? '').slice(0, 180),
+      songRevision: Math.max(1, Math.floor(Number(feedback?.songRevision) || 1)),
+      vote: vote === 'up' || vote === 'down' ? vote : null
+    });
+  }
+
+  requestSongVoteResults(filter = {}) {
+    return this.sendVoteRequest(MESSAGE_TYPES.SONG_VOTE_RESULTS_REQUEST, {
+      speciesId: filter.speciesId ? String(filter.speciesId).slice(0, 100) : '',
+      songRevision: filter.songRevision ?? null
+    });
+  }
+
+  settleVoteRequest(requestId, value, error = null) {
+    const pending = this.pendingVoteRequests.get(requestId);
+    if (!pending) return false;
+    globalThis.clearTimeout(pending.timer);
+    this.pendingVoteRequests.delete(requestId);
+    if (error) pending.reject(error); else pending.resolve(value);
+    return true;
+  }
+
   handleMessage(value) {
     const message = parseProtocolMessage(value);
     if (!message) return;
@@ -194,9 +244,29 @@ export class MultiplayerClient extends EventTarget {
       this.room.consumeCatchEvent(message.payload);
     } else if (message.type === MESSAGE_TYPES.AQUARIUM_SHOWCASE) {
       this.room.consumeAquariumShowcase(message.payload);
+    } else if (message.type === MESSAGE_TYPES.SONG_VOTE_AGGREGATE) {
+      const aggregate = message.payload.aggregate;
+      if (aggregate?.speciesId && Number.isFinite(Number(aggregate.songRevision))) {
+        this.songVoteAggregates.set(`${aggregate.speciesId}@${aggregate.songRevision}`, aggregate);
+        this.dispatchEvent(new CustomEvent('songvoteaggregate', { detail: aggregate }));
+      }
+      if (message.payload.requestId) this.settleVoteRequest(message.payload.requestId, aggregate);
+    } else if (message.type === MESSAGE_TYPES.SONG_VOTE_RESULTS) {
+      const results = Array.isArray(message.payload.results) ? message.payload.results : [];
+      for (const aggregate of results) {
+        if (aggregate?.speciesId) this.songVoteAggregates.set(`${aggregate.speciesId}@${aggregate.songRevision}`, aggregate);
+      }
+      this.dispatchEvent(new CustomEvent('songvoteresults', { detail: results }));
+      if (message.payload.requestId) this.settleVoteRequest(message.payload.requestId, results);
     } else if (message.type === MESSAGE_TYPES.ERROR) {
       const code = String(message.payload.code ?? 'server_error');
       const text = String(message.payload.message ?? 'Multiplayer service error.');
+      if (code.startsWith('song_vote_')) {
+        if (message.payload.requestId) this.settleVoteRequest(message.payload.requestId, null, new Error(text));
+        this.dispatchEvent(new CustomEvent('songvoteerror', { detail: { code, message: text } }));
+        this.dispatchEvent(new CustomEvent('message', { detail: message }));
+        return;
+      }
       if (code === 'reconnect_failed') {
         this.cancelReconnect();
         this.reconnectToken = '';
@@ -268,6 +338,11 @@ export class MultiplayerClient extends EventTarget {
     this.destroyed = true;
     this.cancelReconnect();
     this.room.clear();
+    for (const [requestId, pending] of this.pendingVoteRequests) {
+      globalThis.clearTimeout(pending.timer);
+      pending.reject(new Error('Multiplayer client closed.'));
+      this.pendingVoteRequests.delete(requestId);
+    }
     this.transport.close();
   }
 }
