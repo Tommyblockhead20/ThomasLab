@@ -100,6 +100,8 @@ export class Game {
     };
     this.pendingPersistentPlaytime = 0;
     this.contextualAction = null;
+    this.rockDebugEnabled = false;
+    this.rockDebugTarget = null;
     this.hud = new Hud();
     this.saveSystem = new SaveSystem();
     this.progression = new ProgressionSystem(this.saveSystem);
@@ -241,13 +243,28 @@ export class Game {
       event.stopImmediatePropagation();
     };
     this.onDebugKeyDown = (event) => {
-      if (event.repeat || event.code !== 'F9' || !isCheatsEnabled()) return;
+      if (event.repeat || !isCheatsEnabled()) return;
       if (this.isEditableTarget(event.target)) return;
-      event.preventDefault();
-      const money = this.progression.addMoney(1000, { legitimate: false });
-      this.recordStatEvent('debug-money', { amount: 1000 }, false);
-      this.hud.showToast?.(`+$1,000 • $${money}`);
-      this.inventory.update();
+      if (event.code === 'F2') {
+        event.preventDefault();
+        this.rockDebugEnabled = !this.rockDebugEnabled;
+        this.hud.showToast?.(`Rock IDs ${this.rockDebugEnabled ? 'ON • L copies/logs nearest ID' : 'OFF'}`, 2.5);
+        return;
+      }
+      if (event.code === 'KeyL' && this.rockDebugEnabled && this.rockDebugTarget?.id) {
+        event.preventDefault();
+        console.info(`[Reel Ascent rock] ${this.rockDebugTarget.id} • ${this.rockDebugTarget.name}`);
+        navigator.clipboard?.writeText?.(this.rockDebugTarget.id).catch?.(() => {});
+        this.hud.showToast?.(`ROCK ${this.rockDebugTarget.id} • copied / logged`, 3);
+        return;
+      }
+      if (event.code === 'F9') {
+        event.preventDefault();
+        const money = this.progression.addMoney(1000, { legitimate: false });
+        this.recordStatEvent('debug-money', { amount: 1000 }, false);
+        this.hud.showToast?.(`+$1,000 • $${money}`);
+        this.inventory.update();
+      }
     };
     window.addEventListener('resize', this.onResize);
     window.addEventListener('keydown', this.onPauseKeyDown, true);
@@ -341,6 +358,12 @@ export class Game {
     }
     this.world.update(dt);
     const multiplayerPlayerState = this.player.getState();
+    this.rockDebugTarget = this.rockDebugEnabled
+      ? (multiplayerPlayerState.climbRockId
+          ? { id: multiplayerPlayerState.climbRockId, name: multiplayerPlayerState.climbSurfaceLabel ?? 'gripped rock', distance: 0 }
+          : this.world.getNearestRockDebug?.(multiplayerPlayerState.position, 11))
+      : null;
+    this.hud.setRockDebugLabel?.(this.rockDebugTarget, this.rockDebugEnabled);
     this.contextualAction = this.resolveContextualAction(multiplayerPlayerState);
     this.tutorials.update(dt, this.contextualAction);
     this.homeInteraction.setPromptAllowed(this.contextualAction?.kind === 'interact');

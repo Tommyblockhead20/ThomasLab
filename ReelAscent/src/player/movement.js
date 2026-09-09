@@ -25,7 +25,7 @@ export const DEFAULT_KEY_BINDINGS = Object.freeze(Object.fromEntries(
 ));
 // Pause and hidden playtest/debug controls remain intentionally unavailable here.
 const RESERVED_BINDING_CODES = new Set([
-  'Escape', 'Home', 'F1', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10',
+  'Escape', 'Home', 'F1', 'F2', 'F3', 'F4', 'F6', 'F7', 'F8', 'F9', 'F10',
   'KeyB', 'KeyN', 'Digit0', 'Digit7', 'Digit8', 'Digit9'
 ]);
 

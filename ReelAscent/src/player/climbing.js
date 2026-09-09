@@ -72,9 +72,15 @@ export class ClimbingController {
         position.z - this.pushStartPosition.z
       );
       const outwardSeparation = delta.dot(this.pushStartNormal);
-      if (outwardSeparation >= CLIMBING_CONFIG.sameSurfaceClearSeparation
+      // A vertical or lateral jump can meaningfully leave a small rock without ever moving
+      // far along the original face normal. Euclidean separation therefore clears the source
+      // collider too; the short timer remains only as immediate anti-stick protection.
+      const physicalSeparation = delta.length();
+      if (physicalSeparation >= CLIMBING_CONFIG.sameSurfaceClearDistance
+        || outwardSeparation >= CLIMBING_CONFIG.sameSurfaceClearSeparation
         || (this.sameSurfaceBlockTimer <= 0
-          && outwardSeparation >= CLIMBING_CONFIG.sameSurfaceMinimumSeparation)) {
+          && (physicalSeparation >= CLIMBING_CONFIG.sameSurfaceMinimumDistance
+            || outwardSeparation >= CLIMBING_CONFIG.sameSurfaceMinimumSeparation))) {
         this.blockedSurfaceHandle = null;
       }
     }

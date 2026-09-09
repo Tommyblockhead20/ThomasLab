@@ -15,7 +15,10 @@ import { hasSeenHookTutorial, markHookTutorialSeen } from './tutorial-state.js';
 import { createFishingRodModel } from './rod-model.js';
 import { createSpecimenModel, destroySpecimenModel, positionSpecimenModel } from './specimen-model.js';
 import { resolveCreaturePresentation } from './creature-presentation.js';
-import { getSelectiveBobberSettings, sampleBobberBiteDelay } from './selective-bobbers.js';
+import {
+  chooseStrongBobberRefusal, deriveBobberAcceptance, samplePotentialBiteDelay,
+  strongestBobberHasEligibleTarget
+} from './selective-bobbers.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -618,6 +621,7 @@ export class FishingController {
     this.lastRhythmBeat = -1;
     this.lastJudgmentTime = -1;
     this.lastFishingFailure = null;
+    this.lastStrongBobberRefusal = null;
     this.catchCard = null;
     this.catchGroundLift = 0;
     this.catchHistory = [];
@@ -1896,6 +1900,26 @@ export class FishingController {
     // Flat ponds resolve to their one fixed height. Path-shaped water (Fallglass) resolves
     // at the actual horizontal landing point, avoiding the old center-height sky bobber.
     target.y = (landingZone ?? this.zone).resolveSurfaceY(target);
+    const bobberMode = this.progression?.getEquippedItem?.('bobber')?.bobberMode ?? 'standard';
+    if (landingZone?.id === this.zone.id && bobberMode === 'trophy') {
+      const ecology = getEcologySelection(landingZone, target);
+      const eligibleRarities = ecology.fishIds.map((id) => (
+        FISH_SPECIES.find((species) => species.id === id || species.canonicalId === id)?.rarity
+      )).filter(Boolean);
+      if (!strongestBobberHasEligibleTarget(eligibleRarities)) {
+        const message = chooseStrongBobberRefusal(this.rng(), this.lastStrongBobberRefusal);
+        this.lastStrongBobberRefusal = message;
+        this.lastFishingFailure = 'sentinel declined low-tier water';
+        this.cast = null;
+        this.charge = 0;
+        this.resultTimer = 1.8;
+        this.bobberRoot.enabled = false;
+        this.lineEntity.enabled = false;
+        this.setState('result', message);
+        this.audio.tone(150, .08, 0, 'muted');
+        return false;
+      }
+    }
     const duration = Math.max(
       this.config.minimumCastSeconds,
       distance * this.config.castSecondsPerMeter
@@ -1913,6 +1937,19 @@ export class FishingController {
     this.lineEntity.enabled = true;
     this.audio.cast();
     this.setState('casting', landingZone ? 'Cast away…' : 'That cast is headed for dry ground…');
+    return true;
+  }
+
+  schedulePotentialBite() {
+    const biteRate = (this.zone.modifiers.biteRate ?? 1)
+      * (this.progression?.getModifier('biteRate') ?? 1);
+    const biteDelayMultiplier = this.progression?.getModifier('biteDelayMultiplier') ?? 1;
+    this.biteTimer = samplePotentialBiteDelay(this.rng(), {
+      minimum: this.config.biteDelayMinimum,
+      maximum: this.config.biteDelayMaximum,
+      biteRate,
+      biteDelayMultiplier
+    });
   }
 
   updateCast(dt) {
@@ -1934,18 +1971,7 @@ export class FishingController {
 
     this.audio.splash();
     this.triggerRipple(this.bobberPosition);
-    const biteRate = (this.zone.modifiers.biteRate ?? 1)
-      * (this.progression?.getModifier('biteRate') ?? 1);
-    const biteDelayMultiplier = this.progression?.getModifier('biteDelayMultiplier') ?? 1;
-    const bobber = getSelectiveBobberSettings(
-      this.progression?.getEquippedItem?.('bobber')?.bobberMode
-    );
-    this.biteTimer = sampleBobberBiteDelay(bobber, this.rng(), {
-      minimum: this.config.biteDelayMinimum,
-      maximum: this.config.biteDelayMaximum,
-      biteRate,
-      biteDelayMultiplier
-    });
+    this.schedulePotentialBite();
     this.setState('waiting', 'Watch the bobber…');
   }
 
@@ -1958,15 +1984,11 @@ export class FishingController {
 
   getSelectionModifiers(ecology, includeRecent = true, zone = this.zone) {
     const equipment = this.progression?.getModifiers?.() ?? {};
-    const bobber = getSelectiveBobberSettings(
-      this.progression?.getEquippedItem?.('bobber')?.bobberMode
-    );
     return {
       ...zone?.modifiers,
       rarityTier: ecology.habitat.rarityTier,
       rareProbabilityBonus: equipment.rareProbabilityBonus ?? 0,
       legendaryProbabilityBonus: equipment.legendaryProbabilityBonus ?? 0,
-      bobberAcceptanceByRarity: bobber.acceptanceByRarity,
       nonFishWeightMultiplier: equipment.nonFishWeightMultiplier ?? 1,
       shinyChanceMultiplier: equipment.shinyChanceMultiplier ?? 1,
       specimenSizeBias: (zone?.modifiers?.specimenSizeBias ?? 0) + (equipment.specimenSizeBias ?? 0),
@@ -1990,6 +2012,27 @@ export class FishingController {
     const selectedEntry = selectionTable.find(
       (entry) => (entry.fish.canonicalId ?? entry.fish.id) === this.selectedFish?.speciesId
     );
+    const potentialProfile = Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
+      rarity,
+      selectionTable.filter((entry) => entry.fish.rarity === rarity)
+        .reduce((sum, entry) => sum + entry.probability, 0)
+    ]));
+    const bobberMode = this.progression?.getEquippedItem?.('bobber')?.bobberMode ?? 'standard';
+    const bobberAcceptance = deriveBobberAcceptance(potentialProfile, bobberMode);
+    const acceptance = bobberAcceptance[this.selectedFish?.rarity] ?? 0;
+    if (!forcedSpeciesId && this.rng() >= acceptance) {
+      this.selectionDebug = {
+        habitat: ecology.habitat,
+        candidatePoolSize: selectionTable.length,
+        selectedWeight: 0,
+        selectedProbability: 0,
+        filteredRarity: this.selectedFish?.rarity ?? null,
+        bobberMode
+      };
+      this.selectedFish = null;
+      this.schedulePotentialBite();
+      return false;
+    }
     this.selectionDebug = {
       habitat: ecology.habitat,
       candidatePoolSize: selectionTable.length,
@@ -2017,6 +2060,7 @@ export class FishingController {
     this.triggerRipple(this.bobberPosition);
     this.audio.splash();
     this.audio.bite();
+    return true;
   }
 
   updateBite(dt, pressed) {

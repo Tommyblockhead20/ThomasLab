@@ -2331,6 +2331,7 @@ export class Player {
       canGrip: this.canGrip,
       climbSurface: onClimbSurface ? this.climbing.surface?.type ?? null : null,
       climbSurfaceLabel: onClimbSurface ? this.climbing.surface?.label ?? null : null,
+      climbRockId: onClimbSurface ? this.climbing.surface?.rockId ?? null : null,
       climbMaterial: climbMaterial?.label ?? null,
       climbStaminaMultiplier: climbMaterial?.staminaMultiplier ?? 1,
       climbSlipRate: onClimbSurface ? this.climbing.getSurfaceSlipRate() : 0,

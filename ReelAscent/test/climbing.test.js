@@ -308,7 +308,7 @@ test('directional push-off uses wall tangent and vertical intention', () => {
   assert.ok(diagonal.x > 3 && diagonal.y > neutral.y);
 });
 
-test('push-off blocks the source wall but permits a nearby transfer catch', () => {
+test('push-off briefly blocks its source then physical separation permits the same rock again', () => {
   const fixture = makeFixture();
   const controller = fixture.controller;
   const firstGrip = findFrontGrip(controller);
@@ -326,27 +326,8 @@ test('push-off blocks the source wall but permits a nearby transfer catch', () =
   controller.tickCooldown(0.1, new StaminaResource(), { x: 0.15, y: 1.3, z: 1.25 });
   assert.equal(findFrontGrip(controller), null);
   controller.tickCooldown(1, new StaminaResource(), { x: 1.2, y: 1.1, z: 1.02 });
-  assert.notEqual(controller.blockedSurfaceHandle, null);
-
-  const transferWall = fixture.world.createCollider(
-    RAPIER.ColliderDesc.cuboid(0.5, 2, 2).setTranslation(1.45, 2, 1.02)
-  );
-  const transferSurface = {
-    collider: transferWall,
-    label: 'Transfer wall',
-    type: 'normal',
-    material: getClimbMaterial('normal'),
-    staminaMultiplier: 1
-  };
-  fixture.surfaces.set(transferWall.handle, transferSurface);
-  fixture.world.step();
-  const transferGrip = controller.findGrip(
-    { x: 0, y: 1.1, z: 1.02 },
-    new pc.Vec3(1, 0, 0)
-  );
-  assert.equal(transferGrip?.surface, transferSurface);
-  controller.begin(transferGrip, new pc.Vec3(5, 2, 1));
-  assert.ok(controller.transitionMomentum.length() > 0);
+  assert.equal(controller.blockedSurfaceHandle, null);
+  assert.equal(findFrontGrip(controller)?.surface, firstGrip.surface);
   fixture.world.free();
 });
 

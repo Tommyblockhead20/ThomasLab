@@ -19,6 +19,10 @@ export class Hud {
     this.staminaFill = document.querySelector('#stamina-fill');
     this.staminaValue = document.querySelector('#stamina-value');
     this.debugPanel = document.querySelector('#debug-panel');
+    this.rockDebugLabel = document.createElement('output');
+    this.rockDebugLabel.className = 'rock-debug-label';
+    this.rockDebugLabel.hidden = true;
+    document.body.appendChild(this.rockDebugLabel);
     this.gripPrompt = document.querySelector('#grip-prompt');
     this.fishPrompt = document.querySelector('#fish-prompt');
     this.tutorialToast = document.querySelector('#tutorial-toast');
@@ -459,9 +463,18 @@ export class Hud {
     return true;
   }
 
+  setRockDebugLabel(rock, enabled) {
+    if (!this.rockDebugLabel) return;
+    this.rockDebugLabel.hidden = !enabled;
+    this.rockDebugLabel.textContent = enabled
+      ? (rock ? `ROCK: ${rock.id}  •  L COPY / LOG` : 'ROCK IDS ON  •  approach a climbing rock')
+      : '';
+  }
+
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     document.body.classList.remove('debug-visible');
     document.body.classList.remove('fish-danger');
+    this.rockDebugLabel?.remove();
   }
 }

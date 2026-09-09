@@ -2212,6 +2212,9 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .cheat-activation { --cheat-progress: 0%; position: absolute; z-index: 90; top: 1rem; left: 50%; min-width: 12rem; padding: .65rem .9rem; color: #fff1a6; font: 950 .7rem ui-monospace, monospace; text-align: center; letter-spacing: .08em; background: linear-gradient(90deg, rgb(205 149 43 / 72%) var(--cheat-progress), rgb(6 35 38 / 92%) var(--cheat-progress)); border: 1px solid #efd98b; border-radius: .5rem; transform: translateX(-50%); }
 .cheat-activation[hidden] { display: none; }
 
+.rock-debug-label { position: fixed; z-index: 96; top: 4.2rem; left: 50%; padding: .55rem .8rem; color: #fff1a6; font: 900 .72rem ui-monospace, monospace; letter-spacing: .06em; background: rgb(6 35 38 / 92%); border: 1px solid #efd98b; border-radius: .45rem; transform: translateX(-50%); pointer-events: none; }
+.rock-debug-label[hidden] { display: none; }
+
 @media (max-width: 650px) {
   .save-data-content { grid-template-columns: 1fr; }
   .inventory-item-card { grid-template-columns: auto 1fr; }

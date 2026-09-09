@@ -88,6 +88,7 @@ export const MID_MOUNTAIN_SPIRAL_CONFIG = Object.freeze({
   priority600To650StepHeight: 1.3,
   priority630To660StepHeight: 1.3,
   priority660To700StepHeight: 1.18,
+  priority680To700StepHeight: .72,
   branchEvery: 4
 });
 // Compatibility export retained for debug tooling that knew the older name. v9 no longer
@@ -138,12 +139,12 @@ export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
   angle: AQUARIUM_WORLD_LOCATION?.angle ?? 103,
   radius: AQUARIUM_WORLD_LOCATION?.radius ?? 278,
   floorY: (AQUARIUM_WORLD_LOCATION?.elevation ?? .7) + .28,
-  width: 74,
+  width: 104,
   depth: 42,
-  tankWidth: 12,
+  tankWidth: 18,
   tankDepth: 14.5,
   tankHeight: 8.8,
-  tankSpacingX: 13.4,
+  tankSpacingX: 19.4,
   tankRowZ: 9,
   glassThickness: .24,
   waterFloorY: 1.08,
@@ -153,6 +154,20 @@ export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
   visibleResidentLimit: 300,
   separateFromCabin: true
 });
+
+export function deriveAquariumWaterBounds(config = PUBLIC_AQUARIUM_CONFIG) {
+  return Object.freeze({
+    minX: -config.tankWidth * .5 + config.waterInset,
+    maxX: config.tankWidth * .5 - config.waterInset,
+    minY: config.waterFloorY + .42,
+    maxY: config.waterlineY - .58,
+    minZ: -config.tankDepth * .5 + config.waterInset,
+    maxZ: config.tankDepth * .5 - config.waterInset,
+    floorY: config.waterFloorY,
+    waterlineY: config.waterlineY,
+    safeInset: config.waterInset
+  });
+}
 export const DOCK_DECK_LOWERING = .22;
 export const CAVE_TOPOLOGY_CONFIG = Object.freeze({
   tunnelSegments: 12,
@@ -190,7 +205,7 @@ export const BLUEWATER_SIDE_SEAT_CONFIG = Object.freeze({
   interactionDistance: 2.4
 });
 export const ISLAND_UNDERWATER_PROFILE = Object.freeze({
-  radiusFactors: Object.freeze([2.35, 1.65, 1]),
+  radiusFactors: Object.freeze([2.35, 1.72, 1.28, 1]),
   intermediateDepth: 1.35
 });
 export const ROCK_COLLISION_PROXY_CONFIG = Object.freeze({
@@ -262,6 +277,20 @@ function stableNameHash(value) {
 
 function stableUnit(value) {
   return (stableNameHash(value) % 10000) / 9999;
+}
+
+const ROCK_ID_SECTORS = Object.freeze(['E', 'NE', 'N', 'NW', 'W', 'SW', 'S', 'SE']);
+
+export function createStableRockId(name, position, center = MOUNTAIN_CENTER) {
+  const x = Number(position?.x) || 0;
+  const y = Number(position?.y) || 0;
+  const z = Number(position?.z) || 0;
+  const angle = (Math.atan2(z - center.z, x - center.x) * 180 / Math.PI + 360) % 360;
+  const sector = ROCK_ID_SECTORS[Math.round(angle / 45) % ROCK_ID_SECTORS.length];
+  const feet = Math.max(0, Math.round(y / .3048));
+  const identity = `${String(name)}:${x.toFixed(2)}:${y.toFixed(2)}:${z.toFixed(2)}`;
+  const suffix = stableNameHash(identity).toString(36).toUpperCase().padStart(5, '0').slice(-5);
+  return `R-${String(feet).padStart(3, '0')}-${sector}-${suffix}`;
 }
 
 // Difficulty intentionally rises with elevation but also waves around the circumference,
@@ -488,7 +517,7 @@ const FISHING_LAYOUT = Object.freeze([
     id: 'hearthward-pond', label: 'Hearthward Tutorial Pond', tier: 'lower', waterType: 'pond',
     theme: 'fernwood', ecologyThemes: ['sunwash', 'fernwood'], offshore: 'home-island',
     angle: HOME_WORLD_LOCATION?.angle ?? 222, radius: HOME_WORLD_LOCATION?.radius ?? 980,
-    localOffset: { x: 7.8, z: 8.25 }, waterY: .91, radii: [4.1, 3.15], depth: 'shallow', basinDepth: .5,
+    localOffset: { x: 7.8, z: 8.25 }, waterY: .84, radii: [4.1, 3.15], depth: 'shallow', basinDepth: .5,
     fish: ['bluegill', 'pumpkinseed', 'golden-shiner'], allowedRarities: ['Common'],
     size: .9, rarityBias: -.4, trophyChance: .7, biteRate: 1.3, tutorialWater: true
   }),
@@ -1068,6 +1097,7 @@ export class MountainWorld extends TestWorld {
     this.buildTarget = this.root;
     this.mountainWaters = [];
     this.rockPlacements = [];
+    this.rockIds = new Map();
     this.rejectedRocks = [];
     this.homeInteractions = [];
     this.homeTrophies = [];
@@ -1089,6 +1119,11 @@ export class MountainWorld extends TestWorld {
     this.materials.mangroveWater = makeMaterial([.18, .62, .46], { opacity: .54, gloss: .84, emissive: [.025, .1, .065], doubleSided: true });
     this.materials.aquariumWater = makeMaterial([.3, .72, .76], { opacity: .3, gloss: .92, emissive: [.025, .1, .11], doubleSided: true });
     this.materials.frostWater = makeMaterial([.54, .76, .82], { opacity: .36, gloss: .94, emissive: [.035, .09, .12], doubleSided: true });
+    // Opaque, depth-writing materials sit below the single global ocean surface. Using the
+    // ordinary transparent ice material here caused the cold shelf and spikes to sort through
+    // one another even when an exposed spike was physically in front.
+    this.materials.coldOceanBed = makeMaterial([.43, .67, .74], { gloss: .76, emissive: [.025, .075, .095], doubleSided: true });
+    this.materials.solidIce = makeMaterial([.67, .86, .91], { gloss: .92, emissive: [.028, .07, .085] });
     this.materials.deepWater = makeMaterial([.14, .42, .51], { opacity: .78, gloss: .9, emissive: [.015, .07, .1], doubleSided: true });
     this.materials.waterfall = makeMaterial([.64, .86, .88], { opacity: .74, gloss: .9, emissive: [.04, .13, .14], doubleSided: true });
     this.materials.holdRough = makeMaterial([.72, .57, .37], { gloss: .04 });
@@ -1110,6 +1145,7 @@ export class MountainWorld extends TestWorld {
     this.materials.islandGrass = makeMaterial([.36, .53, .31], { gloss: .04 });
     this.materials.islandRock = makeMaterial([.47, .48, .45], { gloss: .08 });
     this.materials.coldRock = makeMaterial([.62, .69, .72], { gloss: .3 });
+    this.materials.pondBank = makeMaterial([.38, .43, .24], { gloss: .035 });
 
     this.rockMaterialVariants = new Map();
     // A route should read as broken mountain rock, not a vertical row of cylinders.
@@ -1267,24 +1303,27 @@ export class MountainWorld extends TestWorld {
     // Broad submerged aprons replace the old near-vertical 1.2→1.0 shoreline drop.
     // Everything at/above the waterline keeps its authored footprint and elevation.
     const ringFactors = [...ISLAND_UNDERWATER_PROFILE.radiusFactors, .68, .2];
-    const ringHeights = [oceanFloorHeightAt(location.radius) + .12,
-      OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth,
-      OCEAN_SURFACE_Y - .08, location.elevation + .06, location.elevation + .16];
+    const ringHeights = [
+      oceanFloorHeightAt(location.radius) + .12,
+      OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * 1.7,
+      OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * .68,
+      OCEAN_SURFACE_Y - .16,
+      location.elevation + .06,
+      location.elevation + .16
+    ];
     const vertices = [];
     for (let ring = 0; ring < ringFactors.length; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
         const theta = segment * Math.PI * 2 / segments;
         const angle = segment * 360 / segments;
         const identityScale = islandFootprintScale(location.id, angle);
-        const microWobble = 1 + Math.sin(segment * 2.17 + location.worldPosition.x * .01) * .022
-          + Math.sin(segment * .79 + location.worldPosition.z * .013) * .014;
-        // Underwater skirts are slightly softened, while the shoreline/top rings preserve
-        // the destination's actual distinctive silhouette for future map simplification.
-        const footprintScale = lerp(1, identityScale, ring <= 1 ? .72 : 1) * microWobble;
+        // Every connected ring samples the exact same authored outline. The former independent
+        // micro-wobble made adjacent triangles shimmer at the transparent ocean boundary.
+        const footprintScale = identityScale;
         const vertexX = location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * footprintScale;
         const vertexZ = location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * footprintScale;
-        let vertexY = ringHeights[ring] + (ring >= 2 ? Math.sin(segment * 1.91) * .035 : 0);
-        if (location.id === 'cold-island' && ring >= 3) {
+        let vertexY = ringHeights[ring];
+        if (location.id === 'cold-island' && ring >= 4) {
           const lakeRadius = Math.hypot(
             (vertexX - location.worldPosition.x) / 6.35,
             (vertexZ - location.worldPosition.z) / 5.05
@@ -1458,10 +1497,23 @@ export class MountainWorld extends TestWorld {
     const { x, z } = location.worldPosition;
     const y = location.elevation + .18;
     if (location.id === 'home-island') {
+      const pondCenter = radialPoint(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius + 8.25,
+        location.elevation, -7.8);
       for (let index = 0; index < 9; index += 1) {
         const theta = (index * 41 + 14) * Math.PI / 180;
+        let treeX = x + Math.cos(theta) * (10 + index % 3 * 2.2);
+        let treeZ = z + Math.sin(theta) * (7 + index % 2 * 2.4);
+        // The old deterministic ring happened to put one trunk through the new pond.
+        // Move any future conflicting candidate radially outward instead of special-casing
+        // one tree index, so pond edits cannot silently regrow it in the water.
+        const pondDistance = Math.hypot(treeX - pondCenter.x, treeZ - pondCenter.z);
+        if (pondDistance < 6.2) {
+          const scale = 6.2 / Math.max(.01, pondDistance);
+          treeX = pondCenter.x + (treeX - pondCenter.x) * scale;
+          treeZ = pondCenter.z + (treeZ - pondCenter.z) * scale;
+        }
         this.addIslandTree(`${location.displayName} cozy tree ${index + 1}`,
-          x + Math.cos(theta) * (10 + index % 3 * 2.2), z + Math.sin(theta) * (7 + index % 2 * 2.4), y,
+          treeX, treeZ, y,
           .55 + index % 3 * .1, index % 2 ? 'broadleaf' : 'conifer');
       }
     } else if (location.id === 'shop-island') {
@@ -1481,7 +1533,8 @@ export class MountainWorld extends TestWorld {
         const theta = (index * 31 + 40) * Math.PI / 180;
         this.addMountainBoulder(`Cave island natural rock ${index + 1}`,
           { x: x + Math.cos(theta) * (8 + index % 4 * 2), y: y + .55, z: z + Math.sin(theta) * (6 + index % 3 * 1.7) },
-          { x: 1.5 + index % 3 * .5, y: 1.1 + index % 4 * .55, z: 1.6 }, this.materials.islandRock);
+          { x: 1.5 + index % 3 * .5, y: 1.1 + index % 4 * .55, z: 1.6 }, this.materials.islandRock,
+          { ensureCoreContact: false, supportKind: 'satellite-island' });
       }
     } else if (location.id === 'normal-fishing-island') {
       // Mangrove Cay is a warm, muddy lagoon biome rather than another generic grass
@@ -1539,18 +1592,18 @@ export class MountainWorld extends TestWorld {
         {}, { castShadows: false });
       }
     } else if (location.id === 'cold-island') {
-      // A pale submerged ice shelf colors the one shared ocean surface from below. The old
-      // second transparent water sheet overlapped the global ocean and caused the widespread
-      // Frosthook transparency fighting reported around the shoreline.
+      // One large opaque/depth-writing seabed tint sits well below the one global ocean.
+      // Its visual radius intentionally exceeds the ecology annulus: Frosthook looks frozen
+      // throughout ordinary local view without changing which catches belong to Cold Ocean.
       const coldShelf = this.addFishingWaterSurface('Frosthook submerged pale cold-ocean shelf', {
-        x, y: OCEAN_SURFACE_Y - .34, z
-      }, { x: 46, z: 41 }, this.materials.ice);
+        x, y: OCEAN_SURFACE_Y - .58, z
+      }, { x: 225, z: 195 }, this.materials.coldOceanBed);
       coldShelf.render.castShadows = false;
       for (let index = 0; index < 12; index += 1) {
         const theta = (index * 29 + 8) * Math.PI / 180;
         this.createPrimitive(`Frosthook ice formation ${index + 1}`, 'cone',
           { x: x + Math.cos(theta) * (8 + index % 4 * 2), y: y + 1.15 + index % 3 * .35, z: z + Math.sin(theta) * (7 + index % 3 * 2) },
-          { x: .65 + index % 3 * .22, y: 2.3 + index % 4 * .7, z: .65 }, this.materials.ice,
+          { x: .65 + index % 3 * .22, y: 2.3 + index % 4 * .7, z: .65 }, this.materials.solidIce,
           { z: index % 2 ? 8 : -9 });
       }
       for (let index = 0; index < 18; index += 1) {
@@ -1560,7 +1613,7 @@ export class MountainWorld extends TestWorld {
           x: x + Math.cos(theta) * radius, y: OCEAN_SURFACE_Y + .08,
           z: z + Math.sin(theta) * radius * .88
         }, { x: 1.2 + index % 4 * .45, y: .11 + index % 2 * .04, z: .8 + index % 3 * .35 },
-        index % 3 ? this.materials.ice : this.materials.snow,
+        index % 3 ? this.materials.solidIce : this.materials.snow,
         { y: index * 29, z: index % 2 ? 3 : -3 }, { castShadows: false });
       }
     } else if (location.id === 'veiled-athenaeum') {
@@ -1588,6 +1641,53 @@ export class MountainWorld extends TestWorld {
     this.createPrimitive(`${name} crown`, crownType, { x, y: baseY + 3.45 * size, z },
       { x: 2.1 * size, y: (style === 'broadleaf' ? 1.7 : 3.4) * size, z: 2.1 * size },
       style === 'broadleaf' ? this.materials.shrubLight : this.materials.foliage);
+  }
+
+  addHomePondBank() {
+    const segments = 40;
+    const outer = { x: 4.95, z: 3.95, y: .02 };
+    const inner = { x: 4.18, z: 3.23, y: -.16 };
+    const center = { x: 7.8, z: 8.25 };
+    const localVertices = [];
+    const worldVertices = [];
+    for (const ring of [outer, inner]) {
+      for (let index = 0; index < segments; index += 1) {
+        const phase = index / segments * Math.PI * 2;
+        const local = {
+          x: center.x + Math.cos(phase) * ring.x,
+          y: ring.y,
+          z: center.z + Math.sin(phase) * ring.z
+        };
+        const world = this.homePoint(local.x, local.y, local.z);
+        localVertices.push([local.x, local.y, local.z]);
+        worldVertices.push([world.x, world.y, world.z]);
+      }
+    }
+    const triangles = [];
+    for (let index = 0; index < segments; index += 1) {
+      const next = (index + 1) % segments;
+      triangles.push([index, segments + index, next], [next, segments + index, segments + next]);
+    }
+    const geometry = new pc.Geometry();
+    geometry.positions = [];
+    geometry.indices = [];
+    for (const triangle of triangles) for (const vertexIndex of triangle) {
+      geometry.positions.push(...localVertices[vertexIndex]);
+      geometry.indices.push(geometry.indices.length);
+    }
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity('Hearthward pond connected sloped bank');
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.pondBank, entity)];
+    entity.render.castShadows = false;
+    this.homeCabinRoot.addChild(entity);
+    entity.physicsCollider = this.physicsWorld.createCollider(
+      this.RAPIER.ColliderDesc.trimesh(
+        new Float32Array(worldVertices.flat()), new Uint32Array(triangles.flat())
+      ).setFriction(.94).setRestitution(0)
+    );
+    return entity;
   }
 
   buildTravelDocks() {
@@ -2051,10 +2151,9 @@ export class MountainWorld extends TestWorld {
       x: -1.1 + side * .42, y: 2.18, z: -3.24
     }, { x: .08, y: .28, z: .18 }, this.materials.deepRock, { x: -18 }, false);
 
-    // Hearthward's beginner pond now sits diagonally in front of the cabin (+local Z),
-    // visible from the porch instead of hidden behind the rear wall.
-    this.addCabinBox('Hearthward pond short fishing deck', { x: 4.75, y: -.015, z: 8.25 },
-      { x: 2.9, y: .16, z: 1.35 }, this.materials.woodLight);
+    // A connected earthen annulus slopes down from the lawn to a waterline below it. The
+    // former short wooden platform read as a diving board and served no required interaction.
+    this.addHomePondBank();
     this.addCabinBox('Hearthward pond bench seat', { x: 7.8, y: .48, z: 4.55 },
       { x: 2.2, y: .18, z: .72 }, this.materials.woodLight);
     this.addCabinBox('Hearthward pond bench back', { x: 7.8, y: 1.02, z: 4.08 },
@@ -2070,6 +2169,13 @@ export class MountainWorld extends TestWorld {
       if (index % 3 === 0) this.createPrimitive(`Hearthward pond flower ${index + 1}`, 'sphere',
         this.homePoint(localX + .25, .28, localZ - .18), { x: .16, y: .12, z: .16 },
         this.materials.cabinWarm, {}, { castShadows: false });
+    }
+    for (let index = 0; index < 5; index += 1) {
+      const angle = (index * 73 + 18) * Math.PI / 180;
+      this.createPrimitive(`Hearthward pond modest shoreline rock ${index + 1}`, 'sphere',
+        this.homePoint(7.8 + Math.cos(angle) * 4.48, -.08, 8.25 + Math.sin(angle) * 3.53),
+        { x: .42 + index % 2 * .12, y: .24, z: .36 }, this.materials.waterEdge,
+        { x: index * 7, y: index * 39, z: index % 2 ? 5 : -4 }, { castShadows: false });
     }
 
     const cabinYaw = inwardYaw(config.angle);
@@ -2125,9 +2231,35 @@ export class MountainWorld extends TestWorld {
         { x: 0, y: config.waterlineY + 2.35, z: side * 10.1 },
         { x: config.width + 1, y: .3, z: 18.2 }, this.materials.cabinRoof, { x: side * 2 });
     }
-    for (const x of [-35, -21, -7, 7, 21, 35]) for (const z of [-20.2, 20.2]) {
+    const hallPostXs = [-.46, -.28, -.1, .1, .28, .46].map((ratio) => ratio * config.width);
+    for (const x of hallPostXs) for (const z of [-20.2, 20.2]) {
       this.addAquariumBox(`Glasswater Aquarium hall post ${x}:${z}`, { x, y: 5.45, z },
         { x: .38, y: 10.9, z: .38 }, this.materials.cabinTrim);
+    }
+    // A central clerestory, roof ribs, lighting, and furniture turn the two exhibit rows into
+    // a deliberate public gallery instead of isolated glass boxes under a flat pavilion.
+    this.addAquariumBox('Glasswater Aquarium central clerestory roof',
+      { x: 0, y: config.waterlineY + 3.05, z: 0 },
+      { x: config.width + 2, y: .32, z: 5.8 }, this.materials.cabinRoof, { z: 1.5 });
+    this.addAquariumBox('Glasswater Aquarium clerestory ridge',
+      { x: 0, y: config.waterlineY + 3.42, z: 0 },
+      { x: config.width + 2.6, y: .22, z: .32 }, this.materials.cabinTrim, {}, false);
+    for (let rib = -4; rib <= 4; rib += 1) {
+      const x = rib * config.width / 10;
+      this.addAquariumBox(`Glasswater Aquarium roof rib ${rib + 5}`, { x, y: config.waterlineY + 2.72, z: 0 },
+        { x: .24, y: .24, z: config.depth - 1 }, this.materials.cabinTrim, {}, false);
+      this.addAquariumBox(`Glasswater Aquarium warm gallery light ${rib + 5}`, { x, y: config.waterlineY + 2.4, z: 0 },
+        { x: 1.05, y: .12, z: .28 }, this.materials.cabinWarm, {}, false);
+    }
+    for (const x of [-config.width * .29, 0, config.width * .29]) {
+      for (const z of [-2.35, 2.35]) {
+        this.addAquariumBox(`Glasswater Aquarium visitor bench ${x}:${z}`, { x, y: .52, z },
+          { x: 3.8, y: .22, z: .72 }, this.materials.woodLight);
+      }
+      this.addAquariumBox(`Glasswater Aquarium information board ${x}`, { x, y: 1.55, z: 0 },
+        { x: 3.1, y: 1.65, z: .16 }, this.materials.deepRock, {}, false);
+      this.addAquariumBox(`Glasswater Aquarium information face ${x}`, { x, y: 1.58, z: .1 },
+        { x: 2.7, y: 1.28, z: .06 }, this.materials.cabinWarm, {}, false);
     }
     this.addAquariumBox('Glasswater Aquarium entrance step', { x: 0, y: -.38, z: config.depth * .5 + 2.2 },
       { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
@@ -2163,17 +2295,7 @@ export class MountainWorld extends TestWorld {
       const addTankBox = (suffix, position, size, material, rotation = {}) => this.addStructureBox(
         root, `Aquarium Tank ${index + 1} ${suffix}`, position, size, material, rotation, false
       );
-      const waterBounds = Object.freeze({
-        minX: -config.tankWidth * .5 + config.waterInset,
-        maxX: config.tankWidth * .5 - config.waterInset,
-        minY: config.waterFloorY + .42,
-        maxY: config.waterlineY - .58,
-        minZ: -config.tankDepth * .5 + config.waterInset,
-        maxZ: config.tankDepth * .5 - config.waterInset,
-        floorY: config.waterFloorY,
-        waterlineY: config.waterlineY,
-        safeInset: config.waterInset
-      });
+      const waterBounds = deriveAquariumWaterBounds(config);
       const glassCenterY = config.waterFloorY + config.tankHeight * .5;
       addTankBox('stone plinth', { x: 0, y: .48, z: 0 },
         { x: config.tankWidth + .55, y: .96, z: config.tankDepth + .55 }, this.materials.deepRock);
@@ -2187,13 +2309,20 @@ export class MountainWorld extends TestWorld {
         { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass);
       addTankBox('right glass', { x: config.tankWidth * .5, y: glassCenterY, z: 0 },
         { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass);
+      for (const side of [-1, 1]) {
+        addTankBox(`${side < 0 ? 'left' : 'right'} structural frame`,
+          { x: side * config.tankWidth * .5, y: glassCenterY, z: 0 },
+          { x: .38, y: config.tankHeight + .55, z: .38 }, this.materials.cabinTrim);
+      }
+      addTankBox('upper exhibit frame', { x: 0, y: config.waterlineY + .16, z: 0 },
+        { x: config.tankWidth + .55, y: .32, z: config.tankDepth + .55 }, this.materials.cabinTrim);
       const tankWater = addTankBox('bounded water volume',
         { x: 0, y: (config.waterFloorY + config.waterlineY) * .5, z: 0 },
         { x: config.tankWidth - config.glassThickness * 2, y: config.waterlineY - config.waterFloorY, z: config.tankDepth - config.glassThickness * 2 },
         this.materials.aquariumWater);
       tankWater.render.castShadows = false;
       for (let decor = 0; decor < 6; decor += 1) {
-        const decorX = -4.2 + (decor % 3) * 4.2;
+        const decorX = -config.tankWidth * .31 + (decor % 3) * config.tankWidth * .31;
         const decorZ = -4.7 + Math.floor(decor / 3) * 9.4;
         addTankBox(`habitat stone ${decor + 1}`, { x: decorX, y: config.waterFloorY + .28, z: decorZ },
           { x: 1.25 + (decor % 2) * .4, y: .58 + (decor % 3) * .18, z: 1.05 },
@@ -2682,10 +2811,29 @@ export class MountainWorld extends TestWorld {
       collider,
       entity,
       label,
+      rockId: entity.rockId ?? null,
       type: climbMaterial.id,
       material: climbMaterial,
       staminaMultiplier: climbMaterial.staminaMultiplier
     });
+  }
+
+  getNearestRockDebug(point, maximumDistance = 10) {
+    if (![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
+    let nearest = null;
+    let nearestDistance = maximumDistance;
+    for (const rock of this.rockPlacements) {
+      if (!rock.rockId || !rock.grippable) continue;
+      const distance = Math.hypot(
+        point.x - rock.position.x,
+        point.y - rock.position.y,
+        point.z - rock.position.z
+      );
+      if (distance >= nearestDistance) continue;
+      nearestDistance = distance;
+      nearest = { id: rock.rockId, name: rock.name, distance, entity: rock.entity };
+    }
+    return nearest;
   }
 
   terrainYAtWorldXZ(x, z) {
@@ -2900,6 +3048,7 @@ export class MountainWorld extends TestWorld {
       }
     }
     const entity = new pc.Entity(name);
+    entity.rockId = createStableRockId(name, groundedPosition);
     entity.addComponent('render');
     entity.render.meshInstances = [new pc.MeshInstance(form.mesh, this.getRockMaterial(material, name, groundedPosition), entity)];
     entity.render.castShadows = options.castShadows ?? false;
@@ -2950,6 +3099,7 @@ export class MountainWorld extends TestWorld {
     if (angle < 0) angle += 360;
     this.rockPlacements.push({
       name,
+      rockId: entity.rockId,
       entity,
       position: { ...groundedPosition },
       size: { ...size },
@@ -2960,7 +3110,7 @@ export class MountainWorld extends TestWorld {
       contactCount: placement.support.contactCount,
       maximumExposure: placement.exposure?.maximum ?? null,
       visibleFraction: placement.exposure?.visibleFraction ?? null,
-      supportKind: useRoundedProxy ? 'mountain-core-rounded-proxy' : 'mountain-core',
+      supportKind: options.supportKind ?? (useRoundedProxy ? 'mountain-core-rounded-proxy' : 'mountain-core'),
       climbMaterial: climbMaterial ?? null,
       grippable: Boolean(this.climbSurfaces.get(entity.physicsCollider.handle))
     });
@@ -4459,7 +4609,8 @@ export class MountainWorld extends TestWorld {
 
   spiralStepHeightAt(targetHeight) {
     const feet = targetHeight / .3048;
-    if (feet >= 660 && feet <= 700) return MID_MOUNTAIN_SPIRAL_CONFIG.priority660To700StepHeight;
+    if (feet >= 680 && feet <= 700) return MID_MOUNTAIN_SPIRAL_CONFIG.priority680To700StepHeight;
+    if (feet >= 660 && feet < 680) return MID_MOUNTAIN_SPIRAL_CONFIG.priority660To700StepHeight;
     if (feet >= 600 && feet <= 650) return MID_MOUNTAIN_SPIRAL_CONFIG.priority600To650StepHeight;
     if (feet >= 550 && feet < 600) return MID_MOUNTAIN_SPIRAL_CONFIG.priority550To600StepHeight;
     if (feet >= 500 && feet < 550) return MID_MOUNTAIN_SPIRAL_CONFIG.priority500To550StepHeight;
@@ -4550,7 +4701,7 @@ export class MountainWorld extends TestWorld {
         // Frequent side options overlap adjacent spiral steps vertically. These are branches
         // off the same ascent path—not another ring—and make passing/rest choices possible.
         if (stepIndex % config.branchEvery === (routeIndex % config.branchEvery)
-          || priorityMid && stepIndex % (feet >= 660 ? 2 : 3) === 0) {
+          || priorityMid && stepIndex % (feet >= 680 ? 1 : feet >= 660 ? 2 : 3) === 0) {
           const side = ((stepIndex + routeIndex) % 2 ? 1 : -1) * direction;
           const branchAngle = angle + side * (1.2 + (stepIndex % 3) * .42);
           const branchRadius = radius + side * (1.25 + (stepIndex % 4) * .26);
@@ -4586,6 +4737,7 @@ export class MountainWorld extends TestWorld {
       requestedSteps: requested,
       priority500To650Requested,
       priority660To700StepHeight: config.priority660To700StepHeight,
+      priority680To700StepHeight: config.priority680To700StepHeight,
       added,
       routeAudits
     };
@@ -5378,14 +5530,19 @@ export class MountainWorld extends TestWorld {
       this.buildCaveInteriorShell(location);
       return;
     }
-    for (let stone = 0; stone < 4; stone += 1) {
-      const stoneAngle = location.angle + (stone - 1.5) * 4.6;
-      const stoneRadius = location.radius + Math.max(location.radii[0], location.radii[1]) + 1.1;
-      const y = this.terrainY(stoneAngle, stoneRadius);
-      const point = this.point(stoneAngle, stoneRadius, y + .45);
-      this.addMountainBoulder(`${location.label} shore stone ${stone + 1}`, point,
-        { x: 1.25 + (stone % 2) * .45, y: .9 + (stone % 3) * .22, z: 1.35 },
-        ['upper', 'summit'].includes(location.tier) ? this.materials.alpine : this.materials.waterEdge);
+    // Main-mountain ponds can use polar route coordinates. Offshore water cannot: a 4.6°
+    // offset at a 1,500 m island radius throws a prop more than 100 m into open ocean.
+    // Satellite islands already own correctly anchored decoration in decorateOceanIsland().
+    if (!location.offshore) {
+      for (let stone = 0; stone < 4; stone += 1) {
+        const stoneAngle = location.angle + (stone - 1.5) * 4.6;
+        const stoneRadius = location.radius + Math.max(location.radii[0], location.radii[1]) + 1.1;
+        const y = this.terrainY(stoneAngle, stoneRadius);
+        const point = this.point(stoneAngle, stoneRadius, y + .45);
+        this.addMountainBoulder(`${location.label} shore stone ${stone + 1}`, point,
+          { x: 1.25 + (stone % 2) * .45, y: .9 + (stone % 3) * .22, z: 1.35 },
+          ['upper', 'summit'].includes(location.tier) ? this.materials.alpine : this.materials.waterEdge);
+      }
     }
     if (location.offshore) return;
     // Shore dressing varies by climate and water scale instead of stamping the same ring

@@ -73,19 +73,8 @@ export function getRarityProfile(modifiers = {}, availableRarities = CATCH_RARIT
   };
   addPercentagePoints('Rare', modifiers.rareProbabilityBonus);
   addPercentagePoints('Legendary', modifiers.legendaryProbabilityBonus);
-  // Lure percentage-point changes happen first. A selective bobber then represents which
-  // rarity of bite is strong enough to register, after which the accepted mass is normalized.
-  // This keeps bobbers composable and prevents applying lure bonuses twice.
-  const acceptance = modifiers.bobberAcceptanceByRarity;
-  if (acceptance) {
-    const accepted = Object.fromEntries(CATCH_RARITIES.map((rarity) => [
-      rarity, profile[rarity] * Math.max(0, acceptance[rarity] ?? 1)
-    ]));
-    const acceptedTotal = Object.values(accepted).reduce((sum, value) => sum + value, 0);
-    if (acceptedTotal > 0) {
-      for (const rarity of CATCH_RARITIES) profile[rarity] = accepted[rarity] / acceptedTotal;
-    }
-  }
+  // Bobbers do not belong in this normalized selection profile. They filter a completed
+  // potential bite afterward, preserving absolute good-bite opportunities per unit time.
   return Object.freeze(profile);
 }
 

@@ -32,7 +32,7 @@ export const EQUIPMENT_CATALOG = Object.freeze([
     'A patient cedar float that ignores nervous taps and settles only for a confident pull.', {},
     { bobberMode: 'selective' }),
   item('trophy-sentinel-bobber', 'bobber', 'Trophy Sentinel Bobber', 4500,
-    'A brass-eyed deepwater float, slow to stir and hard to impress.', {},
+    'A brass-eyed deepwater float that waits until a bite seems worth bothering you about.', {},
     { bobberMode: 'trophy' }),
 
   item('common-field-notes', 'guide', 'Common Field Notes', 400, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),
