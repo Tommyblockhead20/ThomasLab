@@ -541,7 +541,7 @@ const FISHING_LAYOUT = Object.freeze([
   Object.freeze({ id: 'sunwash-tidepool', label: 'Sunwash Tidepool', tier: 'lower', waterType: 'tidepool', theme: 'sunwash', angle: 348, radius: 190, radii: [6, 4.8], depth: 'shallow', basinDepth: .35, fish: ['sardine', 'anchovy', 'tidepool-sculpin', 'striped-mullet'], size: .94, rarityBias: 0.08, trophyChance: .9 }),
   Object.freeze({ id: 'blackstone-inlet', label: 'Blackstone Inlet', tier: 'lower', waterType: 'inlet', theme: 'blackstone', angle: 62, radius: 188, radii: [7, 5.3], depth: 'deep', basinDepth: .45, fish: ['mackerel', 'rockfish', 'sea-bass', 'flounder'], size: 1, rarityBias: 0.1, trophyChance: 1 }),
   Object.freeze({ id: 'fernwater-pond', label: 'Fernwater Pond', tier: 'lower', waterType: 'pond', theme: 'fernwood', angle: 104, radius: 164, radii: [6.2, 4.7], depth: 'shallow', basinDepth: 2.2, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'largemouth-bass', 'common-carp'], size: 1, rarityBias: 0.09, trophyChance: 1 }),
-  Object.freeze({ id: 'amber-reed-pond', label: 'Mangrove Lagoon', tier: 'lower', waterType: 'lagoon', theme: 'mangrove', ecologyThemes: ['sunwash', 'fernwood'], offshore: 'normal-fishing-island', angle: NORMAL_FISHING_WORLD_LOCATION?.angle ?? 344, radius: NORMAL_FISHING_WORLD_LOCATION?.radius ?? 300, waterY: .88, radii: [7.8, 5.8], depth: 'shallow', basinDepth: .8, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'black-crappie'], size: 1, rarityBias: 0.12, trophyChance: 1.01 }),
+  Object.freeze({ id: 'amber-reed-pond', label: 'Mangrove Lagoon', tier: 'lower', waterType: 'lagoon', theme: 'mangrove', ecologyThemes: ['sunwash', 'fernwood'], offshore: 'normal-fishing-island', angle: NORMAL_FISHING_WORLD_LOCATION?.angle ?? 344, radius: NORMAL_FISHING_WORLD_LOCATION?.radius ?? 300, waterY: .62, radii: [7.8, 5.8], depth: 'shallow', basinDepth: .8, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'black-crappie'], size: 1, rarityBias: 0.12, trophyChance: 1.01 }),
   Object.freeze({ id: 'basalt-grotto', label: 'Basalt Grotto', tier: 'lower', waterType: 'cave-pool', theme: 'fallglass', offshore: 'cave-fishing-island', cave: true, entranceDepth: 11.5, angle: CAVE_FISHING_WORLD_LOCATION?.angle ?? 164, radius: CAVE_FISHING_WORLD_LOCATION?.radius ?? 300, waterY: .22, radii: [4.8, 3.9], depth: 'shallow', basinDepth: 1.15, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.01, rarityBias: 0.16, trophyChance: 1.04 }),
   Object.freeze({ id: 'boulder-lagoon', label: 'Boulder Coast Lagoon', tier: 'lower', waterType: 'lagoon', theme: 'blackstone', angle: 226, radius: 177, radii: [9.5, 7.2], depth: 'deep', basinDepth: .7, fish: ['rockfish', 'flounder', 'striped-mullet', 'sea-bass'], size: 1.01, rarityBias: 0.1, trophyChance: 1.02 }),
   Object.freeze({ id: 'gull-crag-pond', label: 'Gull Crag Pond', tier: 'lower', waterType: 'pond', theme: 'blackstone', angle: 263, radius: 160, radii: [6.5, 5.1], depth: 'shallow', basinDepth: 2.5, fish: ['yellow-perch', 'black-crappie', 'freshwater-drum', 'channel-catfish'], size: 1.03, rarityBias: 0.14, trophyChance: 1.05 }),
@@ -1333,7 +1333,9 @@ export class MountainWorld extends TestWorld {
     // Everything at/above the waterline keeps its authored footprint and elevation.
     // Hearthward gets enough interior rings for its small tutorial pond to be carved into
     // the actual island mesh. Two broad top rings could only draw a flat triangle through it.
-    const topRingFactors = location.id === 'home-island' ? [.84, .68, .52, .36, .2] : [.68, .2];
+    const topRingFactors = location.id === 'home-island' ? [.84, .68, .52, .36, .2]
+      : location.id === 'normal-fishing-island' ? [.84, .68, .52, .36, .2]
+        : [.68, .2];
     const ringFactors = [...ISLAND_UNDERWATER_PROFILE.radiusFactors, ...topRingFactors];
     const ringHeights = [
       oceanFloorHeightAt(location.radius) + .12,
@@ -1347,6 +1349,7 @@ export class MountainWorld extends TestWorld {
       ? radialPoint(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius + 8.25, HOME_CABIN_CONFIG.floorY, -7.8)
       : null;
     const homeRadians = degreesToRadians(HOME_CABIN_CONFIG.angle);
+    const mangroveLagoonCenter = location.id === 'normal-fishing-island' ? location.worldPosition : null;
     const vertices = [];
     for (let ring = 0; ring < ringFactors.length; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
@@ -1382,6 +1385,20 @@ export class MountainWorld extends TestWorld {
             vertexY = lerp(basinTarget, vertexY, smoothstep(1.08, 1.42, pondDistance));
           }
         }
+        if (mangroveLagoonCenter && ring >= ISLAND_UNDERWATER_PROFILE.radiusFactors.length) {
+          const lagoonDistance = Math.hypot(
+            (vertexX - mangroveLagoonCenter.x) / 8.3,
+            (vertexZ - mangroveLagoonCenter.z) / 6.2
+          );
+          if (lagoonDistance < 1.42) {
+            const basinFloor = location.elevation - .36;
+            const shoreline = location.elevation + .04;
+            const basinTarget = lagoonDistance <= .7
+              ? lerp(basinFloor, basinFloor + .04, smoothstep(0, .7, lagoonDistance))
+              : lerp(basinFloor + .04, shoreline, smoothstep(.7, 1.08, lagoonDistance));
+            vertexY = lerp(basinTarget, vertexY, smoothstep(1.08, 1.42, lagoonDistance));
+          }
+        }
         vertices.push([vertexX, vertexY, vertexZ]);
       }
     }
@@ -1402,7 +1419,9 @@ export class MountainWorld extends TestWorld {
     const centerIndex = vertices.length;
     vertices.push([
       location.worldPosition.x,
-      location.id === 'cold-island' ? .96 - .78 : location.elevation + .18,
+      location.id === 'cold-island' ? .96 - .78
+        : location.id === 'normal-fishing-island' ? location.elevation - .36
+          : location.elevation + .18,
       location.worldPosition.z
     ]);
     const finalRingStart = (ringFactors.length - 1) * segments;
@@ -1591,11 +1610,9 @@ export class MountainWorld extends TestWorld {
       // Mangrove Cay is a warm, muddy lagoon biome rather than another generic grass
       // island. The broadleaf trunks are registered climb surfaces; root fans are low,
       // visual shoreline structure and never seal the fishable banks.
-      // The old mud shelf top was exactly coplanar with the lagoon surface (.88 m), which
-      // caused the transparent water and opaque mud to alternate every frame. Keep the shelf
-      // visibly submerged as one intentional underwater layer instead of offsetting duplicates.
-      this.addCylinder('Mangrove Cay submerged warm mud shelf', { x, y: y - .16, z },
-        { x: 17.2, y: .12, z: 13.2 }, this.materials.sand, {}, false);
+      // The lagoon is carved into the island terrain itself in buildOceanIsland. There is no
+      // separate mud disc here: the former overlapping cylinder was the source of shoreline
+      // depth fighting and could never produce a readable sloped bank.
       for (let index = 0; index < 20; index += 1) {
         const theta = (index * 18 + 14) * Math.PI / 180;
         const treeX = x + Math.cos(theta) * (11.1 + index % 3 * 1.15);
@@ -1610,15 +1627,15 @@ export class MountainWorld extends TestWorld {
       for (let index = 0; index < 34; index += 1) {
         const theta = index * Math.PI * 2 / 34;
         this.createPrimitive(`Mangrove Lagoon reed ${index + 1}`, 'cone',
-          { x: x + Math.cos(theta) * 8.8, y: y + .48, z: z + Math.sin(theta) * 6.65 },
+          { x: x + Math.cos(theta) * 8.8, y: y + .33, z: z + Math.sin(theta) * 6.65 },
           { x: .12, y: .95 + index % 4 * .16, z: .12 }, index % 3 ? this.materials.shrubLight : this.materials.dryGrass,
           { z: index % 2 ? 5 : -5 }, { castShadows: false });
       }
       for (let index = 0; index < 48; index += 1) {
         const theta = (index * 137.5 + 9) * Math.PI / 180;
-        const distance = 4.8 + index % 7 * 1.25;
+        const distance = Math.max(9.25, 4.8 + index % 7 * 1.25);
         const groundX = x + Math.cos(theta) * distance;
-        const groundZ = z + Math.sin(theta) * distance * .72;
+        const groundZ = z + Math.sin(theta) * distance * .76;
         for (const side of [-1, 1]) this.createPrimitive(`Mangrove Cay tropical fern ${index + 1}-${side}`,
           'cone', { x: groundX + side * .22, y: y + .28, z: groundZ },
           { x: .36, y: .58 + index % 3 * .09, z: .11 },
@@ -1636,12 +1653,27 @@ export class MountainWorld extends TestWorld {
       for (let index = 0; index < 18; index += 1) {
         const theta = (index * 47 + 5) * Math.PI / 180;
         this.createPrimitive(`Mangrove Cay lush ground-cover mound ${index + 1}`, 'sphere', {
-          x: x + Math.cos(theta) * (5.5 + index % 5 * 1.7), y: y + .13,
-          z: z + Math.sin(theta) * (4.1 + index % 4 * 1.15)
+          x: x + Math.cos(theta) * (9.2 + index % 5 * 1.05), y,
+          z: z + Math.sin(theta) * (6.8 + index % 4 * .72)
         }, { x: .85 + index % 3 * .18, y: .28, z: .7 },
         index % 2 ? this.materials.shrubDark : this.materials.shrubLight,
         {}, { castShadows: false });
       }
+      const logX = x + 9.25;
+      const logZ = z;
+      const logCenterY = location.elevation + .32;
+      this.addCylinder('Mangrove Lagoon sit-and-fish log', { x: logX, y: logCenterY, z: logZ },
+        { x: .72, y: 4.4, z: .72 }, this.materials.wood, { x: 90 });
+      for (const end of [-1, 1]) this.addCylinder(`Mangrove Lagoon log end ${end < 0 ? 'south' : 'north'}`,
+        { x: logX, y: logCenterY, z: logZ + end * 2.18 },
+        { x: .62, y: .035, z: .62 }, this.materials.woodLight, { x: 90 }, false);
+      this.homeInteractions.push({
+        id: 'mangrove-lagoon-fishing-log', label: 'SIT', action: 'bench', seatKind: 'fishing log',
+        position: { x: logX + .25, y: location.elevation + .04, z: logZ },
+        seatPosition: { x: logX - .08, y: logCenterY + .37 + PLAYER_FOOT_OFFSET, z: logZ },
+        exitPosition: { x: logX + 1.35, y: location.elevation + .08 + PLAYER_FOOT_OFFSET, z: logZ },
+        facingYaw: 90, fishingFacing: 'amber-reed-pond', fishingLabel: 'Mangrove Lagoon', range: 2.4
+      });
     } else if (location.id === 'cold-island') {
       // One large opaque/depth-writing seabed tint sits well below the one global ocean.
       // Its visual radius intentionally exceeds the ecology annulus: Frosthook looks frozen
@@ -2347,6 +2379,44 @@ export class MountainWorld extends TestWorld {
       { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
     this.addAquariumBox('Glasswater Aquarium collection sign', { x: 0, y: config.waterlineY + 1.15, z: config.depth * .5 + 1.1 },
       { x: 8.8, y: 1.15, z: .18 }, this.materials.woodLight, {}, false);
+
+    // A loose low-poly stepping-stone trail joins the outward-facing dock to the public
+    // entrance. Thin visual stones follow the island grade without introducing little
+    // collision lips that could snag a player walking in from the pier.
+    const dockArrival = AQUARIUM_WORLD_LOCATION?.dock?.arrivalPosition;
+    const dockArrivalDistance = dockArrival
+      ? Math.hypot(
+          dockArrival.x - AQUARIUM_WORLD_LOCATION.worldPosition.x,
+          dockArrival.z - AQUARIUM_WORLD_LOCATION.worldPosition.z
+        )
+      : config.depth * .5 + 32;
+    const pathStartZ = config.depth * .5 + 3.4;
+    const pathEndZ = Math.max(pathStartZ + 12, dockArrivalDistance - 1.4);
+    const pathStoneCount = 15;
+    for (let index = 0; index < pathStoneCount; index += 1) {
+      const progress = index / (pathStoneCount - 1);
+      const pathZ = lerp(pathStartZ, pathEndZ, progress);
+      const pathX = Math.sin(index * 1.73) * .42;
+      this.addAquariumBox(`Glasswater dock path stone ${index + 1}`,
+        { x: pathX, y: -.06 + Math.sin(index * .9) * .018, z: pathZ },
+        { x: 2.75 + index % 3 * .28, y: .16, z: 2.05 + (index + 1) % 3 * .24 },
+        index % 4 === 0 ? this.materials.waterEdge : this.materials.rockLight,
+        { y: index % 2 ? 6 : -7 }, false);
+    }
+    for (const side of [-1, 1]) {
+      for (let index = 0; index < 6; index += 1) {
+        const pathZ = lerp(pathStartZ + 2, pathEndZ - 2, index / 5);
+        this.addAquariumBox(`Glasswater path edging plant ${side < 0 ? 'west' : 'east'} ${index + 1}`,
+          { x: side * (2.15 + index % 2 * .22), y: .28, z: pathZ },
+          { x: .42 + index % 3 * .08, y: .7 + index % 2 * .22, z: .42 },
+          index % 2 ? this.materials.shrubLight : this.materials.foliage,
+          { z: side * (5 + index * 2) }, false);
+      }
+    }
+    this.addAquariumBox('Glasswater dock path sign post', { x: -2.9, y: 1.05, z: pathStartZ + 4.2 },
+      { x: .18, y: 2.1, z: .18 }, this.materials.wood, {}, false);
+    this.addAquariumBox('Glasswater dock path welcome sign', { x: -2.9, y: 1.72, z: pathStartZ + 4.2 },
+      { x: 2.3, y: .8, z: .16 }, this.materials.woodLight, { y: -4 }, false);
 
     // Low garden beds and paths make the expanded grounds feel intentional without adding
     // expensive simulation. They remain outside the exhibit/viewing circulation.

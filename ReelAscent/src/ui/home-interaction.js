@@ -181,7 +181,8 @@ export class HomeInteractionController {
       this.player.setBenchSeat(interaction);
       this.camera?.setYaw?.(interaction.facingYaw);
       this.pendingSeat = { expiresAt: performance.now() + 1800 };
-      const destination = interaction.seatKind === 'boat fishing seat' ? 'open water' : 'Stoneveil Tarn';
+      const destination = interaction.fishingLabel
+        ?? (interaction.seatKind === 'boat fishing seat' ? 'open water' : 'Stoneveil Tarn');
       this.hud.showToast?.(`Seated facing ${destination} • press F to fish • click the prompt to get up.`);
       return true;
     }

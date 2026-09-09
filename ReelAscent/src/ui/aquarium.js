@@ -21,6 +21,7 @@ export class AquariumMenu {
     this.isOpen = false;
     this.selectedSpecimenId = null;
     this.selectedTankIndex = 0;
+    this.collectionSection = 'displayed';
     this.view = 'collection';
     this.remotePlayerId = null;
     this.renderedRevision = -1;
@@ -66,13 +67,18 @@ export class AquariumMenu {
     else if (action === 'showcase-add') result = this.progression.setAquariumShowcase(button.dataset.specimenId, true);
     else if (action === 'showcase-remove') result = this.progression.setAquariumShowcase(button.dataset.specimenId, false);
     else if (action === 'auto-showcase') result = this.progression.autoFillAquariumShowcase();
-    else if (action === 'tank') this.selectedTankIndex = Math.max(0, Number(button.dataset.tankIndex) || 0);
+    else if (action === 'tank') {
+      this.selectedTankIndex = Math.max(0, Number(button.dataset.tankIndex) || 0);
+      this.collectionSection = 'displayed';
+    } else if (action === 'list') this.collectionSection = ['displayed', 'stored', 'inventory'].includes(button.dataset.list)
+      ? button.dataset.list
+      : 'displayed';
     else if (action === 'view') {
       this.view = button.dataset.view;
       this.remotePlayerId = button.dataset.playerId || null;
     }
     if (result.ok && ['showcase-add', 'showcase-remove', 'auto-showcase'].includes(action)) this.onShowcaseChanged();
-    if (this.status && !['tank', 'view'].includes(action)) this.status.textContent = result.ok ? 'Aquarium collection updated.' : result.reason;
+    if (this.status && !['tank', 'list', 'view'].includes(action)) this.status.textContent = result.ok ? 'Aquarium collection updated.' : result.reason;
     if (result.ok) this.render(true);
   }
 
@@ -128,7 +134,7 @@ export class AquariumMenu {
     const upgrade = economy.nextTier
       ? `<div><small>NEXT TANK</small><strong>Tank ${economy.nextTier.tankCount}</strong><button data-aquarium-action="upgrade" ${state.money < economy.nextTier.price ? 'disabled' : ''}>BUY $${economy.nextTier.price}</button></div>`
       : '<div><small>EXPANSION</small><strong>MAXIMUM</strong><span>10 tanks • 300 creatures</span></div>';
-    const summary = `<section class="aquarium-summary-bar"><div><small>TANKS</small><strong>${economy.tankCount} / 10</strong><span>${economy.displayedCount} displayed</span></div><div><small>CREATURES</small><strong>${specimens.length} / ${economy.capacity}</strong></div><div><small>COLLECTION VALUE</small><strong>$${economy.collectionValue}</strong><span>$${economy.exhibitedValue} displayed</span></div><div><small>VISITOR INCOME</small><strong>$${economy.payout} / 5 min</strong><span>${clock} remaining</span></div>${upgrade}</section>`;
+    const summary = `<section class="aquarium-summary-bar"><div><small>TANKS</small><strong>${economy.tankCount} / 10</strong></div><div><small>DISPLAYED</small><strong>${economy.displayedCount}</strong><span>of ${specimens.length} retained</span></div><div><small>COLLECTION VALUE</small><strong>$${economy.collectionValue}</strong><span>$${economy.exhibitedValue} on display</span></div><div><small>VISITOR INCOME</small><strong>$${economy.payout} / 5 min</strong><span>${clock} remaining</span></div>${upgrade}<div><small>RETAINED</small><strong>${specimens.length} / ${economy.capacity}</strong></div></section>`;
     const tabs = `<nav class="aquarium-view-tabs"><button data-aquarium-action="view" data-view="collection" class="${this.view === 'collection' ? 'is-active' : ''}">MY TANKS</button><button data-aquarium-action="view" data-view="showcase" class="${this.view === 'showcase' ? 'is-active' : ''}">MY MULTIPLAYER TANK</button>${socials.filter((entry) => !entry.isLocal).map((entry) => `<button data-aquarium-action="view" data-view="remote" data-player-id="${escapeHtml(entry.playerId)}" class="${this.view === 'remote' && this.remotePlayerId === entry.playerId ? 'is-active' : ''}">${escapeHtml(entry.displayName || 'Guest')}</button>`).join('')}</nav>`;
     this.content.innerHTML = `${summary}${tabs}${this.view === 'collection' ? this.renderCollection(state, tankSpecimens, available, selected, ids, economy) : this.renderShowcase(state, specimens, socials)}`;
     this.renderedRevision = this.progression.revision;
@@ -136,14 +142,26 @@ export class AquariumMenu {
 
   renderCollection(state, tankSpecimens, available, selected, displayedIds, economy) {
     const displays = this.progression.getAquariumTankDisplays();
-    const tankButtons = displays.map((ids, index) => `<button data-aquarium-action="tank" data-tank-index="${index}" class="${index === this.selectedTankIndex ? 'is-active' : ''}">TANK ${index + 1}<small>${ids.length} / 30 • $${economy.tanks[index]?.payout ?? 0} / 5 min</small></button>`).join('');
-    const cards = (items, subtitle) => items.length ? items.map((entry) => specimenCard(entry, this.selectedSpecimenId, subtitle)).join('') : '<p class="shop-empty">Nothing here yet.</p>';
+    const tankButtons = displays.map((ids, index) => `<button data-aquarium-action="tank" data-tank-index="${index}" class="${index === this.selectedTankIndex ? 'is-active' : ''}" aria-pressed="${index === this.selectedTankIndex}"><strong>TANK ${index + 1}</strong><small>${ids.length} / 30</small><span>$${economy.tanks[index]?.payout ?? 0} / 5 min</span></button>`).join('');
+    const lists = {
+      displayed: { label: `TANK ${this.selectedTankIndex + 1}`, subtitle: 'DISPLAYED', items: tankSpecimens },
+      stored: { label: 'STORED', subtitle: 'AVAILABLE', items: available },
+      inventory: { label: 'INVENTORY', subtitle: 'CARRIED', items: state.inventory }
+    };
+    if (!lists[this.collectionSection]) this.collectionSection = 'displayed';
+    const activeList = lists[this.collectionSection];
+    const cards = activeList.items.length
+      ? activeList.items.map((entry) => specimenCard(entry, this.selectedSpecimenId, activeList.subtitle)).join('')
+      : `<p class="shop-empty">No creatures in ${activeList.label.toLowerCase()}.</p>`;
     const selectedStored = selected && state.aquarium.some((entry) => entry.specimenId === selected.specimenId);
     const selectedDisplayed = selected && displayedIds.has(selected.specimenId);
+    const displayedTankIndex = selected
+      ? displays.findIndex((ids) => ids.includes(selected.specimenId))
+      : -1;
     const detailAction = selected ? (selectedStored
-      ? `<div class="aquarium-detail-actions"><button data-aquarium-action="${selectedDisplayed ? 'undisplay' : 'display'}" data-specimen-id="${escapeHtml(selected.specimenId)}">${selectedDisplayed ? 'REMOVE FROM THIS DISPLAY' : `DISPLAY IN TANK ${this.selectedTankIndex + 1}`}</button><button data-aquarium-action="return" data-specimen-id="${escapeHtml(selected.specimenId)}">RETURN TO INVENTORY</button></div>`
+      ? `<div class="aquarium-placement"><small>CURRENT PLACEMENT</small><strong>${displayedTankIndex >= 0 ? `Tank ${displayedTankIndex + 1}` : 'Aquarium storage'}</strong></div><div class="aquarium-detail-actions"><button data-aquarium-action="${selectedDisplayed ? 'undisplay' : 'display'}" data-specimen-id="${escapeHtml(selected.specimenId)}">${selectedDisplayed ? `REMOVE FROM TANK ${this.selectedTankIndex + 1}` : displayedTankIndex >= 0 ? `MOVE TO TANK ${this.selectedTankIndex + 1}` : `DISPLAY IN TANK ${this.selectedTankIndex + 1}`}</button><button class="is-secondary" data-aquarium-action="return" data-specimen-id="${escapeHtml(selected.specimenId)}">RETURN TO INVENTORY</button></div>`
       : `<button data-aquarium-action="store" data-specimen-id="${escapeHtml(selected.specimenId)}">STORE IN AQUARIUM</button>`) : '';
-    return `<div class="aquarium-tank-selector">${tankButtons}<button data-aquarium-action="auto-tank">AUTO-FILL TANK ${this.selectedTankIndex + 1}</button></div><div class="aquarium-workspace"><section class="aquarium-collection"><div><h3>DISPLAYED IN TANK ${this.selectedTankIndex + 1}</h3><div class="aquarium-creature-grid">${cards(tankSpecimens, 'DISPLAYED')}</div></div><div><h3>STORED & AVAILABLE</h3><div class="aquarium-creature-grid">${cards(available, 'STORED')}</div></div><div><h3>CARRIED INVENTORY</h3><div class="aquarium-creature-grid">${cards(state.inventory, 'CARRIED')}</div></div></section>${this.renderDetail(selected, detailAction)}</div>`;
+    return `<div class="aquarium-collection-layout"><section class="aquarium-tank-browser"><div class="aquarium-section-heading"><div><h3>CHOOSE A TANK</h3><small>Select a tank, then manage its creatures below.</small></div><button data-aquarium-action="auto-tank">AUTO-FILL TANK ${this.selectedTankIndex + 1}</button></div><div class="aquarium-tank-selector">${tankButtons}</div></section><div class="aquarium-workspace"><section class="aquarium-collection"><nav class="aquarium-list-tabs"><button data-aquarium-action="list" data-list="displayed" class="${this.collectionSection === 'displayed' ? 'is-active' : ''}">TANK ${this.selectedTankIndex + 1}<small>${tankSpecimens.length}</small></button><button data-aquarium-action="list" data-list="stored" class="${this.collectionSection === 'stored' ? 'is-active' : ''}">STORED<small>${available.length}</small></button><button data-aquarium-action="list" data-list="inventory" class="${this.collectionSection === 'inventory' ? 'is-active' : ''}">INVENTORY<small>${state.inventory.length}</small></button></nav><div class="aquarium-creature-list-heading"><h3>${activeList.label}</h3><small>${activeList.items.length} creature${activeList.items.length === 1 ? '' : 's'}</small></div><div class="aquarium-creature-grid">${cards}</div></section>${this.renderDetail(selected, detailAction)}</div></div>`;
   }
 
   renderShowcase(state, specimens, socials) {

@@ -18,6 +18,39 @@ function colorCss(color = [.45, .62, .55]) {
 
 const SPECIMEN_PREVIEW_CACHE = new Map();
 
+export const INVENTORY_SORT_OPTIONS = Object.freeze([
+  ['recent', 'Most recent'],
+  ['value', 'Value: high to low'],
+  ['rarity', 'Rarity: high to low'],
+  ['size', 'Size: largest first'],
+  ['species', 'Species: A to Z'],
+  ['location', 'Catch location: A to Z']
+]);
+
+const RARITY_ORDER = Object.freeze({ common: 0, uncommon: 1, rare: 2, legendary: 3 });
+const compareText = (left, right) => String(left ?? '').localeCompare(String(right ?? ''), undefined, { sensitivity: 'base' });
+const recentTime = (entry) => Number(entry?.provenance?.caughtAt ?? entry?.caughtAt) || 0;
+
+export function sortInventorySpecimens(specimens = [], mode = 'recent') {
+  const indexed = specimens.map((specimen, index) => ({ specimen, index }));
+  const recent = (a, b) => recentTime(b.specimen) - recentTime(a.specimen) || b.index - a.index;
+  indexed.sort((a, b) => {
+    if (mode === 'value') return (Number(b.specimen.value) || 0) - (Number(a.specimen.value) || 0) || recent(a, b);
+    if (mode === 'rarity') return (RARITY_ORDER[String(b.specimen.rarity).toLowerCase()] ?? -1) - (RARITY_ORDER[String(a.specimen.rarity).toLowerCase()] ?? -1)
+      || (Number(b.specimen.value) || 0) - (Number(a.specimen.value) || 0) || recent(a, b);
+    if (mode === 'size') return Math.max(Number(b.specimen.lengthCategoryIndex) || 0, Number(b.specimen.sizeCategoryIndex) || 0)
+      - Math.max(Number(a.specimen.lengthCategoryIndex) || 0, Number(a.specimen.sizeCategoryIndex) || 0)
+      || (Number(b.specimen.length) || 0) - (Number(a.specimen.length) || 0)
+      || (Number(b.specimen.weight) || 0) - (Number(a.specimen.weight) || 0) || recent(a, b);
+    if (mode === 'species') return compareText(a.specimen.name, b.specimen.name)
+      || (Number(b.specimen.value) || 0) - (Number(a.specimen.value) || 0) || recent(a, b);
+    if (mode === 'location') return compareText(a.specimen.provenance?.locationLabel || 'Unknown water', b.specimen.provenance?.locationLabel || 'Unknown water')
+      || compareText(a.specimen.name, b.specimen.name) || recent(a, b);
+    return recent(a, b) || compareText(a.specimen.name, b.specimen.name);
+  });
+  return indexed.map(({ specimen }) => specimen);
+}
+
 export function specimenPreview(specimen) {
   const presentation = resolveCreaturePresentation(specimen, { context: 'inventory preview' });
   const { visual, archetype } = presentation;
@@ -69,6 +102,7 @@ export class InventoryMenu {
     this.mobileButton = document.querySelector('#open-inventory');
     this.isOpen = false;
     this.activeTab = 'catches';
+    this.catchSort = 'recent';
     this.renderedRevision = -1;
     this.previousFocus = null;
 
@@ -97,6 +131,12 @@ export class InventoryMenu {
     };
     this.onClick = (event) => this.handleClick(event);
     this.onChange = (event) => {
+      const sort = event.target.closest?.('[data-inventory-sort]');
+      if (sort) {
+        this.catchSort = INVENTORY_SORT_OPTIONS.some(([value]) => value === sort.value) ? sort.value : 'recent';
+        this.render(true, true);
+        return;
+      }
       const select = event.target.closest?.('[data-inventory-equip-select]');
       if (!select) return;
       const result = this.progression.equip(select.value);
@@ -204,10 +244,11 @@ export class InventoryMenu {
   }
 
   renderCatches(state) {
-    const specimens = [...(state.inventory ?? [])].reverse().map((specimen) => (
+    const specimens = sortInventorySpecimens(state.inventory ?? [], this.catchSort).map((specimen) => (
       `<article class="inventory-card" data-rarity="${escapeHtml(specimen.rarity.toLowerCase())}" data-held="${state.heldSpecimenId === specimen.specimenId}">${specimenPreview(specimen)}<div class="inventory-card-heading"><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)} • ${escapeHtml(specimen.quality)}</small></div><dl><div><dt>LENGTH</dt><dd>${specimen.length.toFixed(1)} in • ${escapeHtml(specimen.lengthCategory)}</dd></div><div><dt>BODY</dt><dd>${specimen.weight.toFixed(2)} lb • ${escapeHtml(specimen.sizeCategory)}</dd></div><div><dt>VALUE</dt><dd>$${specimen.value}</dd></div><div><dt>FOUND</dt><dd>${escapeHtml(specimen.provenance.locationLabel || 'Unknown water')}</dd></div></dl><div class="inventory-actions"><button type="button" data-inventory-action="hold" data-specimen-id="${escapeHtml(specimen.specimenId)}">${state.heldSpecimenId === specimen.specimenId ? 'PUT AWAY' : 'HOLD IN HAND'}</button></div></article>`
     )).join('');
-    return specimens || '<p class="shop-empty">No carried catches yet.</p>';
+    const options = INVENTORY_SORT_OPTIONS.map(([value, label]) => `<option value="${value}" ${this.catchSort === value ? 'selected' : ''}>${label}</option>`).join('');
+    return `<div class="inventory-sort-toolbar"><label><span>SORT CATCHES</span><select data-inventory-sort aria-label="Sort catches">${options}</select></label><small>${state.inventory.length} carried catch${state.inventory.length === 1 ? '' : 'es'}</small></div><div class="inventory-catch-grid">${specimens || '<p class="shop-empty">No carried catches yet.</p>'}</div>`;
   }
 
   renderGear(state) {
