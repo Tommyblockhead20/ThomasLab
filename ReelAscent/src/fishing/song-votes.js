@@ -1,13 +1,13 @@
 export const SONG_VOTES_STORAGE_KEY = 'reel-ascent-song-votes-v2';
 export const LEGACY_SONG_VOTES_STORAGE_KEY = 'reel-ascent-song-votes-v1';
-export const SONG_VOTE_SCHEMA_VERSION = 4;
+export const SONG_VOTE_SCHEMA_VERSION = 5;
 
 export const SONG_DOWNVOTE_REASONS = Object.freeze([
+  Object.freeze({ id: 'sounds_bad', label: 'Sounds Bad' }),
+  Object.freeze({ id: 'glitched', label: 'Glitched' }),
   Object.freeze({ id: 'too_hard', label: 'Too Hard' }),
   Object.freeze({ id: 'too_easy', label: 'Too Easy' }),
-  Object.freeze({ id: 'awkward_rhythm', label: 'Awkward Rhythm' }),
-  Object.freeze({ id: 'too_long', label: 'Too Long' }),
-  Object.freeze({ id: 'bad_fit', label: 'Bad Fit' })
+  Object.freeze({ id: 'bad_instrument', label: 'Bad Instrument' })
 ]);
 const DOWNVOTE_REASON_IDS = new Set(SONG_DOWNVOTE_REASONS.map((entry) => entry.id));
 export const normalizeDownvoteReason = (value) => DOWNVOTE_REASON_IDS.has(value) ? value : null;

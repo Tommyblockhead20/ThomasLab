@@ -29,7 +29,10 @@ export const SUMMIT_HEIGHT = 304.8; // exactly 1,000 ft
 export const COASTAL_SHELF_RADIUS = 214;
 export const OCEAN_FLOOR_OUTER_RADIUS = WORLD_MAP_RADIUS + 48;
 export const OCEAN_SEABED_JOIN_RADIUS = 208;
-export const OCEAN_WATER_INNER_RADIUS = 221;
+// Start the true ocean at the authored coastal shelf instead of leaving a 13 m
+// dry-cast moat between terrain and water. This is ocean-only; ponds and tiny
+// authored sources retain their own exact bounds.
+export const OCEAN_WATER_INNER_RADIUS = COASTAL_SHELF_RADIUS;
 export const OCEAN_SHALLOW_WALK_END_RADIUS = 239;
 export const OCEAN_SURFACE_Y = -.76;
 // Track the registry's global map extent so later far-away load groups still sit over
@@ -115,7 +118,6 @@ const CAVE_FISHING_WORLD_LOCATION = worldLocationById('cave-fishing-island');
 const NORMAL_FISHING_WORLD_LOCATION = worldLocationById('normal-fishing-island');
 const FROSTHOOK_WORLD_LOCATION = worldLocationById('cold-island');
 const BLUEWATER_WORLD_LOCATION = worldLocationById('bluewater-reach');
-const SKYREACH_WORLD_LOCATION = worldLocationById('skyreach-foundation');
 
 export const SUMMIT_BENCH_CONFIG = Object.freeze({
   id: 'summit-bench',
@@ -159,25 +161,25 @@ export const SKYREACH_TOWER_CONFIG = Object.freeze({
   locationId: 'skyreach-foundation',
   width: 32,
   depth: 24,
-  playableHeight: 381,
   mainRoofHeight: 381,
   spireHeight: 428.9898,
-  observationHeight: 316.992,
-  midpointHeight: 190.5,
-  routeCount: 4,
-  routeStepRise: 2,
-  routeTurns: 2.35,
-  restHeights: Object.freeze([95.25, 190.5, 285.75, 316.992, 381]),
-  movingObstacleCount: 14,
   visualAssetUrl: './assets/models/empire-state-building.glb',
   visualSourceRoofHeight: 8.8903,
   visualSourceSpireHeight: 10.0101,
   visualVerticalScale: 42.8556966582,
-  // Match the source model's measured 3.1563 × 1.5708 footprint to the authored
-  // 32 × 24 m collision envelope, keeping exterior holds visible at the facade edge.
+  // Match the source model's measured 3.1563 × 1.5708 footprint to the clean
+  // 32 × 24 m baseline collision envelope.
   visualHorizontalScaleX: 10.1384532522,
   visualHorizontalScaleZ: 15.2788388083,
-  visualSourceCenterZ: 1.5165
+  visualSourceCenterZ: 1.5165,
+  collisionLayers: Object.freeze([
+    Object.freeze({ bottom: 0, top: 66, width: 32, depth: 24 }),
+    Object.freeze({ bottom: 65, top: 132, width: 24, depth: 19 }),
+    Object.freeze({ bottom: 131, top: 236, width: 19, depth: 15 }),
+    Object.freeze({ bottom: 235, top: 316, width: 14.5, depth: 15 }),
+    Object.freeze({ bottom: 315, top: 382, width: 13.5, depth: 13.8 }),
+    Object.freeze({ bottom: 381, top: 429, width: 3.6, depth: 5.2 })
+  ])
 });
 
 export function skyreachRectanglePoint(progress, width = SKYREACH_TOWER_CONFIG.width, depth = SKYREACH_TOWER_CONFIG.depth) {
@@ -642,42 +644,9 @@ export const BLUEWATER_REACH_DESCRIPTOR = Object.freeze({
   fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
 });
 
-function skyreachWorldPoint(localX, localY, localZ) {
-  const location = SKYREACH_WORLD_LOCATION;
-  if (!location) return { ...MOUNTAIN_CENTER, y: localY };
-  return radialPoint(
-    location.angle,
-    location.radius + localZ,
-    location.elevation + .18 + localY,
-    -localX
-  );
-}
-
-export const SKYREACH_FISHING_DESCRIPTORS = Object.freeze([
-  Object.freeze({
-    id: 'skyreach-toilet', label: 'Skyscraper Restroom', physicalZone: 'Toilet bowl',
-    tier: 'middle', waterType: 'pool', theme: 'blackstone', ecologyThemes: ['blackstone', 'fernwood'],
-    habitatAliasIds: Object.freeze(['amber-reed-pond']),
-    center: Object.freeze(skyreachWorldPoint(-10.2, SKYREACH_TOWER_CONFIG.midpointHeight + 1.27, -1.56)),
-    radii: Object.freeze([.32, .33]), depth: 'shallow',
-    interactionDistance: 2.2, minimumCastDistance: .35, maximumCastDistance: 2.2,
-    fixedCastTarget: Object.freeze(skyreachWorldPoint(-10.2, SKYREACH_TOWER_CONFIG.midpointHeight + 1.27, -1.56)),
-    fish: Object.freeze(['weather-loach', 'goldfish']),
-    modifiers: Object.freeze({ biteRate: 1.12, size: .82, maximumSpeciesProbability: .65 })
-  }),
-  Object.freeze({
-    id: 'skyreach-rooftop-pool', label: 'Skyreach Rooftop Pool', physicalZone: 'Rooftop pool',
-    tier: 'middle', waterType: 'pool', theme: 'sunwash', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'],
-    habitatAliasIds: Object.freeze(['fernwater-pond', 'amber-reed-pond', 'sheltered-mirror', 'twilight-basin']),
-    center: Object.freeze(skyreachWorldPoint(0, SKYREACH_TOWER_CONFIG.playableHeight + .05, 0)),
-    radii: Object.freeze([9.5, 6]), depth: 'deep', swimmable: true,
-    floorY: SKYREACH_WORLD_LOCATION
-      ? SKYREACH_WORLD_LOCATION.elevation + .18 + SKYREACH_TOWER_CONFIG.playableHeight + .05 - 1.35
-      : SKYREACH_TOWER_CONFIG.playableHeight - 1.3,
-    fish: Object.freeze(['goldfish', 'bluegill', 'channel-catfish', 'capybara']),
-    modifiers: Object.freeze({ biteRate: 1.04, size: 1.05, rarityBias: .06, maximumSpeciesProbability: .45 })
-  })
-]);
+// Kept as an empty compatibility export for map/test consumers from v17-v17.2.
+// The v17.3 hard reset deliberately removes the failed toilet and rooftop-pool scenes.
+export const SKYREACH_FISHING_DESCRIPTORS = Object.freeze([]);
 
 function isFrosthookColdOceanPoint(point, margin = 0) {
   const descriptor = FROSTHOOK_COLD_OCEAN_DESCRIPTOR;
@@ -692,7 +661,7 @@ function isBluewaterReachPoint(point, margin = 0) {
 }
 
 export const FISHING_WATER_COUNTS = Object.freeze({
-  ocean: 3, lower: 11, middle: 9, upper: 4, summit: 2, waterfall: 1, total: 30
+  ocean: 3, lower: 11, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 28
 });
 
 export function terrainHeightAt(angle, radius) {
@@ -1211,7 +1180,6 @@ export class MountainWorld extends TestWorld {
     this.islandEntities = new Map();
     this.locationLoadGroups = new Map();
     this.activeLocationId = MAIN_WORLD_LOCATION.id;
-    this.skyreachMovingPlatforms = [];
     this.movingSurfaceMotion = new Map();
     this.summitRadius = CROWN_TOP_RADIUS + 1.5;
 
@@ -1835,229 +1803,37 @@ export class MountainWorld extends TestWorld {
   buildSkyreachFoundation(location) {
     const config = SKYREACH_TOWER_CONFIG;
     const floorY = location.elevation + .18;
-    const root = this.createStructureRoot('Skyreach Foundation Art Deco tower', location.angle, location.radius, floorY, location.id);
+    const root = this.createStructureRoot(
+      'Skyreach Foundation clean Empire State Building baseline',
+      location.angle,
+      location.radius,
+      floorY,
+      location.id
+    );
     this.skyreachRoot = root;
-    const worldPoint = (x, y, z) => root.getWorldTransform().transformPoint(new pc.Vec3(x, y, z));
-    const box = (name, position, size, material, rotation = {}, solid = true, climb = null) => {
-      const entity = this.addStructureBox(root, name, position, size, material, rotation, solid);
-      if (solid && climb) this.registerClimbSurface(entity, entity.physicsCollider, climb, name);
-      return entity;
-    };
-    const { width, depth, playableHeight } = config;
     this.loadSkyreachVisualShell(root);
 
-    // Arrival plaza: broad, uncluttered circulation from the existing dock to a geometric
-    // fountain and the tower's open entrance. The original durable island ID/name remains.
-    box('Skyreach striped arrival walk', { x: 0, y: .08, z: -27 }, { x: 7.2, y: .14, z: 18 }, this.materials.decoTile);
-    box('Skyreach fountain lower basin', { x: 0, y: .34, z: -21 }, { x: 9.2, y: .55, z: 7.2 }, this.materials.decoStone);
-    box('Skyreach fountain water', { x: 0, y: .67, z: -21 }, { x: 7.9, y: .08, z: 5.9 }, this.materials.shallowWater, {}, false);
-    for (const side of [-1, 1]) box(`Skyreach fountain fin ${side}`, { x: side * 2.2, y: 1.22, z: -21 }, { x: .42, y: 1.6, z: 3.4 }, this.materials.decoBrass, { z: side * 24 });
-    box('Skyreach fountain central jet', { x: 0, y: 2.15, z: -21 }, { x: .34, y: 3.5, z: .34 }, this.materials.decoBrass, {}, false);
-    for (const side of [-1, 1]) {
-      box(`Skyreach plaza planter ${side}`, { x: side * 10.5, y: .45, z: -21 }, { x: 4.4, y: .8, z: 7 }, this.materials.decoStone);
-      for (const offset of [-1.2, 1.2]) this.createPrimitive(`Skyreach plaza planting ${side}:${offset}`, 'sphere',
-        { x: side * 10.5 + offset, y: 1.25, z: -21 }, { x: 1.15, y: .8, z: 1.35 }, this.materials.shrubDark, {}, { castShadows: false });
+    // v17.3 intentionally resets the island to one imported landmark and a compact,
+    // invisible collision hull. These overlapping setback volumes form a continuous,
+    // hole-free solid while staying out of the climb-surface registry.
+    for (const [index, layer] of config.collisionLayers.entries()) {
+      const collision = this.addStructureBox(
+        root,
+        `Skyreach non-climbable collision layer ${index + 1}`,
+        { x: 0, y: (layer.bottom + layer.top) / 2, z: 0 },
+        { x: layer.width, y: layer.top - layer.bottom, z: layer.depth },
+        this.materials.decoStone,
+        {},
+        true
+      );
+      collision.render.enabled = false;
+      collision.tags.add('non-climbable');
     }
-    box('Skyreach grand lobby floor', { x: 0, y: .2, z: -7.2 }, { x: width - 3, y: .4, z: 8.8 }, this.materials.decoTile);
-    for (const side of [-1, 1]) {
-      box(`Skyreach entrance pier ${side}`, { x: side * 8.1, y: 5, z: -depth / 2 }, { x: 3.2, y: 10, z: 2.1 }, this.materials.decoStone, {}, true, 'rough');
-      box(`Skyreach entrance brass fan ${side}`, { x: side * 4.7, y: 7.4, z: -depth / 2 - 1.15 }, { x: .28, y: 5.8, z: .24 }, this.materials.decoBrass, { z: side * 28 }, false);
-    }
-
-    // Hollow rectangular tower: the imported facade stays visual-only, while a small set
-    // of invisible wall proxies stops players walking through it. Full-height gaps at the
-    // midpoint and observation bands are the authored crossover/interior access levels.
-    for (const x of [-width / 2 + 1.25, width / 2 - 1.25]) for (const z of [-depth / 2 + 1.25, depth / 2 - 1.25]) {
-      const pier = box(`Skyreach facade proxy corner ${x}:${z}`, { x, y: playableHeight / 2, z }, { x: 2.35, y: playableHeight, z: 2.35 }, this.materials.decoStone, {}, true, 'rough');
-      pier.render.enabled = false;
-    }
-    const facadeCollisionSpans = [
-      [6, config.midpointHeight - 3.2],
-      [config.midpointHeight + 4.8, config.observationHeight - 3.2],
-      [config.observationHeight + 6.6, playableHeight - 1.2]
-    ];
-    for (const [bottom, top] of facadeCollisionSpans) {
-      const y = (bottom + top) / 2;
-      const height = top - bottom;
-      for (const face of [-1, 1]) {
-        const north = box(`Skyreach north-south facade collision ${bottom}:${face}`, { x: 0, y, z: face * depth / 2 },
-          { x: width - 3.1, y: height, z: .64 }, this.materials.decoStone);
-        const east = box(`Skyreach east-west facade collision ${bottom}:${face}`, { x: face * width / 2, y, z: 0 },
-          { x: .64, y: height, z: depth - 3.1 }, this.materials.decoStone);
-        north.render.enabled = false;
-        east.render.enabled = false;
-      }
-    }
-    const floorPitch = 10.58;
-    const floorCount = Math.floor(playableHeight / floorPitch);
-    for (let floor = 1; floor < floorCount; floor += 1) {
-      const y = floor * floorPitch;
-      const setback = floor >= 30 ? 2.4 : floor >= 24 ? 1.4 : floor >= 18 ? .7 : 0;
-      const w = width - setback * 2;
-      const d = depth - setback * 2;
-      for (const face of [-1, 1]) {
-        const north = box(`Skyreach floor ${floor} north spandrel`, { x: 0, y, z: face * d / 2 }, { x: w, y: .42, z: .78 }, floor % 4 ? this.materials.decoDark : this.materials.decoBrass, {}, true, 'normal');
-        const east = box(`Skyreach floor ${floor} east spandrel`, { x: face * w / 2, y, z: 0 }, { x: .78, y: .42, z: d }, floor % 4 ? this.materials.decoDark : this.materials.decoBrass, {}, true, 'normal');
-        north.render.enabled = false;
-        east.render.enabled = false;
-      }
-    }
-
-    // Four continuous, interweaving spirals. A two-metre rise keeps every route dense and
-    // playable, while different materials/sizes give each line a distinct identity.
-    const routeMaterials = [this.materials.decoStone, this.materials.decoBrass, this.materials.decoDark, this.materials.holdRough];
-    const routeNames = ['Accessible Architectural', 'Technical Masonry', 'Moving Maintenance', 'Exposed Fast'];
-    for (let route = 0; route < config.routeCount; route += 1) {
-      const routeRise = [2.05, 1.85, 2.15, 2.48][route];
-      const routeTurns = [2.18, 2.58, 2.04, 2.76][route];
-      const routeSteps = Math.ceil(playableHeight / routeRise);
-      for (let step = 0; step <= routeSteps; step += 1) {
-        const progress = step / routeSteps;
-        const crossoverDrift = route === 1 ? Math.sin(progress * Math.PI * 8) * .018
-          : route === 2 ? Math.sin(progress * Math.PI * 5) * .03
-            : route === 3 ? Math.sin(progress * Math.PI * 11) * .012 : 0;
-        const point = skyreachRectanglePoint(route / config.routeCount + progress * routeTurns + crossoverDrift, width, depth);
-        const normal = point.side === 'north' ? { x: 0, z: -1 } : point.side === 'south' ? { x: 0, z: 1 } : point.side === 'east' ? { x: 1, z: 0 } : { x: -1, z: 0 };
-        const tangentWide = point.side === 'north' || point.side === 'south';
-        const technical = route === 1;
-        const exposed = route === 3;
-        const accessible = route === 0;
-        box(`Skyreach ${routeNames[route]} hold ${step + 1}`, {
-          x: point.x + normal.x * (.55 + route * .07),
-          y: .8 + progress * (playableHeight - 1.5),
-          z: point.z + normal.z * (.55 + route * .07)
-        }, tangentWide
-          ? { x: accessible ? 2.45 : technical ? 1.05 : exposed ? 1.2 : 1.65, y: accessible ? .52 : .4, z: technical ? .62 : .82 }
-          : { x: technical ? .62 : .82, y: accessible ? .52 : .4, z: accessible ? 2.45 : technical ? 1.05 : exposed ? 1.2 : 1.65 },
-        routeMaterials[route], { z: route === 2 && step % 3 === 0 ? 8 : 0 }, true,
-        route === 1 ? 'rough' : route === 2 ? 'normal' : exposed ? 'smooth' : 'rough');
-        if (accessible && step > 0 && step % 18 === 0) {
-          box(`Skyreach Accessible Architectural recovery cornice ${step}`, {
-            x: point.x + normal.x * 1.05, y: .8 + progress * (playableHeight - 1.5) - .45,
-            z: point.z + normal.z * 1.05
-          }, tangentWide ? { x: 5.2, y: .38, z: 1.65 } : { x: 1.65, y: .38, z: 5.2 }, this.materials.decoStone, {}, true, 'rough');
-        }
-      }
-    }
-
-    // Full perimeter terraces deliberately intersect all four spirals, making route changes
-    // legible and supplying fair recovery without converting the climb into stairs.
-    for (const height of config.restHeights) {
-      const terraceWidth = height === playableHeight ? width + 5 : width + 2.5;
-      const terraceDepth = height === playableHeight ? depth + 5 : depth + 2.5;
-      for (const side of [-1, 1]) {
-        box(`Skyreach ${height}m north-south rest terrace ${side}`, { x: 0, y: height, z: side * terraceDepth / 2 }, { x: terraceWidth, y: .55, z: 2.5 }, this.materials.decoTile, {}, true, 'rough');
-        box(`Skyreach ${height}m east-west rest terrace ${side}`, { x: side * terraceWidth / 2, y: height, z: 0 }, { x: 2.5, y: .55, z: terraceDepth - 5 }, this.materials.decoTile, {}, true, 'rough');
-      }
-    }
-
-    // A major observation milestone at 1,040 ft links every exterior line to one safe
-    // terrace and a deliberately limited interior lounge rather than modeling every floor.
-    const observation = config.observationHeight;
-    box('Skyreach observation interior floor', { x: 5.2, y: observation + .22, z: 0 }, { x: 18, y: .44, z: 15 }, this.materials.decoTile);
-    box('Skyreach observation interior rear wall', { x: 13.9, y: observation + 3.1, z: 0 }, { x: .38, y: 6.2, z: 15 }, this.materials.decoStone);
-    for (const side of [-1, 1]) box(`Skyreach observation interior side wall ${side}`, { x: 5.2, y: observation + 3.1, z: side * 7.25 }, { x: 18, y: 6.2, z: .38 }, this.materials.decoStone);
-    box('Skyreach observation canopy', { x: 5.2, y: observation + 6.1, z: 0 }, { x: 18, y: .35, z: 15 }, this.materials.decoDark);
-    for (const side of [-1, 1]) box(`Skyreach observation brass view frame ${side}`, { x: -3.72, y: observation + 3.1, z: side * 4.3 }, { x: .32, y: 5.2, z: .42 }, this.materials.decoBrass, {}, false);
-
-    // Midpoint bathroom/rest stop. The toilet bowl is its own tiny fishing footprint, well
-    // separated vertically and horizontally from every other water body.
-    const mid = config.midpointHeight;
-    box('Skyreach midpoint bathroom floor', { x: -7.5, y: mid + .18, z: 0 }, { x: 12, y: .36, z: 10 }, this.materials.decoTile);
-    box('Skyreach midpoint bathroom rear wall', { x: -13.25, y: mid + 2.8, z: 0 }, { x: .4, y: 5.6, z: 10 }, this.materials.decoStone);
-    box('Skyreach midpoint bathroom north wall', { x: -7.5, y: mid + 2.8, z: -4.8 }, { x: 12, y: 5.6, z: .4 }, this.materials.decoStone);
-    box('Skyreach midpoint bathroom south wall', { x: -7.5, y: mid + 2.8, z: 4.8 }, { x: 12, y: 5.6, z: .4 }, this.materials.decoStone);
-    box('Skyreach midpoint stall divider', { x: -8.1, y: mid + 1.7, z: 1.45 }, { x: .24, y: 3.4, z: 5.8 }, this.materials.decoDark);
-    box('Skyreach midpoint toilet pedestal', { x: -10.2, y: mid + .72, z: -1.25 }, { x: 1.25, y: 1, z: 1.5 }, this.materials.snow);
-    box('Skyreach midpoint toilet tank', { x: -10.2, y: mid + 1.45, z: -.45 }, { x: 1.35, y: 1.3, z: .48 }, this.materials.snow);
-    box('Skyreach midpoint toilet water', { x: -10.2, y: mid + 1.27, z: -1.56 }, { x: .72, y: .05, z: .74 }, this.materials.shallowWater, {}, false);
-    for (const [name, position, size] of [
-      ['rear', { x: -10.2, y: mid + 1.3, z: -1.94 }, { x: 1.05, y: .16, z: .16 }],
-      ['front', { x: -10.2, y: mid + 1.3, z: -1.18 }, { x: 1.05, y: .16, z: .16 }],
-      ['left', { x: -10.72, y: mid + 1.3, z: -1.56 }, { x: .16, y: .16, z: .72 }],
-      ['right', { x: -9.68, y: mid + 1.3, z: -1.56 }, { x: .16, y: .16, z: .72 }]
-    ]) box(`Skyreach fishable toilet rim ${name}`, position, size, this.materials.snow);
-    box('Skyreach midpoint sink cabinet', { x: -5.35, y: mid + .82, z: -3.85 }, { x: 2.4, y: 1.25, z: .9 }, this.materials.decoStone);
-    box('Skyreach midpoint sink basin', { x: -5.35, y: mid + 1.5, z: -3.78 }, { x: 1.9, y: .18, z: .72 }, this.materials.snow);
-    box('Skyreach midpoint brass faucet', { x: -5.35, y: mid + 1.82, z: -4.05 }, { x: .18, y: .58, z: .18 }, this.materials.decoBrass, {}, false);
-    box('Skyreach midpoint mirror', { x: -5.35, y: mid + 3.1, z: -4.57 }, { x: 2.5, y: 2.1, z: .08 }, this.materials.decoGlass, {}, false);
-    box('Skyreach midpoint open doorway lintel', { x: -2.1, y: mid + 4.65, z: 0 }, { x: .45, y: .4, z: 4.2 }, this.materials.decoBrass, {}, false);
-    box('Skyreach midpoint rest bench', { x: -5.2, y: mid + .72, z: 2.8 }, { x: 3.2, y: .3, z: 1 }, this.materials.decoStone);
-    this.homeInteractions.push({
-      id: 'skyreach-midpoint-bench', label: 'SIT', action: 'bench', seatKind: 'tower rest bench',
-      position: worldPoint(-5.2, mid + 1, 2.8),
-      seatPosition: worldPoint(-5.2, mid + 1.05 + PLAYER_FOOT_OFFSET, 2.8),
-      exitPosition: worldPoint(-3.2, mid + .5 + PLAYER_FOOT_OFFSET, 2.8),
-      facingYaw: inwardYaw(location.angle) + 90, range: 2.4
-    });
-
-    // Rooftop pool has a real basin, walkable/swimmable depth, walls and a fishable surface
-    // precisely at the requested 1,250-foot main-roof height.
-    const poolY = playableHeight + .05;
-    box('Skyreach rooftop pool bottom', { x: 0, y: poolY - 1.35, z: 0 }, { x: 20, y: .45, z: 13 }, this.materials.decoTile);
-    for (const side of [-1, 1]) {
-      box(`Skyreach rooftop pool long wall ${side}`, { x: 0, y: poolY - .55, z: side * 6.5 }, { x: 20, y: 1.5, z: .5 }, this.materials.decoStone);
-      box(`Skyreach rooftop pool short wall ${side}`, { x: side * 10, y: poolY - .55, z: 0 }, { x: .5, y: 1.5, z: 13 }, this.materials.decoStone);
-    }
-    box('Skyreach rooftop fishable pool water', { x: 0, y: poolY, z: 0 }, { x: 19, y: .08, z: 12 }, this.materials.aquariumWater, {}, false);
-
-    // Readable Art-Deco doors/call panels anchor each otherwise lightweight shortcut
-    // interaction. They are visual markers; the nearby authored floors own safe collision.
-    for (const [name, x, y, z] of [
-      ['lobby', 5.2, .45, -5.7],
-      ['observation down', 5.2, observation + .45, -5],
-      ['observation up', 5.2, observation + .45, 5],
-      ['roof', 0, playableHeight + .45, 9.2]
-    ]) {
-      box(`Skyreach ${name} elevator door`, { x, y: y + 1.65, z }, { x: 2.5, y: 3.3, z: .18 }, this.materials.decoDark, {}, false);
-      for (const side of [-1, 1]) box(`Skyreach ${name} elevator brass jamb ${side}`,
-        { x: x + side * 1.35, y: y + 1.65, z: z - .12 }, { x: .15, y: 3.55, z: .24 }, this.materials.decoBrass, {}, false);
-      box(`Skyreach ${name} elevator call panel`, { x: x + 1.62, y: y + 1.45, z: z - .2 },
-        { x: .22, y: .5, z: .12 }, this.materials.decoBrass, {}, false);
-    }
-
-    const createSkyreachZone = (descriptor) => {
-      const zone = new FishingZone({
-        id: descriptor.id, label: descriptor.label, center: descriptor.center,
-        radii: { x: descriptor.radii[0], z: descriptor.radii[1] }, surfaceY: descriptor.center.y,
-        fishIds: descriptor.fish, depth: descriptor.depth, swimmable: descriptor.swimmable,
-        floorY: descriptor.floorY, modifiers: descriptor.modifiers,
-        interactionDistance: descriptor.interactionDistance,
-        minimumCastDistance: descriptor.minimumCastDistance,
-        maximumCastDistance: descriptor.maximumCastDistance,
-        fixedCastTarget: descriptor.fixedCastTarget
-      });
-      zone.tier = descriptor.tier;
-      zone.waterType = descriptor.waterType;
-      zone.theme = descriptor.theme;
-      zone.ecologyThemes = descriptor.ecologyThemes;
-      zone.habitatAliasIds = descriptor.habitatAliasIds;
-      zone.physicalZone = descriptor.physicalZone;
-      zone.allowedFishIds = [...descriptor.fish];
-      return attachZoneEcology(zone);
-    };
-    // Ecology tier stays middle so the current ordinary pool species remain valid; physical
-    // elevation still records the real 1,000-foot rooftop surface.
-    this.fishingZones.push(...SKYREACH_FISHING_DESCRIPTORS.map(createSkyreachZone));
-
-    // Predictable oscillating service beams ride visible horizontal tracks. Their kinematic
-    // colliders are genuine support/grip surfaces rather than animation-only hazards.
-    for (let index = 0; index < config.movingObstacleCount; index += 1) {
-      const point = skyreachRectanglePoint(index / config.movingObstacleCount * 2.15 + .08, width + 3.2, depth + 3.2);
-      const local = { x: point.x, y: 25 + index * 24.2, z: point.z };
-      const axis = point.side === 'north' || point.side === 'south' ? 'x' : 'z';
-      box(`Skyreach maintenance track ${index + 1}`, { ...local, y: local.y - .55 },
-        axis === 'x' ? { x: 13, y: .18, z: .3 } : { x: .3, y: .18, z: 13 }, this.materials.decoBrass, {}, false);
-      this.addSkyreachMovingPlatform(root, index, local, axis);
-    }
-
-    this.addSkyreachElevators(worldPoint, config);
   }
-
   loadSkyreachVisualShell(root) {
     this.app.assets.loadFromUrl(SKYREACH_TOWER_CONFIG.visualAssetUrl, 'container', (error, asset) => {
       if (error || !asset?.resource || !root?.parent) {
-        console.warn('[reel-ascent] Skyreach visual shell unavailable; traversal proxies remain active.');
+        console.warn('[reel-ascent] Skyreach visual shell unavailable; solid collision baseline remains active.');
         return;
       }
       const visual = asset.resource.instantiateRenderEntity();
@@ -2077,54 +1853,8 @@ export class MountainWorld extends TestWorld {
     });
   }
 
-  addSkyreachElevators(worldPoint, config) {
-    const station = (id, label, local, destination, requiredMilestone = null, lockedLabel = '') => this.homeInteractions.push({
-      id, label, lockedLabel, action: 'elevator', range: 2.45, requiredMilestone,
-      position: worldPoint(local.x, local.y, local.z),
-      destinationPosition: worldPoint(destination.x, destination.y + PLAYER_FOOT_OFFSET, destination.z),
-      facingYaw: 180
-    });
-    station('skyreach-lobby-elevator', 'RIDE TO OBSERVATION', { x: 5.2, y: .5, z: -5.5 },
-      { x: 5.2, y: config.observationHeight + .45, z: -4.8 }, 'skyreach-observation-reached', 'ELEVATOR LOCKED • REACH OBSERVATION');
-    station('skyreach-observation-elevator-down', 'RIDE TO LOBBY', { x: 5.2, y: config.observationHeight + .5, z: -4.8 },
-      { x: 5.2, y: .45, z: -5.5 });
-    station('skyreach-observation-elevator-up', 'RIDE TO ROOF', { x: 5.2, y: config.observationHeight + .5, z: 4.8 },
-      { x: 0, y: config.mainRoofHeight + .5, z: 9 }, 'skyreach-roof-reached', 'ELEVATOR LOCKED • REACH ROOF');
-    station('skyreach-roof-elevator', 'RIDE TO OBSERVATION', { x: 0, y: config.mainRoofHeight + .5, z: 9 },
-      { x: 5.2, y: config.observationHeight + .45, z: 4.8 });
-  }
-
-  addSkyreachMovingPlatform(root, index, local, axis = 'x') {
-    const entity = new pc.Entity(`Skyreach tracked moving beam ${index + 1}`);
-    entity.addComponent('render', { type: 'box', material: index % 2 ? this.materials.decoDark : this.materials.decoBrass });
-    entity.setLocalPosition(local.x, local.y, local.z);
-    entity.setLocalScale(axis === 'x' ? 3.4 : 1.15, .55, axis === 'x' ? 1.15 : 3.4);
-    root.addChild(entity);
-    const position = entity.getPosition();
-    const body = this.physicsWorld.createRigidBody(this.RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(position.x, position.y, position.z));
-    const collider = this.physicsWorld.createCollider(this.RAPIER.ColliderDesc.cuboid(
-      axis === 'x' ? 1.7 : .575, .275, axis === 'x' ? .575 : 1.7
-    ).setFriction(.94), body);
-    entity.physicsCollider = collider;
-    this.registerClimbSurface(entity, collider, 'normal', entity.name);
-    this.skyreachMovingPlatforms.push({ entity, body, collider, base: { ...local }, axis, previous: { x: position.x, y: position.y, z: position.z }, phase: index * .83, speed: .48 + index % 3 * .08, range: 4.8 });
-    return entity;
-  }
-
-  updateKinematics(dt) {
+  updateKinematics() {
     this.movingSurfaceMotion.clear();
-    if (this.activeLocationId !== SKYREACH_TOWER_CONFIG.locationId) return;
-    for (const platform of this.skyreachMovingPlatforms) {
-      const offset = Math.sin((this.elapsed + dt) * platform.speed + platform.phase) * platform.range;
-      const x = platform.base.x + (platform.axis === 'x' ? offset : 0);
-      const z = platform.base.z + (platform.axis === 'z' ? offset : 0);
-      platform.entity.setLocalPosition(x, platform.base.y, z);
-      const position = platform.entity.getPosition();
-      const delta = { x: position.x - platform.previous.x, y: position.y - platform.previous.y, z: position.z - platform.previous.z };
-      platform.previous = { x: position.x, y: position.y, z: position.z };
-      this.movingSurfaceMotion.set(platform.collider.handle, delta);
-      platform.body.setNextKinematicTranslation({ x: position.x, y: position.y, z: position.z });
-    }
   }
 
   getSurfaceMotion(collider) {

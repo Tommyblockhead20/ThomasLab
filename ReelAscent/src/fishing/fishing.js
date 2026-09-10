@@ -644,6 +644,7 @@ export class FishingController {
     this.galleryModelArchetypes = Object.freeze([...new Set(FISH_SPECIES.map((species) => species.visual?.archetype ?? 'panfish'))]);
     this.cast = null;
     this.aimDirection = new pc.Vec3(0, 0, -1);
+    this.resultRecastAimDirection = new pc.Vec3(0, 0, -1);
     this.bobberPosition = new pc.Vec3();
     this.visualTime = 0;
     this.rippleAge = 99;
@@ -1806,7 +1807,12 @@ export class FishingController {
     this.stateTime += dt;
     this.visualTime += dt;
     if (this.state !== 'caught') {
-      this.aimDirection.copy(cameraAxes.forward);
+      // Catch presentation deliberately swings the render camera around the specimen.
+      // A result recast must keep the last real fishing aim instead of inheriting that
+      // temporary (often nearly backwards) presentation-camera direction.
+      this.aimDirection.copy(this.resultRecastCharging
+        ? this.resultRecastAimDirection
+        : cameraAxes.forward);
       this.aimDirection.y = 0;
       if (this.aimDirection.lengthSq() < 0.001) this.aimDirection.set(0, 0, -1);
       this.aimDirection.normalize();
@@ -2326,6 +2332,13 @@ export class FishingController {
 
   beginResultRecast() {
     if (!this.resultActive || this.resultRecastCharging) return false;
+    this.resultRecastAimDirection.copy(this.aimDirection);
+    this.resultRecastAimDirection.y = 0;
+    if (this.resultRecastAimDirection.lengthSq() < .001) {
+      this.resultRecastAimDirection.copy(this.player.getFacingDirection());
+      this.resultRecastAimDirection.y = 0;
+    }
+    this.resultRecastAimDirection.normalize();
     this.resetForNextCast('Hold ↑ to charge • release to cast');
     this.resultRecastCharging = true;
     this.charge = 0;

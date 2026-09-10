@@ -135,13 +135,14 @@ test('mountain v2 provides six unique safe starts and preserves traversal geomet
   }
 });
 
-test('the world exposes 30 waters including Skyreach and distinct ocean areas', () => {
+test('the world exposes 28 waters after the Skyreach baseline reset', () => {
   assert.deepEqual(FISHING_WATER_COUNTS, {
-    ocean: 3, lower: 11, middle: 9, upper: 4, summit: 2, waterfall: 1, total: 30
+    ocean: 3, lower: 11, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 28
   });
   assert.equal(MOUNTAIN_FISHING_LOCATIONS.length, 25);
-  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 30);
-  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 30);
+  assert.equal(SKYREACH_FISHING_DESCRIPTORS.length, 0);
+  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 28);
+  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 28);
   assert.equal(OCEAN_FISHING_DESCRIPTOR.id, 'outer-ocean');
   assert.ok(OCEAN_FISHING_DESCRIPTOR.innerRadius >= COASTAL_SHELF_RADIUS - 5);
   assert.ok(OCEAN_FISHING_DESCRIPTOR.outerRadius > OCEAN_FISHING_DESCRIPTOR.innerRadius);
@@ -185,12 +186,12 @@ test('every cave entrance descends to its water surface', () => {
   }
 });
 
-test('300-creature ecology audit preserves the active 30-water topology', () => {
+test('300-creature ecology audit preserves the active 28-water topology', () => {
   const zones = ecologyZones();
   const audit = auditFishingEcology(zones);
   assert.equal(FISH_SPECIES.length, 300);
-  assert.equal(audit.waterCount, 30);
-  assert.equal(audit.uniqueWaterCount, 30);
+  assert.equal(audit.waterCount, 28);
+  assert.equal(audit.uniqueWaterCount, 28);
   assert.deepEqual(audit.zeroWaterSpecies, []);
   assert.equal(audit.exclusiveCount, ECOLOGY_TARGETS.exclusiveSpecies);
   assert.equal(audit.sharedCount, ECOLOGY_TARGETS.sharedSpecies);
@@ -201,18 +202,14 @@ test('300-creature ecology audit preserves the active 30-water topology', () => 
   )));
   assert.equal(audit.pools.reduce((total, pool) => total + pool.exclusiveCount, 0), audit.exclusiveCount);
   assert.ok(audit.pools.every((pool) => (
-    ['hearthward-pond', 'blue-ice-melt', 'bluewater-reach-water', 'skyreach-toilet', 'skyreach-rooftop-pool'].includes(pool.id)
+    ['hearthward-pond', 'blue-ice-melt', 'bluewater-reach-water'].includes(pool.id)
       || (pool.exclusiveCount >= ECOLOGY_TARGETS.minimumExclusivePerWater
         && pool.exclusiveCount <= ECOLOGY_TARGETS.maximumExclusivePerWater)
   )));
   assert.ok(audit.pools.every((pool) => pool.poolSize >= (
-    pool.id === 'skyreach-toilet' ? 2
-      : pool.id === 'skyreach-rooftop-pool' ? 4
-        : pool.id === 'frosthook-cold-ocean' ? 5 : pool.id === 'blue-ice-melt' ? 7 : 8
+    pool.id === 'frosthook-cold-ocean' ? 5 : pool.id === 'blue-ice-melt' ? 7 : 8
   )));
-  const generalWaterMaximumShare = Math.max(...audit.pools
-    .filter((pool) => !['skyreach-toilet', 'skyreach-rooftop-pool'].includes(pool.id))
-    .map((pool) => pool.maximumNormalizedShare));
+  const generalWaterMaximumShare = Math.max(...audit.pools.map((pool) => pool.maximumNormalizedShare));
   assert.ok(generalWaterMaximumShare <= .25 + 1e-9);
   assert.ok(audit.mostDiversePool.poolSize >= 40);
 

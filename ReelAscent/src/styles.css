@@ -679,6 +679,7 @@ body.fish-gallery .debug-panel {
 .song-downvote-reason { display: grid; gap: .35rem; width: min(34rem, calc(100vw - 2rem)); padding: .5rem; background: rgb(8 35 35 / 92%); border: 1px solid rgb(239 217 139 / 32%); border-radius: .55rem; }
 .song-downvote-reason > strong { color: #efd98b; font-size: .5rem; letter-spacing: .08em; text-align: center; }
 .song-downvote-reason > strong small { color: rgb(239 244 230 / 52%); font-size: .42rem; }
+.reason-touch-hint { display: none; }
 .song-downvote-reason > div { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: center; }
 .song-downvote-reason button { min-height: 2.15rem; padding: .32rem .48rem; color: #f7ecc8; font-size: .48rem; font-weight: 950; background: rgb(255 255 255 / 8%); border: 1px solid rgb(255 255 255 / 16%); border-radius: .4rem; cursor: pointer; touch-action: manipulation; }
 .song-downvote-reason button:last-child { color: rgb(239 244 230 / 64%); }
@@ -1676,7 +1677,7 @@ body.fish-danger #game-shell::after {
   right: max(1rem, env(safe-area-inset-right));
   display: grid;
   width: min(11.8rem, calc(50vw - 1.4rem));
-  grid-template: 5.2rem 5.6rem / repeat(2, minmax(0, 1fr));
+  grid-template: 4.35rem 4.65rem / repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
   justify-content: end;
 }
@@ -1729,7 +1730,7 @@ body.fish-danger #game-shell::after {
   right: max(.6rem, env(safe-area-inset-right));
   bottom: max(.6rem, env(safe-area-inset-bottom));
   width: auto;
-  height: min(9rem, 26vh);
+  height: clamp(5.8rem, 18vh, 7.4rem);
   aspect-ratio: auto;
   grid-template: minmax(0, 1fr) / repeat(4, minmax(0, 1fr));
   gap: .45rem;
@@ -1741,12 +1742,12 @@ body.fish-danger #game-shell::after {
 }
 .mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .mobile-actions {
   right: max(.6rem, env(safe-area-inset-right));
-  bottom: calc(max(.6rem, env(safe-area-inset-bottom)) + min(9rem, 26vh) + .45rem);
+  bottom: calc(max(.6rem, env(safe-area-inset-bottom)) + clamp(5.8rem, 18vh, 7.4rem) + .38rem);
   display: block;
-  width: 5.2rem;
+  width: 4.7rem;
 }
 .mobile-controls:is([data-mode="fishing"], [data-mode="result"]) :is(.touch-sprint, .touch-slide, .touch-jump) { display: none; }
-.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-context-action { width: 100%; min-height: 2.8rem; padding: .3rem; font-size: .6rem; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-context-action { width: 100%; min-height: 2.35rem; padding: .26rem; font-size: .54rem; }
 
 body.mobile-mode .mouse-hint,
 body.mobile-mode .grip-prompt,
@@ -1916,12 +1917,35 @@ body.mobile-mode .stamina-panel {
 }
 
 body.mobile-mode .fishing-panel {
-  bottom: max(1rem, env(safe-area-inset-bottom));
+  bottom: calc(max(.6rem, env(safe-area-inset-bottom)) + clamp(5.8rem, 18vh, 7.4rem) + 3.15rem);
+  width: min(22rem, calc(100vw - 1rem));
+  padding: .62rem .75rem;
 }
 
 body.mobile-mode .rhythm-panel {
-  bottom: max(11.8rem, calc(env(safe-area-inset-bottom) + 11.8rem));
+  bottom: calc(max(.6rem, env(safe-area-inset-bottom)) + clamp(5.8rem, 18vh, 7.4rem) + .5rem);
+  max-height: calc(100vh - max(.6rem, env(safe-area-inset-top)) - max(.6rem, env(safe-area-inset-bottom)) - clamp(5.8rem, 18vh, 7.4rem) - 1.8rem);
 }
+
+body.mobile-mode .fishing-result-controls {
+  top: auto;
+  bottom: calc(max(.6rem, env(safe-area-inset-bottom)) + clamp(5.8rem, 18vh, 7.4rem) + 3.15rem);
+  width: min(24rem, calc(100vw - 1rem));
+  min-width: 0;
+  max-height: calc(100vh - max(5.2rem, calc(env(safe-area-inset-top) + 5.2rem)) - max(.6rem, env(safe-area-inset-bottom)) - clamp(5.8rem, 18vh, 7.4rem) - 3.7rem);
+  padding: .4rem;
+  overflow: auto;
+}
+
+body.mobile-mode .fishing-result-navigation button,
+body.mobile-mode .song-feedback button { min-height: 2.25rem; padding: .34rem .52rem; }
+body.mobile-mode .song-downvote-reason { width: 100%; padding: .38rem; }
+body.mobile-mode .song-downvote-reason > div { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+body.mobile-mode .song-downvote-reason button { min-height: 2rem; }
+body.mobile-mode .song-downvote-reason button:last-child { grid-column: 1 / -1; }
+body.mobile-mode .song-downvote-reason kbd,
+body.mobile-mode .reason-key-hint { display: none; }
+body.mobile-mode .reason-touch-hint { display: inline; }
 
 .error-panel {
   background: linear-gradient(155deg, #574c56, #8c6665);
@@ -1959,7 +1983,7 @@ body.mobile-mode .rhythm-panel {
   .mobile-actions {
     right: max(0.6rem, env(safe-area-inset-right));
     width: min(11.8rem, calc(50vw - .9rem));
-    grid-template: 5.2rem 5.6rem / repeat(2, minmax(0, 1fr));
+    grid-template: 4.35rem 4.65rem / repeat(2, minmax(0, 1fr));
     gap: 0.55rem;
   }
 
@@ -1981,12 +2005,20 @@ body.mobile-mode .rhythm-panel {
   }
 
   body.mobile-mode .rhythm-panel {
-    bottom: max(0.7rem, env(safe-area-inset-bottom));
+    bottom: calc(max(.45rem, env(safe-area-inset-bottom)) + clamp(5.4rem, 18vh, 6.2rem) + .4rem);
     width: min(25rem, calc(100vw - 19rem));
   }
 
   body.mobile-mode .fishing-panel {
+    bottom: calc(max(.45rem, env(safe-area-inset-bottom)) + clamp(5.4rem, 18vh, 6.2rem) + 2.8rem);
     width: min(22rem, calc(100vw - 20rem));
+  }
+
+  body.mobile-mode .fishing-result-controls {
+    top: max(.4rem, env(safe-area-inset-top));
+    bottom: auto;
+    max-height: calc(100vh - max(.4rem, env(safe-area-inset-top)) - max(.45rem, env(safe-area-inset-bottom)) - clamp(5.4rem, 18vh, 6.2rem) - .8rem);
+    width: min(28rem, calc(100vw - 20rem));
   }
 }
 

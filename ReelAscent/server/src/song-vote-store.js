@@ -4,7 +4,10 @@ const { Pool } = pg;
 const safeId = (value, maximum) => String(value ?? '').trim().toLowerCase()
   .replace(/[^a-z0-9_:-]/g, '_').slice(0, maximum);
 export const SONG_DOWNVOTE_REASON_IDS = Object.freeze([
-  'too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit'
+  'sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument'
+]);
+const LEGACY_DOWNVOTE_REASON_IDS = Object.freeze([
+  'awkward_rhythm', 'too_long', 'bad_fit', 'other'
 ]);
 const DOWNVOTE_REASON_IDS = new Set(SONG_DOWNVOTE_REASON_IDS);
 const normalizeReason = (value) => DOWNVOTE_REASON_IDS.has(value) ? value : null;
@@ -127,7 +130,7 @@ export class PostgresSongVoteStore {
         song_id VARCHAR(180) NOT NULL,
         song_revision INTEGER NOT NULL CHECK (song_revision > 0),
         vote VARCHAR(4) NOT NULL CHECK (vote IN ('up', 'down')),
-        downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit'))),
+        downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument'))),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (voter_id, species_id, song_revision)
@@ -135,20 +138,28 @@ export class PostgresSongVoteStore {
     `);
     // Existing v16.3 databases receive the nullable column without losing vote history.
     await this.pool.query('ALTER TABLE reel_ascent_song_votes ADD COLUMN IF NOT EXISTS downvote_reason VARCHAR(32) NULL');
-    // v17.2 replaces the brief v17.1 draft taxonomy. Only the optional reason is cleared;
-    // the vote row, voter identity, timestamps, song, and historical revision all survive.
+    // Drop the prior taxonomy constraint before migrating. The v17.1 `bugged` code has
+    // an exact replacement; ambiguous v17.2 categories remain queryable historical data.
+    // Every new write is still normalized against SONG_DOWNVOTE_REASON_IDS above.
+    await this.pool.query('ALTER TABLE reel_ascent_song_votes DROP CONSTRAINT IF EXISTS reel_ascent_song_votes_downvote_reason_check');
     await this.pool.query(`
       UPDATE reel_ascent_song_votes
       SET downvote_reason = NULL
       WHERE downvote_reason IS NOT NULL
-        AND (vote <> 'down'
-          OR downvote_reason NOT IN ('too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit'))
+        AND vote <> 'down'
     `);
-    await this.pool.query('ALTER TABLE reel_ascent_song_votes DROP CONSTRAINT IF EXISTS reel_ascent_song_votes_downvote_reason_check');
+    await this.pool.query(`
+      UPDATE reel_ascent_song_votes
+      SET downvote_reason = 'glitched'
+      WHERE vote = 'down' AND downvote_reason = 'bugged'
+    `);
     await this.pool.query(`
       ALTER TABLE reel_ascent_song_votes
       ADD CONSTRAINT reel_ascent_song_votes_downvote_reason_check
-      CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit')))
+      CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN (
+        'sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument',
+        '${LEGACY_DOWNVOTE_REASON_IDS.join("', '")}'
+      )))
     `);
     await this.pool.query(`
       CREATE INDEX IF NOT EXISTS reel_ascent_song_votes_species_revision

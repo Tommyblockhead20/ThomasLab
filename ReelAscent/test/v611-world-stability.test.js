@@ -63,6 +63,7 @@ test('casting uses the actual cast direction: dry beach fails while an outward s
     surfaceY: OCEAN_SURFACE_Y, fishIds: ['sardine']
   });
   const fakeWorld = {
+    fishingZones: [ocean],
     findFishingZoneAt(point) {
       return ocean.contains(point, .25) ? ocean : null;
     }

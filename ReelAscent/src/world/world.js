@@ -163,9 +163,9 @@ export class TestWorld {
     if (horizontalLength < .001) return null;
     const dx = direction.x / horizontalLength;
     const dz = direction.z / horizontalLength;
-    // Very small authored sources (currently the Skyreach toilet bowl) opt into a
-    // source-specific envelope. They still require proximity, vertical agreement, and
-    // facing the water; only the ordinary several-metre cast scan is bypassed.
+    // Very small authored sources may opt into a source-specific envelope. They still
+    // require proximity, vertical agreement, and facing the water; only the ordinary
+    // several-metre cast scan is bypassed.
     for (const zone of this.fishingZones) {
       if (!Number.isFinite(zone.maximumCastDistance)) continue;
       const target = zone.fixedCastTarget ?? zone.center;
