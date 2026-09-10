@@ -87,6 +87,14 @@ export const PLAYER_FOOT_OFFSET = PLAYER_CONFIG.capsuleHalfHeight + PLAYER_CONFI
 export const PLAYER_STANDING_HEIGHT = PLAYER_FOOT_OFFSET * 2;
 export const NORMAL_JUMP_APEX_METERS = PLAYER_CONFIG.jumpSpeed ** 2 / (2 * PLAYER_CONFIG.gravity);
 
+export const MOBILE_CLIMBING_ASSIST = Object.freeze({
+  grabDistanceMultiplier: 1.12,
+  staminaCapacityMultiplier: 1.15,
+  jumpApexMultiplier: 1.08,
+  // Ballistic apex is proportional to launch velocity squared.
+  jumpVelocityMultiplier: Math.sqrt(1.08)
+});
+
 export const CLIMBING_CONFIG = Object.freeze({
   gripDistance: 1.05,
   gripProbeSideOffset: 0.27,

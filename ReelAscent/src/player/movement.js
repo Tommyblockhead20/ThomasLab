@@ -655,6 +655,7 @@ export class StaminaResource {
   constructor(config = STAMINA_CONFIG) {
     this.config = config;
     this.value = config.maximum;
+    this.capacityMultiplier = 1;
     this.regenerationDelay = 0;
     this.sprintLocked = false;
     this.unlimited = false;
@@ -662,7 +663,7 @@ export class StaminaResource {
 
   update(dt, wantsSprint, isMoving, canRegenerate = true, sprintDrainMultiplier = 1) {
     if (this.unlimited) {
-      this.value = this.config.maximum;
+      this.value = this.maximum;
       this.regenerationDelay = 0;
       this.sprintLocked = false;
       return wantsSprint && isMoving;
@@ -684,8 +685,8 @@ export class StaminaResource {
       this.regenerationDelay = Math.max(0, this.regenerationDelay - dt);
     } else if (canRegenerate) {
       this.value = Math.min(
-        this.config.maximum,
-        this.value + this.config.regenerationPerSecond * dt
+        this.maximum,
+        this.value + this.config.regenerationPerSecond * this.capacityMultiplier * dt
       );
     }
 
@@ -694,7 +695,7 @@ export class StaminaResource {
 
   spend(amount, regenerationDelay = this.config.regenerationDelay) {
     if (this.unlimited) {
-      this.value = this.config.maximum;
+      this.value = this.maximum;
       return true;
     }
     this.value = Math.max(0, this.value - Math.max(0, amount));
@@ -703,7 +704,7 @@ export class StaminaResource {
   }
 
   reset() {
-    this.value = this.config.maximum;
+    this.value = this.maximum;
     this.regenerationDelay = 0;
     this.sprintLocked = false;
   }
@@ -711,15 +712,28 @@ export class StaminaResource {
   setUnlimited(enabled) {
     this.unlimited = Boolean(enabled);
     if (this.unlimited) {
-      this.value = this.config.maximum;
+      this.value = this.maximum;
       this.regenerationDelay = 0;
       this.sprintLocked = false;
     }
     return this.unlimited;
   }
 
+  setCapacityMultiplier(multiplier = 1) {
+    const next = Math.max(1, Number(multiplier) || 1);
+    if (Math.abs(next - this.capacityMultiplier) < .0001) return this.maximum;
+    const fraction = this.normalized;
+    this.capacityMultiplier = next;
+    this.value = this.unlimited ? this.maximum : Math.min(this.maximum, fraction * this.maximum);
+    return this.maximum;
+  }
+
+  get maximum() {
+    return this.config.maximum * this.capacityMultiplier;
+  }
+
   get normalized() {
-    return this.value / this.config.maximum;
+    return this.value / this.maximum;
   }
 }
 

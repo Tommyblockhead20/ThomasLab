@@ -163,6 +163,22 @@ export class TestWorld {
     if (horizontalLength < .001) return null;
     const dx = direction.x / horizontalLength;
     const dz = direction.z / horizontalLength;
+    // Very small authored sources (currently the Skyreach toilet bowl) opt into a
+    // source-specific envelope. They still require proximity, vertical agreement, and
+    // facing the water; only the ordinary several-metre cast scan is bypassed.
+    for (const zone of this.fishingZones) {
+      if (!Number.isFinite(zone.maximumCastDistance)) continue;
+      const target = zone.fixedCastTarget ?? zone.center;
+      const targetX = target.x - point.x;
+      const targetZ = target.z - point.z;
+      const distance = Math.hypot(targetX, targetZ);
+      const minimum = zone.minimumCastDistance ?? 0;
+      const maximum = zone.maximumCastDistance;
+      const facing = distance > .001 ? (targetX * dx + targetZ * dz) / distance : 1;
+      if (distance < minimum || distance > maximum || facing < .42) continue;
+      if (Math.abs(point.y - zone.resolveSurfaceY(target)) > 3.5) continue;
+      return zone;
+    }
     for (let distance = minimumCastDistance; distance <= maximumCastDistance + .001; distance += .55) {
       const target = { x: point.x + dx * distance, y: point.y, z: point.z + dz * distance };
       const zone = this.findFishingZoneAt(target);

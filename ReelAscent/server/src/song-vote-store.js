@@ -4,7 +4,7 @@ const { Pool } = pg;
 const safeId = (value, maximum) => String(value ?? '').trim().toLowerCase()
   .replace(/[^a-z0-9_:-]/g, '_').slice(0, maximum);
 export const SONG_DOWNVOTE_REASON_IDS = Object.freeze([
-  'sounds_bad', 'too_hard', 'too_easy', 'bugged', 'bad_instrument', 'other'
+  'too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit'
 ]);
 const DOWNVOTE_REASON_IDS = new Set(SONG_DOWNVOTE_REASON_IDS);
 const normalizeReason = (value) => DOWNVOTE_REASON_IDS.has(value) ? value : null;
@@ -127,7 +127,7 @@ export class PostgresSongVoteStore {
         song_id VARCHAR(180) NOT NULL,
         song_revision INTEGER NOT NULL CHECK (song_revision > 0),
         vote VARCHAR(4) NOT NULL CHECK (vote IN ('up', 'down')),
-        downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR downvote_reason IN ('sounds_bad', 'too_hard', 'too_easy', 'bugged', 'bad_instrument', 'other')),
+        downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit'))),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (voter_id, species_id, song_revision)
@@ -135,6 +135,21 @@ export class PostgresSongVoteStore {
     `);
     // Existing v16.3 databases receive the nullable column without losing vote history.
     await this.pool.query('ALTER TABLE reel_ascent_song_votes ADD COLUMN IF NOT EXISTS downvote_reason VARCHAR(32) NULL');
+    // v17.2 replaces the brief v17.1 draft taxonomy. Only the optional reason is cleared;
+    // the vote row, voter identity, timestamps, song, and historical revision all survive.
+    await this.pool.query(`
+      UPDATE reel_ascent_song_votes
+      SET downvote_reason = NULL
+      WHERE downvote_reason IS NOT NULL
+        AND (vote <> 'down'
+          OR downvote_reason NOT IN ('too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit'))
+    `);
+    await this.pool.query('ALTER TABLE reel_ascent_song_votes DROP CONSTRAINT IF EXISTS reel_ascent_song_votes_downvote_reason_check');
+    await this.pool.query(`
+      ALTER TABLE reel_ascent_song_votes
+      ADD CONSTRAINT reel_ascent_song_votes_downvote_reason_check
+      CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('too_hard', 'too_easy', 'awkward_rhythm', 'too_long', 'bad_fit')))
+    `);
     await this.pool.query(`
       CREATE INDEX IF NOT EXISTS reel_ascent_song_votes_species_revision
       ON reel_ascent_song_votes (species_id, song_revision)

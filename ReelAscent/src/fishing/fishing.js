@@ -1606,7 +1606,8 @@ export class FishingController {
     // Once the fishing stance is open, validity should depend on physical proximity to the
     // water rather than where the camera happens to be facing. A small grace margin avoids
     // flicker at the exact boundary, while a fall away from the bank cleanly exits fishing.
-    return this.zone.canCastFrom(this.player.getPosition(), maximumCastDistance + 1.25, 5.5);
+    const remainDistance = this.zone.maximumCastDistance ?? maximumCastDistance + 1.25;
+    return this.zone.canCastFrom(this.player.getPosition(), remainDistance, 5.5);
   }
 
   enter(zone) {
@@ -1884,15 +1885,21 @@ export class FishingController {
     const maximumCastDistance = this.config.maximumCastDistance
       * (this.progression?.getModifier('castDistance') ?? 1);
     this.lastCastCharge = Math.max(.08, this.charge || this.lastCastCharge || .65);
-    const distance = this.config.minimumCastDistance
-      + this.charge * (maximumCastDistance - this.config.minimumCastDistance);
+    const minimumCastDistance = this.zone.minimumCastDistance ?? this.config.minimumCastDistance;
+    const sourceMaximumCastDistance = this.zone.maximumCastDistance ?? maximumCastDistance;
+    let distance = minimumCastDistance
+      + this.charge * (sourceMaximumCastDistance - minimumCastDistance);
     const start = this.getRodTipPosition();
     const playerPosition = this.player.getPosition();
-    const target = new pc.Vec3(
-      playerPosition.x + this.aimDirection.x * distance,
-      0,
-      playerPosition.z + this.aimDirection.z * distance
-    );
+    const fixedTarget = this.zone.fixedCastTarget;
+    const target = fixedTarget
+      ? new pc.Vec3(fixedTarget.x, fixedTarget.y, fixedTarget.z)
+      : new pc.Vec3(
+          playerPosition.x + this.aimDirection.x * distance,
+          0,
+          playerPosition.z + this.aimDirection.z * distance
+        );
+    if (fixedTarget) distance = Math.hypot(target.x - playerPosition.x, target.z - playerPosition.z);
     const landingZone = this.world.findFishingZoneAt(target);
     // Flat ponds resolve to their one fixed height. Path-shaped water (Fallglass) resolves
     // at the actual horizontal landing point, avoiding the old center-height sky bobber.

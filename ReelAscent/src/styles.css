@@ -683,6 +683,7 @@ body.fish-gallery .debug-panel {
 .song-downvote-reason button { min-height: 2.15rem; padding: .32rem .48rem; color: #f7ecc8; font-size: .48rem; font-weight: 950; background: rgb(255 255 255 / 8%); border: 1px solid rgb(255 255 255 / 16%); border-radius: .4rem; cursor: pointer; touch-action: manipulation; }
 .song-downvote-reason button:last-child { color: rgb(239 244 230 / 64%); }
 .song-downvote-reason button.is-pending { opacity: .55; }
+.song-downvote-reason button.is-selected { color: #153a36; background: #efd98b; border-color: #fff0b8; }
 
 .song-feedback-dashboard { position: absolute; z-index: 86; inset: 50% auto auto 50%; display: grid; width: min(72rem, calc(100vw - 1rem)); max-height: calc(100vh - 1rem); grid-template-rows: auto auto auto minmax(0, 1fr); gap: .65rem; translate: -50% -50%; padding: .9rem; color: #edf6e9; background: rgb(7 31 33 / 98%); border: 1px solid rgb(239 217 139 / 46%); border-radius: .8rem; box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 58%); }
 .song-feedback-dashboard[hidden] { display: none; }
@@ -1733,11 +1734,11 @@ body.fish-danger #game-shell::after {
   grid-template: minmax(0, 1fr) / repeat(4, minmax(0, 1fr));
   gap: .45rem;
 }
-.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-left { grid-area: 1 / 1; }
-.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-down { grid-area: 1 / 2; }
-.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-up { grid-area: 1 / 3; }
-.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-right { grid-area: 1 / 4; }
-.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .mobile-dpad .touch-button { font-size: clamp(1.8rem, 7vw, 3.4rem); border-radius: 1.2rem; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .mobile-dpad .touch-button {
+  grid-area: 1 / var(--fishing-direction-column);
+  font-size: clamp(1.8rem, 7vw, 3.4rem);
+  border-radius: 1.2rem;
+}
 .mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .mobile-actions {
   right: max(.6rem, env(safe-area-inset-right));
   bottom: calc(max(.6rem, env(safe-area-inset-bottom)) + min(9rem, 26vh) + .45rem);
@@ -2212,6 +2213,8 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .aquarium-topbar > div { display: flex; align-items: center; gap: .72rem; }
 .aquarium-topbar strong { color: rgb(234 244 231 / 72%); font-size: .62rem; }
 .aquarium-topbar button, .aquarium-detail-actions button, .aquarium-auto-fill { padding: .5rem .64rem; color: #153a36; font-size: .52rem; font-weight: 950; background: #edd58c; border: 0; border-radius: .4rem; cursor: pointer; }
+.aquarium-close-overlay { position: fixed; z-index: 94; top: calc(env(safe-area-inset-top) + 8px); right: calc(env(safe-area-inset-right) + 8px); min-height: 2.65rem; padding: .5rem .72rem; color: #153a36; font-size: .55rem; font-weight: 950; background: #efd98b; border: 1px solid #fff0b8; border-radius: .45rem; box-shadow: 0 .35rem 1.2rem rgb(0 0 0 / 36%); cursor: pointer; pointer-events: auto; }
+.aquarium-close-overlay[hidden] { display: none; }
 .aquarium-content { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: .58rem; }
 .aquarium-summary-row { display: grid; grid-template-columns: repeat(6, minmax(6.25rem, 9.375rem)); gap: .4rem; justify-content: space-between; }
 .aquarium-summary-row article { min-width: 0; min-height: 3.35rem; display: grid; align-content: center; gap: .1rem; padding: .46rem .55rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 10%); border-radius: .46rem; }
@@ -2279,7 +2282,7 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 }
 @media (max-width: 800px) {
   .aquarium-menu { width: calc(100vw - .5rem); height: calc(100vh - .5rem); padding: .55rem; }
-  .aquarium-topbar { position: sticky; top: 0; z-index: 5; min-height: calc(2.7rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); background: rgb(7 34 34 / 99%); }
+  .aquarium-topbar { min-height: calc(2.7rem + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); padding-right: 5rem; background: rgb(7 34 34 / 99%); }
   .aquarium-topbar h2 { font-size: 1rem; }
   .aquarium-summary-row { grid-template-columns: repeat(3, 1fr); }
   .aquarium-desktop-layout { grid-template-columns: 1fr; overflow-y: auto; }

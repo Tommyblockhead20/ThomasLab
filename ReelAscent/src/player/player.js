@@ -2,6 +2,7 @@ import * as pc from 'playcanvas';
 import {
   CLIMBING_CONFIG,
   COLORS,
+  MOBILE_CLIMBING_ASSIST,
   NORMAL_JUMP_APEX_METERS,
   PLAYER_CONFIG,
   PLAYER_FOOT_OFFSET,
@@ -1104,6 +1105,9 @@ export class Player {
 
   update(dt, cameraAxes) {
     this.updateEmote();
+    this.stamina.setCapacityMultiplier(this.input.mobileMode
+      ? MOBILE_CLIMBING_ASSIST.staminaCapacityMultiplier
+      : 1);
     this.momentumDeflectCooldown = Math.max(0, this.momentumDeflectCooldown - dt);
     const wasRecoveringFromSlideJam = this.slideRecoveryTimer > 0;
     this.slideRecoveryTimer = Math.max(0, this.slideRecoveryTimer - dt);
@@ -1413,7 +1417,11 @@ export class Player {
       ? this.moveDirection
       : this.getFacingDirection();
     this.gripCandidate = this.climbing.canAttemptGrip(this.stamina)
-      ? this.climbing.findGrip(this.body.translation(), facingDirection)
+      ? this.climbing.findGrip(
+          this.body.translation(),
+          facingDirection,
+          CLIMBING_CONFIG.gripDistance * (this.input.mobileMode ? MOBILE_CLIMBING_ASSIST.grabDistanceMultiplier : 1)
+        )
       : null;
     this.canGrip = this.gripCandidate !== null;
 
@@ -1588,7 +1596,9 @@ export class Player {
     if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0 && !onTooSteepSurface && !slidingDownSlope
         && this.stamina.value >= PLAYER_CONFIG.jumpStaminaCost * this.normalStaminaCostMultiplier('jumpCostMultiplier')) {
       this.stamina.spend(PLAYER_CONFIG.jumpStaminaCost * this.normalStaminaCostMultiplier('jumpCostMultiplier'));
-      this.verticalVelocity = PLAYER_CONFIG.jumpSpeed * (this.progression?.getModifier('jumpImpulseMultiplier') ?? 1);
+      this.verticalVelocity = PLAYER_CONFIG.jumpSpeed
+        * (this.input.mobileMode ? MOBILE_CLIMBING_ASSIST.jumpVelocityMultiplier : 1)
+        * (this.progression?.getModifier('jumpImpulseMultiplier') ?? 1);
       this.jumpBufferTimer = 0;
       this.coyoteTimer = 0;
       this.grounded = false;
@@ -2327,7 +2337,8 @@ export class Player {
       position: { x: position.x, y: position.y, z: position.z },
       verticalSpeed: this.verticalVelocity,
       standingHeight: PLAYER_STANDING_HEIGHT,
-      normalJumpApex: NORMAL_JUMP_APEX_METERS,
+      normalJumpApex: NORMAL_JUMP_APEX_METERS
+        * (this.input.mobileMode ? MOBILE_CLIMBING_ASSIST.jumpApexMultiplier : 1),
       grounded: this.grounded,
       speed: this.lastSpeed,
       sprinting: this.sprinting,

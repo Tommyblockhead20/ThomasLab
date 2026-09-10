@@ -1,7 +1,7 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
 
-export const SAVE_SCHEMA_VERSION = 12;
+export const SAVE_SCHEMA_VERSION = 13;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -46,6 +46,7 @@ export function defaultSave() {
       biomesFished: [],
       destinationsVisited: []
     },
+    worldMilestones: [],
     runHistory: [],
     progression: defaultProgressionState()
   };
@@ -158,6 +159,7 @@ export function normalizeSave(value = {}) {
     biomesFished: cleanIds(badgeSource.biomesFished, 100),
     destinationsVisited: cleanIds(badgeSource.destinationsVisited, 100)
   };
+  normalized.worldMilestones = cleanIds(value.worldMilestones, 100);
   normalized.runHistory = Array.isArray(value.runHistory)
     ? value.runHistory.slice(0, 12).filter((entry) => entry && typeof entry === 'object').map((entry) => ({
       ...entry,
@@ -235,6 +237,12 @@ const MIGRATIONS = Object.freeze({
   11: (value) => ({
     ...value,
     version: 12,
+    progression: normalizeProgressionState(value.progression)
+  }),
+  12: (value) => ({
+    ...value,
+    version: 13,
+    worldMilestones: Array.isArray(value.worldMilestones) ? value.worldMilestones : [],
     progression: normalizeProgressionState(value.progression)
   })
 });
@@ -492,6 +500,19 @@ export class SaveSystem {
     if (this.data.trailBadges.destinationsVisited.includes(destinationId)) return false;
     this.data.trailBadges.destinationsVisited.push(destinationId.slice(0, 160));
     return this.save();
+  }
+
+  unlockWorldMilestone(milestoneId, { legitimate = true } = {}) {
+    if (!legitimate || typeof milestoneId !== 'string' || !milestoneId) return false;
+    this.data.worldMilestones ??= [];
+    const id = milestoneId.slice(0, 160);
+    if (this.data.worldMilestones.includes(id)) return false;
+    this.data.worldMilestones.push(id);
+    return this.save();
+  }
+
+  hasWorldMilestone(milestoneId) {
+    return typeof milestoneId === 'string' && this.data.worldMilestones?.includes(milestoneId);
   }
 
   unlockTrailBadges(ids = []) {

@@ -97,12 +97,17 @@ export class HomeInteractionController {
     }
     if (this.current && this.label) {
       if (this.eyebrow) this.eyebrow.textContent = ({
-        boat: 'ISLAND FERRY', board: 'BOAT LADDER', shop: "OUTFITTER'S REACH", aquarium: 'GLASSWATER ISLE', appearance: 'HEARTHWARD ISLE'
+        boat: 'ISLAND FERRY', board: 'BOAT LADDER', shop: "OUTFITTER'S REACH", aquarium: 'GLASSWATER ISLE', appearance: 'HEARTHWARD ISLE', elevator: 'SKYREACH ELEVATOR'
       })[this.current.action] ?? 'WORLD INTERACTION';
       this.label.textContent = seatedInteraction
         ? (this.player.fishing?.active ? 'STOP FISHING & GET UP' : 'CLICK TO GET UP')
-        : this.current.label;
+        : (this.isInteractionLocked(this.current) ? this.current.lockedLabel : this.current.label);
     }
+  }
+
+  isInteractionLocked(interaction) {
+    return Boolean(interaction?.requiredMilestone
+      && !this.progression?.saveSystem?.hasWorldMilestone?.(interaction.requiredMilestone));
   }
 
   setPromptAllowed(allowed) {
@@ -155,6 +160,20 @@ export class HomeInteractionController {
       this.camera?.setYaw?.(interaction.facingYaw);
       this.dismissPrompt();
       this.hud.showToast?.('Boarded Bluewater Reach safely.');
+      return true;
+    }
+    if (interaction.action === 'elevator' && interaction.destinationPosition) {
+      if (this.isInteractionLocked(interaction)) {
+        this.hud.showToast?.(interaction.lockedLabel || 'Elevator shortcut locked.');
+        return false;
+      }
+      this.player.exitFishing?.();
+      this.player.cancelEmote();
+      this.player.clearBenchSeat?.();
+      this.player.teleport(interaction.destinationPosition, interaction.facingYaw);
+      this.camera?.setYaw?.(interaction.facingYaw);
+      this.dismissPrompt();
+      this.hud.showToast?.(interaction.label.replace(/^RIDE TO /, 'Arrived at '));
       return true;
     }
     if (interaction.action === 'rest' && interaction.seatPosition) {

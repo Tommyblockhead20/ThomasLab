@@ -82,8 +82,8 @@ export class AquariumMenu {
   }
 
   toggle() { if (this.isOpen) this.close(); else this.open(); }
-  open() { if (!this.screen) return; document.exitPointerLock?.(); this.isOpen = true; this.screen.hidden = false; document.body.classList.add('aquarium-open'); this.render(true); this.closeButton?.focus({ preventScroll: true }); }
-  close() { if (!this.screen) return; this.isOpen = false; this.screen.hidden = true; document.body.classList.remove('aquarium-open'); }
+  open() { if (!this.screen) return; document.exitPointerLock?.(); this.isOpen = true; this.screen.hidden = false; if (this.closeButton) this.closeButton.hidden = false; document.body.classList.add('aquarium-open'); this.render(true); this.closeButton?.focus({ preventScroll: true }); }
+  close() { if (!this.screen) return; this.isOpen = false; this.screen.hidden = true; if (this.closeButton) this.closeButton.hidden = true; document.body.classList.remove('aquarium-open'); }
   update() {
     const income = this.progression.processAquariumIncome();
     if (income.paid && this.status) this.status.textContent = `Aquarium visitors contributed $${income.paid}.`;
@@ -194,6 +194,7 @@ export class AquariumMenu {
     this.screen?.removeEventListener('click', this.onClick);
     this.screen?.removeEventListener('change', this.onChange);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
+    if (this.closeButton) this.closeButton.hidden = true;
     document.body.classList.remove('aquarium-open');
   }
 }

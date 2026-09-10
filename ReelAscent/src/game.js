@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { COLORS, PLAYER_CONFIG } from './config.js';
+import { COLORS, PLAYER_CONFIG, PLAYER_FOOT_OFFSET } from './config.js';
 import { OrbitCamera } from './camera/orbit-camera.js';
 import { FishingController } from './fishing/fishing.js';
 import { fishingResultActionForDirection } from './fishing/result-actions.js';
@@ -16,7 +16,7 @@ import { EcologyGuidePanel } from './ui/ecology-guide.js';
 import { FishingPerformanceMenu } from './ui/fishing-performance.js';
 import { Hud } from './ui/hud.js';
 import { InventoryMenu } from './ui/inventory.js';
-import { MountainWorld, START_LOCATIONS } from './world/mountain-v2.js';
+import { MountainWorld, SKYREACH_TOWER_CONFIG, START_LOCATIONS } from './world/mountain-v2.js';
 import { RunManager } from './world/run-manager.js';
 import { MultiplayerClient } from './multiplayer/multiplayer-client.js';
 import { MESSAGE_TYPES } from './multiplayer/protocol.js';
@@ -699,6 +699,7 @@ export class Game {
     this.pendingPersistentPlaytime += dt;
     if (this.pendingPersistentPlaytime >= 15) this.flushActivePlaytime();
     const playerState = this.player.getState();
+    this.updateSkyreachMilestones(playerState);
     const worldInfo = this.world.getWorldInfo(playerState.position, playerState.climbMaterial);
     const elevationMeters = Number(worldInfo?.elevation) || 0;
     if (this.currentLocationId !== this.mainWorldLocationId) return;
@@ -720,6 +721,30 @@ export class Game {
     if (legitimate && (this.sessionStats.fastestAscentSeconds === null || elapsed < this.sessionStats.fastestAscentSeconds)) {
       this.sessionStats.fastestAscentSeconds = elapsed;
       this.saveSystem.recordFastestAscent(elapsed, { legitimate: true });
+    }
+  }
+
+  updateSkyreachMilestones(playerState) {
+    if (this.currentLocationId !== SKYREACH_TOWER_CONFIG.locationId || !playerState?.position) return;
+    const location = WORLD_LOCATIONS.find((entry) => entry.id === SKYREACH_TOWER_CONFIG.locationId);
+    const relativeElevation = playerState.position.y - PLAYER_FOOT_OFFSET - (location?.elevation ?? 0) - .18;
+    if (relativeElevation <= 1) {
+      this.sessionStats.ascentCheatContaminated = false;
+      return;
+    }
+    if (this.sessionStats.ascentCheatContaminated) return;
+    const unlocked = [];
+    if (relativeElevation >= SKYREACH_TOWER_CONFIG.observationHeight - .8
+      && this.saveSystem.unlockWorldMilestone('skyreach-observation-reached', { legitimate: true })) {
+      unlocked.push('Lobby → Observation elevator');
+    }
+    if (relativeElevation >= SKYREACH_TOWER_CONFIG.mainRoofHeight - .8
+      && this.saveSystem.unlockWorldMilestone('skyreach-roof-reached', { legitimate: true })) {
+      unlocked.push('Observation → Roof elevator');
+    }
+    if (unlocked.length) {
+      this.recordStatEvent('skyreach-milestone', { unlocked }, true);
+      this.hud.showToast?.(`Shortcut unlocked • ${unlocked.join(' • ')}`, 4);
     }
   }
 

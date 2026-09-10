@@ -1,7 +1,8 @@
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
+import { MOBILE_FISHING_DIRECTION_ORDER } from '../fishing/result-actions.js';
 import { formatInputCode } from '../player/movement.js';
 import { GAME_VERSION } from '../version.js';
-import { SongVoteStore, normalizeDownvoteReason, songVoteKey } from '../fishing/song-votes.js';
+import { SongVoteStore, normalizeDownvoteReason, songDownvoteReasonForDigit, songVoteKey } from '../fishing/song-votes.js';
 
 function formatRunTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
@@ -137,8 +138,20 @@ export class Hud {
     this.mobileDirectionButtons = Object.fromEntries(['up', 'down', 'left', 'right'].map((direction) => [
       direction, document.querySelector(`[data-touch-action="${direction}"]`)
     ]));
+    for (const [index, direction] of MOBILE_FISHING_DIRECTION_ORDER.entries()) {
+      this.mobileDirectionButtons[direction]?.style.setProperty('--fishing-direction-column', String(index + 1));
+    }
 
     this.onKeyDown = (event) => {
+      const reason = this.downvoteReasonOpen && !this.downvoteReasonPending
+        ? songDownvoteReasonForDigit(event.code)
+        : null;
+      if (reason) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.resultActionHandler('downvote-reason', 'trigger', reason);
+        return;
+      }
       if (event.code !== 'F3' || event.repeat || !isCheatsEnabled()) return;
       event.preventDefault();
       this.debugVisible = !this.debugVisible;
@@ -589,7 +602,8 @@ export class Hud {
   confirmSongDownvoteReason(feedback, reason, aggregate = null) {
     this.songVoteStore.set(feedback, 'down', reason);
     if (aggregate) this.setSongAggregate(aggregate);
-    this.downvoteReasonOpen = false;
+    // Keep the optional prompt for this result so 1–5 can revise the same vote row.
+    this.downvoteReasonOpen = true;
     this.downvoteReasonPending = false;
     this.feedbackError = '';
     this.renderSongFeedback(feedback);
@@ -650,6 +664,9 @@ export class Hud {
       for (const button of this.songDownvoteReason.querySelectorAll('[data-song-downvote-reason]')) {
         button.disabled = this.downvoteReasonPending;
         button.classList.toggle('is-pending', this.downvoteReasonPending);
+        const selected = button.dataset.songDownvoteReason === this.songVoteStore.getReason(feedback);
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-pressed', String(selected));
       }
     }
     if (this.mobileControls) this.mobileControls.dataset.rated = String(Boolean(currentVote && !this.allowVoteChange));

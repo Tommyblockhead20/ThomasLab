@@ -1,3 +1,5 @@
+export const MOBILE_FISHING_DIRECTION_ORDER = Object.freeze(['left', 'up', 'down', 'right']);
+
 export const FISHING_RESULT_DIRECTIONS = Object.freeze({
   ArrowUp: 'recast',
   ArrowDown: 'stay',
