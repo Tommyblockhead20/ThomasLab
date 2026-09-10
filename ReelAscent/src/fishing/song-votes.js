@@ -1,6 +1,17 @@
 export const SONG_VOTES_STORAGE_KEY = 'reel-ascent-song-votes-v2';
 export const LEGACY_SONG_VOTES_STORAGE_KEY = 'reel-ascent-song-votes-v1';
-export const SONG_VOTE_SCHEMA_VERSION = 2;
+export const SONG_VOTE_SCHEMA_VERSION = 3;
+
+export const SONG_DOWNVOTE_REASONS = Object.freeze([
+  Object.freeze({ id: 'sounds_bad', label: 'Sounds Bad' }),
+  Object.freeze({ id: 'too_hard', label: 'Too Hard' }),
+  Object.freeze({ id: 'too_easy', label: 'Too Easy' }),
+  Object.freeze({ id: 'bugged', label: 'Bugged' }),
+  Object.freeze({ id: 'bad_instrument', label: 'Bad Instrument' }),
+  Object.freeze({ id: 'other', label: 'Other / Not Fun' })
+]);
+const DOWNVOTE_REASON_IDS = new Set(SONG_DOWNVOTE_REASONS.map((entry) => entry.id));
+export const normalizeDownvoteReason = (value) => DOWNVOTE_REASON_IDS.has(value) ? value : null;
 
 const safeId = (value, maximum = 180) => String(value ?? '')
   .trim().toLowerCase().replace(/[^a-z0-9_:-]/g, '_').slice(0, maximum);
@@ -27,7 +38,11 @@ export function normalizeSongVotes(value = {}, voterId = '') {
   for (const entry of Object.values(value?.votes ?? {})) {
     const feedback = normalizeSongFeedback(entry);
     if (!feedback || !validVote(entry?.vote)) continue;
-    votes[songVoteKey(feedback)] = { ...feedback, vote: entry.vote };
+    votes[songVoteKey(feedback)] = {
+      ...feedback,
+      vote: entry.vote,
+      reason: entry.vote === 'down' ? normalizeDownvoteReason(entry.reason) : null
+    };
   }
   return {
     version: SONG_VOTE_SCHEMA_VERSION,
@@ -75,12 +90,21 @@ export class SongVoteStore {
 
   hasRated(feedback) { return this.get(feedback) !== null; }
 
-  set(feedback, vote = null) {
+  getReason(feedback) {
+    const key = songVoteKey(feedback);
+    return key && this.data.votes[key]?.vote === 'down' ? this.data.votes[key].reason ?? null : null;
+  }
+
+  set(feedback, vote = null, reason = null) {
     const normalized = normalizeSongFeedback(feedback);
     const key = songVoteKey(normalized);
     if (!key || (vote !== null && !validVote(vote))) return null;
     if (vote === null) delete this.data.votes[key];
-    else this.data.votes[key] = { ...normalized, vote };
+    else this.data.votes[key] = {
+      ...normalized,
+      vote,
+      reason: vote === 'down' ? normalizeDownvoteReason(reason) : null
+    };
     this.persist();
     return this.get(normalized);
   }

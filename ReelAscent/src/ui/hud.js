@@ -1,7 +1,7 @@
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 import { formatInputCode } from '../player/movement.js';
 import { GAME_VERSION } from '../version.js';
-import { SongVoteStore, songVoteKey } from '../fishing/song-votes.js';
+import { SongVoteStore, normalizeDownvoteReason, songVoteKey } from '../fishing/song-votes.js';
 
 function formatRunTime(seconds) {
   const whole = Math.max(0, Math.floor(seconds));
@@ -62,15 +62,32 @@ export class Hud {
     this.fishingResultTitle = document.querySelector('#fishing-result-title');
     this.songFeedback = document.querySelector('#song-feedback');
     this.songFeedbackSummary = document.querySelector('#song-feedback-summary');
+    this.songDownvoteReason = document.querySelector('#song-downvote-reason');
     this.songVoteStore = new SongVoteStore(null, voterId);
     this.songAggregates = new Map();
     this.resultActionHandler = () => false;
     this.feedbackPending = false;
     this.feedbackError = '';
     this.allowVoteChange = false;
+    this.downvoteReasonOpen = false;
+    this.downvoteReasonPending = false;
     this.currentSongFeedback = null;
     this.currentSongFeedbackKey = '';
     this.onFishingResultPointerDown = (event) => {
+      const reasonButton = event.target.closest?.('[data-song-downvote-reason]');
+      if (reasonButton && !this.fishingResultControls?.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (this.downvoteReasonPending) return;
+        const reason = reasonButton.dataset.songDownvoteReason;
+        if (reason === 'skip') {
+          this.dismissSongDownvoteReason();
+          return;
+        }
+        const normalized = normalizeDownvoteReason(reason);
+        if (normalized) this.resultActionHandler('downvote-reason', 'trigger', normalized);
+        return;
+      }
       const button = event.target.closest?.('[data-fishing-result-action]');
       if (!button || this.fishingResultControls?.hidden) return;
       event.preventDefault();
@@ -101,7 +118,6 @@ export class Hud {
     this.fishingResultControls?.addEventListener('pointercancel', this.onFishingResultPointerUp);
     this.mobileControls = document.querySelector('#mobile-controls');
     this.touchContextAction = document.querySelector('#touch-context-action');
-    this.touchMovementAction = document.querySelector('#touch-movement-action');
     this.runStatus = document.querySelector('#run-status');
     this.currencyIndicator = document.querySelector('#currency-indicator');
     this.runSector = document.querySelector('#run-sector');
@@ -118,7 +134,6 @@ export class Hud {
     this.debugVisible = false;
     this.smoothedFps = 60;
     this.lastTouchContextLabel = '';
-    this.lastTouchMovementLabel = '';
     this.mobileDirectionButtons = Object.fromEntries(['up', 'down', 'left', 'right'].map((direction) => [
       direction, document.querySelector(`[data-touch-action="${direction}"]`)
     ]));
@@ -277,7 +292,8 @@ export class Hud {
 
     this.bitePrompt.hidden = playerState.fishing.state !== 'bite' || !playerState.fishing.showHookTutorial;
 
-    const touchContextLabel = ({ fish: 'Fish', grip: 'Grip', interact: 'Interact' })[
+    const postCastFishing = !['inactive', 'ready', 'charging'].includes(playerState.fishing.state);
+    const touchContextLabel = ({ fish: postCastFishing ? 'Exit Fish' : 'Fish', grip: 'Grip', interact: 'Interact' })[
       playerState.mobileActions?.context
     ] ?? 'Interact';
     if (this.touchContextAction && touchContextLabel !== this.lastTouchContextLabel) {
@@ -286,12 +302,6 @@ export class Hud {
       this.lastTouchContextLabel = touchContextLabel;
     }
     this.touchContextAction?.classList.toggle('is-unavailable', !playerState.mobileActions?.contextAvailable);
-    const touchMovementLabel = playerState.mobileActions?.movement === 'slide' ? 'Slide' : 'Sprint';
-    if (this.touchMovementAction && touchMovementLabel !== this.lastTouchMovementLabel) {
-      this.touchMovementAction.textContent = touchMovementLabel;
-      this.touchMovementAction.setAttribute('aria-label', touchMovementLabel);
-      this.lastTouchMovementLabel = touchMovementLabel;
-    }
 
     const rhythm = playerState.fishing.rhythm;
     const matchingMovement = playerState.fishing.state === 'rhythm-starting'
@@ -311,9 +321,9 @@ export class Hud {
       this.rhythmPanel.hidden = true;
     }
     const fishingResultActive = Boolean(playerState.fishing.resultActive);
-    if (this.mobileControls) this.mobileControls.dataset.mode = matchingMovement
-      ? 'rhythm'
-      : fishingResultActive ? 'result' : 'movement';
+    if (this.mobileControls) this.mobileControls.dataset.mode = fishingResultActive
+      ? 'result'
+      : postCastFishing ? 'fishing' : 'movement';
     if (rhythm) {
       this.rhythmBpm.textContent = `${rhythm.bpm} BPM`;
       this.rhythmJudgment.textContent = rhythm.judgment;
@@ -381,6 +391,8 @@ export class Hud {
       this.feedbackPending = false;
       this.feedbackError = '';
       this.allowVoteChange = false;
+      this.downvoteReasonOpen = false;
+      this.downvoteReasonPending = false;
     }
     this.renderMobileDirections(fishingResultActive, songFeedback);
     this.staminaPanel.hidden = playerState.fishing.state !== 'inactive';
@@ -555,17 +567,43 @@ export class Hud {
     return true;
   }
 
-  confirmSongVote(feedback, vote, aggregate = null) {
-    this.songVoteStore.set(feedback, vote);
+  confirmSongVote(feedback, vote, aggregate = null, { askForReason = false, reason = null } = {}) {
+    this.songVoteStore.set(feedback, vote, reason);
     if (aggregate) this.setSongAggregate(aggregate);
     this.feedbackPending = false;
     this.feedbackError = '';
     this.allowVoteChange = false;
+    this.downvoteReasonOpen = vote === 'down' && askForReason;
+    this.downvoteReasonPending = false;
     this.renderSongFeedback(feedback);
+  }
+
+  beginSongDownvoteReason(feedback) {
+    if (!this.downvoteReasonOpen || this.downvoteReasonPending || !feedback?.songId) return false;
+    this.downvoteReasonPending = true;
+    this.feedbackError = '';
+    this.renderSongFeedback(feedback);
+    return true;
+  }
+
+  confirmSongDownvoteReason(feedback, reason, aggregate = null) {
+    this.songVoteStore.set(feedback, 'down', reason);
+    if (aggregate) this.setSongAggregate(aggregate);
+    this.downvoteReasonOpen = false;
+    this.downvoteReasonPending = false;
+    this.feedbackError = '';
+    this.renderSongFeedback(feedback);
+  }
+
+  dismissSongDownvoteReason() {
+    this.downvoteReasonOpen = false;
+    this.downvoteReasonPending = false;
+    this.renderSongFeedback(this.currentSongFeedback);
   }
 
   setSongVoteError(message = "Feedback couldn't be saved.") {
     this.feedbackPending = false;
+    this.downvoteReasonPending = false;
     this.feedbackError = String(message || "Feedback couldn't be saved.");
     this.renderSongFeedback(this.currentSongFeedback);
   }
@@ -585,6 +623,8 @@ export class Hud {
       this.feedbackPending = false;
       this.feedbackError = '';
       this.allowVoteChange = false;
+      this.downvoteReasonOpen = false;
+      this.downvoteReasonPending = false;
     }
     this.currentSongFeedback = feedback;
     if (!key || !this.songFeedback || !this.songFeedbackSummary) return;
@@ -605,6 +645,13 @@ export class Hud {
     this.songFeedbackSummary.innerHTML = this.feedbackError
       ? `<span>${escapeHtml(this.feedbackError)}</span>`
       : currentVote ? `<span><strong>YOU: ${currentVote === 'up' ? '👍' : '👎'}</strong></span>${aggregateText}<button type="button" data-fishing-result-action="vote-change">CHANGE</button>` : '';
+    if (this.songDownvoteReason) {
+      this.songDownvoteReason.hidden = !this.downvoteReasonOpen;
+      for (const button of this.songDownvoteReason.querySelectorAll('[data-song-downvote-reason]')) {
+        button.disabled = this.downvoteReasonPending;
+        button.classList.toggle('is-pending', this.downvoteReasonPending);
+      }
+    }
     if (this.mobileControls) this.mobileControls.dataset.rated = String(Boolean(currentVote && !this.allowVoteChange));
   }
 

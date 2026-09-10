@@ -23,7 +23,7 @@ const BLOCKING_CLASSES = Object.freeze([
 ]);
 
 const GROUPS = Object.freeze([
-  Object.freeze({ key: 'avatarType', label: 'Avatar Type', options: AVATAR_TYPES, section: 'all' }),
+  Object.freeze({ key: 'avatarType', label: 'Avatar Type', options: AVATAR_TYPES, section: 'body' }),
   Object.freeze({ key: 'blobColor', label: 'Blob Color', options: BLOB_COLORS, blob: true, swatches: true, section: 'body' }),
   Object.freeze({ key: 'skinTone', label: 'Skin Tone', options: SKIN_TONES, human: true, slider: true, section: 'body' }),
   Object.freeze({ key: 'shirtColor', label: 'Shirt / Top', options: SHIRT_COLORS, human: true, swatches: true, section: 'body' }),
@@ -196,9 +196,10 @@ export class AppearanceMenu {
     for (const tab of this.screen.querySelectorAll('[data-appearance-tab]')) {
       tab.setAttribute('aria-pressed', String(tab.dataset.appearanceTab === this.activeTab));
     }
-    const groups = GROUPS.filter((group) => group.section === 'all' || group.section === this.activeTab).map((group) => {
+    this.content.dataset.section = this.activeTab;
+    const groups = GROUPS.filter((group) => group.section === this.activeTab).map((group) => {
       const fieldset = document.createElement('fieldset');
-      fieldset.className = 'appearance-group';
+      fieldset.className = `appearance-group appearance-group-${group.key}`;
       fieldset.hidden = Boolean((group.human && !human) || (group.blob && human));
       const legend = document.createElement('legend');
       legend.textContent = group.label;

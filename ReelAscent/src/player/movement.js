@@ -207,7 +207,6 @@ export class PlayerInput {
     this.touchPointers = new Map();
     this.touchActions = new Set();
     this.mobileContextAction = 'interact';
-    this.mobileMovementAction = 'sprint';
     this.mobileControls = document.querySelector('#mobile-controls');
     this.forceMobile = new URLSearchParams(window.location.search).get('mobile') === '1';
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
@@ -367,7 +366,7 @@ export class PlayerInput {
       const action = event.currentTarget.dataset.touchAction;
       const effectiveAction = action === 'context-action'
         ? this.mobileContextAction
-        : action === 'movement-action' ? this.mobileMovementAction : action;
+        : action;
       const alreadyHeld = this.touchActions.has(effectiveAction);
       const rhythmPress = this.rhythmCapture && TOUCH_DIRECTIONS.has(action);
       const rhythmSource = `touch:${event.pointerId}`;
@@ -578,9 +577,8 @@ export class PlayerInput {
   hasDeliberateClick() { return this.deliberateClickQueued; }
   discardDeliberateClick() { this.deliberateClickQueued = false; }
   setFishingActive(active) { this.fishingActive = Boolean(active); }
-  setMobileActionModes({ context = 'interact', movement = 'sprint' } = {}) {
+  setMobileActionModes({ context = 'interact' } = {}) {
     this.mobileContextAction = ['interact', 'grip', 'fish'].includes(context) ? context : 'interact';
-    this.mobileMovementAction = movement === 'slide' ? 'slide' : 'sprint';
   }
 
   suppressGripUntilRelease() {

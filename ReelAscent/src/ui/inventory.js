@@ -19,12 +19,12 @@ function colorCss(color = [.45, .62, .55]) {
 const SPECIMEN_PREVIEW_CACHE = new Map();
 
 export const INVENTORY_SORT_OPTIONS = Object.freeze([
-  ['recent', 'Most recent'],
-  ['value', 'Value: high to low'],
-  ['rarity', 'Rarity: high to low'],
-  ['size', 'Size: largest first'],
-  ['species', 'Species: A to Z'],
-  ['location', 'Catch location: A to Z']
+  ['recent', 'Recently Caught'],
+  ['value', 'Value'],
+  ['rarity', 'Rarity'],
+  ['size', 'Size'],
+  ['species', 'Species'],
+  ['location', 'Location']
 ]);
 
 const RARITY_ORDER = Object.freeze({ common: 0, uncommon: 1, rare: 2, legendary: 3 });

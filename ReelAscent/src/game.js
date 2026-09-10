@@ -449,12 +449,8 @@ export class Game {
       mobileContextCandidate,
       performance.now()
     );
-    const mobileMovementAction = multiplayerPlayerState.canSlide || multiplayerPlayerState.slideActive
-      ? 'slide'
-      : 'sprint';
     this.player.input.setMobileActionModes?.({
-      context: this.mobileContextState.current?.kind ?? 'interact',
-      movement: mobileMovementAction
+      context: this.mobileContextState.current?.kind ?? 'interact'
     });
     this.tutorials.update(dt, this.contextualAction);
     this.homeInteraction.setPromptAllowed(this.contextualAction?.kind === 'interact');
@@ -483,8 +479,9 @@ export class Game {
       this.lastSongVoteQueryKey = feedbackKey;
       if (feedbackKey && this.hud.songVoteStore.hasRated(songFeedback)) {
         const savedVote = this.hud.songVoteStore.get(songFeedback);
-        this.multiplayer.submitSongVote(songFeedback, savedVote)
-          .then((aggregate) => this.hud.confirmSongVote(songFeedback, savedVote, aggregate))
+        const savedReason = this.hud.songVoteStore.getReason(songFeedback);
+        this.multiplayer.submitSongVote(songFeedback, savedVote, savedReason)
+          .then((aggregate) => this.hud.confirmSongVote(songFeedback, savedVote, aggregate, { reason: savedReason }))
           .catch(() => this.hud.setSongVoteError("Live feedback totals couldn't be loaded."));
       }
     }
@@ -566,12 +563,23 @@ export class Game {
     this.pauseMenu?.setOpen(false);
   }
 
-  performFishingResultAction(action, phase = 'trigger') {
+  performFishingResultAction(action, phase = 'trigger', detail = null) {
     if (action === 'recast') return phase === 'end'
       ? this.fishing.releaseResultRecast()
       : this.fishing.beginResultRecast();
     if (!this.fishing.resultActive) return false;
     if (action === 'stay') return this.fishing.performResultAction(action);
+    if (action === 'downvote-reason') {
+      const feedback = { ...this.fishing.lastSongFeedback };
+      if (!this.hud.beginSongDownvoteReason(feedback)) return false;
+      this.multiplayer.submitSongVote(feedback, 'down', detail)
+        .then((aggregate) => this.hud.confirmSongDownvoteReason(feedback, detail, aggregate))
+        .catch(() => {
+          this.hud.setSongVoteError("Reason couldn't be saved.");
+          this.hud.showToast?.("The downvote is saved, but its reason couldn't be updated.", 3);
+        });
+      return true;
+    }
     const clearing = action === 'clear-vote';
     if ((!['up', 'down'].includes(action) && !clearing)
       || (!clearing && !this.hud.canRateSong(this.fishing.lastSongFeedback))) return false;
@@ -579,7 +587,7 @@ export class Game {
     const vote = clearing ? null : action;
     if (!this.hud.beginSongVote(feedback)) return false;
     this.multiplayer.submitSongVote(feedback, vote)
-      .then((aggregate) => this.hud.confirmSongVote(feedback, vote, aggregate))
+      .then((aggregate) => this.hud.confirmSongVote(feedback, vote, aggregate, { askForReason: vote === 'down' }))
       .catch(() => {
         this.hud.setSongVoteError("Feedback couldn't be saved.");
         this.hud.showToast?.("Feedback couldn't be saved. Fishing is unaffected.", 3);
@@ -969,8 +977,7 @@ export class Game {
       contextualAction: this.contextualAction ? { ...this.contextualAction } : null,
       mobileActions: {
         context: this.mobileContextState.current?.kind ?? 'interact',
-        contextAvailable: Boolean(this.mobileContextState.current),
-        movement: playerState.canSlide || playerState.slideActive ? 'slide' : 'sprint'
+        contextAvailable: Boolean(this.mobileContextState.current)
       },
       keyBindings: loadKeyBindings(),
       pause: {

@@ -1,5 +1,5 @@
 import { AQUARIUM_TANK_CAPACITY } from '../progression/aquarium.js';
-import { specimenPreview } from './inventory.js';
+import { INVENTORY_SORT_OPTIONS, sortInventorySpecimens, specimenPreview } from './inventory.js';
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -20,6 +20,7 @@ export class AquariumMenu {
     this.selectedSpecimenId = null;
     this.selectedTankIndex = 0;
     this.moveDestination = 'tank:0';
+    this.sortMode = 'recent';
     this.view = 'inventory';
     this.remotePlayerId = null;
     this.renderedRevision = -1;
@@ -35,6 +36,12 @@ export class AquariumMenu {
       if (selection) { this.selectedSpecimenId = selection.dataset.aquariumSelect; this.render(true); }
     };
     this.onChange = (event) => {
+      const sort = event.target.closest?.('[data-aquarium-sort]');
+      if (sort) {
+        this.sortMode = INVENTORY_SORT_OPTIONS.some(([value]) => value === sort.value) ? sort.value : 'recent';
+        this.render(true);
+        return;
+      }
       const target = event.target.closest?.('[data-aquarium-destination]');
       if (target) { this.moveDestination = target.value; this.render(true); }
     };
@@ -49,6 +56,9 @@ export class AquariumMenu {
 
   handleAction(button) {
     const action = button.dataset.aquariumAction;
+    const sourceAction = ['inventory', 'tank', 'showcase', 'remote'].includes(action);
+    const selectedIndex = [...(this.content?.querySelectorAll('[data-aquarium-select]') ?? [])]
+      .findIndex((entry) => entry.dataset.aquariumSelect === this.selectedSpecimenId);
     let result = { ok: true };
     if (action === 'upgrade') result = this.progression.purchaseAquariumCapacityUpgrade();
     else if (action === 'move-location') result = this.progression.moveAquariumSpecimen(button.dataset.specimenId,
@@ -65,7 +75,10 @@ export class AquariumMenu {
     if (this.status && !['inventory', 'tank', 'showcase', 'remote'].includes(action)) this.status.textContent = result.ok
       ? action === 'auto-tank' ? `Added ${result.count} highest-value creature${result.count === 1 ? '' : 's'} to Tank ${this.selectedTankIndex + 1}.` : 'Aquarium updated.'
       : result.reason;
-    if (result.ok) this.render(true);
+    if (result.ok) {
+      if (!sourceAction && selectedIndex >= 0) this.selectionFallbackIndex = selectedIndex;
+      this.render(true, { preserveScroll: !sourceAction });
+    }
   }
 
   toggle() { if (this.isOpen) this.close(); else this.open(); }
@@ -79,8 +92,32 @@ export class AquariumMenu {
     if (this.isOpen && (this.renderedRevision !== this.progression.revision || second !== this.lastClockSecond)) { this.lastClockSecond = second; this.render(true); }
   }
 
-  render(force = false) {
+  captureBrowserPosition() {
+    const grid = this.content?.querySelector('.aquarium-specimen-grid');
+    if (!grid) return null;
+    const cards = [...grid.querySelectorAll('[data-aquarium-select]')];
+    const anchor = cards.find((entry) => entry.offsetTop + entry.offsetHeight >= grid.scrollTop);
+    return {
+      top: grid.scrollTop,
+      anchorId: anchor?.dataset.aquariumSelect ?? null,
+      anchorOffset: anchor ? anchor.offsetTop - grid.scrollTop : 0
+    };
+  }
+
+  restoreBrowserPosition(position) {
+    if (!position) return;
+    const grid = this.content?.querySelector('.aquarium-specimen-grid');
+    if (!grid) return;
+    const anchor = position.anchorId
+      ? [...grid.querySelectorAll('[data-aquarium-select]')]
+        .find((entry) => entry.dataset.aquariumSelect === position.anchorId)
+      : null;
+    grid.scrollTop = anchor ? anchor.offsetTop - position.anchorOffset : position.top;
+  }
+
+  render(force = false, { preserveScroll = true } = {}) {
     if (!this.isOpen || !this.content || (!force && this.renderedRevision === this.progression.revision)) return;
+    const browserPosition = preserveScroll ? this.captureBrowserPosition() : null;
     const state = this.progression.getSnapshot();
     const displays = this.progression.getAquariumTankDisplays();
     const economy = this.progression.getAquariumEconomy();
@@ -91,6 +128,7 @@ export class AquariumMenu {
     const remaining = Math.ceil(Math.max(0, economy.intervalSeconds - economy.bankedActiveSeconds));
     const clock = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
     this.content.innerHTML = `${this.renderSummary(economy, state, clock)}<div class="aquarium-desktop-layout">${this.renderRail(state, displays, economy, socials)}${this.renderBrowser(state, displays, socials)}${this.renderDetails(state, displays, socials)}</div>`;
+    this.restoreBrowserPosition(browserPosition);
     this.renderedRevision = this.progression.revision;
   }
 
@@ -110,18 +148,24 @@ export class AquariumMenu {
   }
 
   collection(state, displays, socials) {
+    const sorted = (result) => ({ ...result, items: sortInventorySpecimens(result.items, this.sortMode) });
     const byId = new Map((state.aquarium ?? []).map((entry) => [entry.specimenId, entry]));
-    if (this.view === 'inventory') return { title: 'Inventory', subtitle: 'Creatures currently carried.', items: state.inventory ?? [], label: () => 'Inventory' };
-    if (this.view === 'tank') return { title: `Tank ${this.selectedTankIndex + 1}`, subtitle: 'Every listed creature is physically displayed here.', items: (displays[this.selectedTankIndex] ?? []).map((id) => byId.get(id)).filter(Boolean), label: () => `Tank ${this.selectedTankIndex + 1}` };
-    if (this.view === 'showcase') { const ids = new Set(this.progression.getAquariumShowcasePresentation().map((entry) => entry.specimenId)); return { title: 'My Multiplayer Tank', subtitle: 'Presentation only; normal locations stay unchanged.', items: [...state.aquarium, ...state.inventory], label: (entry) => ids.has(entry.specimenId) ? 'Shown to room' : 'Not showcased' }; }
+    if (this.view === 'inventory') return sorted({ title: 'Inventory', subtitle: 'Creatures currently carried.', items: state.inventory ?? [], label: () => 'Inventory' });
+    if (this.view === 'tank') return sorted({ title: `Tank ${this.selectedTankIndex + 1}`, subtitle: 'Every listed creature is physically displayed here.', items: (displays[this.selectedTankIndex] ?? []).map((id) => byId.get(id)).filter(Boolean), label: () => `Tank ${this.selectedTankIndex + 1}` });
+    if (this.view === 'showcase') { const ids = new Set(this.progression.getAquariumShowcasePresentation().map((entry) => entry.specimenId)); return sorted({ title: 'My Multiplayer Tank', subtitle: 'Presentation only; normal locations stay unchanged.', items: [...state.aquarium, ...state.inventory], label: (entry) => ids.has(entry.specimenId) ? 'Shown to room' : 'Not showcased' }); }
     const remote = socials.find((entry) => !entry.isLocal && entry.playerId === this.remotePlayerId);
-    return { title: `${remote?.displayName || 'Guest'}'s Multiplayer Tank`, subtitle: 'Read-only multiplayer display.', items: remote?.specimens ?? [], label: () => 'Multiplayer tank' };
+    return sorted({ title: `${remote?.displayName || 'Guest'}'s Multiplayer Tank`, subtitle: 'Read-only multiplayer display.', items: remote?.specimens ?? [], label: () => 'Multiplayer tank' });
   }
 
   renderBrowser(state, displays, socials) {
     const collection = this.collection(state, displays, socials);
-    if (!collection.items.some((entry) => entry.specimenId === this.selectedSpecimenId)) this.selectedSpecimenId = collection.items[0]?.specimenId ?? null;
-    return `<main class="aquarium-specimen-browser"><header><div><small>CREATURES</small><h3>${escapeHtml(collection.title)}</h3><p>${escapeHtml(collection.subtitle)}</p></div><strong>${collection.items.length}</strong></header><div class="aquarium-specimen-grid">${collection.items.map((entry) => card(entry, this.selectedSpecimenId, collection.label(entry))).join('') || '<p class="shop-empty">No creatures are in this location.</p>'}</div></main>`;
+    if (!collection.items.some((entry) => entry.specimenId === this.selectedSpecimenId)) {
+      const fallback = Math.min(Math.max(0, this.selectionFallbackIndex ?? 0), Math.max(0, collection.items.length - 1));
+      this.selectedSpecimenId = collection.items[fallback]?.specimenId ?? null;
+    }
+    this.selectionFallbackIndex = null;
+    const options = INVENTORY_SORT_OPTIONS.map(([value, label]) => `<option value="${value}" ${value === this.sortMode ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+    return `<main class="aquarium-specimen-browser"><header><div><small>CREATURES</small><h3>${escapeHtml(collection.title)}</h3><p>${escapeHtml(collection.subtitle)}</p></div><label class="aquarium-sort-control"><span>SORT</span><select data-aquarium-sort aria-label="Sort Aquarium creatures">${options}</select></label><strong>${collection.items.length}</strong></header><div class="aquarium-specimen-grid">${collection.items.map((entry) => card(entry, this.selectedSpecimenId, collection.label(entry))).join('') || '<p class="shop-empty">No creatures are in this location.</p>'}</div></main>`;
   }
 
   renderDetails(state, displays, socials) {

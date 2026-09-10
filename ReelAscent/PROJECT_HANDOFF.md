@@ -1,3 +1,44 @@
+# REEL ASCENT v17.1
+
+Status: the focused Aquarium UX, Appearance layout, rhythm-chord reliability, mobile fishing controls, and optional durable downvote-reason pass is complete as **REEL ASCENT • v17.1**. The focused checks and production frontend build pass, and the multiplayer server still starts cleanly when PostgreSQL is unavailable.
+
+1. **Aquarium sorting implementation** — The Aquarium browser imports and uses Inventory's authoritative `INVENTORY_SORT_OPTIONS` and `sortInventorySpecimens` implementation. It offers exactly Recently Caught, Value, Rarity, Size, Species, and Location with Inventory's existing tie-breakers and applies the chosen sort only after resolving the active Inventory, Tank, local Showcase, or remote Showcase source.
+2. **Aquarium scroll-preservation fix** — Before state-driven rerenders, the browser captures its grid scrollTop plus the first visible specimen and its visual offset. After Move To, tank moves, returning to Inventory, Auto-Fill, showcase changes, income/revision updates, and other same-source refreshes, it restores that anchor or the prior clamped scroll position instead of returning to zero.
+3. **Appearance Accessories layout changes** — Accessories now receives a scrollable, wide two-column management area whose category grids use readable minimum-width cards. Headwear, Eyewear, Face/Neck, Back, and Backpack Color use the main space; locked cards retain concise unlock-source text.
+4. **Avatar Type location** — Human and Trail Blob now live only in **Body & Colors** as a compact two-choice group. The oversized Avatar Type section was removed from Accessories.
+5. **Rhythm chord root cause** — Every browser keydown/touch edge was previously judged immediately. Because one chord's OS events arrive serially, its first lane could be compared against a same-time different-lane note and consume that note as a wrong-lane miss before the rest of the intended chord arrived.
+6. **Chord timing/set matching** — Multi-note chart groups now buffer unique directional presses for a 75 ms chord-input window, match the complete required lane set without event-order dependence, and then judge each required lane using its real press time. Single notes remain immediate; focused checks cover 2-, 3-, and all-4-arrow chords across small timing offsets.
+7. **Mobile Sprint control** — Sprint is again its own real pointer target in the left half of the former top Jump area. It can remain held independently of every other action.
+8. **Mobile Jump control** — Jump occupies the right half of that top area and retains its separate press edge, so Sprint + Jump works through two pointer IDs rather than a cosmetic split.
+9. **Mobile Slide control** — Slide is a distinct lower action target and no longer shares/remaps through Sprint. The contextual Interact/Grip/Fish action remains independently available beside it during ordinary movement.
+10. **Active-fishing mobile layout** — Ready/near-water and charge-before-release states keep normal controls. Only after a rod is actually cast does the HUD enter fishing mode: Sprint, Slide, and Jump hide while four large arrows span almost the full safe lower-screen width. The result state keeps Up Recast, Down Stay, Left Dislike, and Right Like.
+11. **Mobile multi-touch chords** — Each arrow is a separate element, every active pointer is retained in `touchPointers`, and rhythm ownership is tracked per `touch:<pointerId>`. Releasing one arrow cannot cancel the others, so opposite-direction, 3-arrow, and all-4-arrow chords are physically representable.
+12. **Fishing exit behavior** — During the post-cast layout, the small contextual action moves above the arrow strip, reads **Exit Fish**, and uses the existing fishing-toggle/cancel path. Ending or cancelling fishing returns the HUD mode to movement and restores the normal arrows plus Sprint, Jump, Slide, and context control.
+13. **Downvote reason UI** — A Down vote is submitted and accepted first. After success, a compact optional “What didn't work?” panel offers six reasons plus Skip; Skip closes only the panel and leaves the already-recorded downvote intact.
+14. **Stable reason IDs** — Stored/wire IDs are `sounds_bad`, `too_hard`, `too_easy`, `bugged`, `bad_instrument`, and `other`; displayed English labels are not used as identity. Local normalization rejects unknown IDs.
+15. **Database/schema change** — `reel_ascent_song_votes` gains nullable `downvote_reason VARCHAR(32)`. New tables constrain it to the six IDs, and startup idempotently adds the column to an existing Neon table without deleting rows or historical song revisions. The existing `pg` dependency remains sufficient; no new package was added.
+16. **Live reason aggregation** — The existing voter/species/song-revision upsert now writes one reason only for a Down vote. Aggregate queries return all six reason counts. Down→Up writes a null reason so it stops counting; Up→Down starts with no reason and offers the optional prompt again; updating a reason does not add a vote.
+17. **Song Feedback dashboard** — Each species/revision row retains 👍, 👎, total, and approval, and now adds a compact nonzero downvote-reason breakdown with a clear “No reasons” state.
+18. **FUTURE TODO section** — The deferred list below explicitly retains Fish / Creature Balance Rework, Veiled Athenaeum gameplay/content, Skyscraper Casino, Playable Instruments, Accounts / Cloud Saves, and More Cosmetic Work. None was implemented in v17.1.
+19. **Files changed** — `index.html`; `src/version.js`; `src/styles.css`; `src/game.js`; `src/fishing/{rhythm-session,song-votes}.js`; `src/multiplayer/multiplayer-client.js`; `src/player/movement.js`; `src/ui/{aquarium,appearance-menu,hud,inventory,song-feedback-dashboard}.js`; `server/src/{connection,song-vote-store}.js`; `test/v17-1-focused.test.js`; regenerated tracked `dist/index.html` and hashed JS/CSS; and this handoff.
+20. **Save schema** — The gameplay/progression save schema did not change. Browser-local song-feedback records normalize from version 2 to version 3 in the same storage slot to add the optional reason; existing votes remain valid and default to no reason.
+21. **Multiplayer/server protocol** — Existing message types and protocol version are unchanged. `song_vote_set` gains an optional nullable `reason` field and aggregates gain `downvoteReasons`; older clients remain compatible because both are additive and normal up/down/clear behavior is unchanged.
+22. **Neon schema** — **Changed.** Server startup adds the nullable `downvote_reason` column through `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`; PostgreSQL remains the authoritative durable store and `DATABASE_URL` remains environment-only.
+23. **Render redeployment** — **Required.** Redeploy the Ohio multiplayer service so it runs the idempotent column migration and begins accepting/aggregating reason IDs. Successful configured startup should still log `[reel-ascent] PostgreSQL connected` and `[reel-ascent] song-voting schema initialized successfully`.
+24. **Frontend rebuilding** — **Required for release and completed locally.** `npm run build` passed and regenerated the tracked `dist/` assets. Syntax checks for every changed runtime/server module and the v17.1 focused suite pass **7/7**. The normal Vite PlayCanvas worker-externalization and large-chunk advisories remain warnings only.
+25. **Short manual checklist** — Aquarium: choose Inventory and Tank 2, exercise all six sorts, scroll deep, repeatedly Move To/Auto-Fill/showcase-toggle, and confirm the nearby position/selection remains stable. Appearance: verify Avatar Type under Body & Colors and readable accessory categories. Rhythm: play one single, 2-arrow, Up+Down+Left, and all-four chord on keyboard and touch. Mobile: hold Sprint+Jump, use Slide, verify normal controls remain through charging, then confirm the post-cast full-width arrows and small Exit Fish restore correctly. Feedback: Down then Skip; Down then each reason; Change Down→Up→Down; inspect live reason totals from a second client/dashboard.
+
+## FUTURE TODO
+
+- **FISH / CREATURE BALANCE REWORK** — In a dedicated future pass, review species availability, water-zone pools, rarity balance, lure/bobber interactions, catch rates, and progression/value balance without folding those broad changes into a UI/reliability update.
+- **VEILED ATHENAEUM gameplay/content**
+- **SKYSCRAPER CASINO**
+- **PLAYABLE INSTRUMENTS**
+- **ACCOUNTS / CLOUD SAVES**
+- **MORE COSMETIC WORK**
+
+## Previous v17 handoff
+
 # REEL ASCENT v17
 
 Status: the focused multiplayer-Cabin spawn, simplified Aquarium management, charged result recast, and first playable Skyreach skyscraper pass is complete as **REEL ASCENT • v17**. The production frontend build passes; broader route/gameplay tuning remains for manual playtesting.

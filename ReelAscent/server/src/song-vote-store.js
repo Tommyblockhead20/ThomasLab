@@ -3,6 +3,14 @@ import pg from 'pg';
 const { Pool } = pg;
 const safeId = (value, maximum) => String(value ?? '').trim().toLowerCase()
   .replace(/[^a-z0-9_:-]/g, '_').slice(0, maximum);
+export const SONG_DOWNVOTE_REASON_IDS = Object.freeze([
+  'sounds_bad', 'too_hard', 'too_easy', 'bugged', 'bad_instrument', 'other'
+]);
+const DOWNVOTE_REASON_IDS = new Set(SONG_DOWNVOTE_REASON_IDS);
+const normalizeReason = (value) => DOWNVOTE_REASON_IDS.has(value) ? value : null;
+const REASON_AGGREGATE_COLUMNS = SONG_DOWNVOTE_REASON_IDS.map((reason) => (
+  `COUNT(*) FILTER (WHERE vote = 'down' AND downvote_reason = '${reason}')::integer AS "reason_${reason}"`
+)).join(',\n          ');
 
 export function normalizeSongVote(value = {}) {
   const voterId = String(value.voterId ?? '').trim().slice(0, 160);
@@ -12,13 +20,17 @@ export function normalizeSongVote(value = {}) {
   const vote = value.vote === null || value.vote === 'none' ? null
     : value.vote === 'up' || value.vote === 'down' ? value.vote : undefined;
   if (!voterId || !speciesId || !songId.startsWith('song:') || vote === undefined) return null;
-  return { voterId, speciesId, songId, songRevision, vote };
+  const reason = vote === 'down' ? normalizeReason(value.reason) : null;
+  return { voterId, speciesId, songId, songRevision, vote, reason };
 }
 
 const aggregate = (record, upVotes = 0, downVotes = 0) => {
   const up = Number(upVotes) || 0;
   const down = Number(downVotes) || 0;
   const totalVotes = up + down;
+  const downvoteReasons = Object.fromEntries(SONG_DOWNVOTE_REASON_IDS.map((reason) => [
+    reason, Number(record[`reason_${reason}`] ?? record.downvoteReasons?.[reason]) || 0
+  ]));
   return {
     speciesId: record.speciesId,
     songId: record.songId,
@@ -26,7 +38,8 @@ const aggregate = (record, upVotes = 0, downVotes = 0) => {
     upVotes: up,
     downVotes: down,
     totalVotes,
-    approvalPercent: totalVotes ? up / totalVotes * 100 : 0
+    approvalPercent: totalVotes ? up / totalVotes * 100 : 0,
+    downvoteReasons
   };
 };
 
@@ -71,7 +84,10 @@ export class MemorySongVoteStore {
       const key = `${record.speciesId}@${record.songRevision}`;
       const group = groups.get(key) ?? aggregate(record);
       if (record.vote === 'up') group.upVotes += 1;
-      if (record.vote === 'down') group.downVotes += 1;
+      if (record.vote === 'down') {
+        group.downVotes += 1;
+        if (record.reason) group.downvoteReasons[record.reason] += 1;
+      }
       group.totalVotes = group.upVotes + group.downVotes;
       group.approvalPercent = group.totalVotes ? group.upVotes / group.totalVotes * 100 : 0;
       groups.set(key, group);
@@ -111,11 +127,14 @@ export class PostgresSongVoteStore {
         song_id VARCHAR(180) NOT NULL,
         song_revision INTEGER NOT NULL CHECK (song_revision > 0),
         vote VARCHAR(4) NOT NULL CHECK (vote IN ('up', 'down')),
+        downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR downvote_reason IN ('sounds_bad', 'too_hard', 'too_easy', 'bugged', 'bad_instrument', 'other')),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (voter_id, species_id, song_revision)
       )
     `);
+    // Existing v16.3 databases receive the nullable column without losing vote history.
+    await this.pool.query('ALTER TABLE reel_ascent_song_votes ADD COLUMN IF NOT EXISTS downvote_reason VARCHAR(32) NULL');
     await this.pool.query(`
       CREATE INDEX IF NOT EXISTS reel_ascent_song_votes_species_revision
       ON reel_ascent_song_votes (species_id, song_revision)
@@ -146,13 +165,14 @@ export class PostgresSongVoteStore {
       } else {
         await client.query(`
           INSERT INTO reel_ascent_song_votes
-            (voter_id, species_id, song_id, song_revision, vote)
-          VALUES ($1, $2, $3, $4, $5)
+            (voter_id, species_id, song_id, song_revision, vote, downvote_reason)
+          VALUES ($1, $2, $3, $4, $5, $6)
           ON CONFLICT (voter_id, species_id, song_revision) DO UPDATE SET
             song_id = EXCLUDED.song_id,
             vote = EXCLUDED.vote,
+            downvote_reason = EXCLUDED.downvote_reason,
             updated_at = NOW()
-        `, [record.voterId, record.speciesId, record.songId, record.songRevision, record.vote]);
+        `, [record.voterId, record.speciesId, record.songId, record.songRevision, record.vote, record.reason]);
       }
       const result = await client.query(`
         SELECT
@@ -160,7 +180,8 @@ export class PostgresSongVoteStore {
           MAX(song_id) AS "songId",
           song_revision AS "songRevision",
           COUNT(*) FILTER (WHERE vote = 'up')::integer AS "upVotes",
-          COUNT(*) FILTER (WHERE vote = 'down')::integer AS "downVotes"
+          COUNT(*) FILTER (WHERE vote = 'down')::integer AS "downVotes",
+          ${REASON_AGGREGATE_COLUMNS}
         FROM reel_ascent_song_votes
         WHERE species_id = $1 AND song_revision = $2
         GROUP BY species_id, song_revision
@@ -192,7 +213,8 @@ export class PostgresSongVoteStore {
         MAX(song_id) AS "songId",
         song_revision AS "songRevision",
         COUNT(*) FILTER (WHERE vote = 'up')::integer AS "upVotes",
-        COUNT(*) FILTER (WHERE vote = 'down')::integer AS "downVotes"
+        COUNT(*) FILTER (WHERE vote = 'down')::integer AS "downVotes",
+        ${REASON_AGGREGATE_COLUMNS}
       FROM reel_ascent_song_votes
       ${where}
       GROUP BY species_id, song_revision

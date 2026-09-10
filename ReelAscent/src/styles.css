@@ -663,7 +663,7 @@ body.fish-gallery .debug-panel {
 .catch-banner[data-rarity="legendary"] { border-color: #b26de0; }
 
 .fishing-result-controls { position: absolute; z-index: 24; top: max(8.2rem, 20%); left: 50%; display: grid; min-width: min(25rem, calc(100vw - 1rem)); gap: .38rem; justify-items: center; translate: -50% 0; padding: .52rem; color: #f5e7b5; background: rgb(8 39 39 / 92%); border: 1px solid rgb(239 217 139 / 40%); border-radius: .72rem; box-shadow: 0 8px 22px rgb(0 0 0 / 28%); pointer-events: auto; }
-.fishing-result-controls[hidden], .song-feedback[hidden], .song-feedback-summary[hidden] { display: none; }
+.fishing-result-controls[hidden], .song-feedback[hidden], .song-feedback-summary[hidden], .song-downvote-reason[hidden] { display: none; }
 .fishing-result-controls > strong { font-size: .58rem; letter-spacing: .11em; }
 .fishing-result-navigation, .song-feedback { display: flex; gap: .38rem; align-items: center; justify-content: center; }
 .fishing-result-navigation button, .song-feedback button, .song-feedback-summary button { min-height: 2.75rem; padding: .45rem .7rem; color: #f7ecc8; font-size: .58rem; font-weight: 950; background: rgb(255 255 255 / 7%); border: 1px solid rgb(255 255 255 / 16%); border-radius: .45rem; cursor: pointer; touch-action: manipulation; }
@@ -676,6 +676,13 @@ body.fish-gallery .debug-panel {
 .song-feedback-summary { display: flex; gap: .45rem; align-items: center; color: rgb(239 244 230 / 78%); font-size: .53rem; }
 .song-feedback-summary strong { color: #efd98b; }
 .song-feedback-summary button { min-height: 1.9rem; padding: .28rem .46rem; font-size: .46rem; }
+.song-downvote-reason { display: grid; gap: .35rem; width: min(34rem, calc(100vw - 2rem)); padding: .5rem; background: rgb(8 35 35 / 92%); border: 1px solid rgb(239 217 139 / 32%); border-radius: .55rem; }
+.song-downvote-reason > strong { color: #efd98b; font-size: .5rem; letter-spacing: .08em; text-align: center; }
+.song-downvote-reason > strong small { color: rgb(239 244 230 / 52%); font-size: .42rem; }
+.song-downvote-reason > div { display: flex; flex-wrap: wrap; gap: .3rem; justify-content: center; }
+.song-downvote-reason button { min-height: 2.15rem; padding: .32rem .48rem; color: #f7ecc8; font-size: .48rem; font-weight: 950; background: rgb(255 255 255 / 8%); border: 1px solid rgb(255 255 255 / 16%); border-radius: .4rem; cursor: pointer; touch-action: manipulation; }
+.song-downvote-reason button:last-child { color: rgb(239 244 230 / 64%); }
+.song-downvote-reason button.is-pending { opacity: .55; }
 
 .song-feedback-dashboard { position: absolute; z-index: 86; inset: 50% auto auto 50%; display: grid; width: min(72rem, calc(100vw - 1rem)); max-height: calc(100vh - 1rem); grid-template-rows: auto auto auto minmax(0, 1fr); gap: .65rem; translate: -50% -50%; padding: .9rem; color: #edf6e9; background: rgb(7 31 33 / 98%); border: 1px solid rgb(239 217 139 / 46%); border-radius: .8rem; box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 58%); }
 .song-feedback-dashboard[hidden] { display: none; }
@@ -693,6 +700,10 @@ body.fish-gallery .debug-panel {
 .song-feedback-dashboard tbody th { color: #edf6e9; font-size: .58rem; letter-spacing: 0; }
 .song-feedback-dashboard tbody th small { display: block; margin-top: .12rem; color: rgb(234 244 231 / 42%); font-size: .42rem; }
 .song-feedback-dashboard code { color: rgb(234 244 231 / 72%); font-size: .5rem; }
+.song-reason-breakdown { display: flex; min-width: 9rem; flex-wrap: wrap; gap: .18rem .38rem; }
+.song-reason-breakdown span { color: rgb(234 244 231 / 72%); font-size: .45rem; white-space: nowrap; }
+.song-reason-breakdown strong { color: #efd98b; }
+.song-reason-breakdown .is-empty { opacity: .48; }
 body.song-feedback-dashboard-open #game-shell::after { position: absolute; z-index: 85; inset: 0; content: ''; background: rgb(3 18 20 / 55%); }
 
 .catch-banner span {
@@ -1691,10 +1702,10 @@ body.fish-danger #game-shell::after {
   letter-spacing: 0.04em;
 }
 
-.touch-jump {
-  grid-column: 1 / -1;
-  background: rgb(116 83 32 / 76%);
-}
+.touch-sprint { grid-area: 1 / 1; background: rgb(46 97 65 / 78%); }
+.touch-jump { grid-area: 1 / 2; background: rgb(116 83 32 / 76%); }
+.touch-slide { grid-area: 2 / 1; background: rgb(47 78 98 / 78%); }
+.touch-context-action { grid-area: 2 / 2; }
 
 .touch-context-action { background: rgb(116 83 32 / 76%); }
 .touch-context-action.is-unavailable { opacity: .68; }
@@ -1709,6 +1720,32 @@ body.fish-danger #game-shell::after {
 .mobile-controls[data-mode="result"] .touch-button { font-size: 1.05rem; line-height: .9; }
 .mobile-controls[data-mode="result"] .touch-button small { display: block; margin-top: .16rem; font-size: .42rem; letter-spacing: .04em; }
 .mobile-controls[data-mode="result"][data-rated="true"] :is(.touch-left, .touch-right) { visibility: hidden; }
+
+/* Once a cast is in flight, four independent full-width targets own the lower screen.
+   Every button remains a separate pointer surface, so opposite and four-lane chords work. */
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .mobile-dpad {
+  left: max(.6rem, env(safe-area-inset-left));
+  right: max(.6rem, env(safe-area-inset-right));
+  bottom: max(.6rem, env(safe-area-inset-bottom));
+  width: auto;
+  height: min(9rem, 26vh);
+  aspect-ratio: auto;
+  grid-template: minmax(0, 1fr) / repeat(4, minmax(0, 1fr));
+  gap: .45rem;
+}
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-left { grid-area: 1 / 1; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-down { grid-area: 1 / 2; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-up { grid-area: 1 / 3; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-right { grid-area: 1 / 4; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .mobile-dpad .touch-button { font-size: clamp(1.8rem, 7vw, 3.4rem); border-radius: 1.2rem; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .mobile-actions {
+  right: max(.6rem, env(safe-area-inset-right));
+  bottom: calc(max(.6rem, env(safe-area-inset-bottom)) + min(9rem, 26vh) + .45rem);
+  display: block;
+  width: 5.2rem;
+}
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) :is(.touch-sprint, .touch-slide, .touch-jump) { display: none; }
+.mobile-controls:is([data-mode="fishing"], [data-mode="result"]) .touch-context-action { width: 100%; min-height: 2.8rem; padding: .3rem; font-size: .6rem; }
 
 body.mobile-mode .mouse-hint,
 body.mobile-mode .grip-prompt,
@@ -2203,6 +2240,8 @@ body.boat-travel-open #game-shell::after { position: absolute; z-index: 51; inse
 .aquarium-specimen-browser h3 { margin: .12rem 0 .14rem; color: #f0dfa8; font-size: .78rem; }
 .aquarium-specimen-browser header p { margin: 0; color: rgb(234 244 231 / 55%); font-size: .48rem; line-height: 1.35; }
 .aquarium-specimen-browser header > strong { display: grid; min-width: 2rem; min-height: 2rem; place-items: center; color: #efd98b; font-size: .58rem; background: rgb(239 217 139 / 8%); border: 1px solid rgb(239 217 139 / 22%); border-radius: 999px; }
+.aquarium-sort-control { display: grid; gap: .18rem; margin-left: auto; color: #d9c675; font-size: .43rem; font-weight: 950; letter-spacing: .08em; }
+.aquarium-sort-control select { min-width: 8.5rem; padding: .38rem .45rem; color: #edf6e9; font-size: .52rem; background: #153a36; border: 1px solid rgb(239 217 139 / 28%); border-radius: .36rem; }
 .aquarium-specimen-grid { min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr)); grid-auto-rows: min-content; gap: .42rem; align-content: start; padding: .58rem; overflow-y: auto; overflow-x: hidden; }
 .aquarium-specimen-card { min-width: 0; display: grid; grid-template-columns: 4.7rem minmax(0, 1fr); gap: .5rem; align-items: center; padding: .46rem; color: #edf6e9; text-align: left; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 10%); border-left: 3px solid #96a69a; border-radius: .44rem; cursor: pointer; }
 .aquarium-specimen-card[data-rarity="uncommon"] { border-left-color: #62c77e; }
@@ -2499,8 +2538,12 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-preview canvas { display: block; width: 100%; height: 100%; min-height: 0; background: radial-gradient(circle at 50% 35%, #315b58, #071d20 72%); border: 1px solid rgb(239 217 139 / 36%); border-radius: .62rem; }
 .appearance-preview figcaption { color: rgb(239 217 139 / 72%); font-size: .5rem; font-weight: 950; letter-spacing: .1em; text-align: center; }
 .appearance-spin-toggle { position: absolute; right: .55rem; bottom: .55rem; padding: .4rem .52rem; color: #153a36; background: rgb(239 217 139 / 92%); border: 0; border-radius: .36rem; font-size: .5rem; font-weight: 950; cursor: pointer; box-shadow: 0 4px 12px rgb(0 0 0 / 28%); }
-.appearance-content { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; align-content: start; }
+.appearance-content { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; align-content: start; overflow-y: auto; padding-right: .18rem; }
+.appearance-content[data-section="accessories"] { grid-template-columns: repeat(2, minmax(13rem, 1fr)); }
 .appearance-group { display: grid; min-width: 0; margin: 0; padding: .5rem; border: 1px solid rgb(255 255 255 / 12%); border-radius: .55rem; background: rgb(255 255 255 / 4%); }
+.appearance-group-avatarType .appearance-options { grid-template-columns: repeat(2, minmax(7rem, 1fr)); }
+.appearance-content[data-section="accessories"] .appearance-options { grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
+.appearance-content[data-section="accessories"] .appearance-options button { min-height: 2.55rem; padding: .48rem .55rem; }
 .appearance-group[hidden] { display: none; }
 .appearance-group legend { padding: 0 .28rem; color: #efd98b; font-size: .56rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
 .appearance-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.4rem, 1fr)); gap: .3rem; }

@@ -193,12 +193,13 @@ export class MultiplayerClient extends EventTarget {
     });
   }
 
-  submitSongVote(feedback, vote) {
+  submitSongVote(feedback, vote, reason = null) {
     return this.sendVoteRequest(MESSAGE_TYPES.SONG_VOTE_SET, {
       speciesId: String(feedback?.speciesId ?? '').slice(0, 100),
       songId: String(feedback?.songId ?? '').slice(0, 180),
       songRevision: Math.max(1, Math.floor(Number(feedback?.songRevision) || 1)),
-      vote: vote === 'up' || vote === 'down' ? vote : null
+      vote: vote === 'up' || vote === 'down' ? vote : null,
+      reason: vote === 'down' ? String(reason ?? '').slice(0, 32) : null
     });
   }
 

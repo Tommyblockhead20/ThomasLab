@@ -119,6 +119,18 @@
             <button type="button" data-fishing-result-action="clear-vote" aria-label="Clear this song vote" hidden>CLEAR</button>
           </div>
           <div id="song-feedback-summary" class="song-feedback-summary" hidden aria-live="polite"></div>
+          <div id="song-downvote-reason" class="song-downvote-reason" hidden aria-label="Optional downvote reason">
+            <strong>WHAT DIDN'T WORK? <small>OPTIONAL</small></strong>
+            <div>
+              <button type="button" data-song-downvote-reason="sounds_bad">SOUNDS BAD</button>
+              <button type="button" data-song-downvote-reason="too_hard">TOO HARD</button>
+              <button type="button" data-song-downvote-reason="too_easy">TOO EASY</button>
+              <button type="button" data-song-downvote-reason="bugged">BUGGED</button>
+              <button type="button" data-song-downvote-reason="bad_instrument">BAD INSTRUMENT</button>
+              <button type="button" data-song-downvote-reason="other">OTHER / NOT FUN</button>
+              <button type="button" data-song-downvote-reason="skip">SKIP</button>
+            </div>
+          </div>
         </section>
 
         <aside id="ecology-guide" class="ecology-guide" hidden aria-label="Equipped ecology guide">
@@ -351,8 +363,9 @@
           <button class="touch-button touch-right" type="button" data-touch-action="right" aria-label="Move right or rhythm right">→</button>
         </div>
         <div class="mobile-actions" aria-label="Actions">
+          <button id="touch-sprint" class="touch-button touch-action touch-sprint" type="button" data-touch-action="sprint">Sprint</button>
           <button class="touch-button touch-action touch-jump" type="button" data-touch-action="jump">Jump</button>
-          <button id="touch-movement-action" class="touch-button touch-action touch-movement-action" type="button" data-touch-action="movement-action">Sprint</button>
+          <button id="touch-slide" class="touch-button touch-action touch-slide" type="button" data-touch-action="slide">Slide</button>
           <button id="touch-context-action" class="touch-button touch-action touch-context-action" type="button" data-touch-action="context-action">Interact</button>
         </div>
         <nav class="mobile-utility-cluster" aria-label="Game utilities">

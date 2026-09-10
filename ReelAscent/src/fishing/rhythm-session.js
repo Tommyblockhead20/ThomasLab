@@ -33,6 +33,9 @@ const GOOD_WINDOW_BONUS_BY_RARITY = Object.freeze({
 });
 
 export const RHYTHM_MINIMUM_ACTION_GAP_SECONDS = .08;
+// OS/browser keydown events for one physical chord arrive separately. Multi-note groups
+// briefly collect a lane set so the first arrow cannot be judged as an incomplete chord.
+export const RHYTHM_CHORD_INPUT_WINDOW_SECONDS = .075;
 
 // Only these quick-moving species can receive a short tap riff. Riffs replace a small
 // run of existing events rather than expanding the song and therefore preserve each
@@ -510,6 +513,7 @@ export class RhythmSession {
     this.mistakeLog = [];
     this.mistakeEvents = [];
     this.rawInputLog = [];
+    this.pendingChordInput = null;
     this.result = null;
     this.lastBeat = -1;
   }
@@ -521,10 +525,13 @@ export class RhythmSession {
     this.lastNow = now;
     this.songTime = Math.max(0, now - this.startTime - this.pauseOffset);
 
-    for (const input of inputs) {
-      this.handleInput(input.lane, Math.max(0, input.time - this.startTime - this.pauseOffset));
+    for (const input of [...inputs].sort((left, right) => left.time - right.time)) {
+      const inputTime = Math.max(0, input.time - this.startTime - this.pauseOffset);
+      this.flushPendingChordInput(inputTime);
+      this.collectChordInput(input.lane, inputTime);
       if (this.result) return this.result;
     }
+    this.flushPendingChordInput(this.songTime);
 
     for (const note of this.pattern.notes) {
       if (note.status === 'holding') {
@@ -538,7 +545,8 @@ export class RhythmSession {
             this.completeHold(note);
           } else this.missNote(note, note.lane, this.songTime, 'hold-release');
         }
-      } else if (note.status === 'pending' && this.songTime > note.hitTime + this.goodWindowFor(note)) {
+      } else if (note.status === 'pending' && !this.pendingChordContains(note)
+        && this.songTime > note.hitTime + this.goodWindowFor(note)) {
         this.missNote(note);
       }
       if (this.result) return this.result;
@@ -549,6 +557,68 @@ export class RhythmSession {
     }
     this.resolveOutcome();
     return this.result;
+  }
+
+  chordGroupNear(lane, inputTime) {
+    const candidates = [];
+    const groups = new Map();
+    for (const note of this.pattern.notes) {
+      if (note.status !== 'pending') continue;
+      const key = note.groupIndex ?? note.stepIndex ?? note.hitTime;
+      const group = groups.get(key) ?? [];
+      group.push(note);
+      groups.set(key, group);
+    }
+    for (const [key, notes] of groups) {
+      if (notes.length < 2 || !notes.some((note) => note.lane === lane)) continue;
+      const hitTime = notes[0].hitTime;
+      const delta = Math.abs(hitTime - inputTime);
+      if (delta <= Math.max(...notes.map((note) => this.goodWindowFor(note)))) {
+        candidates.push({ key, hitTime, notes, delta });
+      }
+    }
+    return candidates.sort((left, right) => left.delta - right.delta)[0] ?? null;
+  }
+
+  collectChordInput(lane, inputTime) {
+    const chord = this.chordGroupNear(lane, inputTime);
+    if (!chord) {
+      this.handleInput(lane, inputTime);
+      return;
+    }
+    if (!this.pendingChordInput || this.pendingChordInput.key !== chord.key) {
+      this.flushPendingChordInput(inputTime, true);
+      this.pendingChordInput = {
+        key: chord.key,
+        hitTime: chord.hitTime,
+        startedAt: inputTime,
+        notes: chord.notes,
+        presses: new Map()
+      };
+    }
+    if (!this.pendingChordInput.presses.has(lane)) this.pendingChordInput.presses.set(lane, inputTime);
+    const required = new Set(this.pendingChordInput.notes.map((note) => note.lane));
+    if ([...required].every((requiredLane) => this.pendingChordInput.presses.has(requiredLane))) {
+      this.flushPendingChordInput(inputTime, true);
+    }
+  }
+
+  pendingChordContains(note) {
+    return Boolean(this.pendingChordInput?.notes.some((entry) => entry.id === note.id));
+  }
+
+  flushPendingChordInput(now, force = false) {
+    const pending = this.pendingChordInput;
+    if (!pending || (!force && now - pending.startedAt < RHYTHM_CHORD_INPUT_WINDOW_SECONDS)) return false;
+    this.pendingChordInput = null;
+    // Required lanes are processed in chart order, while each lane retains its actual press
+    // time. Input event order therefore has no effect on a complete 2/3/4-arrow chord.
+    for (const note of pending.notes) {
+      const pressedAt = pending.presses.get(note.lane);
+      if (Number.isFinite(pressedAt)) this.handleInput(note.lane, pressedAt);
+      if (this.result) break;
+    }
+    return true;
   }
 
   handleInput(lane, inputTime) {

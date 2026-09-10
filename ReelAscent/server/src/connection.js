@@ -219,12 +219,14 @@ export class ClientConnection {
         speciesId: payload.speciesId,
         songId: payload.songId,
         songRevision: payload.songRevision,
-        vote: payload.vote ?? null
+        vote: payload.vote ?? null,
+        reason: payload.reason ?? null
       });
       send(this.socket, MESSAGE_TYPES.SONG_VOTE_AGGREGATE, {
         requestId,
         aggregate,
-        yourVote: payload.vote ?? null
+        yourVote: payload.vote ?? null,
+        yourReason: payload.vote === 'down' ? payload.reason ?? null : null
       });
       this.broadcastSongAggregate(aggregate, this.socket);
     } catch (error) {

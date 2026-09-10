@@ -1,4 +1,5 @@
 import { FISH_SPECIES } from '../fishing/fish-data.js';
+import { SONG_DOWNVOTE_REASONS } from '../fishing/song-votes.js';
 
 const speciesNames = new Map(FISH_SPECIES.map((species) => [
   species.canonicalId ?? species.id,
@@ -9,6 +10,11 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 })[character]);
 const labelForSpecies = (id) => speciesNames.get(id)
   ?? String(id).split(/[_-]/).map((part) => part ? part[0].toUpperCase() + part.slice(1) : '').join(' ');
+const reasonBreakdown = (entry) => SONG_DOWNVOTE_REASONS
+  .map(({ id, label }) => ({ label, count: Number(entry.downvoteReasons?.[id]) || 0 }))
+  .filter(({ count }) => count > 0)
+  .map(({ label, count }) => `<span>${escapeHtml(label)} <strong>${count}</strong></span>`)
+  .join('') || '<span class="is-empty">No reasons</span>';
 
 export class SongFeedbackDashboard {
   constructor(multiplayer) {
@@ -26,7 +32,7 @@ export class SongFeedbackDashboard {
     this.root.innerHTML = `<header><div><small>DEVELOPER VIEW</small><h2 id="song-feedback-dashboard-title">Song Feedback</h2></div><button type="button" data-song-dashboard-close>CLOSE <kbd>Esc</kbd></button></header>
       <div class="song-dashboard-toolbar"><label>SORT <select data-song-dashboard-sort><option value="lowest">Lowest Approval</option><option value="dislikes">Most Dislikes</option><option value="votes">Most Votes</option><option value="species">Species Name</option></select></label><label><input type="checkbox" data-song-dashboard-history> SHOW HISTORICAL REVISIONS</label><button type="button" data-song-dashboard-refresh>REFRESH</button></div>
       <p class="song-dashboard-status" aria-live="polite">Open the dashboard to load durable results.</p>
-      <div class="song-dashboard-table-wrap"><table><thead><tr><th>Species</th><th>Song ID</th><th>Revision</th><th>👍</th><th>👎</th><th>Total</th><th>Approval</th></tr></thead><tbody></tbody></table></div>`;
+      <div class="song-dashboard-table-wrap"><table><thead><tr><th>Species</th><th>Song ID</th><th>Revision</th><th>👍</th><th>👎</th><th>Total</th><th>Approval</th><th>Downvote reasons</th></tr></thead><tbody></tbody></table></div>`;
     document.querySelector('#game-shell')?.appendChild(this.root);
     this.status = this.root.querySelector('.song-dashboard-status');
     this.body = this.root.querySelector('tbody');
@@ -110,8 +116,8 @@ export class SongFeedbackDashboard {
 
   render() {
     const rows = this.visibleResults();
-    this.body.innerHTML = rows.length ? rows.map((entry) => `<tr><th>${escapeHtml(labelForSpecies(entry.speciesId))}<small>${escapeHtml(entry.speciesId)}</small></th><td><code>${escapeHtml(entry.songId)}</code></td><td>${Number(entry.songRevision) || 1}</td><td>${Number(entry.upVotes) || 0}</td><td>${Number(entry.downVotes) || 0}</td><td>${Number(entry.totalVotes) || 0}</td><td>${Math.round(Number(entry.approvalPercent) || 0)}%</td></tr>`).join('')
-      : '<tr><td colspan="7">No results to display.</td></tr>';
+    this.body.innerHTML = rows.length ? rows.map((entry) => `<tr><th>${escapeHtml(labelForSpecies(entry.speciesId))}<small>${escapeHtml(entry.speciesId)}</small></th><td><code>${escapeHtml(entry.songId)}</code></td><td>${Number(entry.songRevision) || 1}</td><td>${Number(entry.upVotes) || 0}</td><td>${Number(entry.downVotes) || 0}</td><td>${Number(entry.totalVotes) || 0}</td><td>${Math.round(Number(entry.approvalPercent) || 0)}%</td><td><div class="song-reason-breakdown">${reasonBreakdown(entry)}</div></td></tr>`).join('')
+      : '<tr><td colspan="8">No results to display.</td></tr>';
   }
 
   destroy() {
