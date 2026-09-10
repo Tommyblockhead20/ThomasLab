@@ -175,6 +175,13 @@ export class TestWorld {
     return this.fishingZones.find((zone) => zone.containsWaterFootprint(point)) ?? null;
   }
 
+  getSwimmingZone(point) {
+    return this.fishingZones.find((zone) => zone.swimmable
+      && zone.containsWaterFootprint(point, .15)
+      && point.y >= zone.floorY - .35
+      && point.y <= zone.surfaceY + 1.35) ?? null;
+  }
+
   addBoulder(name, position, scale, material = this.materials.rock) {
     const rotation = {
       x: (position.x * 17) % 32,

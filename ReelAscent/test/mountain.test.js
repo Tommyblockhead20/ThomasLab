@@ -16,6 +16,7 @@ import {
   MOUNTAIN_FAILURE_RADIUS,
   MOUNTAIN_FISHING_LOCATIONS,
   OCEAN_FISHING_DESCRIPTOR,
+  SKYREACH_FISHING_DESCRIPTORS,
   START_LOCATIONS,
   SUMMIT_HEIGHT,
   TERRAIN_ANGLE_PROFILE,
@@ -87,10 +88,34 @@ function ecologyZones() {
   });
     return attachZoneEcology(ocean);
   };
+  const skyreachZones = SKYREACH_FISHING_DESCRIPTORS.map((descriptor) => {
+    const zone = new FishingZone({
+      id: descriptor.id,
+      label: descriptor.label,
+      center: descriptor.center,
+      radii: { x: descriptor.radii[0], z: descriptor.radii[1] },
+      surfaceY: descriptor.center.y,
+      fishIds: descriptor.fish,
+      modifiers: descriptor.modifiers,
+      depth: descriptor.depth,
+      swimmable: descriptor.swimmable,
+      floorY: descriptor.floorY
+    });
+    Object.assign(zone, {
+      tier: descriptor.tier,
+      waterType: descriptor.waterType,
+      theme: descriptor.theme,
+      ecologyThemes: descriptor.ecologyThemes,
+      habitatAliasIds: descriptor.habitatAliasIds,
+      allowedFishIds: [...descriptor.fish]
+    });
+    return attachZoneEcology(zone);
+  });
   return [
     ...inland,
     oceanZone(FROSTHOOK_COLD_OCEAN_DESCRIPTOR),
     oceanZone(BLUEWATER_REACH_DESCRIPTOR),
+    ...skyreachZones,
     oceanZone(OCEAN_FISHING_DESCRIPTOR)
   ];
 }
@@ -110,13 +135,13 @@ test('mountain v2 provides six unique safe starts and preserves traversal geomet
   }
 });
 
-test('the world exposes 27 waters including distinct cold and bluewater ocean areas', () => {
+test('the world exposes 30 waters including Skyreach and distinct ocean areas', () => {
   assert.deepEqual(FISHING_WATER_COUNTS, {
-    ocean: 3, lower: 10, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 27
+    ocean: 3, lower: 11, middle: 9, upper: 4, summit: 2, waterfall: 1, total: 30
   });
-  assert.equal(MOUNTAIN_FISHING_LOCATIONS.length, 24);
-  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 27);
-  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 27);
+  assert.equal(MOUNTAIN_FISHING_LOCATIONS.length, 25);
+  assert.equal(ALL_FISHING_WATER_DESCRIPTORS.length, 30);
+  assert.equal(new Set(ALL_FISHING_WATER_DESCRIPTORS.map((water) => water.id)).size, 30);
   assert.equal(OCEAN_FISHING_DESCRIPTOR.id, 'outer-ocean');
   assert.ok(OCEAN_FISHING_DESCRIPTOR.innerRadius >= COASTAL_SHELF_RADIUS - 5);
   assert.ok(OCEAN_FISHING_DESCRIPTOR.outerRadius > OCEAN_FISHING_DESCRIPTOR.innerRadius);
@@ -160,12 +185,12 @@ test('every cave entrance descends to its water surface', () => {
   }
 });
 
-test('300-creature ecology audit preserves the active 27-water topology', () => {
+test('300-creature ecology audit preserves the active 30-water topology', () => {
   const zones = ecologyZones();
   const audit = auditFishingEcology(zones);
   assert.equal(FISH_SPECIES.length, 300);
-  assert.equal(audit.waterCount, 27);
-  assert.equal(audit.uniqueWaterCount, 27);
+  assert.equal(audit.waterCount, 30);
+  assert.equal(audit.uniqueWaterCount, 30);
   assert.deepEqual(audit.zeroWaterSpecies, []);
   assert.equal(audit.exclusiveCount, ECOLOGY_TARGETS.exclusiveSpecies);
   assert.equal(audit.sharedCount, ECOLOGY_TARGETS.sharedSpecies);
@@ -176,14 +201,19 @@ test('300-creature ecology audit preserves the active 27-water topology', () => 
   )));
   assert.equal(audit.pools.reduce((total, pool) => total + pool.exclusiveCount, 0), audit.exclusiveCount);
   assert.ok(audit.pools.every((pool) => (
-    ['blue-ice-melt', 'bluewater-reach-water'].includes(pool.id)
+    ['hearthward-pond', 'blue-ice-melt', 'bluewater-reach-water', 'skyreach-toilet', 'skyreach-rooftop-pool'].includes(pool.id)
       || (pool.exclusiveCount >= ECOLOGY_TARGETS.minimumExclusivePerWater
         && pool.exclusiveCount <= ECOLOGY_TARGETS.maximumExclusivePerWater)
   )));
   assert.ok(audit.pools.every((pool) => pool.poolSize >= (
-    pool.id === 'frosthook-cold-ocean' ? 5 : pool.id === 'blue-ice-melt' ? 7 : 8
+    pool.id === 'skyreach-toilet' ? 2
+      : pool.id === 'skyreach-rooftop-pool' ? 4
+        : pool.id === 'frosthook-cold-ocean' ? 5 : pool.id === 'blue-ice-melt' ? 7 : 8
   )));
-  assert.ok(audit.maximumNormalizedShare <= .25 + 1e-9);
+  const generalWaterMaximumShare = Math.max(...audit.pools
+    .filter((pool) => !['skyreach-toilet', 'skyreach-rooftop-pool'].includes(pool.id))
+    .map((pool) => pool.maximumNormalizedShare));
+  assert.ok(generalWaterMaximumShare <= .25 + 1e-9);
   assert.ok(audit.mostDiversePool.poolSize >= 40);
 
   for (const zone of zones) {

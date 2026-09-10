@@ -153,10 +153,10 @@ export function normalizeProgressionState(value = {}) {
   const tankState = normalizeAquariumTankDisplays(
     aquarium, aquariumTankCount, value.aquariumTankDisplays, value.aquariumTankManual
   );
-  const aquariumIds = new Set(aquarium.map((specimen) => specimen.specimenId));
+  const ownedSpecimenIds = new Set([...aquarium, ...inventory].map((specimen) => specimen.specimenId));
   const showcaseManual = Boolean(value.aquariumShowcaseManual);
   const selectedShowcase = [...new Set(Array.isArray(value.aquariumShowcaseSpecimenIds)
-    ? value.aquariumShowcaseSpecimenIds.filter((id) => typeof id === 'string' && aquariumIds.has(id))
+    ? value.aquariumShowcaseSpecimenIds.filter((id) => typeof id === 'string' && ownedSpecimenIds.has(id))
     : [])].slice(0, 30);
   const equipped = { ...DEFAULT_EQUIPPED };
   for (const category of Object.keys(equipped)) {
@@ -206,7 +206,7 @@ export function normalizeProgressionState(value = {}) {
     aquariumTankManual: tankState.manual,
     aquariumShowcaseSpecimenIds: showcaseManual
       ? selectedShowcase
-      : highestValueSpecimenIds(aquarium, 30),
+      : highestValueSpecimenIds([...aquarium, ...inventory], 30),
     aquariumShowcaseManual: showcaseManual,
     aquariumIncome: {
       bankedActiveSeconds: Math.max(0, finite(value.aquariumIncome?.bankedActiveSeconds)),

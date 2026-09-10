@@ -84,9 +84,21 @@ export class Hud {
       }
       if (this.feedbackPending || (['up', 'down'].includes(action) && !this.canRateSong(this.currentSongFeedback))) return;
       if (action === 'clear-vote' && !this.songVoteStore.hasRated(this.currentSongFeedback)) return;
-      this.resultActionHandler(action);
+      if (action === 'recast') {
+        button.setPointerCapture?.(event.pointerId);
+        this.resultRecastPointerId = event.pointerId;
+        this.resultActionHandler(action, 'start', `result-button:${event.pointerId}`);
+      } else this.resultActionHandler(action, 'trigger');
+    };
+    this.onFishingResultPointerUp = (event) => {
+      if (event.pointerId !== this.resultRecastPointerId) return;
+      event.preventDefault(); event.stopPropagation();
+      this.resultRecastPointerId = null;
+      this.resultActionHandler('recast', 'end', `result-button:${event.pointerId}`);
     };
     this.fishingResultControls?.addEventListener('pointerdown', this.onFishingResultPointerDown);
+    this.fishingResultControls?.addEventListener('pointerup', this.onFishingResultPointerUp);
+    this.fishingResultControls?.addEventListener('pointercancel', this.onFishingResultPointerUp);
     this.mobileControls = document.querySelector('#mobile-controls');
     this.touchContextAction = document.querySelector('#touch-context-action');
     this.touchMovementAction = document.querySelector('#touch-movement-action');
@@ -627,6 +639,8 @@ export class Hud {
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown);
     this.fishingResultControls?.removeEventListener('pointerdown', this.onFishingResultPointerDown);
+    this.fishingResultControls?.removeEventListener('pointerup', this.onFishingResultPointerUp);
+    this.fishingResultControls?.removeEventListener('pointercancel', this.onFishingResultPointerUp);
     document.body.classList.remove('debug-visible');
     document.body.classList.remove('fish-danger');
     this.rockDebugLabel?.remove();

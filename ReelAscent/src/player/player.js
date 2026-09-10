@@ -581,7 +581,7 @@ export class Player {
       if (slideDirection.lengthSq() > 0.0001) slideDirection.normalize();
       const climbSurface = this.surfaceRegistry.getClimbSurface?.(hit.collider) ?? null;
       const surfaceMaterialId = climbSurface?.material?.id ?? climbSurface?.type ?? null;
-      return { normal, slopeDegrees, downhill, slideDirection, distance, nearFeet: true, kind, surfaceMaterialId };
+      return { normal, slopeDegrees, downhill, slideDirection, distance, nearFeet: true, kind, surfaceMaterialId, collider: hit.collider };
     };
 
     // Several downward samples stop a single triangle edge from deciding whether a slope
@@ -1248,6 +1248,33 @@ export class Player {
     this.input.consumeDebugFish();
     this.input.discardPrimaryEdges();
 
+    const swimmingZone = this.surfaceRegistry.getSwimmingZone?.(this.body.translation()) ?? null;
+    if (swimmingZone) {
+      // Rooftop pools use a real bounded water volume. Horizontal input swims in camera
+      // space, buoyancy holds the capsule near the surface, and Jump gives one clean upward
+      // stroke for exiting over the coping. The solid basin/walls remain ordinary collision.
+      this.moveDirection.set(0, 0, 0);
+      if (hasMoveInput) {
+        this.moveDirection.add(cameraAxes.right.clone().mulScalar(axes.x / Math.max(1, inputLength)))
+          .add(cameraAxes.forward.clone().mulScalar(axes.z / Math.max(1, inputLength)));
+        this.moveDirection.y = 0;
+        if (this.moveDirection.lengthSq() > .001) this.moveDirection.normalize();
+      }
+      const swimSpeed = PLAYER_CONFIG.walkSpeed * .72;
+      this.horizontalVelocity.x = moveToward(this.horizontalVelocity.x, this.moveDirection.x * swimSpeed, PLAYER_CONFIG.groundAcceleration * .55 * dt);
+      this.horizontalVelocity.z = moveToward(this.horizontalVelocity.z, this.moveDirection.z * swimSpeed, PLAYER_CONFIG.groundAcceleration * .55 * dt);
+      const surfaceTarget = swimmingZone.surfaceY + .12;
+      this.verticalVelocity = moveToward(this.verticalVelocity, clamp((surfaceTarget - this.body.translation().y) * 3.2, -2.2, 2.2), 7 * dt);
+      if (jumpPressed) this.verticalVelocity = Math.max(this.verticalVelocity, PLAYER_CONFIG.jumpSpeed * .72);
+      this.grounded = false;
+      this.movementState = 'swimming';
+      this.sprinting = false;
+      this.canGrip = false;
+      this.stamina.update(dt, false, hasMoveInput, false);
+      this.applyKinematicMovement({ x: this.horizontalVelocity.x * dt, y: this.verticalVelocity * dt, z: this.horizontalVelocity.z * dt }, { allowMomentumDeflect: false });
+      return;
+    }
+
     if (this.movementState === 'mantling') {
       const output = this.climbing.updateMantle(dt, this.body.translation());
       this.applyKinematicMovement(output.movement, { topOut: true, ignoreContactLock: true });
@@ -1572,6 +1599,12 @@ export class Player {
       y: this.verticalVelocity * dt,
       z: this.horizontalVelocity.z * dt
     };
+    const supportMotion = this.grounded ? this.surfaceRegistry.getSurfaceMotion?.(groundSurface?.collider) : null;
+    if (supportMotion) {
+      desiredMovement.x += supportMotion.x;
+      desiredMovement.y += supportMotion.y;
+      desiredMovement.z += supportMotion.z;
+    }
     const movementResult = this.applyKinematicMovement(
       desiredMovement,
       { allowMomentumDeflect: true }
@@ -1786,6 +1819,8 @@ export class Player {
       this.horizontalVelocity.set(0, 0, 0);
       this.grounded = false;
       this.movementState = 'climbing';
+      const surfaceMotion = this.surfaceRegistry.getSurfaceMotion?.(this.climbing.surface?.collider);
+      if (surfaceMotion) output.movement.add(new pc.Vec3(surfaceMotion.x, surfaceMotion.y, surfaceMotion.z));
       this.applyKinematicMovement(output.movement, { climbing: true, ignoreContactLock: true });
       // Rapier can report walkable support while the capsule is pressed into a wall/ledge.
       // Active grip owns the state until the controller explicitly lands or detaches.

@@ -653,6 +653,7 @@ export class FishingController {
     this.showHookTutorial = false;
     this.biteSplashTimer = 0;
     this.lastCastCharge = .65;
+    this.resultRecastCharging = false;
     this.buildVisuals();
     this.onDebugKeyDown = (event) => {
       if (event.repeat) return;
@@ -1616,6 +1617,7 @@ export class FishingController {
     this.stateTime = 0;
     this.message = 'Hold ↑ to charge • release to cast';
     this.charge = 0;
+    this.resultRecastCharging = false;
     this.rodRoot.enabled = true;
     this.player.input.consumeFishingCastPressed();
     this.player.input.consumeFishingCastReleased();
@@ -1638,6 +1640,7 @@ export class FishingController {
     this.zone = null;
     this.message = '';
     this.charge = 0;
+    this.resultRecastCharging = false;
     this.biteTimer = 0;
     this.hookTimer = 0;
     this.resultTimer = 0;
@@ -1877,6 +1880,7 @@ export class FishingController {
   }
 
   startCast() {
+    this.resultRecastCharging = false;
     const maximumCastDistance = this.config.maximumCastDistance
       * (this.progression?.getModifier('castDistance') ?? 1);
     this.lastCastCharge = Math.max(.08, this.charge || this.lastCastCharge || .65);
@@ -2293,6 +2297,7 @@ export class FishingController {
     this.lastSongFeedback = null;
     this.cast = null;
     this.charge = 0;
+    this.resultRecastCharging = false;
     this.castInputHeld = this.player.input.fishingCastHeld;
     this.nearLossWarned = false;
     this.catchFish.enabled = false;
@@ -2307,14 +2312,26 @@ export class FishingController {
   }
 
   performResultAction(action) {
-    if (!this.resultActive || !['recast', 'stay'].includes(action)) return false;
-    const recastCharge = this.lastCastCharge;
-    this.resetForNextCast(action === 'recast' ? 'Recasting…' : 'Ready to cast');
-    if (action === 'recast') {
-      this.charge = recastCharge;
-      this.startCast();
-      return true;
-    }
+    if (!this.resultActive || action !== 'stay') return false;
+    this.resetForNextCast('Ready to cast');
+    return true;
+  }
+
+  beginResultRecast() {
+    if (!this.resultActive || this.resultRecastCharging) return false;
+    this.resetForNextCast('Hold ↑ to charge • release to cast');
+    this.resultRecastCharging = true;
+    this.charge = 0;
+    this.castInputHeld = false;
+    this.setState('charging', 'Hold ↑ to charge • release to cast');
+    this.audio.tone(250, .055);
+    return true;
+  }
+
+  releaseResultRecast() {
+    if (!this.resultRecastCharging || this.state !== 'charging') return false;
+    // startCast is the one canonical cast-strength and landing path used by normal casts.
+    this.startCast();
     return true;
   }
 

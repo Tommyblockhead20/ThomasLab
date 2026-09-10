@@ -184,7 +184,7 @@ export class Game {
       createRemoteRepresentation: (playerId, colorIndex, appearance, displayName) => (
         this.createRemotePlayerRepresentation(playerId, colorIndex, appearance, displayName)
       ),
-      onAuthoritativeRunSeed: (runSeed) => this.applyAuthoritativeRunSeed(runSeed)
+      onAuthoritativeRunSeed: (runSeed, roomState) => this.applyAuthoritativeRunSeed(runSeed, roomState)
     });
     this.multiplayer.room.setLocalLocationId?.(this.currentLocationId);
     this.onMultiplayerMessage = (event) => this.handleMultiplayerMessage(event.detail);
@@ -193,7 +193,7 @@ export class Game {
     this.multiplayer.addEventListener('songvoteaggregate', this.onSongVoteAggregate);
     this.lastSongVoteQueryKey = '';
     this.songFeedbackDashboard = new SongFeedbackDashboard(this.multiplayer);
-    this.hud.setFishingResultActionHandler((action) => this.performFishingResultAction(action));
+    this.hud.setFishingResultActionHandler((action, phase, source) => this.performFishingResultAction(action, phase, source));
     this.multiplayerMenu = new MultiplayerMenu(this.multiplayer);
     this.player.setFishingController(this.fishing);
     this.runManager = new RunManager(
@@ -253,12 +253,17 @@ export class Game {
       event.stopImmediatePropagation();
     };
     this.onFishingResultKeyDown = (event) => {
-      if (event.repeat || this.isEditableTarget(event.target) || !this.fishing.resultActive) return;
+      if (this.isEditableTarget(event.target)) return;
       const action = fishingResultActionForDirection(event.code);
-      if (!action) return;
+      if (!action || (!this.fishing.resultActive && !(action === 'recast' && this.fishing.resultRecastCharging))) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      this.performFishingResultAction(action);
+      if (!event.repeat) this.performFishingResultAction(action, action === 'recast' ? 'start' : 'trigger', `key:${event.code}`);
+    };
+    this.onFishingResultKeyUp = (event) => {
+      if (fishingResultActionForDirection(event.code) !== 'recast' || !this.fishing.resultRecastCharging) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      this.performFishingResultAction('recast', 'end', `key:${event.code}`);
     };
     this.onFishingResultPointerDown = (event) => {
       if (!this.fishing.resultActive || event.button > 0) return;
@@ -267,7 +272,16 @@ export class Game {
       if (!action) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      this.performFishingResultAction(action);
+      if (action === 'recast') {
+        this.resultRecastPointerId = event.pointerId;
+        this.performFishingResultAction(action, 'start', `dpad:${event.pointerId}`);
+      } else this.performFishingResultAction(action, 'trigger');
+    };
+    this.onFishingResultPointerUp = (event) => {
+      if (event.pointerId !== this.resultRecastPointerId) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      this.resultRecastPointerId = null;
+      this.performFishingResultAction('recast', 'end', `dpad:${event.pointerId}`);
     };
     this.mobilePauseButton = document.querySelector('#mobile-pause');
     this.onMobilePausePointerDown = (event) => {
@@ -318,7 +332,10 @@ export class Game {
     window.addEventListener('keydown', this.onPauseKeyDown, true);
     window.addEventListener('keydown', this.onPausedGameplayKeyDown, true);
     window.addEventListener('keydown', this.onFishingResultKeyDown, true);
+    window.addEventListener('keyup', this.onFishingResultKeyUp, true);
     window.addEventListener('pointerdown', this.onFishingResultPointerDown, true);
+    window.addEventListener('pointerup', this.onFishingResultPointerUp, true);
+    window.addEventListener('pointercancel', this.onFishingResultPointerUp, true);
     window.addEventListener('keydown', this.onDebugKeyDown, true);
     this.mobilePauseButton?.addEventListener('pointerdown', this.onMobilePausePointerDown);
 
@@ -396,6 +413,7 @@ export class Game {
         // Generic world interaction only consumes Grip when a real nearby target exists;
         // otherwise Grip remains available to climbing exactly as before.
         this.homeInteraction.captureInteractionInput();
+        this.world.updateKinematics?.(dt);
         this.player.update(dt, this.camera.getPlanarAxes());
         this.physicsWorld.timestep = dt;
         this.physicsWorld.step();
@@ -548,9 +566,12 @@ export class Game {
     this.pauseMenu?.setOpen(false);
   }
 
-  performFishingResultAction(action) {
+  performFishingResultAction(action, phase = 'trigger') {
+    if (action === 'recast') return phase === 'end'
+      ? this.fishing.releaseResultRecast()
+      : this.fishing.beginResultRecast();
     if (!this.fishing.resultActive) return false;
-    if (action === 'recast' || action === 'stay') return this.fishing.performResultAction(action);
+    if (action === 'stay') return this.fishing.performResultAction(action);
     const clearing = action === 'clear-vote';
     if ((!['up', 'down'].includes(action) && !clearing)
       || (!clearing && !this.hud.canRateSong(this.fishing.lastSongFeedback))) return false;
@@ -778,13 +799,15 @@ export class Game {
     };
   }
 
-  applyAuthoritativeRunSeed(runSeed) {
+  applyAuthoritativeRunSeed(runSeed, roomState = null) {
     if (runSeed === null || runSeed === undefined) return;
     this.activeMultiplayerSeed = runSeed;
-    const sharedStart = this.world.chooseStart(null, this.seededRandom(runSeed));
+    const roster = Array.isArray(roomState?.players) ? roomState.players : [];
+    const slotIndex = Math.max(0, roster.findIndex((entry) => (entry?.id ?? entry?.playerId) === this.multiplayer.playerId));
+    const sharedStart = this.world.getMultiplayerHomeArrival?.(slotIndex) ?? this.world.getHomeArrival();
     this.setCurrentLocation(sharedStart.locationId ?? this.currentLocationId, sharedStart.coordinateSpace ?? 'global-world');
     this.runManager.startRun(sharedStart, true);
-    this.hud.showToast?.(`Joined shared run • ${sharedStart.label}`);
+    this.hud.showToast?.(`Joined room at ${sharedStart.label}`);
   }
 
   syncMultiplayerFishingState(playerState) {
@@ -995,7 +1018,10 @@ export class Game {
     window.removeEventListener('keydown', this.onPauseKeyDown, true);
     window.removeEventListener('keydown', this.onPausedGameplayKeyDown, true);
     window.removeEventListener('keydown', this.onFishingResultKeyDown, true);
+    window.removeEventListener('keyup', this.onFishingResultKeyUp, true);
     window.removeEventListener('pointerdown', this.onFishingResultPointerDown, true);
+    window.removeEventListener('pointerup', this.onFishingResultPointerUp, true);
+    window.removeEventListener('pointercancel', this.onFishingResultPointerUp, true);
     window.removeEventListener('keydown', this.onDebugKeyDown, true);
     this.mobilePauseButton?.removeEventListener('pointerdown', this.onMobilePausePointerDown);
     cheatGate.destroy();

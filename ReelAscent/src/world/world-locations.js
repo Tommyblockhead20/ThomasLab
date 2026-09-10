@@ -202,9 +202,8 @@ export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
   islandLocation({
     id: 'skyreach-foundation', displayName: 'Skyreach Foundation', type: 'large-island-foundation',
     angle: 66, radius: 1650, radii: { x: 48, z: 39 }, elevation: .64,
-    theme: 'future-parkour-foundation', functions: ['future-tower', 'future-parkour'], dockLength: 18,
-    destinationEnabled: false,
-    lockMessage: 'Survey stakes mark a future tower climb. The island is not yet open for travel.'
+    theme: 'art-deco-skyscraper', functions: ['tower-climbing', 'parkour', 'fountain', 'toilet-fishing', 'rooftop-pool'], dockLength: 18,
+    destinationEnabled: true
   }),
   openWaterBoatLocation({
     id: 'bluewater-reach', displayName: 'Bluewater Reach', angle: 196, radius: 1640

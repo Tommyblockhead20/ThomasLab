@@ -3,7 +3,7 @@ export class FishingZone {
     id, label, center, radii, surfaceY, fishIds, modifiers = {}, exclusions = [],
     depth = 'shallow', shape = 'ellipse', innerRadius = 0, outerRadius = 0,
     renderedInnerRadius = null, containsRenderedWater = null, distanceToRenderedWater = null,
-    pathPoints = [], pathWidth = 0
+    pathPoints = [], pathWidth = 0, swimmable = false, floorY = null
   }) {
     this.id = id;
     this.label = label;
@@ -27,6 +27,8 @@ export class FishingZone {
     this.modifiers = { ...modifiers };
     this.exclusions = exclusions.map((exclusion) => ({ ...exclusion }));
     this.depth = depth;
+    this.swimmable = Boolean(swimmable);
+    this.floorY = Number.isFinite(floorY) ? floorY : surfaceY - 1;
   }
 
   normalizedRadius(point) {

@@ -57,12 +57,14 @@ export function normalizeAquariumTankDisplays(aquarium = [], tankCount = 1, assi
     }
     return ids;
   });
-  for (let index = 0; index < count; index += 1) {
-    if (manual[index]) continue;
-    for (const id of highestValueSpecimenIds(aquarium, AQUARIUM_TANK_CAPACITY, used)) {
-      displays[index].push(id);
-      used.add(id);
-    }
+  // v17 has no hidden aquarium warehouse: every aquarium specimen belongs to exactly
+  // one physical tank. Preserve valid authored placement first, then place any migrated
+  // or formerly-hidden residents into the first available slots by value.
+  for (const id of highestValueSpecimenIds(aquarium, aquarium.length, used)) {
+    const target = displays.find((entries) => entries.length < AQUARIUM_TANK_CAPACITY);
+    if (!target) break;
+    target.push(id);
+    used.add(id);
   }
   return { displays, manual };
 }
