@@ -47,6 +47,28 @@ light = bpy.data.materials.get("light")
 if windows is None or light is None:
     raise RuntimeError("The supplied ESB materials were not found")
 
+# Bake the source object's non-uniform scale and offset into the complete original
+# mesh before export. PlayCanvas applies runtime scale to the instantiated root; leaving
+# Blender's transform on that same root meant runtime placement overwrote it, shrinking,
+# widening, and offsetting the actual architecture.
+bpy.ops.object.select_all(action="DESELECT")
+building.select_set(True)
+bpy.context.view_layer.objects.active = building
+bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+
+# Normalize the asset pivot from the complete mesh bounds: footprint center at X/Y zero,
+# lowest source vertex at Z zero. No vertices or faces are removed or simplified.
+minimum = [min(vertex.co[axis] for vertex in building.data.vertices) for axis in range(3)]
+maximum = [max(vertex.co[axis] for vertex in building.data.vertices) for axis in range(3)]
+center_x = (minimum[0] + maximum[0]) * 0.5
+center_y = (minimum[1] + maximum[1]) * 0.5
+base_z = minimum[2]
+for vertex in building.data.vertices:
+    vertex.co.x -= center_x
+    vertex.co.y -= center_y
+    vertex.co.z -= base_z
+building.data.update()
+
 configure_principled_material(
     windows,
     base_color=(0.25, 0.29, 0.31),
@@ -62,9 +84,6 @@ configure_principled_material(
     emission=(0.035, 0.025, 0.004),
 )
 
-bpy.ops.object.select_all(action="DESELECT")
-building.select_set(True)
-bpy.context.view_layer.objects.active = building
 OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 bpy.ops.export_scene.gltf(
     filepath=str(OUTPUT_PATH),
@@ -72,5 +91,14 @@ bpy.ops.export_scene.gltf(
     use_selection=True,
     export_apply=True,
     export_materials=True,
+    export_texcoords=True,
+    export_normals=True,
+    export_colors=True,
+)
+dimensions = building.dimensions
+print(
+    "[reel-ascent] source-detail audit: "
+    f"{len(building.data.vertices)} vertices, {len(building.data.polygons)} polygons, "
+    f"bounds {dimensions.x:.6f} x {dimensions.y:.6f} x {dimensions.z:.6f}"
 )
 print(f"[reel-ascent] exported opaque Empire State Building to {OUTPUT_PATH}")

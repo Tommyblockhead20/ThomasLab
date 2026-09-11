@@ -160,25 +160,35 @@ export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
 export const SKYREACH_TOWER_CONFIG = Object.freeze({
   locationId: 'skyreach-foundation',
   width: 32,
-  depth: 24,
+  depth: 15.9252601603,
   mainRoofHeight: 381,
   spireHeight: 428.9898,
   visualAssetUrl: './assets/models/empire-state-building.glb',
   visualSourceRoofHeight: 8.8903,
-  visualSourceSpireHeight: 10.0101,
+  visualSourceSpireHeight: 10.0101108551,
   visualVerticalScale: 42.8556966582,
-  // Match the source model's measured 3.1563 × 1.5708 footprint to the clean
-  // 32 × 24 m baseline collision envelope.
-  visualHorizontalScaleX: 10.1384532522,
-  visualHorizontalScaleZ: 15.2788388083,
-  visualSourceCenterZ: 1.5165,
+  // The v17.4 exporter bakes the supplied object's transform and normalizes the
+  // complete source bounds to footprint center + base zero without simplifying it.
+  visualSourceWidth: 3.1562936306,
+  visualSourceDepth: 1.5707749128,
+  visualHorizontalScaleX: 10.1384737116,
+  // One horizontal scale preserves the supplied building's real footprint ratio.
+  visualHorizontalScaleZ: 10.1384737116,
+  visualGroundEmbed: .035,
   collisionLayers: Object.freeze([
-    Object.freeze({ bottom: 0, top: 66, width: 32, depth: 24 }),
-    Object.freeze({ bottom: 65, top: 132, width: 24, depth: 19 }),
-    Object.freeze({ bottom: 131, top: 236, width: 19, depth: 15 }),
-    Object.freeze({ bottom: 235, top: 316, width: 14.5, depth: 15 }),
-    Object.freeze({ bottom: 315, top: 382, width: 13.5, depth: 13.8 }),
-    Object.freeze({ bottom: 381, top: 429, width: 3.6, depth: 5.2 })
+    Object.freeze({ bottom: -.05, top: 82, width: 32, depth: 15.93 }),
+    Object.freeze({ bottom: 81, top: 98, width: 18.4, depth: 12.6 }),
+    Object.freeze({ bottom: 97, top: 118.5, width: 18.4, depth: 10.1 }),
+    Object.freeze({ bottom: 117.5, top: 274, width: 14.3, depth: 10.1 }),
+    Object.freeze({ bottom: 273, top: 308, width: 13.45, depth: 9.2 }),
+    Object.freeze({ bottom: 307, top: 326, width: 10.95, depth: 7.35 }),
+    Object.freeze({ bottom: 325, top: 333, width: 10.25, depth: 6.4 }),
+    Object.freeze({ bottom: 332, top: 340, width: 7.6, depth: 5.2 }),
+    Object.freeze({ bottom: 339, top: 346, width: 5, depth: 4.45 }),
+    Object.freeze({ bottom: 345, top: 366, width: 3.28, depth: 3.28 }),
+    Object.freeze({ bottom: 365, top: 382, width: 3.45, depth: 3.45 }),
+    Object.freeze({ bottom: 381, top: 391, width: 3.45, depth: 3.45 }),
+    Object.freeze({ bottom: 390, top: 429, width: 1, depth: 1.02 })
   ])
 });
 
@@ -1813,9 +1823,9 @@ export class MountainWorld extends TestWorld {
     this.skyreachRoot = root;
     this.loadSkyreachVisualShell(root);
 
-    // v17.3 intentionally resets the island to one imported landmark and a compact,
-    // invisible collision hull. These overlapping setback volumes form a continuous,
-    // hole-free solid while staying out of the climb-surface registry.
+    // v17.4 keeps the island to one imported landmark and a compact invisible hull.
+    // These overlapping volumes follow the real model's setbacks, form a continuous
+    // hole-free solid, and stay out of the climb-surface registry.
     for (const [index, layer] of config.collisionLayers.entries()) {
       const collision = this.addStructureBox(
         root,
@@ -1843,12 +1853,34 @@ export class MountainWorld extends TestWorld {
         SKYREACH_TOWER_CONFIG.visualVerticalScale,
         SKYREACH_TOWER_CONFIG.visualHorizontalScaleZ
       );
-      visual.setLocalPosition(0, 0, -SKYREACH_TOWER_CONFIG.visualSourceCenterZ * SKYREACH_TOWER_CONFIG.visualHorizontalScaleZ);
+      visual.setLocalPosition(0, 0, 0);
       for (const component of visual.findComponents?.('render') ?? []) {
         component.castShadows = true;
         component.receiveShadows = true;
       }
       root.addChild(visual);
+      visual.syncHierarchy();
+
+      // Align from the instantiated render bounds, not the source pivot or hand-entered
+      // offsets. setPosition converts the exact world correction back through the radial
+      // island root, so this remains deterministic at any island angle.
+      let bounds = null;
+      for (const component of visual.findComponents?.('render') ?? []) {
+        for (const meshInstance of component.meshInstances ?? []) {
+          if (!bounds) bounds = meshInstance.aabb.clone();
+          else bounds.add(meshInstance.aabb);
+        }
+      }
+      if (bounds) {
+        const islandCenter = root.getPosition();
+        const minimum = bounds.getMin();
+        const position = visual.getPosition();
+        visual.setPosition(
+          position.x + islandCenter.x - bounds.center.x,
+          position.y + islandCenter.y - SKYREACH_TOWER_CONFIG.visualGroundEmbed - minimum.y,
+          position.z + islandCenter.z - bounds.center.z
+        );
+      }
       this.skyreachVisualShell = visual;
     });
   }
