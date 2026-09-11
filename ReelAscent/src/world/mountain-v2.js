@@ -167,8 +167,8 @@ export const SKYREACH_TOWER_CONFIG = Object.freeze({
   visualSourceRoofHeight: 8.8903,
   visualSourceSpireHeight: 10.0101108551,
   visualVerticalScale: 42.8556966582,
-  // The v17.4 exporter bakes the supplied object's transform and normalizes the
-  // complete source bounds to footprint center + base zero without simplifying it.
+  // These are the effective bounds of the authored ESB node after its embedded GLB
+  // transform. The v17.5 runtime deliberately preserves that direct-export hierarchy.
   visualSourceWidth: 3.1562936306,
   visualSourceDepth: 1.5707749128,
   visualHorizontalScaleX: 10.1384737116,
@@ -1238,6 +1238,7 @@ export class MountainWorld extends TestWorld {
     this.materials.decoBrass = makeMaterial([.72, .51, .19], { gloss: .72, metalness: .62, emissive: [.025, .014, .003] });
     this.materials.decoGlass = makeMaterial([.19, .42, .5], { opacity: .56, gloss: .9, emissive: [.012, .045, .06] });
     this.materials.decoTile = makeMaterial([.78, .74, .62], { gloss: .42 });
+    this.materials.athenaeumMist = makeMaterial([.56, .7, .7], { opacity: .085, gloss: .02, emissive: [.012, .02, .02], doubleSided: true });
 
     this.rockMaterialVariants = new Map();
     // A route should read as broken mountain rock, not a vertical row of cylinders.
@@ -1794,19 +1795,27 @@ export class MountainWorld extends TestWorld {
         { y: index * 47, z: index % 2 ? 1.5 : -1.5 }, { castShadows: false });
       }
     } else if (location.id === 'veiled-athenaeum') {
-      // Exterior-only destination seed: a readable archive silhouette with no interior
-      // promises. Travel remains locked by registry metadata.
-      this.addBox('Veiled Athenaeum stone plinth', { x, y: y + .24, z },
-        { x: 13.5, y: .48, z: 10.5 }, this.materials.islandRock, { y: 8 });
-      this.addBox('Veiled Athenaeum archive hall', { x, y: y + 2.55, z: z + .2 },
-        { x: 9.8, y: 4.5, z: 7.4 }, this.materials.cave, { y: 8 });
-      this.addBox('Veiled Athenaeum shadowed door', { x, y: y + 1.55, z: z - 3.58 },
-        { x: 1.8, y: 2.65, z: .16 }, this.materials.deepRock, { y: 8 }, false);
-      this.addBox('Veiled Athenaeum roof', { x, y: y + 5.05, z: z + .2 },
-        { x: 11.2, y: .55, z: 8.8 }, this.materials.cabinRoof, { x: 2, y: 8, z: -2 });
-      for (const side of [-1, 1]) this.addCylinder(`Veiled Athenaeum column ${side}`,
-        { x: x + side * 3.25, y: y + 2.15, z: z - 3.55 },
-        { x: .48, y: 3.75, z: .48 }, this.materials.rockLight);
+      // Keep only an indistinct massing silhouette. Low-alpha, overlapping volumes create
+      // local mist around this island without changing the scene-wide fog settings.
+      this.addBox('Veiled Athenaeum obscured foundation', { x, y: y + .22, z },
+        { x: 12.8, y: .44, z: 10.2 }, this.materials.islandRock, { y: 8 });
+      this.addBox('Veiled Athenaeum distant silhouette', { x, y: y + 2.45, z: z + .3 },
+        { x: 9.2, y: 4.2, z: 6.9 }, this.materials.cave, { y: 8 });
+      this.addBox('Veiled Athenaeum softened roofline', { x, y: y + 4.82, z: z + .3 },
+        { x: 10.6, y: .48, z: 8.1 }, this.materials.cabinRoof, { x: 2, y: 8, z: -2 });
+      for (let index = 0; index < 12; index += 1) {
+        const theta = index * Math.PI * 2 / 12 + .17;
+        const radius = 8 + index % 4 * 4.1;
+        this.createPrimitive(`Veiled Athenaeum localized mist ${index + 1}`, 'sphere', {
+          x: x + Math.cos(theta) * radius,
+          y: y + 2.2 + index % 3 * .55,
+          z: z + Math.sin(theta) * radius * .72
+        }, {
+          x: 8.5 + index % 3 * 2.1,
+          y: 2.2 + index % 2 * .7,
+          z: 6.6 + index % 4 * 1.35
+        }, this.materials.athenaeumMist, { y: index * 31 }, { castShadows: false, receiveShadows: false });
+      }
     }
   }
 
@@ -1846,26 +1855,39 @@ export class MountainWorld extends TestWorld {
         console.warn('[reel-ascent] Skyreach visual shell unavailable; solid collision baseline remains active.');
         return;
       }
-      const visual = asset.resource.instantiateRenderEntity();
-      visual.name = 'Skyreach Empire State Building visual shell — SonnySee CC BY 3.0';
+      const imported = asset.resource.instantiateRenderEntity();
+      const sourceBuilding = imported.findByName?.('ESB');
+      if (!sourceBuilding) {
+        imported.destroy?.();
+        console.warn('[reel-ascent] The direct Skyreach GLB did not contain its authored ESB node.');
+        return;
+      }
+      // The artist's direct export also contains a Blender camera, sun, and 60×60 preview
+      // plane. Keep the ESB node and all of its authored mesh primitives/materials intact,
+      // while excluding only that unrelated presentation plane from the game world.
+      const previewPlane = imported.findByName?.('Plane');
+      if (previewPlane && previewPlane !== sourceBuilding) previewPlane.enabled = false;
+
+      const visual = new pc.Entity('Skyreach Empire State Building placement root — SonnySee CC BY 3.0');
+      visual.addChild(imported);
+      root.addChild(visual);
       visual.setLocalScale(
         SKYREACH_TOWER_CONFIG.visualHorizontalScaleX,
         SKYREACH_TOWER_CONFIG.visualVerticalScale,
         SKYREACH_TOWER_CONFIG.visualHorizontalScaleZ
       );
       visual.setLocalPosition(0, 0, 0);
-      for (const component of visual.findComponents?.('render') ?? []) {
+      for (const component of sourceBuilding.findComponents?.('render') ?? []) {
         component.castShadows = true;
         component.receiveShadows = true;
       }
-      root.addChild(visual);
       visual.syncHierarchy();
 
       // Align from the instantiated render bounds, not the source pivot or hand-entered
       // offsets. setPosition converts the exact world correction back through the radial
       // island root, so this remains deterministic at any island angle.
       let bounds = null;
-      for (const component of visual.findComponents?.('render') ?? []) {
+      for (const component of sourceBuilding.findComponents?.('render') ?? []) {
         for (const meshInstance of component.meshInstances ?? []) {
           if (!bounds) bounds = meshInstance.aabb.clone();
           else bounds.add(meshInstance.aabb);

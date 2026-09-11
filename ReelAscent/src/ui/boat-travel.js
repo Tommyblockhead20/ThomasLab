@@ -73,7 +73,7 @@ export class BoatTravelMenu {
       const label = document.createElement('b');
       label.textContent = location.displayName;
       button.append(footprint, label);
-      const lockMessage = location.destination?.enabled === false
+      const lockMessage = location.destination?.enabled === false && !location.destination.concealDetails
         ? location.destination.lockMessage || 'This destination is not open yet.'
         : '';
       if (lockMessage) {

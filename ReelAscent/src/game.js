@@ -572,6 +572,7 @@ export class Game {
     if (action === 'downvote-reason') {
       const feedback = { ...this.fishing.lastSongFeedback };
       if (!this.hud.beginSongDownvoteReason(feedback)) return false;
+      this.hud.applyLocalSongDownvoteReason(feedback, detail);
       this.multiplayer.submitSongVote(feedback, 'down', detail)
         .then((aggregate) => this.hud.confirmSongDownvoteReason(feedback, detail, aggregate))
         .catch(() => {
@@ -586,6 +587,7 @@ export class Game {
     const feedback = { ...this.fishing.lastSongFeedback };
     const vote = clearing ? null : action;
     if (!this.hud.beginSongVote(feedback)) return false;
+    this.hud.applyLocalSongVote(feedback, vote, { askForReason: vote === 'down' });
     this.multiplayer.submitSongVote(feedback, vote)
       .then((aggregate) => this.hud.confirmSongVote(feedback, vote, aggregate, { askForReason: vote === 'down' }))
       .catch(() => {

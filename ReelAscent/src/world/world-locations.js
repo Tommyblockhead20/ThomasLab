@@ -59,7 +59,7 @@ function outlineScaleAt(locationId, angleDegrees) {
 function islandLocation({
   id, displayName, type, angle, radius, radii, elevation, theme, functions = [],
   mapClass = type, dockLength = 12.5, dockSide = 'mountain',
-  destinationEnabled = true, lockMessage = ''
+  destinationEnabled = true, lockMessage = '', concealDetails = false
 }) {
   const direction = { x: Math.cos(radians(angle)), z: Math.sin(radians(angle)) };
   const center = {
@@ -91,7 +91,7 @@ function islandLocation({
     alwaysLoaded: false,
     coordinateSpace: 'global-world',
     mapRepresentation: Object.freeze({ className: mapClass, label: displayName }),
-    destination: Object.freeze({ enabled: destinationEnabled, order: 1, lockMessage }),
+    destination: Object.freeze({ enabled: destinationEnabled, order: 1, lockMessage, concealDetails }),
     dock: Object.freeze({
       id: `${id}-dock`,
       worldPosition: Object.freeze({
@@ -195,9 +195,9 @@ export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
     id: 'veiled-athenaeum', displayName: 'The Veiled Athenaeum', type: 'mythical-library-island',
     // Same southwest chart quadrant, but pushed toward the map corner as a remote landmark.
     angle: 246, radius: 1620, radii: { x: 31, z: 25 }, elevation: .88,
-    theme: 'mythical-archive', functions: ['future-library', 'lore'], dockLength: 15,
+    theme: 'veiled', functions: ['veiled'], dockLength: 15,
     destinationEnabled: false,
-    lockMessage: 'A veil of old tide-magic seals the Athenaeum. Its archive will open in a future expedition.'
+    concealDetails: true
   }),
   islandLocation({
     id: 'skyreach-foundation', displayName: 'Skyreach Foundation', type: 'large-island-foundation',

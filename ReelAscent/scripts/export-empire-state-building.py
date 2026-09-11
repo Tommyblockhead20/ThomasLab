@@ -1,4 +1,4 @@
-"""Re-export the supplied Empire State Building with explicit opaque materials."""
+"""Build the optional normalized fallback GLB; v17.5 uses the direct artist export."""
 
 from pathlib import Path
 
@@ -6,7 +6,7 @@ import bpy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_PATH = REPO_ROOT / "public" / "assets" / "models" / "empire-state-building.glb"
+OUTPUT_PATH = REPO_ROOT / "third_party" / "empire-state-building" / "empire-state-building-normalized-fallback.glb"
 
 
 def configure_principled_material(material, base_color, roughness, metallic, emission):

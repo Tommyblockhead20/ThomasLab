@@ -8,8 +8,8 @@
       content="Reel Ascent is an original low-poly climbing and fishing adventure prototype."
     />
     <title>Reel Ascent — Climbing & Fishing Prototype</title>
-    <script type="module" crossorigin src="./assets/index-BnbzCdxt.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-7q98LW47.css">
+    <script type="module" crossorigin src="./assets/index-CuNIBsYW.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DeBFwrST.css">
   </head>
   <body>
     <main id="game-shell">
@@ -238,6 +238,11 @@
 
       <section id="progression-shop" class="progression-shop" role="dialog" aria-modal="true" hidden aria-labelledby="shop-title">
         <header class="shop-header"><div><span class="eyebrow">SHOP ISLAND OUTFITTER</span><h2 id="shop-title">Gear, Maps & Fish Market</h2></div><strong id="shop-money">$0</strong><button id="close-shop" type="button">CLOSE <kbd>Esc</kbd></button></header>
+        <nav id="shop-tabs" class="shop-tabs" aria-label="Outfitter departments">
+          <button type="button" data-shop-tab="fishing" aria-pressed="true">FISHING</button>
+          <button type="button" data-shop-tab="climbing" aria-pressed="false">CLIMBING</button>
+          <button type="button" data-shop-tab="cosmetics" aria-pressed="false">COSMETICS</button>
+        </nav>
         <p id="shop-status" class="shop-status" aria-live="polite">Purchase gear and maps, equip gear, or sell carried specimens.</p>
         <div id="shop-content" class="shop-content"></div>
       </section>

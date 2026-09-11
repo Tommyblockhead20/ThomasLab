@@ -7,6 +7,28 @@ import {
 } from './appearance.js';
 import { COSMETIC_BY_ID } from '../progression/cosmetics.js';
 
+// This manifest is intentionally shared with the focused catalog audit. Adding an active
+// visual token without a corresponding low-poly recipe makes the audit fail instead of
+// quietly falling through to an unrelated placeholder.
+export const COSMETIC_MODEL_VISUALS = Object.freeze({
+  headwear: Object.freeze(['beanie', 'cowboy', 'cap', 'headlamp', 'flower', 'bucket', 'wizard', 'propeller', 'crown', 'halo', 'hood', 'horn', 'gills', 'tentacle', 'sun', 'crest', 'top-hat']),
+  eyewear: Object.freeze(['glasses', 'round', 'aviator', 'visor', 'goggles', 'electric', 'hammer', 'sun']),
+  faceAccessory: Object.freeze(['scarf', 'bandana', 'gaiter', 'necklace', 'collar', 'serpent', 'whirlpool', 'puff']),
+  backAccessory: Object.freeze(['pack', 'cape', 'flag', 'emblem', 'tank', 'atlas', 'wings', 'claws', 'fin', 'hydra', 'tentacle', 'shell'])
+});
+
+export function auditCosmeticModelCoverage(catalog = []) {
+  const missingModelIds = catalog.filter((cosmetic) => !COSMETIC_MODEL_VISUALS[cosmetic.slot]?.includes(cosmetic.visual)).map(({ id }) => id);
+  const invalidCompatibilityIds = catalog.filter((cosmetic) => !cosmetic.supports?.length
+    || cosmetic.supports.some((avatar) => !['human', 'blob'].includes(avatar))).map(({ id }) => id);
+  return Object.freeze({
+    activeCount: catalog.length,
+    renderableCount: catalog.length - new Set([...missingModelIds, ...invalidCompatibilityIds]).size,
+    missingModelIds: Object.freeze(missingModelIds),
+    invalidCompatibilityIds: Object.freeze(invalidCompatibilityIds)
+  });
+}
+
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
 // Full primitive scales and joint-local anchors. Each child reaches slightly through its
@@ -170,9 +192,13 @@ function buildGeneratedCosmetic(parent, cosmetic, materials, blob = false) {
   );
   const visual = cosmetic.visual;
   if (cosmetic.slot === 'headwear') {
-    if (['crown', 'crest'].includes(visual)) {
+    if (visual === 'crown') {
       add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .5, y: .1, z: .5 });
       for (const x of [-.3, 0, .3]) add(`point ${x}`, 'cone', { x, y: headY + .22 + (x ? 0 : .06), z: -.05 }, { x: .13, y: .36, z: .13 });
+    } else if (visual === 'crest') {
+      add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .49, y: .07, z: .49 });
+      [-.26, -.13, 0, .13, .26].forEach((z, index) => add(`ridge ${index + 1}`, 'cone',
+        { x: 0, y: headY + .2 + (.26 - Math.abs(z)) * .35, z }, { x: .12, y: .42, z: .12 }, materials.accessory, { x: z * 24 }));
     } else if (visual === 'top-hat') {
       add('brim', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .62, y: .06, z: .62 });
       add('crown', 'cylinder', { x: 0, y: headY + .3, z: 0 }, { x: .42, y: .58, z: .42 });
@@ -199,8 +225,32 @@ function buildGeneratedCosmetic(parent, cosmetic, materials, blob = false) {
       for (const side of [-1, 1]) for (let index = 0; index < 3; index += 1) add(`gill ${side} ${index}`, 'capsule',
         { x: side * (.48 + index * .035), y: headY + .03 - index * .08, z: .02 }, { x: .055, y: .28, z: .055 }, materials.accessory, { z: side * (28 + index * 7) });
     } else if (visual === 'tentacle') {
-      add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .5, y: .08, z: .5 });
-      for (const x of [-.34, -.17, 0, .17, .34]) add(`tentacle ${x}`, 'capsule', { x, y: headY + .3 + Math.abs(x) * .2, z: .02 }, { x: .07, y: .48, z: .07 }, materials.accessory, { z: x * -45 });
+      add('octopus head', 'sphere', { x: 0, y: headY + .2, z: -.01 }, { x: .47, y: .38, z: .44 });
+      for (const x of [-.34, -.2, -.07, .07, .2, .34]) add(`tentacle ${x}`, 'capsule',
+        { x, y: headY + .01 + Math.abs(x) * .1, z: -.01 }, { x: .075, y: .42, z: .075 }, materials.accessory, { z: x * -58 });
+      for (const x of [-.13, .13]) add(`eye ${x}`, 'sphere', { x, y: headY + .27, z: -.4 }, { x: .055, y: .065, z: .045 }, materials.dark);
+    } else if (visual === 'flower') {
+      add('vine band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .5, y: .055, z: .5 }, materials.pack);
+      for (let index = 0; index < 5; index += 1) {
+        const theta = (index / 5 * Math.PI * 1.35) + Math.PI * .82;
+        const x = Math.cos(theta) * .4;
+        const z = Math.sin(theta) * .4;
+        add(`flower ${index + 1} center`, 'sphere', { x, y: headY + .13, z }, { x: .075, y: .07, z: .075 }, materials.silver);
+        for (let petal = 0; petal < 4; petal += 1) {
+          const phase = petal * Math.PI / 2;
+          add(`flower ${index + 1} petal ${petal + 1}`, 'sphere',
+            { x: x + Math.cos(phase) * .08, y: headY + .13 + Math.sin(phase) * .08, z }, { x: .07, y: .07, z: .035 });
+        }
+      }
+    } else if (visual === 'sun') {
+      add('sun band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .48, y: .055, z: .48 });
+      add('sun disc', 'sphere', { x: 0, y: headY + .39, z: -.03 }, { x: .22, y: .22, z: .09 }, materials.silver);
+      for (let index = 0; index < 8; index += 1) {
+        const theta = index * Math.PI / 4;
+        add(`sun ray ${index + 1}`, 'cone',
+          { x: Math.cos(theta) * .29, y: headY + .39 + Math.sin(theta) * .29, z: -.02 },
+          { x: .07, y: .2, z: .07 }, materials.accessory, { x: 90, z: 90 - theta * 180 / Math.PI });
+      }
     } else if (['hood', 'beanie', 'cap', 'headlamp'].includes(visual)) {
       add('crown', visual === 'beanie' ? 'cone' : 'sphere', { x: 0, y: headY + .08, z: .03 }, { x: .5, y: .28, z: .48 });
       if (visual === 'cap') add('bill', 'box', { x: 0, y: headY, z: -.35 }, { x: .48, y: .055, z: .34 });
@@ -209,18 +259,50 @@ function buildGeneratedCosmetic(parent, cosmetic, materials, blob = false) {
       add('headband', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .49, y: .08, z: .49 });
     }
   } else if (cosmetic.slot === 'eyewear') {
+    const eyeY = blob ? .85 : .73;
     const wide = ['visor', 'hammer', 'electric'].includes(visual);
-    if (wide) add('visor', 'box', { x: 0, y: blob ? .85 : .73, z: frontZ }, { x: visual === 'hammer' ? .68 : .42, y: .14, z: .04 }, materials.dark);
-    else for (const x of [-.14, .14]) add(`lens ${x}`, visual === 'round' || visual === 'sun' ? 'sphere' : 'box',
-      { x, y: blob ? .85 : .73, z: frontZ }, { x: .16, y: .14, z: .035 }, materials.glass);
+    if (wide) add('visor', 'box', { x: 0, y: eyeY, z: frontZ }, { x: visual === 'hammer' ? .56 : .42, y: .14, z: .04 }, materials.dark);
+    else for (const x of [-.14, .14]) add(`lens ${x}`, ['round', 'sun', 'aviator', 'goggles'].includes(visual) ? 'sphere' : 'box',
+      { x, y: eyeY, z: frontZ }, { x: visual === 'goggles' ? .18 : .16, y: visual === 'aviator' ? .16 : .14, z: visual === 'goggles' ? .055 : .035 }, visual === 'goggles' ? materials.dark : materials.glass,
+      { z: visual === 'aviator' ? x * 45 : 0 });
     add('bridge', 'box', { x: 0, y: blob ? .85 : .73, z: frontZ - .01 }, { x: .1, y: .025, z: .025 });
-    if (visual === 'electric') for (const side of [-1, 1]) add(`spark ${side}`, 'box', { x: side * .43, y: blob ? .91 : .79, z: frontZ }, { x: .16, y: .035, z: .035 }, materials.silver, { z: side * 48 });
+    if (visual === 'goggles') add('strap', 'cylinder', { x: 0, y: eyeY, z: 0 }, { x: .5, y: .04, z: .5 }, materials.accessory);
+    if (visual === 'hammer') for (const side of [-1, 1]) {
+      add(`hammer neck ${side}`, 'box', { x: side * .37, y: eyeY, z: frontZ }, { x: .16, y: .07, z: .07 }, materials.silver);
+      add(`hammer head ${side}`, 'box', { x: side * .48, y: eyeY, z: frontZ }, { x: .11, y: .28, z: .14 }, materials.accessory);
+    }
+    if (visual === 'electric') for (const side of [-1, 1]) for (const offset of [-1, 1]) add(`spark ${side} ${offset}`, 'box',
+      { x: side * (.4 + offset * .035), y: eyeY + offset * .07, z: frontZ }, { x: .15, y: .035, z: .035 }, materials.silver, { z: side * offset * 48 });
+    if (visual === 'sun') for (const side of [-1, 1]) for (let index = 0; index < 6; index += 1) {
+      const theta = index * Math.PI / 3;
+      add(`sun lens ${side} ray ${index + 1}`, 'box',
+        { x: side * .14 + Math.cos(theta) * .19, y: eyeY + Math.sin(theta) * .17, z: frontZ + .005 },
+        { x: .075, y: .025, z: .025 }, materials.accessory, { z: theta * 180 / Math.PI });
+    }
   } else if (cosmetic.slot === 'faceAccessory') {
     const neckY = blob ? .44 : .45;
-    if (['scarf', 'serpent'].includes(visual)) {
+    if (visual === 'scarf') {
       add('collar', 'cylinder', { x: 0, y: neckY, z: 0 }, { x: blob ? .5 : .33, y: .17, z: blob ? .5 : .33 });
       add('tail', 'box', { x: .18, y: neckY - .31, z: .25 }, { x: .18, y: .55, z: .1 }, materials.accessory, { x: -12, z: -8 });
-    } else if (['collar', 'puff', 'whirlpool', 'gaiter'].includes(visual)) {
+    } else if (visual === 'serpent') {
+      add('coiled body', 'cylinder', { x: 0, y: neckY, z: 0 }, { x: blob ? .5 : .35, y: .12, z: blob ? .5 : .35 });
+      add('raised neck', 'capsule', { x: .28, y: neckY + .17, z: -.12 }, { x: .065, y: .34, z: .065 }, materials.accessory, { z: -24 });
+      add('serpent head', 'sphere', { x: .35, y: neckY + .3, z: -.15 }, { x: .12, y: .08, z: .08 }, materials.dark);
+    } else if (visual === 'bandana') {
+      add('face cloth', 'box', { x: 0, y: blob ? .62 : .57, z: frontZ - .015 }, { x: .4, y: .25, z: .035 }, materials.accessory, { x: -5 });
+      for (const side of [-1, 1]) add(`knot tail ${side}`, 'box', { x: side * .24, y: neckY - .12, z: .22 }, { x: .12, y: .32, z: .06 }, materials.accessory, { z: side * 18 });
+    } else if (visual === 'puff') {
+      for (let index = 0; index < 10; index += 1) {
+        const theta = index / 10 * Math.PI * 2;
+        add(`puff ${index + 1}`, 'sphere', { x: Math.cos(theta) * (blob ? .45 : .31), y: neckY, z: Math.sin(theta) * (blob ? .45 : .31) }, { x: .16, y: .16, z: .16 });
+      }
+    } else if (visual === 'whirlpool') {
+      for (let index = 0; index < 12; index += 1) {
+        const theta = index * .9;
+        const radius = .1 + index * .018;
+        add(`spiral ${index + 1}`, 'sphere', { x: Math.cos(theta) * radius, y: neckY - .04, z: frontZ - .03 + Math.sin(theta) * radius * .25 }, { x: .055, y: .055, z: .035 });
+      }
+    } else if (['collar', 'gaiter'].includes(visual)) {
       add('collar', 'cylinder', { x: 0, y: neckY, z: 0 }, { x: visual === 'puff' ? .52 : .36, y: visual === 'gaiter' ? .24 : .14, z: visual === 'puff' ? .52 : .36 });
     } else {
       add('cord', 'cylinder', { x: 0, y: neckY, z: -.12 }, { x: .24, y: .035, z: .24 });
@@ -234,14 +316,44 @@ function buildGeneratedCosmetic(parent, cosmetic, materials, blob = false) {
     } else if (['fin', 'flag'].includes(visual)) {
       add('spine', 'box', { x: 0, y: backY + .2, z: blob ? .52 : .38 }, { x: .08, y: .9, z: .08 });
       add('fin', visual === 'flag' ? 'box' : 'cone', { x: .22, y: backY + .38, z: blob ? .52 : .4 }, { x: .45, y: .58, z: .08 }, materials.accessory, { z: -20 });
-    } else if (['tentacle', 'hydra', 'claws'].includes(visual)) {
-      for (const x of [-.32, 0, .32]) add(`arm ${x}`, 'capsule', { x, y: backY + .04, z: blob ? .55 : .4 }, { x: .09, y: .85, z: .09 }, materials.accessory, { z: x * -45 });
+    } else if (visual === 'claws') {
+      const handY = blob ? .28 : -.43;
+      for (const side of [-1, 1]) {
+        add(`hand cuff ${side}`, 'cylinder', { x: side * (blob ? .56 : .41), y: handY, z: -.02 }, { x: .14, y: .13, z: .14 }, materials.dark);
+        for (const digit of [-1, 0, 1]) add(`hand ${side} claw ${digit}`, 'cone',
+          { x: side * (blob ? .6 : .45) + digit * .04, y: handY - .04 + digit * .025, z: -.19 },
+          { x: .045, y: .28, z: .045 }, materials.silver, { x: 90 + digit * 8, z: side * 5 });
+      }
+    } else if (visual === 'hydra') {
+      for (const [index, x] of [-.32, 0, .32].entries()) {
+        add(`neck ${index + 1}`, 'capsule', { x, y: backY + .2 + (index === 1 ? .13 : 0), z: blob ? .55 : .4 }, { x: .085, y: .75, z: .085 }, materials.accessory, { z: x * -45 });
+        add(`head ${index + 1}`, 'sphere', { x: x * 1.5, y: backY + .58 + (index === 1 ? .15 : 0), z: blob ? .54 : .39 }, { x: .14, y: .11, z: .12 }, materials.dark);
+      }
+    } else if (visual === 'tentacle') {
+      for (const [index, x] of [-.38, -.19, 0, .19, .38].entries()) add(`tentacle ${index + 1}`, 'capsule',
+        { x, y: backY - .08 + Math.abs(x) * .18, z: blob ? .55 : .4 }, { x: .085, y: .82, z: .085 }, materials.accessory, { x: index % 2 ? 8 : -8, z: x * -55 });
     } else if (visual === 'shell') {
       add('spiral shell', 'sphere', { x: 0, y: backY, z: blob ? .56 : .43 }, { x: .58, y: .58, z: .2 });
-      add('spiral center', 'cylinder', { x: 0, y: backY, z: blob ? .73 : .59 }, { x: .2, y: .05, z: .2 }, materials.dark, { x: 90 });
+      for (let index = 0; index < 13; index += 1) {
+        const theta = index * .76;
+        const radius = .04 + index * .027;
+        add(`raised spiral ${index + 1}`, 'sphere',
+          { x: Math.cos(theta) * radius, y: backY + Math.sin(theta) * radius, z: blob ? .75 : .62 }, { x: .045, y: .045, z: .03 }, materials.dark);
+      }
+    } else if (visual === 'tank') {
+      add('tank frame', 'box', { x: 0, y: backY, z: blob ? .5 : .35 }, { x: .58, y: .72, z: .28 }, materials.silver, { x: -7 });
+      add('tank glass', 'sphere', { x: 0, y: backY, z: blob ? .69 : .53 }, { x: .38, y: .49, z: .11 }, materials.glass);
+      add('tank fish', 'cone', { x: .04, y: backY, z: blob ? .79 : .63 }, { x: .09, y: .2, z: .045 }, materials.accessory, { x: 90, z: 90 });
+    } else if (visual === 'atlas') {
+      add('book', 'box', { x: 0, y: backY, z: blob ? .54 : .39 }, { x: .6, y: .72, z: .18 }, materials.pack, { x: -7 });
+      add('book spine', 'box', { x: -.27, y: backY, z: blob ? .65 : .5 }, { x: .08, y: .72, z: .08 }, materials.silver, { x: -7 });
+      add('compass rose', 'sphere', { x: .05, y: backY + .06, z: blob ? .68 : .54 }, { x: .17, y: .17, z: .035 }, materials.accessory);
+    } else if (visual === 'emblem') {
+      add('trophy harness', 'box', { x: 0, y: backY, z: blob ? .51 : .36 }, { x: .5, y: .65, z: .22 }, materials.pack, { x: -7 });
+      add('trophy cup', 'cylinder', { x: 0, y: backY + .15, z: blob ? .7 : .55 }, { x: .19, y: .25, z: .19 }, materials.silver);
+      for (const side of [-1, 1]) add(`trophy handle ${side}`, 'sphere', { x: side * .2, y: backY + .2, z: blob ? .69 : .54 }, { x: .1, y: .13, z: .04 }, materials.accessory);
     } else {
       add('pack', 'box', { x: 0, y: backY, z: blob ? .5 : .35 }, { x: .58, y: .7, z: .3 }, cosmetic.id === 'backpack' ? materials.pack : materials.accessory, { x: -7 });
-      if (['tank', 'atlas', 'emblem'].includes(visual)) add('badge', visual === 'tank' ? 'sphere' : 'box', { x: 0, y: backY + .08, z: blob ? .7 : .53 }, { x: .3, y: .3, z: .05 }, materials.silver);
     }
   }
   root.enabled = false;

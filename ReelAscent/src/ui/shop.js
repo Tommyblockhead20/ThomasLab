@@ -1,6 +1,7 @@
 import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 import { SHOP_COSMETICS } from '../progression/cosmetics.js';
+import { INVENTORY_SORT_OPTIONS, sortInventorySpecimens } from './inventory.js';
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -10,6 +11,9 @@ const CATEGORY_LABELS = Object.freeze({
   rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', bobber: 'BOBBERS', guide: 'ECOLOGY GUIDES',
   boots: 'BOOTS', gloves: 'GLOVES', climbingTool: 'CLIMBING TOOLS', chalk: 'CHALK BAGS', harness: 'HARNESSES & PACKS'
 });
+const SHOP_TABS = Object.freeze(['fishing', 'climbing', 'cosmetics']);
+const FISHING_CATEGORIES = Object.freeze(['rod', 'reel', 'line', 'lure', 'bobber', 'guide']);
+const CLIMBING_CATEGORIES = Object.freeze(['boots', 'gloves', 'climbingTool', 'chalk', 'harness']);
 
 export class ShopMenu {
   constructor(progression) {
@@ -23,7 +27,8 @@ export class ShopMenu {
     this.content = document.querySelector('#shop-content');
     this.status = document.querySelector('#shop-status');
     this.isOpen = false;
-    this.activeMode = 'buy';
+    this.activeMode = 'fishing';
+    this.sellerSort = 'recent';
     this.renderedRevision = -1;
 
     this.onKeyDown = (event) => {
@@ -38,11 +43,11 @@ export class ShopMenu {
     this.onClick = (event) => {
       const tab = event.target.closest('[data-shop-tab]');
       if (tab) {
-        this.activeMode = tab.dataset.shopTab === 'sell' ? 'sell' : 'buy';
+        const next = tab.dataset.shopTab;
+        if (!SHOP_TABS.includes(next)) return;
+        this.activeMode = next;
         this.updateModeHeading();
-        this.status.textContent = this.activeMode === 'sell'
-          ? 'Choose a specimen to sell, or sell the whole catch bag.'
-          : 'Purchase maps and gear, then equip one item in each category.';
+        this.status.textContent = this.tabStatus();
         this.render(true);
         return;
       }
@@ -90,11 +95,18 @@ export class ShopMenu {
         : result.reason;
       this.render(true);
     };
+    this.onChange = (event) => {
+      const sort = event.target.closest?.('[data-seller-sort]');
+      if (!sort) return;
+      this.sellerSort = INVENTORY_SORT_OPTIONS.some(([value]) => value === sort.value) ? sort.value : 'recent';
+      this.render(true);
+    };
     this.onCloseClick = () => this.close();
     this.onOpenRequest = (event) => this.open(event.detail?.mode ?? 'buy');
     window.addEventListener('keydown', this.onKeyDown, true);
     window.addEventListener('reel-ascent:open-shop', this.onOpenRequest);
     this.screen?.addEventListener('click', this.onClick);
+    this.screen?.addEventListener('change', this.onChange);
     this.closeButton?.addEventListener('click', this.onCloseClick);
   }
 
@@ -106,13 +118,11 @@ export class ShopMenu {
     if (!this.screen) return;
     document.exitPointerLock?.();
     this.isOpen = true;
-    this.activeMode = mode === 'sell' ? 'sell' : 'buy';
+    this.activeMode = mode === 'sell' ? 'sell' : SHOP_TABS.includes(mode) ? mode : 'fishing';
     this.screen.hidden = false;
     document.body.classList.add('shop-open');
     this.updateModeHeading();
-    this.status.textContent = this.activeMode === 'sell'
-      ? 'Choose a specimen to sell, or sell the whole catch bag.'
-      : 'Purchase maps and gear, then equip one item in each category.';
+    this.status.textContent = this.tabStatus();
     this.render(true);
     this.closeButton?.focus({ preventScroll: true });
   }
@@ -135,7 +145,15 @@ export class ShopMenu {
       : "OUTFITTER'S REACH • GEAR COUNTER";
     if (this.title) this.title.textContent = selling
       ? 'Fishmonger & Specimen Sales'
-      : 'Outfitter Gear & Maps';
+      : 'Outfitter';
+    if (this.tabs) this.tabs.hidden = selling;
+  }
+
+  tabStatus() {
+    if (this.activeMode === 'sell') return 'Choose a specimen to sell, or sell the whole catch bag.';
+    if (this.activeMode === 'cosmetics') return 'Purchase ordinary Outfitter cosmetics for this save slot.';
+    if (this.activeMode === 'climbing') return 'Purchase maps and traversal gear, then equip one item in each category.';
+    return 'Purchase fishing gear, then equip one item in each category.';
   }
 
   render(force = false) {
@@ -146,14 +164,16 @@ export class ShopMenu {
     for (const tab of this.tabs?.querySelectorAll('[data-shop-tab]') ?? []) {
       tab.setAttribute('aria-pressed', String(tab.dataset.shopTab === this.activeMode));
     }
-    this.content.innerHTML = this.activeMode === 'sell'
-      ? this.renderSales(state)
-      : `${this.renderCosmetics(state)}${this.renderWorldItems(state)}${this.renderEquipment(state)}`;
+    if (this.activeMode === 'sell') this.content.innerHTML = this.renderSales(state);
+    else if (this.activeMode === 'cosmetics') this.content.innerHTML = this.renderCosmetics(state);
+    else if (this.activeMode === 'climbing') this.content.innerHTML = `${this.renderWorldItems(state)}${this.renderEquipment(state, CLIMBING_CATEGORIES)}`;
+    else this.content.innerHTML = this.renderEquipment(state, FISHING_CATEGORIES);
     this.renderedRevision = this.progression.revision;
   }
 
-  renderEquipment(state) {
-    return Object.entries(CATEGORY_LABELS).map(([category, label]) => {
+  renderEquipment(state, categories) {
+    return categories.map((category) => {
+      const label = CATEGORY_LABELS[category];
       const cards = EQUIPMENT_CATALOG.filter((entry) => entry.category === category).map((entry) => {
         const owned = state.ownedEquipment.includes(entry.id);
         const equipped = state.equipped[category] === entry.id;
@@ -190,16 +210,18 @@ export class ShopMenu {
 
   renderSales(state) {
     const total = state.inventory.reduce((sum, specimen) => sum + specimen.value, 0);
-    const cards = [...state.inventory].reverse().map((specimen) => (
+    const options = INVENTORY_SORT_OPTIONS.map(([value, label]) => `<option value="${value}" ${this.sellerSort === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
+    const cards = sortInventorySpecimens(state.inventory, this.sellerSort).map((specimen) => (
       `<article class="shop-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)}</small></div><p>${specimen.length.toFixed(1)} in • ${specimen.weight.toFixed(2)} lb</p><button type="button" data-shop-sell="${escapeHtml(specimen.specimenId)}">SELL $${specimen.value}</button></article>`
     )).join('');
-    return `<section class="shop-category"><div class="shop-category-heading"><h3>SELL CARRIED SPECIMENS</h3><button type="button" data-shop-sell-all ${state.inventory.length ? '' : 'disabled'}>SELL ALL ${state.inventory.length} • $${total}</button></div><div class="shop-card-row">${cards || '<p class="shop-empty">No carried specimens to sell.</p>'}</div></section>`;
+    return `<section class="shop-category"><div class="shop-category-heading"><h3>SELL CARRIED SPECIMENS</h3><button type="button" data-shop-sell-all ${state.inventory.length ? '' : 'disabled'}>SELL ALL ${state.inventory.length} • $${total}</button></div><label class="inventory-sort seller-sort">SORT <select data-seller-sort aria-label="Sort sellable specimens">${options}</select></label><div class="shop-card-row">${cards || '<p class="shop-empty">No carried specimens to sell.</p>'}</div></section>`;
   }
 
   destroy() {
     window.removeEventListener('keydown', this.onKeyDown, true);
     window.removeEventListener('reel-ascent:open-shop', this.onOpenRequest);
     this.screen?.removeEventListener('click', this.onClick);
+    this.screen?.removeEventListener('change', this.onChange);
     this.closeButton?.removeEventListener('click', this.onCloseClick);
     document.body.classList.remove('shop-open');
   }

@@ -79,7 +79,7 @@ export class Hud {
       if (reasonButton && !this.fishingResultControls?.hidden) {
         event.preventDefault();
         event.stopPropagation();
-        if (this.downvoteReasonPending) return;
+        if (!this.canSelectSongDownvoteReason(this.currentSongFeedback)) return;
         const reason = reasonButton.dataset.songDownvoteReason;
         if (reason === 'skip') {
           this.dismissSongDownvoteReason();
@@ -143,7 +143,7 @@ export class Hud {
     }
 
     this.onKeyDown = (event) => {
-      const reason = this.downvoteReasonOpen && !this.downvoteReasonPending
+      const reason = !event.repeat && this.canSelectSongDownvoteReason(this.currentSongFeedback)
         ? songDownvoteReasonForDigit(event.code)
         : null;
       if (reason) {
@@ -580,6 +580,14 @@ export class Hud {
     return true;
   }
 
+  applyLocalSongVote(feedback, vote, { askForReason = false, reason = null } = {}) {
+    this.songVoteStore.set(feedback, vote, reason);
+    this.allowVoteChange = false;
+    this.downvoteReasonOpen = vote === 'down' && askForReason;
+    this.downvoteReasonPending = false;
+    this.renderSongFeedback(feedback);
+  }
+
   confirmSongVote(feedback, vote, aggregate = null, { askForReason = false, reason = null } = {}) {
     this.songVoteStore.set(feedback, vote, reason);
     if (aggregate) this.setSongAggregate(aggregate);
@@ -592,11 +600,27 @@ export class Hud {
   }
 
   beginSongDownvoteReason(feedback) {
-    if (!this.downvoteReasonOpen || this.downvoteReasonPending || !feedback?.songId) return false;
+    if (!this.canSelectSongDownvoteReason(feedback)) return false;
     this.downvoteReasonPending = true;
     this.feedbackError = '';
     this.renderSongFeedback(feedback);
     return true;
+  }
+
+  applyLocalSongDownvoteReason(feedback, reason) {
+    this.songVoteStore.set(feedback, 'down', reason);
+    this.downvoteReasonOpen = true;
+    this.renderSongFeedback(feedback);
+  }
+
+  canSelectSongDownvoteReason(feedback) {
+    return Boolean(feedback?.songId
+      && this.downvoteReasonOpen
+      && !this.feedbackPending
+      && !this.downvoteReasonPending
+      && this.fishingResultControls?.hidden === false
+      && songVoteKey(feedback) === this.currentSongFeedbackKey
+      && this.songVoteStore.get(feedback) === 'down');
   }
 
   confirmSongDownvoteReason(feedback, reason, aggregate = null) {
@@ -662,8 +686,8 @@ export class Hud {
     if (this.songDownvoteReason) {
       this.songDownvoteReason.hidden = !this.downvoteReasonOpen;
       for (const button of this.songDownvoteReason.querySelectorAll('[data-song-downvote-reason]')) {
-        button.disabled = this.downvoteReasonPending;
-        button.classList.toggle('is-pending', this.downvoteReasonPending);
+        button.disabled = this.feedbackPending || this.downvoteReasonPending;
+        button.classList.toggle('is-pending', this.feedbackPending || this.downvoteReasonPending);
         const selected = button.dataset.songDownvoteReason === this.songVoteStore.getReason(feedback);
         button.classList.toggle('is-selected', selected);
         button.setAttribute('aria-pressed', String(selected));
