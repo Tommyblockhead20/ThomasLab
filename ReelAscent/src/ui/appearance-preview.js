@@ -1,18 +1,30 @@
 import * as pc from 'playcanvas';
-import { createRemoteAvatar } from '../multiplayer/remote-avatar.js';
+import { createCharacterModel } from '../player/character-model.js';
+import { normalizeAppearance } from '../player/appearance.js';
 
-// The wardrobe preview deliberately instantiates the real multiplayer avatar builder.
-// That keeps geometry, category visibility, hat/hair compatibility, and palette resolution
-// on the same code path used by another human looking at this player in a room.
+// The wardrobe preview owns a small renderer, but not a separate avatar implementation.
+// Its visible hierarchy is the exact canonical character model used by local and remote play.
 export class AppearancePreview {
   constructor(canvas, appearance) {
     this.canvas = canvas;
     this.app = null;
     this.avatar = null;
+    this.character = null;
+    this.appearance = normalizeAppearance(appearance);
+    this.visible = false;
     this.spinning = true;
-    if (!canvas) return;
+    this.onWindowResize = () => {
+      if (this.visible) globalThis.requestAnimationFrame?.(() => this.resizeToDisplay());
+    };
+  }
+
+  initialize() {
+    if (!this.canvas || this.app) return Boolean(this.app);
     try {
-      this.app = new pc.Application(canvas, {
+      // The menu is visible before this method runs. Initializing against a real non-zero
+      // canvas prevents the incomplete/zero-sized framebuffer that made the old preview
+      // silently show no newly selected cosmetics.
+      this.app = new pc.Application(this.canvas, {
         graphicsDeviceOptions: { antialias: true, alpha: true, preserveDrawingBuffer: false }
       });
       this.app.graphicsDevice.maxPixelRatio = Math.min(globalThis.devicePixelRatio ?? 1, 2);
@@ -39,27 +51,51 @@ export class AppearancePreview {
       fill.setPosition(-2, 1.8, 2.4);
       this.app.root.addChild(fill);
 
-      this.avatar = createRemoteAvatar(this.app, 'wardrobe-preview', 0, appearance);
+      this.avatar = new pc.Entity('Wardrobe canonical character preview');
+      this.avatar.setLocalScale(1, .89, 1);
       this.avatar.setPosition(0, .15, 0);
       this.avatar.setLocalEulerAngles(0, -22, 0);
+      this.app.root.addChild(this.avatar);
+      this.character = createCharacterModel(this.avatar, { name: 'Wardrobe preview' });
+      this.character.setAppearance(this.appearance);
       this.app.on('update', () => {
         if (!this.avatar?.enabled) return;
         if (this.spinning) this.avatar.rotateLocal(0, 7 / 60, 0);
-        this.avatar.setMovementState?.('grounded', Date.now(), 0);
       });
       this.app.start();
+      globalThis.addEventListener?.('resize', this.onWindowResize);
+      this.resizeToDisplay();
+      return true;
     } catch (error) {
       console.warn('Appearance preview could not initialize', error);
       this.destroy();
+      return false;
     }
   }
 
   setAppearance(appearance) {
-    this.avatar?.setAppearance?.(appearance);
+    this.appearance = normalizeAppearance(appearance);
+    this.character?.setAppearance(this.appearance);
   }
 
   setVisible(visible) {
-    if (this.avatar) this.avatar.enabled = Boolean(visible);
+    this.visible = Boolean(visible);
+    if (this.visible && !this.initialize()) return;
+    if (this.avatar) this.avatar.enabled = this.visible;
+    if (this.visible) {
+      this.resizeToDisplay();
+      globalThis.requestAnimationFrame?.(() => this.resizeToDisplay());
+    }
+  }
+
+  resizeToDisplay() {
+    if (!this.app || !this.canvas || !this.visible) return;
+    const width = Math.max(1, Math.round(this.canvas.clientWidth || this.canvas.width || 1));
+    const height = Math.max(1, Math.round(this.canvas.clientHeight || this.canvas.height || 1));
+    // Application.resizeCanvas writes inline CSS width/height. During the modal's
+    // first layout that can freeze the canvas at 1px tall. Only resize the drawing
+    // buffer here and let the responsive wardrobe CSS own the display dimensions.
+    this.app.graphicsDevice.resizeCanvas(width, height);
   }
 
   setSpinning(spinning) {
@@ -68,6 +104,8 @@ export class AppearancePreview {
   }
 
   destroy() {
+    globalThis.removeEventListener?.('resize', this.onWindowResize);
+    this.character = null;
     this.avatar = null;
     this.app?.destroy?.();
     this.app = null;

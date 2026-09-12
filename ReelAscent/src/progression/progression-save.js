@@ -128,9 +128,24 @@ export function normalizeProgressionState(value = {}) {
     ? value.player.id.slice(0, 160)
     : createDurableId('player');
   const defaults = defaultProgressionState(persistedPlayerId);
-  const appearance = !value.appearance
-    ? { ...DEFAULT_APPEARANCE }
-    : normalizeAppearance(value.appearance);
+  const persistedState = Boolean(value.player?.id || Number.isFinite(value.schemaVersion));
+  const savedAppearance = value.appearance && typeof value.appearance === 'object'
+    ? { ...value.appearance }
+    : null;
+  // Fresh v17.6 states use the clean accessory-free default. A genuinely persisted legacy
+  // state that predates categorized fields keeps the beanie/backpack it previously received
+  // implicitly, while any explicit `none` or saved cosmetic remains untouched.
+  const normalizedSavedAppearance = savedAppearance ? normalizeAppearance(savedAppearance) : null;
+  if (persistedState && savedAppearance) {
+    const hasCategorizedHead = ['headwear', 'eyewear', 'faceAccessory'].some((key) => key in savedAppearance);
+    if (!hasCategorizedHead && !('accessory' in savedAppearance)) normalizedSavedAppearance.headwear = 'beanie';
+    if (!('backAccessory' in savedAppearance)) normalizedSavedAppearance.backAccessory = 'backpack';
+  }
+  const appearance = normalizedSavedAppearance
+    ? normalizedSavedAppearance
+    : persistedState
+      ? normalizeAppearance({ headwear: 'beanie', backAccessory: 'backpack' })
+      : { ...DEFAULT_APPEARANCE };
   const ownedCosmetics = new Set((Array.isArray(value.ownedCosmetics) ? value.ownedCosmetics : [])
     .filter((id) => typeof id === 'string' && COSMETIC_BY_ID.has(id)));
   // If an older save was already wearing an item whose source changed in v16, that save

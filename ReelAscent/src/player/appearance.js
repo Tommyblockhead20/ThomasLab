@@ -165,11 +165,11 @@ export const DEFAULT_APPEARANCE = Object.freeze({
   pantsColor: 'classic-trail',
   hairStyle: 'tousled',
   hairColor: 'espresso',
-  accessory: 'beanie',
-  headwear: 'beanie',
+  accessory: 'none',
+  headwear: 'none',
   eyewear: 'none',
   faceAccessory: 'none',
-  backAccessory: 'backpack',
+  backAccessory: 'none',
   backpackColor: 'classic-teal',
   blobColor: 'classic-blue',
   shirtTint: null,
@@ -266,10 +266,9 @@ export function resolveAppearance(value = {}) {
   resolved.backpackColorValue = resolved.backpackColorValue ?? BACKPACK_COLORS[0];
   const classicTrailLook = appearance.shirtColor === 'classic-orange'
     && appearance.pantsColor === 'classic-trail'
-    && appearance.headwear === 'beanie'
     && appearance.accessoryTint === null;
   resolved.shirtAccentColor = classicTrailLook
-    ? [...resolved.accessoryColor]
+    ? [...LEGACY_CHARACTER_PALETTE.playerAccent]
     : resolved.shirtColorValue.color.map((component) => Math.min(1, component * .72 + .08));
   resolved.blobColor = hexToColor(appearance.blobTint, resolved.blobColorValue.color);
   return resolved;
