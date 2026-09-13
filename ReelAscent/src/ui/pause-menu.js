@@ -264,7 +264,10 @@ export class PauseMenu {
     const pending = this.pendingImport
       ? `<p class="import-ready"><strong>${escapeHtml(this.pendingImport.name)}</strong> is valid: ${this.pendingImport.summary.discovered} discoveries, ${this.pendingImport.summary.inventory} carried, ${this.pendingImport.summary.aquarium} in Aquarium, $${this.pendingImport.summary.money}.</p><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="import">APPROVE IMPORT</button>`
       : '';
-    return `<p class="save-local-note">Progress autosaves in this browser and device. Download a backup to move it elsewhere or protect it before clearing browser data.</p><div class="save-data-content">${slotCards}</div><section class="progress-import"><header><h3>IMPORT PROGRESS</h3><strong>.REELASCENT / JSON</strong></header><p>Select one compressed Reel Ascent backup or a current/legacy JSON export. The file is validated before any slot is overwritten.</p><button data-pause-progress-action="file">IMPORT PROGRESS</button>${pending}</section>`;
+    const storageWarning = this.progression.saveSystem.lastLoadError === 'write-unavailable'
+      ? '<p class="save-storage-warning" role="alert">Browser storage is unavailable. This session may not persist after you close the tab; download progress now.</p>'
+      : '';
+    return `${storageWarning}<p class="save-local-note">Progress autosaves in this browser and device. Download a backup to move it elsewhere or protect it before clearing browser data.</p><div class="save-data-content">${slotCards}</div><section class="progress-import"><header><h3>IMPORT PROGRESS</h3><strong>.REELASCENT / JSON</strong></header><p>Select one compressed Reel Ascent backup or a current/legacy JSON export. The file is validated before any slot is overwritten.</p><button data-pause-progress-action="file">IMPORT PROGRESS</button>${pending}</section>`;
   }
 
   renderSettings() {

@@ -59,6 +59,7 @@ export class AppearanceMenu {
     this.randomizeButton = document.querySelector('#randomize-appearance');
     this.resetButton = document.querySelector('#reset-appearance');
     this.spinButton = document.querySelector('#toggle-preview-spin');
+    this.speedButton = document.querySelector('#toggle-preview-speed');
     this.preview = new AppearancePreview(document.querySelector('#appearance-preview-canvas'), this.progression.getAppearance());
     this.preview.setVisible(false);
     this.isOpen = false;
@@ -93,6 +94,13 @@ export class AppearanceMenu {
       if (this.spinButton) {
         this.spinButton.textContent = spinning ? 'PAUSE ROTATION' : 'RESUME ROTATION';
         this.spinButton.setAttribute('aria-pressed', String(!spinning));
+      }
+    };
+    this.onSpeedClick = () => {
+      const speed = this.preview.setRotationSpeed(this.preview.rotationSpeed === 1 ? 2 : 1);
+      if (this.speedButton) {
+        this.speedButton.textContent = `${speed}x`;
+        this.speedButton.setAttribute('aria-pressed', String(speed === 2));
       }
     };
     this.onKeyDown = (event) => {
@@ -160,6 +168,7 @@ export class AppearanceMenu {
     this.randomizeButton?.addEventListener('click', this.onRandomizeClick);
     this.resetButton?.addEventListener('click', this.onResetClick);
     this.spinButton?.addEventListener('click', this.onSpinClick);
+    this.speedButton?.addEventListener('click', this.onSpeedClick);
   }
 
   open() {
@@ -278,6 +287,7 @@ export class AppearanceMenu {
     this.randomizeButton?.removeEventListener('click', this.onRandomizeClick);
     this.resetButton?.removeEventListener('click', this.onResetClick);
     this.spinButton?.removeEventListener('click', this.onSpinClick);
+    this.speedButton?.removeEventListener('click', this.onSpeedClick);
     document.body.classList.remove('appearance-open');
     this.preview.destroy();
   }

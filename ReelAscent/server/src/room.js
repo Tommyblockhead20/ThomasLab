@@ -49,7 +49,8 @@ export class Room {
         aquariumShowcase: player.aquariumShowcase ?? [],
         locationId: player.lastSnapshot?.locationId ?? 'main-mountain',
         coordinateSpace: player.lastSnapshot?.coordinateSpace ?? 'global-world',
-        globalPosition: player.lastSnapshot?.globalPosition ?? player.lastSnapshot?.position ?? null
+        globalPosition: player.lastSnapshot?.globalPosition ?? player.lastSnapshot?.position ?? null,
+        snapshot: player.lastSnapshot ?? null
       }))
     };
   }

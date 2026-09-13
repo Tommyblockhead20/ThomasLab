@@ -341,6 +341,7 @@ export class SaveSystem {
     this.lastLoadError = null;
     this.revision = 0;
     this.slotStore = this.loadSlotStore();
+    if (!this.storage) this.lastLoadError = 'write-unavailable';
     this.activeSlotId = this.slotStore.activeSlotId;
     this.data = migrate(this.slotStore.slots.find((slot) => slot.id === this.activeSlotId)?.data ?? defaultSave());
     this.multiplayerPlayerId = this.loadMultiplayerPlayerId();
@@ -597,7 +598,7 @@ export class SaveSystem {
 
   getSlotSnapshot(id) {
     const slot = this.slotStore.slots.find((entry) => entry.id === id && entry.data);
-    return slot ? copy(migrate(slot.data)) : null;
+    return slot ? copy(migrate(id === this.activeSlotId ? this.data : slot.data)) : null;
   }
 
   getSlotMetadata(id) {

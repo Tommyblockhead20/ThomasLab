@@ -13,6 +13,7 @@ export class AppearancePreview {
     this.appearance = normalizeAppearance(appearance);
     this.visible = false;
     this.spinning = true;
+    this.rotationSpeed = 1;
     this.onWindowResize = () => {
       if (this.visible) globalThis.requestAnimationFrame?.(() => this.resizeToDisplay());
     };
@@ -31,7 +32,7 @@ export class AppearancePreview {
       this.app.setCanvasResolution(pc.RESOLUTION_AUTO);
       this.app.scene.ambientLight = new pc.Color(.72, .76, .71);
 
-      const camera = new pc.Entity('Wardrobe preview camera');
+      const camera = new pc.Entity('Wardrobe preview camera', this.app);
       camera.addComponent('camera', {
         clearColor: new pc.Color(.035, .12, .125, 1),
         fov: 38,
@@ -42,16 +43,16 @@ export class AppearancePreview {
       camera.lookAt(0, .18, 0);
       this.app.root.addChild(camera);
 
-      const key = new pc.Entity('Wardrobe preview key light');
+      const key = new pc.Entity('Wardrobe preview key light', this.app);
       key.addComponent('light', { type: 'directional', color: new pc.Color(1, .91, .72), intensity: 1.45 });
       key.setEulerAngles(35, -28, 0);
       this.app.root.addChild(key);
-      const fill = new pc.Entity('Wardrobe preview fill light');
+      const fill = new pc.Entity('Wardrobe preview fill light', this.app);
       fill.addComponent('light', { type: 'omni', color: new pc.Color(.48, .75, .82), intensity: .72, range: 8 });
       fill.setPosition(-2, 1.8, 2.4);
       this.app.root.addChild(fill);
 
-      this.avatar = new pc.Entity('Wardrobe canonical character preview');
+      this.avatar = new pc.Entity('Wardrobe canonical character preview', this.app);
       this.avatar.setLocalScale(1, .89, 1);
       this.avatar.setPosition(0, .15, 0);
       this.avatar.setLocalEulerAngles(0, -22, 0);
@@ -60,7 +61,7 @@ export class AppearancePreview {
       this.character.setAppearance(this.appearance);
       this.app.on('update', () => {
         if (!this.avatar?.enabled) return;
-        if (this.spinning) this.avatar.rotateLocal(0, 7 / 60, 0);
+        if (this.spinning) this.avatar.rotateLocal(0, 7 / 60 * this.rotationSpeed, 0);
       });
       this.app.start();
       globalThis.addEventListener?.('resize', this.onWindowResize);
@@ -101,6 +102,11 @@ export class AppearancePreview {
   setSpinning(spinning) {
     this.spinning = Boolean(spinning);
     return this.spinning;
+  }
+
+  setRotationSpeed(speed) {
+    this.rotationSpeed = speed === 2 ? 2 : 1;
+    return this.rotationSpeed;
   }
 
   destroy() {

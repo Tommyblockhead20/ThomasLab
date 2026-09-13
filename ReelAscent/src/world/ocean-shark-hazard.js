@@ -1,7 +1,8 @@
 import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
 
 export const SHARK_HAZARD_CONFIG = Object.freeze({
-  safeDistance: 15,
+  // Meters beyond the authored shoreline/dock safety edge (75 feet).
+  safeDistance: 22.86,
   warningSeconds: 1.7,
   circlingSeconds: 2.8,
   attackSeconds: 1.15,
@@ -34,7 +35,7 @@ export class OceanSharkHazard {
     this.model = createSpecimenModel({
       specimenId: 'ocean-hazard-shark', speciesId: 'blue-shark', name: 'Blue Shark',
       rarity: 'Rare', length: 102, weight: 190, sizeFraction: .72, shiny: false
-    }, { name: 'Deep-water shark hazard', maximumScale: 2.1 });
+    }, { name: 'Deep-water shark hazard', maximumScale: 2.1, app: this.app });
     this.app.root.addChild(this.model.root);
     return this.model;
   }

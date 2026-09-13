@@ -59,6 +59,8 @@ export class RoomState {
       this.members.get(playerId)?.representation?.setPosture?.(presentation?.posture);
       this.members.get(playerId)?.representation?.setEmote?.(presentation?.emote ?? null);
       const remote = this.members.get(playerId);
+      remote.connected = presentation?.connected !== false;
+      if (presentation?.snapshot) remote.consumeSnapshot(presentation.snapshot);
       remote?.representation?.setFishingState?.(presentation?.fishingState);
       remote?.representation?.setHeldItem?.(presentation?.heldItem ?? null);
       if (typeof presentation?.locationId === 'string') remote.locationId = presentation.locationId;

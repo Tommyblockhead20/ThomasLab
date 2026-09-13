@@ -14,7 +14,7 @@ function surface(color, { shiny = false, dark = false } = {}) {
 }
 
 function primitive(parent, name, type, position, scale, material, rotation = {}) {
-  const entity = new pc.Entity(name);
+  const entity = new pc.Entity(name, parent._app);
   entity.addComponent('render', { type, material, castShadows: true, receiveShadows: true });
   entity.setLocalPosition(position.x, position.y, position.z);
   entity.setLocalScale(scale.x, scale.y, scale.z);
@@ -120,14 +120,26 @@ const NATIVE_MODEL_LENGTH = Object.freeze({
   rodent: 1.55, platypus: 1.6, mammal: 1.65, wisp: 1, eel: 1.65
 });
 
-export function specimenDisplayScale(specimen, maximum = Number.POSITIVE_INFINITY) {
+export function specimenDisplayScale(specimen, maximum = Number.POSITIVE_INFINITY, nativeLength = null) {
   const { archetype } = resolveCreaturePresentation(specimen, { context: 'display scale' });
   const lengthMeters = clamp((Number(specimen?.length) || 8) * .0254, .04, 30);
-  const exactScale = lengthMeters / (NATIVE_MODEL_LENGTH[archetype] ?? 1.45);
+  const exactScale = lengthMeters / (nativeLength ?? NATIVE_MODEL_LENGTH[archetype] ?? 1.45);
   return Math.min(Math.max(.025, exactScale), Number.isFinite(maximum) ? maximum : exactScale);
 }
 
-export function createSpecimenModel(specimen, { name = 'Specimen display', maximumScale = Number.POSITIVE_INFINITY } = {}) {
+export function specimenModelLength(parts, fallback = 1.45) {
+  if (!parts?.length) return fallback;
+  let minimum = Infinity;
+  let maximum = -Infinity;
+  for (const part of parts) {
+    if (!part?.position || !part?.scale) continue;
+    minimum = Math.min(minimum, part.position.x - part.scale.x * .5);
+    maximum = Math.max(maximum, part.position.x + part.scale.x * .5);
+  }
+  return Number.isFinite(maximum - minimum) && maximum - minimum > .05 ? maximum - minimum : fallback;
+}
+
+export function createSpecimenModel(specimen, { name = 'Specimen display', maximumScale = Number.POSITIVE_INFINITY, app = undefined } = {}) {
   const presentation = resolveCreaturePresentation(specimen, { context: name });
   const { species, visual, archetype } = presentation;
   const colors = visual.colors ?? [[.3, .66, .48], [.84, .56, .22]];
@@ -137,7 +149,7 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
     surface([.025, .035, .03], { dark: true })
   ];
   const [base, accent, dark] = materials;
-  const root = new pc.Entity(name);
+  const root = new pc.Entity(name, app);
   const speciesId = presentation.canonicalId;
   let tail = null;
 
@@ -185,6 +197,25 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
       { x: .24, y: .11, z: .28 }, accent);
     tail = primitive(root, `${name} ray tail`, 'cylinder', { x: -.57, y: 0, z: 0 },
       { x: .035, y: .82, z: .035 }, accent, { z: 90 });
+  } else if (speciesId === 'north_american_river_otter') {
+    primitive(root, `${name} otter long body`, 'sphere', { x: -.18, y: 0, z: 0 }, { x: .94, y: .29, z: .3 }, base);
+    primitive(root, `${name} otter shoulders`, 'sphere', { x: .25, y: .02, z: 0 }, { x: .43, y: .29, z: .29 }, base);
+    primitive(root, `${name} otter neck`, 'sphere', { x: .43, y: .07, z: 0 }, { x: .31, y: .23, z: .24 }, base);
+    primitive(root, `${name} otter head`, 'sphere', { x: .59, y: .11, z: 0 }, { x: .27, y: .22, z: .25 }, base);
+    primitive(root, `${name} otter pale muzzle`, 'sphere', { x: .77, y: .04, z: 0 }, { x: .2, y: .12, z: .19 }, accent);
+    primitive(root, `${name} otter nose`, 'sphere', { x: .87, y: .08, z: 0 }, { x: .06, y: .045, z: .065 }, dark);
+    primitive(root, `${name} otter tail base`, 'sphere', { x: -.66, y: -.035, z: 0 }, { x: .36, y: .18, z: .17 }, base);
+    primitive(root, `${name} otter tapered tail middle`, 'sphere', { x: -.91, y: -.07, z: 0 }, { x: .4, y: .13, z: .13 }, base);
+    tail = primitive(root, `${name} otter tapered tail tip`, 'sphere', { x: -1.17, y: -.09, z: 0 }, { x: .32, y: .075, z: .08 }, base);
+    for (const side of [-1, 1]) {
+      primitive(root, `${name} otter ear ${side}`, 'sphere', { x: .57, y: .29, z: side * .16 }, { x: .1, y: .09, z: .09 }, base);
+      for (const [label, x] of [['fore', .3], ['hind', -.46]]) {
+        primitive(root, `${name} otter ${label} leg ${side}`, 'cylinder', { x, y: -.24, z: side * .2 },
+          { x: .095, y: .3, z: .095 }, base, { z: label === 'fore' ? -12 : 12 });
+        primitive(root, `${name} otter ${label} paw ${side}`, 'sphere', { x: x + .05, y: -.4, z: side * .2 },
+          { x: .17, y: .08, z: .12 }, base);
+      }
+    }
   } else if (['cetacean', 'pinniped', 'sirenian', 'otter', 'beaver', 'rodent', 'platypus', 'mammal'].includes(archetype)) {
     primitive(root, `${name} mammal body`, 'sphere', { x: -.05, y: 0, z: 0 },
       { x: .66, y: .27, z: .28 }, base);
@@ -320,7 +351,9 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
   // connectivity repair before Hand, catch, remote-player, or Aquarium transforms.
   const attachmentValidation = enforceCreatureAttachmentInvariant(root, archetype);
 
-  const scale = specimenDisplayScale(specimen, maximumScale);
+  const nativeLength = specimenModelLength(root.children.map((child) => child._creatureAttachmentPart).filter(Boolean),
+    NATIVE_MODEL_LENGTH[archetype] ?? 1.45);
+  const scale = specimenDisplayScale(specimen, maximumScale, nativeLength);
   const physicalLengthMeters = clamp((Number(specimen?.length) || 8) * .0254, .04, 30);
   root.setLocalScale(scale, scale, scale);
   return { root, tail, materials, species, scale, archetype, physicalLengthMeters, presentation, attachmentValidation };

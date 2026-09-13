@@ -32,6 +32,7 @@ export function createProgressExport(saveSnapshot, saveMetadata = {}) {
       collection: copy(save.collection),
       lifetime: copy(save.lifetime),
       trailBadges: copy(save.trailBadges),
+      worldMilestones: copy(save.worldMilestones),
       runHistory: copy(save.runHistory),
       economy: copy(save.progression)
     }
@@ -97,6 +98,7 @@ export function validateProgressImport(input) {
     collection: portable.collection,
     lifetime: portable.lifetime,
     trailBadges: portable.trailBadges,
+    worldMilestones: portable.worldMilestones,
     runHistory: portable.runHistory,
     progression: normalizedEconomy
   });

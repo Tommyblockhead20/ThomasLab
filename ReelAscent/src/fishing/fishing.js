@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import { sampleOnsetSeconds } from '../audio/sample-onset.js';
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 import { FISHING_CONFIG } from '../config.js';
 import {
@@ -314,7 +315,9 @@ class FishingAudio {
         if (!definition) return false;
         const entries = await Promise.all(definition.samples.map(async (sample) => {
           const buffer = await this.decodeSample(sample.file);
-          return [sample.degree, buffer ? { buffer, normalizationGain: this.getNormalizationGain(buffer) } : null];
+          return [sample.degree, buffer ? {
+            buffer, normalizationGain: this.getNormalizationGain(buffer), onsetSeconds: sampleOnsetSeconds(buffer)
+          } : null];
         }));
         this.instrumentBuffers.set(instrumentId, new Map(entries.filter(([, entry]) => entry?.buffer)));
         return this.instrumentBuffers.get(instrumentId).size > 0;
@@ -361,7 +364,7 @@ class FishingAudio {
         context.currentTime
       );
       source.connect(gain).connect(this.getSampleOutput(context));
-      source.start(context.currentTime + (options.offset ?? 0));
+      source.start(context.currentTime + (options.offset ?? 0), options.trimStart ?? 0);
       return true;
     } catch {
       return false;
@@ -375,6 +378,7 @@ class FishingAudio {
       const mixGain = INSTRUMENT_MIX_GAIN[instrumentId] ?? 1;
       return this.playBuffer(entry.buffer, {
         ...options,
+        trimStart: entry.onsetSeconds,
         volume: (options.volume ?? .2) * entry.normalizationGain * mixGain
       });
     }
@@ -3002,7 +3006,7 @@ export class FishingController {
     // one of them for an actual caught specimen.
     for (const root of Object.values(this.catchCreatureRigs ?? {})) root.enabled = false;
     destroySpecimenModel(this.catchSpecimenModel);
-    this.catchSpecimenModel = createSpecimenModel(fish, { name: `Caught ${fish.speciesId}` });
+    this.catchSpecimenModel = createSpecimenModel(fish, { name: `Caught ${fish.speciesId}`, app: this.app });
     this.catchFish.addChild(this.catchSpecimenModel.root);
     positionSpecimenModel(this.catchSpecimenModel, 'catch');
 

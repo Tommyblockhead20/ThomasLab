@@ -1,7 +1,8 @@
 import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
 import { SHOP_COSMETICS } from '../progression/cosmetics.js';
-import { INVENTORY_SORT_OPTIONS, sortInventorySpecimens } from './inventory.js';
+import { INVENTORY_SORT_OPTIONS } from './inventory.js';
+import { orderAndFilterSpecimens, specimenFilterOptions } from '../progression/specimen-order.js';
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -29,6 +30,7 @@ export class ShopMenu {
     this.isOpen = false;
     this.activeMode = 'fishing';
     this.sellerSort = 'recent';
+    this.sellerFilter = '';
     this.renderedRevision = -1;
 
     this.onKeyDown = (event) => {
@@ -97,8 +99,10 @@ export class ShopMenu {
     };
     this.onChange = (event) => {
       const sort = event.target.closest?.('[data-seller-sort]');
-      if (!sort) return;
-      this.sellerSort = INVENTORY_SORT_OPTIONS.some(([value]) => value === sort.value) ? sort.value : 'recent';
+      const filter = event.target.closest?.('[data-seller-filter]');
+      if (filter) this.sellerFilter = filter.value;
+      else if (sort) this.sellerSort = INVENTORY_SORT_OPTIONS.some(([value]) => value === sort.value) ? sort.value : 'recent';
+      else return;
       this.render(true);
     };
     this.onCloseClick = () => this.close();
@@ -211,10 +215,13 @@ export class ShopMenu {
   renderSales(state) {
     const total = state.inventory.reduce((sum, specimen) => sum + specimen.value, 0);
     const options = INVENTORY_SORT_OPTIONS.map(([value, label]) => `<option value="${value}" ${this.sellerSort === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
-    const cards = sortInventorySpecimens(state.inventory, this.sellerSort).map((specimen) => (
+    const filterChoices = specimenFilterOptions(state.inventory, this.sellerSort);
+    if (this.sellerFilter && !filterChoices.some(([id]) => id === this.sellerFilter)) this.sellerFilter = '';
+    const cards = orderAndFilterSpecimens(state.inventory, this.sellerSort, this.sellerFilter).map((specimen) => (
       `<article class="shop-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)}</small></div><p>${specimen.length.toFixed(1)} in • ${specimen.weight.toFixed(2)} lb</p><button type="button" data-shop-sell="${escapeHtml(specimen.specimenId)}">SELL $${specimen.value}</button></article>`
     )).join('');
-    return `<section class="shop-category"><div class="shop-category-heading"><h3>SELL CARRIED SPECIMENS</h3><button type="button" data-shop-sell-all ${state.inventory.length ? '' : 'disabled'}>SELL ALL ${state.inventory.length} • $${total}</button></div><label class="inventory-sort seller-sort">SORT <select data-seller-sort aria-label="Sort sellable specimens">${options}</select></label><div class="shop-card-row">${cards || '<p class="shop-empty">No carried specimens to sell.</p>'}</div></section>`;
+    const filter = filterChoices.length ? `<label class="inventory-sort seller-sort">${this.sellerSort === 'species' ? 'SPECIES' : 'LOCATION'} <select data-seller-filter aria-label="Filter sellable specimens"><option value="">All</option>${filterChoices.map(([id, label]) => `<option value="${escapeHtml(id)}" ${id === this.sellerFilter ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label>` : '';
+    return `<section class="shop-category"><div class="shop-category-heading"><h3>SELL CARRIED SPECIMENS</h3><button type="button" data-shop-sell-all ${state.inventory.length ? '' : 'disabled'}>SELL ALL ${state.inventory.length} • $${total}</button></div><label class="inventory-sort seller-sort">SORT <select data-seller-sort aria-label="Sort sellable specimens">${options}</select></label>${filter}<div class="shop-card-row">${cards || '<p class="shop-empty">No matching specimens to sell.</p>'}</div></section>`;
   }
 
   destroy() {

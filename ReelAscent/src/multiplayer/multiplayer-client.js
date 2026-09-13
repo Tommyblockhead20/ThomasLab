@@ -1,6 +1,7 @@
 import { createPlayerSnapshot, createProtocolMessage, MESSAGE_TYPES, parseProtocolMessage } from './protocol.js';
 import { RoomState } from './room-state.js';
 import { NoopTransport, WebSocketTransport } from './transport.js';
+import { SongVoteOutbox } from './song-vote-outbox.js';
 
 export const MULTIPLAYER_STATES = Object.freeze([
   'disconnected', 'connecting', 'connected', 'joining', 'in_room', 'reconnecting', 'error'
@@ -41,6 +42,10 @@ export class MultiplayerClient extends EventTarget {
     this.pendingRoomRequest = null;
     this.displayName = '';
     this.pendingVoteRequests = new Map();
+    this.voteOutbox = new SongVoteOutbox(playerId);
+    this.voteFlush = null;
+    this.voteRetryTimer = null;
+    this.voteRetryDelay = 2000;
     this.songVoteAggregates = new Map();
     this.transport.onMessage = (value) => this.handleMessage(value);
     this.transport.onClose = () => this.handleClose();
@@ -78,6 +83,7 @@ export class MultiplayerClient extends EventTarget {
       if (this.destroyed) return false;
       if (!reconnecting) this.setState('connected');
       this.sendHello();
+      if (this.voteOutbox.size && !this.voteFlush) this.scheduleVoteRetry(0);
       return true;
     } catch (error) {
       if (reconnecting && this.room.roomCode && this.reconnectToken) {
@@ -194,13 +200,51 @@ export class MultiplayerClient extends EventTarget {
   }
 
   submitSongVote(feedback, vote, reason = null) {
-    return this.sendVoteRequest(MESSAGE_TYPES.SONG_VOTE_SET, {
+    const payload = {
       speciesId: String(feedback?.speciesId ?? '').slice(0, 100),
       songId: String(feedback?.songId ?? '').slice(0, 180),
       songRevision: Math.max(1, Math.floor(Number(feedback?.songRevision) || 1)),
       vote: vote === 'up' || vote === 'down' ? vote : null,
       reason: vote === 'down' ? String(reason ?? '').slice(0, 32) : null
-    });
+    };
+    const key = this.voteOutbox.enqueue(payload);
+    if (!key) return Promise.reject(new Error('Invalid song feedback vote.'));
+    return this.flushVoteOutbox().then((results) => results.get(key) ?? null);
+  }
+
+  flushVoteOutbox() {
+    if (this.voteFlush) return this.voteFlush;
+    this.voteFlush = (async () => {
+      const results = new Map();
+      while (!this.destroyed && this.voteOutbox.size) {
+        const [key, row] = this.voteOutbox.peek();
+        const aggregate = await this.sendVoteRequest(MESSAGE_TYPES.SONG_VOTE_SET, row);
+        results.set(key, aggregate);
+        this.voteOutbox.acknowledge(key, row);
+      }
+      this.voteRetryDelay = 2000;
+      if (this.voteRetryTimer) globalThis.clearTimeout(this.voteRetryTimer);
+      this.voteRetryTimer = null;
+      return results;
+    })().catch((error) => {
+      if (this.voteOutbox.size && !this.destroyed) this.scheduleVoteRetry(this.voteRetryDelay);
+      this.voteRetryDelay = Math.min(60_000, this.voteRetryDelay * 2);
+      throw error;
+    }).finally(() => { this.voteFlush = null; });
+    return this.voteFlush;
+  }
+
+  scheduleVoteRetry(delay) {
+    if (this.destroyed || this.voteRetryTimer || !this.voteOutbox.size) return;
+    this.voteRetryTimer = globalThis.setTimeout(() => {
+      this.voteRetryTimer = null;
+      this.flushVoteOutbox().catch(() => {});
+    }, delay);
+  }
+
+  isSongVoteQueued(feedback) {
+    const key = `${feedback?.speciesId}@${Math.max(1, Math.floor(Number(feedback?.songRevision) || 1))}`;
+    return Boolean(this.voteOutbox.get(key));
   }
 
   requestSongVoteResults(filter = {}) {
@@ -233,6 +277,7 @@ export class MultiplayerClient extends EventTarget {
       this.reconnectAttempt = 0;
       this.cancelReconnect();
       this.setState('in_room');
+      if (this.voteOutbox.size) this.scheduleVoteRetry(0);
       if (this.room.runSeed !== null && this.room.runSeed !== previousSeed) {
         this.onAuthoritativeRunSeed(this.room.runSeed, message.payload);
       }
@@ -281,6 +326,9 @@ export class MultiplayerClient extends EventTarget {
 
   handleClose() {
     if (this.destroyed) return;
+    for (const [requestId] of this.pendingVoteRequests) {
+      this.settleVoteRequest(requestId, null, new Error('Song feedback connection closed.'));
+    }
     const wasInRoom = this.state === 'in_room' || (this.room.roomCode && this.reconnectToken);
     if (wasInRoom) {
       this.room.clear({ preserveRoomIdentity: true });
@@ -338,6 +386,8 @@ export class MultiplayerClient extends EventTarget {
   destroy() {
     this.destroyed = true;
     this.cancelReconnect();
+    if (this.voteRetryTimer) globalThis.clearTimeout(this.voteRetryTimer);
+    this.voteRetryTimer = null;
     this.room.clear();
     for (const [requestId, pending] of this.pendingVoteRequests) {
       globalThis.clearTimeout(pending.timer);

@@ -13,6 +13,7 @@ import {
 } from './aquarium.js';
 import { createSpecimenRecord, findSpecimenIndex } from './inventory.js';
 import { normalizeProgressionState } from './progression-save.js';
+import { orderAndFilterSpecimens } from './specimen-order.js';
 import { serializeProgress, validateProgressImport } from './progress-transfer.js';
 import { normalizeAppearance } from '../player/appearance.js';
 import { MAP_ITEM_BY_ID, MAP_ITEMS } from '../world/world-locations.js';
@@ -189,12 +190,27 @@ export class ProgressionSystem {
     return this.moveAquariumSpecimen(specimenId, { inventory: true });
   }
 
-  autoFillAquariumTank(tankIndex = 0) {
+  emptyAquariumTank(tankIndex = 0) {
+    const index = Math.max(0, Math.min(this.state.aquariumTankCount - 1, Math.floor(Number(tankIndex) || 0)));
+    this.refreshAquariumDisplays();
+    const ids = new Set(this.state.aquariumTankDisplays[index]);
+    if (!ids.size) return { ok: false, reason: `Tank ${index + 1} is already empty` };
+    const moved = this.state.aquarium.filter((entry) => ids.has(entry.specimenId));
+    this.state.aquarium = this.state.aquarium.filter((entry) => !ids.has(entry.specimenId));
+    this.state.inventory.push(...moved);
+    this.state.aquariumTankDisplays[index] = [];
+    this.state.aquariumTankManual[index] = true;
+    this.commit();
+    return { ok: true, count: moved.length, tankIndex: index };
+  }
+
+  autoFillAquariumTank(tankIndex = 0, { mode = 'value', filter = '' } = {}) {
     const index = Math.max(0, Math.min(this.state.aquariumTankCount - 1, Math.floor(Number(tankIndex) || 0)));
     this.refreshAquariumDisplays();
     const openSlots = AQUARIUM_TANK_CAPACITY - this.state.aquariumTankDisplays[index].length;
     if (openSlots <= 0) return { ok: false, reason: `Tank ${index + 1} is full` };
-    const selected = highestValueSpecimenIds(this.state.inventory, openSlots);
+    const selected = orderAndFilterSpecimens(this.state.inventory, mode, filter)
+      .slice(0, openSlots).map((specimen) => specimen.specimenId);
     if (!selected.length) return { ok: false, reason: 'No inventory creatures are available to add' };
     const selectedSet = new Set(selected);
     const moving = this.state.inventory.filter((specimen) => selectedSet.has(specimen.specimenId));
@@ -220,9 +236,30 @@ export class ProgressionSystem {
     return { ok: true };
   }
 
-  autoFillAquariumShowcase() {
-    this.state.aquariumShowcaseManual = false;
-    this.state.aquariumShowcaseSpecimenIds = highestValueSpecimenIds([...this.state.aquarium, ...this.state.inventory], AQUARIUM_TANK_CAPACITY);
+  clearAquariumShowcase() {
+    this.state.aquariumShowcaseManual = true;
+    this.state.aquariumShowcaseSpecimenIds = [];
+    this.commit();
+    return { ok: true, count: 0 };
+  }
+
+  matchAquariumShowcaseToTank(tankIndex = 0) {
+    this.refreshAquariumDisplays();
+    const index = Math.floor(Number(tankIndex));
+    if (!Number.isInteger(index) || index < 0 || index >= this.state.aquariumTankCount) {
+      return { ok: false, reason: 'That tank is locked' };
+    }
+    this.state.aquariumShowcaseManual = true;
+    this.state.aquariumShowcaseSpecimenIds = [...this.state.aquariumTankDisplays[index]];
+    this.commit();
+    return { ok: true, count: this.state.aquariumShowcaseSpecimenIds.length, tankIndex: index };
+  }
+
+  autoFillAquariumShowcase({ mode = 'value', filter = '' } = {}) {
+    this.state.aquariumShowcaseManual = true;
+    this.state.aquariumShowcaseSpecimenIds = orderAndFilterSpecimens(
+      [...this.state.aquarium, ...this.state.inventory], mode, filter
+    ).slice(0, AQUARIUM_TANK_CAPACITY).map((specimen) => specimen.specimenId);
     this.commit();
     return { ok: true, count: this.state.aquariumShowcaseSpecimenIds.length };
   }

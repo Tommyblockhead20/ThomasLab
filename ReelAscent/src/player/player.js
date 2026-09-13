@@ -506,7 +506,8 @@ export class Player {
     this.heldInventorySpecimen = specimen ? { ...specimen } : null;
     if (!specimen) return null;
     const model = createSpecimenModel(specimen, {
-      name: `Held inventory specimen ${specimen.specimenId}`
+      name: `Held inventory specimen ${specimen.specimenId}`,
+      app: this.app
     });
     (this.rightHandAnchor ?? this.visualRoot).addChild(model.root);
     model.heldOffset = positionSpecimenModel(model, 'held');

@@ -9,7 +9,7 @@ function material(color, gloss) {
 }
 
 function primitive(parent, name, type, position, scale, surface, rotation = {}) {
-  const entity = new pc.Entity(name);
+  const entity = new pc.Entity(name, parent._app);
   entity.addComponent('render', { type, material: surface, castShadows: true, receiveShadows: true });
   entity.setLocalPosition(position.x, position.y, position.z);
   entity.setLocalScale(scale.x, scale.y, scale.z);
@@ -26,7 +26,7 @@ export function createFishingRodModel(parent, { name = 'Fishing rod' } = {}) {
     grip: material([.08, .055, .035], .28),
     line: material([.72, .84, .82], .82)
   };
-  const root = new pc.Entity(name);
+  const root = new pc.Entity(name, parent?._app);
   parent?.addChild(root);
   const rodLength = 1.56;
   primitive(root, `${name} cork handle`, 'cylinder', { x: 0, y: -.16, z: 0 },

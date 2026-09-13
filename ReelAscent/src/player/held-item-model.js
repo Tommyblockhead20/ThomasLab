@@ -9,7 +9,7 @@ function surface(color, gloss = .35) {
 }
 
 function primitive(parent, name, type, position, scale, material, rotation = {}) {
-  const entity = new pc.Entity(name);
+  const entity = new pc.Entity(name, parent._app);
   entity.addComponent('render', { type, material, castShadows: true, receiveShadows: true });
   entity.setLocalPosition(position.x, position.y, position.z);
   entity.setLocalScale(scale.x, scale.y, scale.z);
@@ -25,7 +25,7 @@ export function createHeldEquipmentModel(parent, itemId, { name = 'Held equipmen
     surface([.58, .65, .66], .78),
     surface([.08, .09, .085], .28)
   ];
-  const root = new pc.Entity(`${name} Ice Axe`);
+  const root = new pc.Entity(`${name} Ice Axe`, parent?._app);
   parent?.addChild(root);
   root.setLocalPosition(.08, -.34, -.05);
   root.setLocalEulerAngles(-8, 0, -18);

@@ -15,10 +15,13 @@ export class RemotePlayer {
     this.localLocationId = 'main-mountain';
     this.lastSample = null;
     this.lastSampleAt = null;
+    this.connected = true;
+    this.lastSequence = -1;
   }
 
   consumeSnapshot(snapshot) {
     if (snapshot?.playerId !== this.playerId) return false;
+    if (Number.isSafeInteger(snapshot.sequence) && snapshot.sequence <= this.lastSequence) return false;
     if (typeof snapshot.locationId === 'string' && snapshot.locationId) this.locationId = snapshot.locationId;
     if (typeof snapshot.coordinateSpace === 'string') this.coordinateSpace = snapshot.coordinateSpace;
     if (snapshot.globalPosition && ['x', 'y', 'z'].every((axis) => Number.isFinite(snapshot.globalPosition[axis]))) {
@@ -26,7 +29,6 @@ export class RemotePlayer {
     } else if (snapshot.position && this.coordinateSpace === 'global-world') {
       this.globalPosition = { ...snapshot.position };
     }
-    this.syncVisibility();
     if (snapshot.appearance !== undefined) this.representation?.setAppearance?.(snapshot.appearance);
     if (snapshot.posture !== undefined) this.representation?.setPosture?.(snapshot.posture);
     if (snapshot.fishingState !== undefined) {
@@ -39,7 +41,10 @@ export class RemotePlayer {
       this.heldItem = snapshot.heldItem;
       this.representation?.setHeldItem?.(snapshot.heldItem);
     }
-    return this.snapshots.push(snapshot);
+    const accepted = this.snapshots.push(snapshot);
+    if (accepted && Number.isSafeInteger(snapshot.sequence)) this.lastSequence = snapshot.sequence;
+    this.syncVisibility();
+    return accepted;
   }
 
   setLocalLocationId(locationId) {
@@ -48,7 +53,8 @@ export class RemotePlayer {
   }
 
   syncVisibility() {
-    const visible = this.locationId === this.localLocationId;
+    const visible = this.connected && this.snapshots.snapshots.length > 0
+      && this.locationId === this.localLocationId;
     if (this.representation?.setRemoteVisible) this.representation.setRemoteVisible(visible);
     else if (this.representation) this.representation.enabled = visible;
   }

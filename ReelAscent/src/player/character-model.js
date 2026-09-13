@@ -88,7 +88,7 @@ function recolor(material, color, emissiveScale = 0) {
 }
 
 function primitive(parent, name, type, position, scale, material, rotation = {}) {
-  const entity = new pc.Entity(name);
+  const entity = new pc.Entity(name, parent._app);
   entity.addComponent('render', { type, material, castShadows: true, receiveShadows: true });
   entity.setLocalPosition(position.x, position.y, position.z);
   entity.setLocalScale(scale.x, scale.y, scale.z);
@@ -98,14 +98,14 @@ function primitive(parent, name, type, position, scale, material, rotation = {})
 }
 
 function joint(parent, name, position) {
-  const entity = new pc.Entity(name);
+  const entity = new pc.Entity(name, parent._app);
   entity.setLocalPosition(position.x, position.y, position.z);
   parent.addChild(entity);
   return entity;
 }
 
 function group(parent, name) {
-  const entity = new pc.Entity(name);
+  const entity = new pc.Entity(name, parent._app);
   parent.addChild(entity);
   return entity;
 }

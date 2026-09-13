@@ -108,6 +108,7 @@ export class Game {
     this.rockDebugEnabled = false;
     this.rockDebugTarget = null;
     this.saveSystem = new SaveSystem();
+    this.storageWarningShown = false;
     this.hud = new Hud(this.saveSystem.multiplayerPlayerId);
     this.progression = new ProgressionSystem(this.saveSystem);
     this.tutorials = new TutorialSystem(this.saveSystem, this.hud);
@@ -424,6 +425,10 @@ export class Game {
     if (!localGameplayPaused) this.updateSessionStats(dt);
     if (!localGameplayPaused) this.sharkHazard.update(dt, this.player.getPosition());
     this.syncPersistentProgress();
+    if (!this.storageWarningShown && this.saveSystem.lastLoadError === 'write-unavailable') {
+      this.storageWarningShown = true;
+      this.hud.showToast?.('Browser storage is unavailable. Download a backup from Pause > Saves.', 6);
+    }
     if (this.lastHomeProgressRevision !== this.saveSystem.revision) {
       const unlocked = this.trailBadges.evaluate();
       if (unlocked.length) this.hud.showToast?.(`Trail Badge unlocked • ${unlocked.length} new`);
@@ -432,7 +437,8 @@ export class Game {
       this.sendAquariumShowcase();
       this.lastHomeProgressRevision = this.saveSystem.revision;
     }
-    this.world.update(dt);
+    // Keep networking/UI alive for this client, but do not advance the local world clock.
+    if (!localGameplayPaused) this.world.update(dt);
     const multiplayerPlayerState = this.player.getState();
     this.rockDebugTarget = this.rockDebugEnabled
       ? (multiplayerPlayerState.climbRockId
@@ -452,7 +458,7 @@ export class Game {
     this.player.input.setMobileActionModes?.({
       context: this.mobileContextState.current?.kind ?? 'interact'
     });
-    this.tutorials.update(dt, this.contextualAction);
+    this.tutorials.update(localGameplayPaused ? 0 : dt, this.contextualAction);
     this.homeInteraction.setPromptAllowed(this.contextualAction?.kind === 'interact');
     this.homeInteraction.update();
     const globalPosition = this.getLocalGlobalPosition(multiplayerPlayerState.position);
@@ -482,7 +488,8 @@ export class Game {
         const savedReason = this.hud.songVoteStore.getReason(songFeedback);
         this.multiplayer.submitSongVote(songFeedback, savedVote, savedReason)
           .then((aggregate) => this.hud.confirmSongVote(songFeedback, savedVote, aggregate, { reason: savedReason }))
-          .catch(() => this.hud.setSongVoteError("Live feedback totals couldn't be loaded."));
+          .catch(() => this.hud.setSongVoteError(this.multiplayer.voteOutbox.persisted
+            ? 'Live feedback is queued for automatic retry.' : 'Live feedback is queued in this tab only.'));
       }
     }
     this.fishingPerformance.update(this.fishing.getFishingPerformanceState());
@@ -576,8 +583,10 @@ export class Game {
       this.multiplayer.submitSongVote(feedback, 'down', detail)
         .then((aggregate) => this.hud.confirmSongDownvoteReason(feedback, detail, aggregate))
         .catch(() => {
-          this.hud.setSongVoteError("Reason couldn't be saved.");
-          this.hud.showToast?.("The downvote is saved, but its reason couldn't be updated.", 3);
+          const message = this.multiplayer.voteOutbox.persisted
+            ? 'Reason saved locally and queued for retry.' : 'Reason is queued in this tab only; browser storage is unavailable.';
+          this.hud.setSongVoteError(message);
+          this.hud.showToast?.(message, 3);
         });
       return true;
     }
@@ -591,8 +600,10 @@ export class Game {
     this.multiplayer.submitSongVote(feedback, vote)
       .then((aggregate) => this.hud.confirmSongVote(feedback, vote, aggregate, { askForReason: vote === 'down' }))
       .catch(() => {
-        this.hud.setSongVoteError("Feedback couldn't be saved.");
-        this.hud.showToast?.("Feedback couldn't be saved. Fishing is unaffected.", 3);
+        const message = this.multiplayer.voteOutbox.persisted
+          ? 'Feedback saved locally and queued for retry.' : 'Feedback is queued in this tab only; browser storage is unavailable.';
+        this.hud.setSongVoteError(message);
+        this.hud.showToast?.(message, 3);
       });
     return true;
   }
@@ -602,6 +613,9 @@ export class Game {
     this.currentLocationId = locationId;
     this.currentCoordinateSpace = coordinateSpace || 'global-world';
     this.world.setActiveLocation?.(locationId);
+    if (locationId === 'aquarium-island') {
+      this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot(), this.getAquariumSocialShowcases());
+    }
     this.boatSoftlockRecovery.timer = 0;
     this.boatSoftlockRecovery.lastPosition = null;
     this.multiplayer?.room?.setLocalLocationId?.(locationId);
@@ -869,7 +883,7 @@ export class Game {
 
   getAquariumSocialShowcases() {
     if (this.multiplayer?.state !== 'in_room') return [];
-    return [...this.multiplayer.room.roster.values()].slice(0, 10).map((player) => ({
+    return [...this.multiplayer.room.roster.values()].filter((player) => player.connected !== false).slice(0, 10).map((player) => ({
       playerId: player.id,
       isLocal: player.id === this.multiplayer.playerId,
       displayName: player.displayName || player.name || (player.id === this.multiplayer.playerId ? this.multiplayer.displayName : 'Player'),

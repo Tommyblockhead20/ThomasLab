@@ -2096,7 +2096,7 @@ export class MountainWorld extends TestWorld {
     if (this.app?.systems) {
       for (const speciesId of ['sardine', 'blue-crab']) {
         const model = createSpecimenModel({ speciesId, length: speciesId === 'sardine' ? 8 : 5, weight: 1, shiny: false }, {
-          name: `Fish Market ${speciesId} display`, maximumScale: .48
+          name: `Fish Market ${speciesId} display`, maximumScale: .48, app: this.app
         });
         this.shopRoot.addChild(model.root);
         model.root.setLocalPosition(speciesId === 'sardine' ? 1.62 : 2.08, 2.06, 1.1);
@@ -2153,9 +2153,9 @@ export class MountainWorld extends TestWorld {
         nearest = Math.min(nearest, Math.max(0, pointToSegmentDistance2D(point, start, end) - 4.5));
       }
     }
-    // Count a modest band of authored shallows as part of the safe edge. The shark's own
-    // 15 m threshold is applied after this value, so it cannot arm on land or at the beach.
-    return Math.max(0, nearest - 2.5);
+    // This distance is measured from the authored shoreline or dock safety edge.
+    // OceanSharkHazard applies its 75-foot threshold to this unshifted measurement.
+    return nearest;
   }
 
   chooseTravelArrival(destinationId, rng = Math.random) {
@@ -2751,6 +2751,7 @@ export class MountainWorld extends TestWorld {
           const seen = new Set();
           return {
             owner: entry.displayName,
+            ownerId: entry.playerId,
             specimens: (entry.specimens ?? []).filter((specimen) => {
               if (!specimen?.specimenId || seen.has(specimen.specimenId)) return false;
               seen.add(specimen.specimenId);
@@ -2762,6 +2763,7 @@ export class MountainWorld extends TestWorld {
     const soloCount = Math.max(1, Math.min(10, Number(progression.aquariumTankCount) || 1));
     const soloDisplays = Array.from({ length: soloCount }, (_, tankIndex) => ({
       owner: `Tank ${tankIndex + 1}`,
+      ownerId: 'solo',
       specimens: (progression.aquariumTankDisplays?.[tankIndex] ?? []).map((id) => byId.get(id)).filter(Boolean).slice(0, 30)
     }));
     const displays = multiplayerDisplays ?? soloDisplays;
@@ -2803,26 +2805,29 @@ export class MountainWorld extends TestWorld {
       label._labelText = text;
     });
     const visible = displays.flatMap((display, tankIndex) => display.specimens.map((specimen, slotIndex) => ({
-      specimen, tankIndex, slotIndex, owner: display.owner
+      specimen, tankIndex, slotIndex, owner: display.owner, ownerId: display.ownerId
     })))
       .slice(0, PUBLIC_AQUARIUM_CONFIG.visibleResidentLimit);
-    const signature = `layout:${layoutCount}:${displays.map((display) => display.owner).join(',')}|${visible.map(({ specimen, tankIndex, owner }) => (
-      `${tankIndex}:${owner}:${specimen.specimenId}:${specimen.length}:${specimen.weight}:${specimen.shiny ? 1 : 0}`
+    const signature = `layout:${layoutCount}:${displays.map((display) => `${display.ownerId}:${display.owner}`).join(',')}|${visible.map(({ specimen, tankIndex, ownerId }) => (
+      `${tankIndex}:${ownerId}:${specimen.specimenId}:${specimen.length}:${specimen.weight}:${specimen.shiny ? 1 : 0}`
     )).join('|')}`;
     if (signature === this.aquariumResidentSignature) return this.aquariumResidents.length;
-    for (const resident of this.aquariumResidents) destroySpecimenModel(resident.model);
+    const reusable = new Map(this.aquariumResidents.map((resident) => [resident.cacheKey, resident.model]));
     this.aquariumResidents = [];
     this.aquariumResidentSignature = signature;
 
     for (const [index, entry] of visible.entries()) {
-      const { specimen, tankIndex, slotIndex } = entry;
+      const { specimen, tankIndex, slotIndex, ownerId } = entry;
       const cell = this.aquariumTankCells[tankIndex];
       if (!cell?.root?.enabled) continue;
       const unit = stableUnit(`aquarium:${specimen.specimenId}`);
-      const model = createSpecimenModel(specimen, {
+      const cacheKey = `${ownerId}:${specimen.specimenId}:${specimen.speciesId}:${specimen.length}:${specimen.weight}:${specimen.shiny ? 1 : 0}`;
+      const model = reusable.get(cacheKey) ?? createSpecimenModel(specimen, {
         name: `Tank ${tankIndex + 1} resident ${specimen.name} ${slotIndex + 1}`,
-        maximumScale: 4.25
+        maximumScale: 4.25,
+        app: this.app
       });
+      reusable.delete(cacheKey);
       // Ownership is structural: a resident is a child of exactly one tank module. Moving
       // or hiding that module therefore cannot strand the creature in world/midair space.
       cell.root.addChild(model.root);
@@ -2846,6 +2851,7 @@ export class MountainWorld extends TestWorld {
         ? motionBounds.minY + .18
         : lerp(motionBounds.minY, motionBounds.maxY, heightLane);
       const resident = {
+        cacheKey,
         model,
         tankIndex,
         tankRoot: cell.root,
@@ -2864,6 +2870,7 @@ export class MountainWorld extends TestWorld {
       model.root.setLocalPosition(0, centerY, centerZ);
       this.aquariumResidents.push(resident);
     }
+    for (const model of reusable.values()) destroySpecimenModel(model);
     return this.aquariumResidents.length;
   }
 

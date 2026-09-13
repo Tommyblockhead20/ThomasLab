@@ -10,7 +10,7 @@ import { REMOTE_PLAYER_COLORS } from './player-colors.js';
 function replaceSpecimen(parent, current, specimen, mode, name) {
   destroySpecimenModel(current);
   if (!specimen?.speciesId) return null;
-  const model = createSpecimenModel(specimen, { name });
+  const model = createSpecimenModel(specimen, { name, app: parent._app });
   parent.addChild(model.root);
   positionSpecimenModel(model, mode);
   return model;
@@ -32,8 +32,8 @@ function highestVisiblePoint(root, fallbackY) {
 
 export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppearance = null, initialDisplayName = 'Player') {
   const palette = REMOTE_PLAYER_COLORS[colorIndex % REMOTE_PLAYER_COLORS.length];
-  const root = new pc.Entity(`Remote ${palette.name} player ${playerId}`);
-  const rig = new pc.Entity('Remote complete character visual');
+  const root = new pc.Entity(`Remote ${palette.name} player ${playerId}`, app);
+  const rig = new pc.Entity('Remote complete character visual', app);
   rig.setLocalPosition(0, -.06, 0);
   rig.setLocalScale(1, .89, 1);
   root.addChild(rig);
@@ -50,10 +50,10 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
   fishingRod.setLocalPosition(.02, -.02, -.08);
   fishingRod.setLocalEulerAngles(-32, 0, 8);
   fishingRod.enabled = false;
-  const heldRoot = new pc.Entity('Remote durable Hand slot');
+  const heldRoot = new pc.Entity('Remote durable Hand slot', app);
   character.rightHandAnchor.addChild(heldRoot);
   heldRoot.enabled = false;
-  const catchRoot = new pc.Entity('Remote catch presentation');
+  const catchRoot = new pc.Entity('Remote catch presentation', app);
   catchRoot.setLocalPosition(0, .24, -1.05);
   rig.addChild(catchRoot);
   catchRoot.enabled = false;

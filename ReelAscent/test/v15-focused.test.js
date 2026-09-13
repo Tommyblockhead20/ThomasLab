@@ -107,7 +107,7 @@ test('Hearthward pond is common-only and Frosthook has continuous dedicated cold
 
 test('v15 targeted world, creature, multiplayer, and shark contracts are wired', async () => {
   assert.ok(MID_MOUNTAIN_SPIRAL_CONFIG.priority660To700StepHeight < MID_MOUNTAIN_SPIRAL_CONFIG.generalStepHeight / 1.5);
-  assert.equal(SHARK_HAZARD_CONFIG.safeDistance, 15);
+  assert.equal(SHARK_HAZARD_CONFIG.safeDistance, 22.86);
   const [model, game, clientProtocol, serverProtocol, serverConnection, aquariumUi] = await Promise.all([
     readFile(new URL('src/fishing/specimen-model.js', here), 'utf8'),
     readFile(new URL('src/game.js', here), 'utf8'),
