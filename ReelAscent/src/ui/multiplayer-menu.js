@@ -41,6 +41,7 @@ export class MultiplayerMenu {
       this.codeInput.placeholder = '0000';
       this.codeInput.setAttribute('aria-label', '4-digit room code');
     }
+    if (this.nameInput) this.nameInput.value = this.client.displayName;
     this.status = document.querySelector('#multiplayer-status');
     this.details = document.querySelector('#multiplayer-details');
     this.roster = document.querySelector('#multiplayer-roster');
@@ -97,6 +98,7 @@ export class MultiplayerMenu {
     this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.exitPointerLock?.();
     this.isOpen = true;
+    if (this.nameInput && this.client.displayName) this.nameInput.value = this.client.displayName;
     this.screen.hidden = false;
     document.body.classList.add('multiplayer-open');
     this.render();

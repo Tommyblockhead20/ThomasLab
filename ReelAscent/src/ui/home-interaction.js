@@ -19,6 +19,8 @@ export class HomeInteractionController {
     this.button = document.querySelector('#home-interaction-action');
     this.current = null;
     this.pendingSeat = null;
+    this.pendingSeatRequest = null;
+    this.multiplayer = null;
     this.promptAllowed = true;
 
     this.onKeyDown = (event) => {
@@ -42,6 +44,58 @@ export class HomeInteractionController {
 
   modalOpen() {
     return MODAL_CLASSES.some((name) => document.body.classList.contains(name));
+  }
+
+  setMultiplayer(client) {
+    this.multiplayer = client;
+    this.onBenchRoomState = () => {
+      const seat = this.player.benchSeat;
+      if (!seat || !this.isSharedSeat(this.world.homeInteractions?.find((entry) => entry.id === seat.id))) return;
+      const occupants = client.room.benchSeats.get(seat.id) ?? [];
+      if (client.state === 'in_room' && !occupants.includes(client.playerId)) this.player.clearBenchSeat();
+      else if (occupants.includes(client.playerId)) this.player.setBenchSeatOccupancy(occupants, client.playerId);
+    };
+    this.onBenchConnectionState = () => {
+      if (client.state === 'reconnecting' && this.player.benchSeat) this.player.clearBenchSeat();
+    };
+    client.addEventListener('roomstate', this.onBenchRoomState);
+    client.addEventListener('statechange', this.onBenchConnectionState);
+  }
+
+  isSharedSeat(interaction) {
+    return interaction?.action === 'bench' || /bench|fishing log/i.test(interaction?.seatKind ?? '');
+  }
+
+  enterSeat(interaction, rest = false) {
+    if (this.pendingSeatRequest) return true;
+    const shared = this.isSharedSeat(interaction) && this.multiplayer?.state === 'in_room';
+    const enter = () => {
+      if (this.modalOpen() || this.player.benchSeat) return false;
+      const position = this.player.getPosition();
+      if (Math.hypot(position.x - interaction.position.x,
+        position.y - (interaction.position.y + .9), position.z - interaction.position.z) > (interaction.range ?? 3) + 1) return false;
+      this.player.cancelEmote();
+      if (rest) this.player.stamina.reset();
+      this.player.setBenchSeat(interaction);
+      if (shared) this.player.setBenchSeatOccupancy(this.multiplayer.room.benchSeats.get(interaction.id) ?? [this.multiplayer.playerId], this.multiplayer.playerId);
+      this.camera?.setYaw?.(interaction.facingYaw);
+      this.pendingSeat = { expiresAt: performance.now() + 1800 };
+      this.hud.showToast?.(rest
+        ? `Rested on the ${interaction.seatKind ?? 'seat'} • stamina restored • use X or the prompt to stand.`
+        : `Seated facing ${interaction.fishingLabel ?? 'the water'} • press F to fish • click the prompt to get up.`);
+      return true;
+    };
+    if (!shared) return enter();
+    this.pendingSeatRequest = interaction.id;
+    this.multiplayer.requestBenchSeat(interaction.id, this.world.activeLocationId).then((granted) => {
+      this.pendingSeatRequest = null;
+      if (!granted || this.multiplayer.state !== 'in_room') {
+        this.hud.showToast?.('Seat unavailable • this bench may already have two players.');
+        return;
+      }
+      if (!enter()) this.multiplayer.releaseBenchSeat();
+    });
+    return true;
   }
 
   refreshCurrent() {
@@ -181,13 +235,7 @@ export class HomeInteractionController {
         this.hud.showToast?.('Stand beside the bed or chair to rest.');
         return false;
       }
-      this.player.cancelEmote();
-      this.player.stamina.reset();
-      this.player.setBenchSeat(interaction);
-      this.camera?.setYaw?.(interaction.facingYaw);
-      this.pendingSeat = { expiresAt: performance.now() + 1800 };
-      this.hud.showToast?.(`Rested on the ${interaction.seatKind ?? 'seat'} • stamina restored • use X or the prompt to stand.`);
-      return true;
+      return this.enterSeat(interaction, true);
     }
     if (interaction.action === 'trophies') {
       this.player.cancelEmote();
@@ -200,14 +248,7 @@ export class HomeInteractionController {
         this.hud.showToast?.('Stand beside the seat to sit.');
         return false;
       }
-      this.player.cancelEmote();
-      this.player.setBenchSeat(interaction);
-      this.camera?.setYaw?.(interaction.facingYaw);
-      this.pendingSeat = { expiresAt: performance.now() + 1800 };
-      const destination = interaction.fishingLabel
-        ?? (interaction.seatKind === 'boat fishing seat' ? 'open water' : 'Stoneveil Tarn');
-      this.hud.showToast?.(`Seated facing ${destination} • press F to fish • click the prompt to get up.`);
-      return true;
+      return this.enterSeat(interaction);
     }
     return false;
   }
@@ -218,6 +259,8 @@ export class HomeInteractionController {
   }
 
   destroy() {
+    this.multiplayer?.removeEventListener('roomstate', this.onBenchRoomState);
+    this.multiplayer?.removeEventListener('statechange', this.onBenchConnectionState);
     window.removeEventListener('keydown', this.onKeyDown, true);
     this.button?.removeEventListener('click', this.onClick);
     if (this.prompt) this.prompt.hidden = true;

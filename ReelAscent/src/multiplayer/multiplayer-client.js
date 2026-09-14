@@ -20,6 +20,7 @@ export const normalizeDisplayName = (value) => String(value ?? '').replace(/\s+/
 export class MultiplayerClient extends EventTarget {
   constructor(playerId, {
     endpoint = MULTIPLAYER_ENDPOINT,
+    displayName = '',
     transport = null,
     createRemoteRepresentation = () => null,
     onAuthoritativeRunSeed = () => {}
@@ -40,8 +41,9 @@ export class MultiplayerClient extends EventTarget {
     this.reconnectTimer = null;
     this.destroyed = false;
     this.pendingRoomRequest = null;
-    this.displayName = '';
+    this.displayName = normalizeDisplayName(displayName);
     this.pendingVoteRequests = new Map();
+    this.pendingBenchRequests = new Map();
     this.voteOutbox = new SongVoteOutbox(playerId);
     this.voteFlush = null;
     this.voteRetryTimer = null;
@@ -56,6 +58,16 @@ export class MultiplayerClient extends EventTarget {
     this.state = state;
     this.error = error;
     this.dispatchEvent(new CustomEvent('statechange', { detail: this.getState() }));
+  }
+
+  setDisplayName(value) {
+    const name = normalizeDisplayName(value);
+    if (!name) return false;
+    this.displayName = name;
+    if (this.state === 'in_room') {
+      this.transport.send(createProtocolMessage(MESSAGE_TYPES.PLAYER_NAME_SET, { displayName: name }));
+    }
+    return true;
   }
 
   sendHello() {
@@ -133,6 +145,7 @@ export class MultiplayerClient extends EventTarget {
   }
 
   leave() {
+    this.releaseBenchSeat();
     this.cancelReconnect();
     if (this.room.roomCode && this.transport.isOpen) {
       this.transport.send(createProtocolMessage(MESSAGE_TYPES.LEAVE_ROOM, { roomCode: this.room.roomCode }));
@@ -141,6 +154,31 @@ export class MultiplayerClient extends EventTarget {
     this.reconnectToken = '';
     this.room.clear();
     this.setState(this.transport.isOpen ? 'connected' : 'disconnected');
+  }
+
+  requestBenchSeat(benchId, locationId) {
+    if (this.state !== 'in_room') return Promise.resolve(true);
+    const requestId = `seat-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
+    return new Promise((resolve) => {
+      const timer = globalThis.setTimeout(() => {
+        this.pendingBenchRequests.delete(requestId);
+        this.releaseBenchSeat();
+        resolve(false);
+      }, 4000);
+      this.pendingBenchRequests.set(requestId, { resolve, timer });
+      if (!this.transport.send(createProtocolMessage(MESSAGE_TYPES.BENCH_SEAT_REQUEST, {
+        requestId, benchId, locationId
+      }))) {
+        globalThis.clearTimeout(timer);
+        this.pendingBenchRequests.delete(requestId);
+        resolve(false);
+      }
+    });
+  }
+
+  releaseBenchSeat() {
+    if (this.state !== 'in_room') return false;
+    return this.transport.send(createProtocolMessage(MESSAGE_TYPES.BENCH_SEAT_RELEASE));
   }
 
   sendFishingState(state = {}) {
@@ -205,7 +243,8 @@ export class MultiplayerClient extends EventTarget {
       songId: String(feedback?.songId ?? '').slice(0, 180),
       songRevision: Math.max(1, Math.floor(Number(feedback?.songRevision) || 1)),
       vote: vote === 'up' || vote === 'down' ? vote : null,
-      reason: vote === 'down' ? String(reason ?? '').slice(0, 32) : null
+      reason: vote === 'down' ? String(reason ?? '').slice(0, 32) : null,
+      playerName: this.displayName || null
     };
     const key = this.voteOutbox.enqueue(payload);
     if (!key) return Promise.reject(new Error('Invalid song feedback vote.'));
@@ -277,6 +316,7 @@ export class MultiplayerClient extends EventTarget {
       this.reconnectAttempt = 0;
       this.cancelReconnect();
       this.setState('in_room');
+      if (this.displayName) this.dispatchEvent(new CustomEvent('nameestablished', { detail: this.displayName }));
       if (this.voteOutbox.size) this.scheduleVoteRetry(0);
       if (this.room.runSeed !== null && this.room.runSeed !== previousSeed) {
         this.onAuthoritativeRunSeed(this.room.runSeed, message.payload);
@@ -284,6 +324,13 @@ export class MultiplayerClient extends EventTarget {
       this.dispatchEvent(new CustomEvent('roomstate', { detail: message.payload }));
     } else if (message.type === MESSAGE_TYPES.PLAYER_SNAPSHOT) {
       this.room.consumeSnapshot(message.payload);
+    } else if (message.type === MESSAGE_TYPES.BENCH_SEAT_RESULT) {
+      const pending = this.pendingBenchRequests.get(message.payload.requestId);
+      if (pending) {
+        globalThis.clearTimeout(pending.timer);
+        this.pendingBenchRequests.delete(message.payload.requestId);
+        pending.resolve(Boolean(message.payload.granted));
+      }
     } else if (message.type === MESSAGE_TYPES.FISHING_STATE) {
       this.room.consumeFishingState(message.payload);
     } else if (message.type === MESSAGE_TYPES.CATCH_EVENT) {
@@ -326,6 +373,11 @@ export class MultiplayerClient extends EventTarget {
 
   handleClose() {
     if (this.destroyed) return;
+    for (const [requestId, pending] of this.pendingBenchRequests) {
+      globalThis.clearTimeout(pending.timer);
+      pending.resolve(false);
+      this.pendingBenchRequests.delete(requestId);
+    }
     for (const [requestId] of this.pendingVoteRequests) {
       this.settleVoteRequest(requestId, null, new Error('Song feedback connection closed.'));
     }

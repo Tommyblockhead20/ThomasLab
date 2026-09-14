@@ -59,6 +59,15 @@ export class ClientConnection {
       case MESSAGE_TYPES.LEAVE_ROOM:
         this.handleLeave();
         break;
+      case MESSAGE_TYPES.PLAYER_NAME_SET:
+        this.handlePlayerNameSet(message.payload);
+        break;
+      case MESSAGE_TYPES.BENCH_SEAT_REQUEST:
+        this.handleBenchSeatRequest(message.payload);
+        break;
+      case MESSAGE_TYPES.BENCH_SEAT_RELEASE:
+        this.handleBenchSeatRelease();
+        break;
       case MESSAGE_TYPES.PLAYER_SNAPSHOT:
         this.handleSnapshot(message.payload);
         break;
@@ -132,6 +141,33 @@ export class ClientConnection {
     if (!result.ok) sendError(this.socket, result.code, result.message);
   }
 
+  handlePlayerNameSet(payload = {}) {
+    if (!this.session.room || !this.rateLimit('player_name', 6, 10_000)) return;
+    const name = safeDisplayName(payload.displayName);
+    if (!name) return;
+    this.session.displayName = name;
+    this.session.room.broadcastState();
+  }
+
+  handleBenchSeatRequest(payload = {}) {
+    if (!this.session.room || !this.rateLimit('bench_seat', 12, 10_000)) return;
+    const benchId = safeString(payload.benchId, 100);
+    const locationId = safeString(payload.locationId, 80);
+    if (!/^[a-z0-9][a-z0-9-]{2,99}$/.test(benchId)) return;
+    const granted = this.session.room.claimBench(this.session.playerId, benchId);
+    if (granted) this.session.seatLocationId = locationId;
+    send(this.socket, MESSAGE_TYPES.BENCH_SEAT_RESULT, {
+      requestId: safeString(payload.requestId, 80), benchId, granted,
+      reason: granted ? '' : 'This bench already has two players.'
+    });
+  }
+
+  handleBenchSeatRelease() {
+    if (!this.session.room) return;
+    this.session.seatLocationId = '';
+    if (this.session.room.releaseBench(this.session.playerId)) this.session.room.broadcastState();
+  }
+
   handleSnapshot(payload) {
     if (!this.session.room) {
       sendError(this.socket, 'invalid_state_transition', 'Join a room before sending player snapshots.');
@@ -141,6 +177,9 @@ export class ClientConnection {
     const validated = validateSnapshot(payload, this.session);
     if (!validated.ok) return;
     const snapshot = validated.snapshot;
+    if (this.session.seatLocationId && snapshot.locationId !== this.session.seatLocationId) {
+      this.handleBenchSeatRelease();
+    }
     this.session.lastSequence = snapshot.sequence;
     this.session.lastSnapshot = snapshot;
     this.session.room.broadcast(MESSAGE_TYPES.PLAYER_SNAPSHOT, snapshot, this.session.playerId);
@@ -220,7 +259,8 @@ export class ClientConnection {
         songId: payload.songId,
         songRevision: payload.songRevision,
         vote: payload.vote ?? null,
-        reason: payload.reason ?? null
+        reason: payload.reason ?? null,
+        playerName: safeDisplayName(payload.playerName) || null
       });
       send(this.socket, MESSAGE_TYPES.SONG_VOTE_AGGREGATE, {
         requestId,

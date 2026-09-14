@@ -18,6 +18,7 @@ export class RoomState {
     this.localLocationId = 'main-mountain';
     this.members = new Map();
     this.roster = new Map();
+    this.benchSeats = new Map();
     this.colorAssignments = new Map([[localPlayerId, REMOTE_PLAYER_COLORS.findIndex((color) => color.name === 'ORANGE')]]);
   }
 
@@ -37,6 +38,9 @@ export class RoomState {
   applyRoomState(payload = {}, createRepresentation = () => null) {
     this.roomCode = typeof payload.roomCode === 'string' ? payload.roomCode : this.roomCode;
     this.runSeed = payload.runSeed ?? this.runSeed;
+    this.benchSeats = new Map((Array.isArray(payload.benchSeats) ? payload.benchSeats : [])
+      .filter((entry) => typeof entry?.benchId === 'string' && Array.isArray(entry.playerIds))
+      .map((entry) => [entry.benchId, entry.playerIds.slice(0, 2)]));
     const players = Array.isArray(payload.players) ? payload.players : [];
     this.roster = new Map(players.filter((player) => player?.id).map((player) => {
       const colorIndex = this.assignColor(player.id);
@@ -130,6 +134,7 @@ export class RoomState {
     for (const player of this.members.values()) player.destroy();
     this.members.clear();
     this.roster.clear();
+    this.benchSeats.clear();
     if (!preserveRoomIdentity) {
       this.colorAssignments.clear();
       this.colorAssignments.set(

@@ -720,7 +720,7 @@ export class Hud {
     if (!this.rockDebugLabel) return;
     this.rockDebugLabel.hidden = !enabled;
     this.rockDebugLabel.textContent = enabled
-      ? (rock ? `ROCK: ${rock.id}  •  L COPY / LOG` : 'ROCK IDS ON  •  approach a climbing rock')
+      ? (rock ? `MAP: ${rock.id}  •  L COPY / LOG` : 'MAP IDS ON  •  approach an authored object')
       : '';
   }
 

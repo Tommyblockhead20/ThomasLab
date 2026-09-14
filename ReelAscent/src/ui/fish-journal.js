@@ -1,4 +1,5 @@
 import { isBoundActionCode } from '../player/movement.js';
+import { specimenPreview } from './inventory.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -189,19 +190,15 @@ export class FishJournal {
       }
       const baselineBpm = Math.round((fish.rhythm.bpm[0] + fish.rhythm.bpm[1]) / 2 + 20);
       return `<article class="journal-card" data-species-id="${escapeHtml(speciesId)}" data-rarity="${escapeHtml(fish.rarity.toLowerCase())}" tabindex="0" role="button" aria-expanded="false" aria-label="View ${escapeHtml(fish.name)} details">
-        <div class="journal-card-heading">
-          <span>${escapeHtml(entry.rarity || fish.rarityLabel || fish.rarity)}</span>
-          <b>${entry.catches} caught</b>
-        </div>
-        <strong>${escapeHtml(fish.name)}</strong>
+        <div class="journal-card-hero">${specimenPreview({ speciesId, name: fish.name, shiny: false })}<div><div class="journal-card-heading"><span>${escapeHtml(entry.rarity || fish.rarityLabel || fish.rarity)}</span><b>${entry.catches} caught</b></div><strong>${escapeHtml(fish.name)}</strong></div></div>
         <dl>
-          <div><dt>BEST LENGTH</dt><dd>${measurement(entry.bestLength, 1, 'in')} · ${escapeHtml(entry.bestLengthCategory || '—')}</dd></div>
-          <div><dt>BEST WEIGHT</dt><dd>${measurement(entry.bestWeight, 2, 'lb')} · ${escapeHtml(entry.bestSizeCategory || '—')}</dd></div>
+          <div><dt>BEST LENGTH</dt><dd>${measurement(entry.bestLength, 1, 'in')}</dd><small>${escapeHtml(entry.bestLengthCategory || '—')}</small></div>
+          <div><dt>BEST WEIGHT</dt><dd>${measurement(entry.bestWeight, 2, 'lb')}</dd><small>${escapeHtml(entry.bestSizeCategory || '—')}</small></div>
           <div><dt>BEST QUALITY</dt><dd>${escapeHtml(entry.bestQuality || '—')}</dd></div>
           <div><dt>SHINIES</dt><dd>${entry.shinyCount}</dd></div>
           <div><dt>BASE TEMPO</dt><dd>${baselineBpm} BPM</dd></div>
         </dl>
-        <small>${entry.firstLocation ? `First found at ${escapeHtml(entry.firstLocation)}` : 'Location not recorded'}</small>
+        <small class="journal-first-found">${entry.firstLocation ? `First found: ${escapeHtml(entry.firstLocation)}` : 'First location not recorded'}</small>
         <p class="journal-species-detail" hidden>${escapeHtml(fish.flavor)}</p>
       </article>`;
     }).join('');

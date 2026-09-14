@@ -61,7 +61,7 @@ export class AppearancePreview {
       this.character.setAppearance(this.appearance);
       this.app.on('update', () => {
         if (!this.avatar?.enabled) return;
-        if (this.spinning) this.avatar.rotateLocal(0, 7 / 60 * this.rotationSpeed, 0);
+        if (this.spinning) this.avatar.rotateLocal(0, 14 / 60 * this.rotationSpeed, 0);
       });
       this.app.start();
       globalThis.addEventListener?.('resize', this.onWindowResize);

@@ -1,10 +1,12 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
 import { canonicalSpeciesId } from '../fishing/fish-data.js';
+import { isBetterCatch } from './best-catch.js';
 
-export const SAVE_SCHEMA_VERSION = 13;
+export const SAVE_SCHEMA_VERSION = 14;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
+export const PLAYER_PROFILE_STORAGE_KEY = 'reel-ascent-player-profile-v1';
 export const SAVE_SLOT_SCHEMA_VERSION = 1;
 export const SAVE_SLOT_COUNT = 4;
 
@@ -22,6 +24,7 @@ export function defaultSave() {
   return {
     version: SAVE_SCHEMA_VERSION,
     saveId: createSaveId(),
+    slotName: '',
     tutorials: { fishing: false, climbing: false, dock: false },
     collection: {},
     lifetime: {
@@ -108,6 +111,7 @@ export function normalizeSave(value = {}) {
   normalized.saveId = typeof value.saveId === 'string' && value.saveId.trim()
     ? value.saveId.slice(0, 180)
     : normalized.saveId;
+  normalized.slotName = typeof value.slotName === 'string' ? value.slotName.replace(/\s+/g, ' ').trim().slice(0, 24) : '';
   normalized.tutorials = {
     fishing: Boolean(value.tutorials?.fishing),
     climbing: Boolean(value.tutorials?.climbing),
@@ -136,7 +140,11 @@ export function normalizeSave(value = {}) {
     rarity: normalizeRarity(bestCatch.rarity),
     shiny: Boolean(bestCatch.shiny),
     weight: Math.max(0, finiteNumber(bestCatch.weight)),
-    length: Math.max(0, finiteNumber(bestCatch.length))
+    length: Math.max(0, finiteNumber(bestCatch.length)),
+    sizeFraction: bestCatch.sizeFraction != null && Number.isFinite(Number(bestCatch.sizeFraction)) ? Number(bestCatch.sizeFraction) : null,
+    weightFraction: bestCatch.weightFraction != null && Number.isFinite(Number(bestCatch.weightFraction)) ? Number(bestCatch.weightFraction) : null,
+    value: Math.max(0, finiteNumber(bestCatch.value)),
+    caughtAt: Math.max(0, finiteNumber(bestCatch.caughtAt))
   } : null;
   normalized.lifetime.fishingWatersCaught = [...new Set((Array.isArray(lifetime.fishingWatersCaught) ? lifetime.fishingWatersCaught : [])
     .filter((id) => typeof id === 'string' && id).map((id) => id.slice(0, 160)))];
@@ -244,7 +252,8 @@ const MIGRATIONS = Object.freeze({
     version: 13,
     worldMilestones: Array.isArray(value.worldMilestones) ? value.worldMilestones : [],
     progression: normalizeProgressionState(value.progression)
-  })
+  }),
+  13: (value) => ({ ...value, version: 14, slotName: value.slotName ?? '' })
 });
 
 export function migrate(value) {
@@ -321,7 +330,7 @@ function summarizeSlot(slot, activeSlotId) {
   const save = slot.data ? migrate(slot.data) : null;
   return {
     id: slot.id,
-    label: slot.label,
+    label: save?.slotName || slot.label,
     empty: !save,
     active: slot.id === activeSlotId,
     createdAt: slot.createdAt,
@@ -345,6 +354,27 @@ export class SaveSystem {
     this.activeSlotId = this.slotStore.activeSlotId;
     this.data = migrate(this.slotStore.slots.find((slot) => slot.id === this.activeSlotId)?.data ?? defaultSave());
     this.multiplayerPlayerId = this.loadMultiplayerPlayerId();
+    this.playerDisplayName = this.loadPlayerDisplayName();
+  }
+
+  loadPlayerDisplayName() {
+    try {
+      const profile = JSON.parse(this.storage?.getItem(PLAYER_PROFILE_STORAGE_KEY) || '{}');
+      return profile.playerId === this.multiplayerPlayerId
+        ? String(profile.displayName ?? '').replace(/\s+/g, ' ').trim().slice(0, 18) : '';
+    } catch { return ''; }
+  }
+
+  setPlayerDisplayName(value) {
+    const name = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 18);
+    if (!name) return false;
+    this.playerDisplayName = name;
+    try {
+      this.storage?.setItem(PLAYER_PROFILE_STORAGE_KEY, JSON.stringify({
+        playerId: this.multiplayerPlayerId, displayName: name
+      }));
+    } catch { /* A blocked browser profile must not prevent multiplayer. */ }
+    return true;
   }
 
   loadMultiplayerPlayerId() {
@@ -464,10 +494,12 @@ export class SaveSystem {
     if (typeof biomeId === 'string' && biomeId && !this.data.trailBadges.biomesFished.includes(biomeId)) this.data.trailBadges.biomesFished.push(biomeId.slice(0, 160));
     const candidate = {
       speciesId, name: catchData.name ?? speciesId, rarity, shiny: Boolean(catchData.shiny),
-      weight: Math.max(0, finiteNumber(catchData.weight)), length: Math.max(0, finiteNumber(catchData.length))
+      weight: Math.max(0, finiteNumber(catchData.weight)), length: Math.max(0, finiteNumber(catchData.length)),
+      sizeFraction: catchData.sizeFraction != null && Number.isFinite(Number(catchData.sizeFraction)) ? Number(catchData.sizeFraction) : null,
+      weightFraction: catchData.weightFraction != null && Number.isFinite(Number(catchData.weightFraction)) ? Number(catchData.weightFraction) : null,
+      value: Math.max(0, finiteNumber(catchData.value)), caughtAt: now
     };
-    if (!lifetime.bestCatch || candidate.weight > lifetime.bestCatch.weight
-      || (candidate.weight === lifetime.bestCatch.weight && candidate.length > lifetime.bestCatch.length)) lifetime.bestCatch = candidate;
+    if (isBetterCatch(candidate, lifetime.bestCatch)) lifetime.bestCatch = candidate;
     return this.save();
   }
 
@@ -593,7 +625,28 @@ export class SaveSystem {
   }
 
   getSlotSummaries() {
-    return this.slotStore.slots.map((slot) => summarizeSlot(slot, this.activeSlotId));
+    return this.slotStore.slots.map((slot) => summarizeSlot(
+      slot.id === this.activeSlotId ? { ...slot, data: this.data } : slot, this.activeSlotId
+    ));
+  }
+
+  renameSlot(id, value) {
+    const slot = this.slotStore.slots.find((entry) => entry.id === id && entry.data);
+    if (!slot) return false;
+    const name = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    const previous = slot.data.slotName ?? '';
+    slot.data.slotName = name;
+    if (id === this.activeSlotId) this.data.slotName = name;
+    try {
+      this.writeSlotStore();
+      this.revision += 1;
+      return true;
+    } catch {
+      slot.data.slotName = previous;
+      if (id === this.activeSlotId) this.data.slotName = previous;
+      this.lastLoadError = 'write-unavailable';
+      return false;
+    }
   }
 
   getSlotSnapshot(id) {

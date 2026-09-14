@@ -27,6 +27,7 @@ import { MountainMapMenu } from './ui/mountain-map.js';
 import { EmoteMenu } from './ui/emote-menu.js';
 import { AppearanceMenu } from './ui/appearance-menu.js';
 import { HomeInteractionController } from './ui/home-interaction.js';
+import { isBetterCatch } from './persistence/best-catch.js';
 import { cheatGate, isCheatsEnabled } from './debug/cheat-gate.js';
 import { ShopMenu } from './ui/shop.js';
 import { AquariumMenu } from './ui/aquarium.js';
@@ -86,6 +87,7 @@ export class Game {
     this.mainWorldLocationId = mainWorldLocation?.id ?? this.currentLocationId;
     this.world.setActiveLocation?.(this.currentLocationId);
     this.localPause = { active: false, openedAt: null, totalPausedSeconds: 0 };
+    this.benchPopulationRefresh = 0;
     this.boatSoftlockRecovery = { timer: 0, lastPosition: null };
     this.sessionStats = {
       activePlaytimeSeconds: 0,
@@ -182,11 +184,16 @@ export class Game {
     this.remoteCatchNotices = new Map();
     this.multiplayerCatchFeed = document.querySelector('#multiplayer-catch-feed');
     this.multiplayer = new MultiplayerClient(this.saveSystem.multiplayerPlayerId, {
+      displayName: this.saveSystem.playerDisplayName,
       createRemoteRepresentation: (playerId, colorIndex, appearance, displayName) => (
         this.createRemotePlayerRepresentation(playerId, colorIndex, appearance, displayName)
       ),
       onAuthoritativeRunSeed: (runSeed, roomState) => this.applyAuthoritativeRunSeed(runSeed, roomState)
     });
+    this.homeInteraction.setMultiplayer(this.multiplayer);
+    this.player.onSeatCleared = () => this.multiplayer.releaseBenchSeat();
+    this.onNameEstablished = (event) => this.saveSystem.setPlayerDisplayName(event.detail);
+    this.multiplayer.addEventListener('nameestablished', this.onNameEstablished);
     this.multiplayer.room.setLocalLocationId?.(this.currentLocationId);
     this.onMultiplayerMessage = (event) => this.handleMultiplayerMessage(event.detail);
     this.multiplayer.addEventListener('message', this.onMultiplayerMessage);
@@ -222,6 +229,12 @@ export class Game {
     this.lastRunStatus = this.runManager.status;
     this.camera.update(1 / 60, true);
     this.pauseMenu = new PauseMenu(this.progression, {
+      getPlayerName: () => this.saveSystem.playerDisplayName,
+      onPlayerNameChange: (name) => {
+        if (!this.saveSystem.setPlayerDisplayName(name)) return false;
+        this.multiplayer.setDisplayName(this.saveSystem.playerDisplayName);
+        return true;
+      },
       getStats: () => this.getLifetimeStats(),
       onBeforeSaveSwitch: () => this.flushActivePlaytime(),
       onResume: () => this.setLocalPause(false),
@@ -236,6 +249,9 @@ export class Game {
     });
 
     this.onResize = () => this.app.resizeCanvas();
+    this.onVisibilityChange = () => {
+      if (document.hidden && this.multiplayer.state !== 'in_room' && !this.multiplayer.room.roomCode) this.setLocalPause(true);
+    };
     this.onPauseKeyDown = (event) => {
       if (event.code !== 'Escape' || event.repeat || this.isEditableTarget(event.target)) return;
 
@@ -311,14 +327,14 @@ export class Game {
       if (event.code === 'F5') {
         event.preventDefault();
         this.rockDebugEnabled = !this.rockDebugEnabled;
-        this.hud.showToast?.(`Rock IDs ${this.rockDebugEnabled ? 'ON • L copies/logs nearest ID' : 'OFF'} (F5)`, 2.5);
+        this.hud.showToast?.(`Map IDs ${this.rockDebugEnabled ? 'ON • L copies/logs nearest ID' : 'OFF'} (F5)`, 2.5);
         return;
       }
       if (event.code === 'KeyL' && this.rockDebugEnabled && this.rockDebugTarget?.id) {
         event.preventDefault();
-        console.info(`[Reel Ascent rock] ${this.rockDebugTarget.id} • ${this.rockDebugTarget.name}`);
+        console.info(`[Reel Ascent map] ${this.rockDebugTarget.id} • ${this.rockDebugTarget.name}`);
         navigator.clipboard?.writeText?.(this.rockDebugTarget.id).catch?.(() => {});
-        this.hud.showToast?.(`ROCK ${this.rockDebugTarget.id} • copied / logged`, 3);
+        this.hud.showToast?.(`${this.rockDebugTarget.id} • copied / logged`, 3);
         return;
       }
       if (event.code === 'F9') {
@@ -330,6 +346,7 @@ export class Game {
       }
     };
     window.addEventListener('resize', this.onResize);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
     window.addEventListener('keydown', this.onPauseKeyDown, true);
     window.addEventListener('keydown', this.onPausedGameplayKeyDown, true);
     window.addEventListener('keydown', this.onFishingResultKeyDown, true);
@@ -440,10 +457,19 @@ export class Game {
     // Keep networking/UI alive for this client, but do not advance the local world clock.
     if (!localGameplayPaused) this.world.update(dt);
     const multiplayerPlayerState = this.player.getState();
+    this.benchPopulationRefresh -= dt;
+    if (this.benchPopulationRefresh <= 0) {
+      this.benchPopulationRefresh = .4;
+      const inRoom = this.multiplayer.state === 'in_room';
+      const roster = inRoom ? [...this.multiplayer.room.roster.values()].filter((entry) => entry.connected !== false) : [];
+      const occupiedIds = inRoom ? [...this.multiplayer.room.benchSeats.keys()] : [];
+      const positions = [multiplayerPlayerState.position, ...roster.map((entry) => entry.globalPosition).filter(Boolean)];
+      this.world.setBenchPopulation?.(inRoom ? Math.max(1, roster.length) : 1, occupiedIds, positions);
+    }
     this.rockDebugTarget = this.rockDebugEnabled
       ? (multiplayerPlayerState.climbRockId
           ? { id: multiplayerPlayerState.climbRockId, name: multiplayerPlayerState.climbSurfaceLabel ?? 'gripped rock', distance: 0 }
-          : this.world.getNearestRockDebug?.(multiplayerPlayerState.position, 11))
+          : this.world.getNearestMapDebug?.(multiplayerPlayerState.position, 12))
       : null;
     this.hud.setRockDebugLabel?.(this.rockDebugTarget, this.rockDebugEnabled);
     this.contextualAction = this.resolveContextualAction(multiplayerPlayerState);
@@ -700,12 +726,19 @@ export class Game {
     const weight = Number(catchData?.weight) || 0;
     const length = Number(catchData?.length) || 0;
     const currentBest = this.sessionStats.bestCatch;
-    if (!currentBest || weight > currentBest.weight || (weight === currentBest.weight && length > currentBest.length)) {
+    const candidate = {
+      speciesId: catchData?.speciesId ?? null,
+      name: catchData?.name ?? null,
+      rarity, shiny: Boolean(catchData?.shiny),
+      weight, length,
+      sizeFraction: catchData?.sizeFraction ?? null,
+      weightFraction: catchData?.weightFraction ?? null,
+      value: catchData?.value ?? 0,
+      caughtAt: catchData?.caughtAt ?? Date.now()
+    };
+    if (isBetterCatch(candidate, currentBest)) {
       this.sessionStats.bestCatch = {
-        speciesId: catchData?.speciesId ?? null,
-        name: catchData?.name ?? null,
-        rarity, shiny: Boolean(catchData?.shiny),
-        weight, length
+        ...candidate
       };
     }
   }
@@ -1030,6 +1063,7 @@ export class Game {
     this.emoteMenu.destroy();
     this.multiplayerMenu.destroy();
     this.multiplayer.removeEventListener('message', this.onMultiplayerMessage);
+    this.multiplayer.removeEventListener('nameestablished', this.onNameEstablished);
     this.multiplayer.removeEventListener('songvoteaggregate', this.onSongVoteAggregate);
     this.multiplayer.destroy();
     this.camera.destroy();
@@ -1038,6 +1072,7 @@ export class Game {
     this.journal.destroy();
     this.hud.destroy();
     window.removeEventListener('resize', this.onResize);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
     window.removeEventListener('keydown', this.onPauseKeyDown, true);
     window.removeEventListener('keydown', this.onPausedGameplayKeyDown, true);
     window.removeEventListener('keydown', this.onFishingResultKeyDown, true);

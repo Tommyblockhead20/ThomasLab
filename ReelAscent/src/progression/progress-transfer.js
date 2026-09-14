@@ -25,6 +25,7 @@ export function createProgressExport(saveSnapshot, saveMetadata = {}) {
     exportVersion: PROGRESS_EXPORT_VERSION,
     schemaVersion: SAVE_SCHEMA_VERSION,
     saveId: save.saveId,
+    slotName: save.slotName,
     exportedAt: new Date().toISOString(),
     saveMetadata: normalizeSaveMetadata(saveMetadata),
     progression: {
@@ -94,6 +95,7 @@ export function validateProgressImport(input) {
   const normalizedSave = normalizeSave({
     version: document.schemaVersion,
     saveId: document.saveId,
+    slotName: document.slotName,
     tutorials: portable.tutorials,
     collection: portable.collection,
     lifetime: portable.lifetime,

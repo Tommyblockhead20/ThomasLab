@@ -7,6 +7,7 @@ import {
 } from '../player/movement.js';
 import { getAudioSettings, setAudioSettings } from '../audio/settings.js';
 import { createProgressDownload, decodeProgressBackup } from '../persistence/progress-backup.js';
+import { scoreBestCatch } from '../persistence/best-catch.js';
 
 const SETTINGS_KEY = 'reel-ascent-ui-settings-v1';
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -22,10 +23,13 @@ const formatDuration = (seconds) => {
 export class PauseMenu {
   constructor(progression, {
     getStats = () => ({}), onResume = () => {}, onCabin = () => {},
+    getPlayerName = () => '', onPlayerNameChange = () => false,
     onMultiplayer = () => {}, onCloseMultiplayer = () => {}, onBeforeSaveSwitch = () => {}
   } = {}) {
     this.progression = progression;
     this.getStats = getStats;
+    this.getPlayerName = getPlayerName;
+    this.onPlayerNameChange = onPlayerNameChange;
     this.onResume = onResume;
     this.onCabin = onCabin;
     this.onMultiplayer = onMultiplayer;
@@ -138,7 +142,7 @@ export class PauseMenu {
       if (this.activeTab === 'multiplayer') this.activeTab = 'stats';
       this.previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       document.exitPointerLock?.();
-      this.status.textContent = 'Local gameplay paused. Multiplayer players continue normally.';
+      this.status.textContent = '';
       this.render();
       this.resumeButton?.focus({ preventScroll: true });
     } else {
@@ -150,6 +154,11 @@ export class PauseMenu {
   }
 
   handleClick(event) {
+    if (event.target.closest('[data-save-player-name]')) {
+      const name = this.content?.querySelector('#pause-player-name')?.value ?? '';
+      this.status.textContent = this.onPlayerNameChange(name) ? 'Player Name saved.' : 'Enter a player name.';
+      return;
+    }
     if (event.target.closest('[data-pause-action="cabin"]')) {
       this.onCabin();
       return;
@@ -251,16 +260,16 @@ export class PauseMenu {
       <article><small>ITEMS PURCHASED</small><strong>${stats.itemsPurchased ?? 0}/${stats.totalPurchasableItems ?? 0} • ${Math.round(stats.purchasePercent ?? 0)}%</strong></article>
     </div>
     <section class="pause-stat-detail"><h3>CATCHES BY RARITY</h3><p>Common ${rarity.Common ?? 0} • Uncommon ${rarity.Uncommon ?? 0} • Rare ${rarity.Rare ?? 0} • Legendary ${rarity.Legendary ?? 0}</p></section>
-    <section class="pause-stat-detail"><h3>BEST CATCH</h3><p>${best ? `${escapeHtml(best.name || best.speciesId)} • ${Number(best.length).toFixed(1)} in • ${Number(best.weight).toFixed(2)} lb${best.shiny ? ' • SHINY' : ''}` : 'No legitimate catch recorded yet.'}</p></section>`;
+    <section class="pause-stat-detail"><h3>BEST CATCH</h3><p>${best ? `${escapeHtml(best.name || best.speciesId)} • ${scoreBestCatch(best).score.toFixed(2)} points • ${Number(best.length).toFixed(1)} in • ${Number(best.weight).toFixed(2)} lb${best.shiny ? ' • SHINY' : ''}` : 'No legitimate catch recorded yet.'}</p></section>`;
   }
 
   renderSaveData() {
     const slotCards = this.progression.saveSystem.getSlotSummaries().map((slot) => {
       const date = slot.updatedAt ? new Date(slot.updatedAt).toLocaleString() : 'Unused';
-      if (slot.empty) return `<article class="save-slot-card"><header><strong>${slot.label}</strong><span>EMPTY</span></header><button data-pause-slot-action="create" data-slot-id="${slot.id}">CREATE SAVE</button></article>`;
-      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${slot.label}</strong><span>${slot.active ? 'ACTIVE SAVE' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} creatures</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>LIFETIME</dt><dd>${slot.fishCaught} catches • ${slot.summits} summits</dd></div></dl><div class="save-slot-actions"><button data-pause-slot-action="select" data-slot-id="${slot.id}" ${slot.active ? 'disabled' : ''}>PLAY THIS SAVE</button><button data-pause-slot-action="download" data-slot-id="${slot.id}">DOWNLOAD PROGRESS</button><button data-pause-slot-action="reset" data-slot-id="${slot.id}">RESET SAVE</button></div></article>`;
+      if (slot.empty) return `<article class="save-slot-card"><header><strong>${escapeHtml(slot.label)}</strong><span>EMPTY</span></header><button data-pause-slot-action="create" data-slot-id="${slot.id}">CREATE SAVE</button></article>`;
+      return `<article class="save-slot-card ${slot.active ? 'is-active' : ''}"><header><strong>${escapeHtml(slot.label)}</strong><span>${slot.active ? 'ACTIVE SAVE' : 'LOCAL SAVE'}</span></header><dl><div><dt>LAST PLAYED</dt><dd>${escapeHtml(date)}</dd></div><div><dt>MONEY</dt><dd>$${slot.money}</dd></div><div><dt>PLAYTIME</dt><dd>${formatDuration(slot.activePlaytimeSeconds)}</dd></div><div><dt>JOURNAL</dt><dd>${slot.discovered} creatures</dd></div><div><dt>SUMMITS</dt><dd>${slot.summits}</dd></div><div><dt>CATCHES</dt><dd>${slot.fishCaught}</dd></div></dl><div class="save-slot-actions"><button data-pause-slot-action="rename" data-slot-id="${slot.id}">RENAME</button><button data-pause-slot-action="select" data-slot-id="${slot.id}" ${slot.active ? 'disabled' : ''}>PLAY THIS SAVE</button><button data-pause-slot-action="download" data-slot-id="${slot.id}">DOWNLOAD PROGRESS</button><button data-pause-slot-action="reset" data-slot-id="${slot.id}">RESET SAVE</button></div></article>`;
     }).join('');
-    const options = this.progression.saveSystem.getSlotSummaries().map((slot) => `<option value="${slot.id}" ${slot.active ? 'selected' : ''}>${slot.label}${slot.empty ? ' (empty)' : slot.active ? ' (current)' : ''}</option>`).join('');
+    const options = this.progression.saveSystem.getSlotSummaries().map((slot) => `<option value="${slot.id}" ${slot.active ? 'selected' : ''}>${escapeHtml(slot.label)}${slot.empty ? ' (empty)' : slot.active ? ' (current)' : ''}</option>`).join('');
     const pending = this.pendingImport
       ? `<p class="import-ready"><strong>${escapeHtml(this.pendingImport.name)}</strong> is valid: ${this.pendingImport.summary.discovered} discoveries, ${this.pendingImport.summary.inventory} carried, ${this.pendingImport.summary.aquarium} in Aquarium, $${this.pendingImport.summary.money}.</p><label>IMPORT DESTINATION<select id="pause-progress-slot">${options}</select></label><button data-pause-progress-action="import">APPROVE IMPORT</button>`
       : '';
@@ -274,6 +283,7 @@ export class PauseMenu {
     const audioSlider = (key, label) => `<label class="pause-volume"><span>${label}</span><input type="range" min="0" max="100" step="1" value="${Math.round(this.audioSettings[key] * 100)}" data-audio-setting="${key}"><output>${Math.round(this.audioSettings[key] * 100)}%</output></label>`;
     return `<div class="pause-setting-list">
       <h3>GAMEPLAY &amp; INTERFACE</h3>
+      <label><span>Player Name</span><input id="pause-player-name" type="text" maxlength="18" autocomplete="nickname" value="${escapeHtml(this.getPlayerName())}" placeholder="Set when you use Multiplayer"><button type="button" data-save-player-name>SAVE NAME</button></label>
       <h3>SOUND</h3>
       ${audioSlider('master', 'Master Volume')}
       ${audioSlider('rhythm', 'Music / Rhythm Volume')}
@@ -301,6 +311,15 @@ export class PauseMenu {
 
   handleSlotAction(action, slotId) {
     const saves = this.progression.saveSystem;
+    if (action === 'rename') {
+      const current = saves.getSlotSummaries().find((slot) => slot.id === slotId);
+      const value = globalThis.prompt?.('Save name (up to 24 characters; blank restores the default):', current?.label ?? '');
+      if (value !== null && value !== undefined) {
+        this.status.textContent = saves.renameSlot(slotId, value) ? 'Save renamed.' : 'Could not rename this save.';
+        this.render();
+      }
+      return;
+    }
     if (action === 'create') { if (saves.createSlot(slotId)) this.render(); return; }
     if (action === 'download') {
       void createProgressDownload(this.progression.exportProgressForSlot(slotId), `reel-ascent-${slotId}`);

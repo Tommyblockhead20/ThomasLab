@@ -238,7 +238,7 @@ test('short geometry gaps use grace before releasing the climber', () => {
   fixture.world.free();
 });
 
-test('release and push-off leave climb mode with intentional reattach delays', () => {
+test('manual release allows immediate regrab while push-off retains protection', () => {
   const releaseFixture = makeFixture();
   const releaseController = releaseFixture.controller;
   releaseController.begin(findFrontGrip(releaseController));
@@ -253,7 +253,8 @@ test('release and push-off leave climb mode with intentional reattach delays', (
   );
   assert.equal(released.type, 'released');
   assert.equal(releaseController.active, false);
-  assert.ok(releaseController.reattachTimer > 0);
+  assert.equal(releaseController.reattachTimer, 0);
+  assert.equal(releaseController.canAttemptGrip(new StaminaResource()), true);
 
   const pushFixture = makeFixture();
   const pushController = pushFixture.controller;
@@ -271,6 +272,7 @@ test('release and push-off leave climb mode with intentional reattach delays', (
   assert.equal(pushed.type, 'pushOff');
   assert.equal(stamina.value, 100 - CLIMBING_CONFIG.pushOffStaminaCost);
   assert.ok(pushed.pushNormal.z > 0.9);
+  assert.ok(pushController.reattachTimer > 0);
   releaseFixture.world.free();
   pushFixture.world.free();
 });

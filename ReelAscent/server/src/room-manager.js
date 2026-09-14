@@ -61,6 +61,7 @@ export class RoomManager {
     const room = session.room;
     if (!room) return;
     session.detach();
+    room.releaseBench(session.playerId);
     room.broadcastState();
     session.reconnectTimer = setTimeout(() => {
       if (session.connected || session.room !== room) return;

@@ -1424,6 +1424,15 @@ export class Player {
           CLIMBING_CONFIG.gripDistance * (this.input.mobileMode ? MOBILE_CLIMBING_ASSIST.grabDistanceMultiplier : 1)
         )
       : null;
+    // Traversal input is not necessarily where the avatar is facing (a player may
+    // strafe along a wall). Reuse the same reach/probes toward the facing direction
+    // before declaring an intended climbable surface unavailable.
+    if (!this.gripCandidate && hasMoveInput && this.climbing.canAttemptGrip(this.stamina)) {
+      this.gripCandidate = this.climbing.findGrip(
+        this.body.translation(), this.getFacingDirection(),
+        CLIMBING_CONFIG.gripDistance * (this.input.mobileMode ? MOBILE_CLIMBING_ASSIST.grabDistanceMultiplier : 1)
+      );
+    }
     this.canGrip = this.gripCandidate !== null;
 
     if (this.input.gripHeld && this.gripCandidate) {
@@ -2159,6 +2168,7 @@ export class Player {
 
   teleport(position, facingYaw = this.facingYaw) {
     this.cancelEmote();
+    if (this.benchSeat) this.onSeatCleared?.(this.benchSeat.id);
     this.benchSeat = null;
     const spawn = this.resolveSafeSpawn(position, facingYaw);
     this.body.setTranslation(spawn, true);
@@ -2263,10 +2273,12 @@ export class Player {
 
   setBenchSeat(interaction) {
     if (!interaction?.seatPosition || !interaction?.id) return false;
+    this.input.setMobileSprint?.(false);
     this.teleport(interaction.seatPosition, interaction.facingYaw);
     this.benchSeat = {
       id: interaction.id,
       seatPosition: { ...interaction.seatPosition },
+      basePosition: { ...interaction.seatPosition },
       exitPosition: interaction.exitPosition ? { ...interaction.exitPosition } : null,
       facingYaw: interaction.facingYaw,
       seatKind: interaction.seatKind ?? (interaction.action === 'bench' ? 'bench' : 'seat')
@@ -2277,10 +2289,31 @@ export class Player {
     return true;
   }
 
+  setBenchSeatOccupancy(playerIds = [], localPlayerId = null) {
+    const seat = this.benchSeat;
+    if (!seat?.basePosition) return false;
+    const index = playerIds.indexOf(localPlayerId);
+    if (index < 0) return false;
+    const side = playerIds.length === 1 ? 0 : index === 0 ? -.54 : .54;
+    const yaw = (seat.facingYaw || 0) * Math.PI / 180;
+    seat.seatPosition = {
+      x: seat.basePosition.x + Math.cos(yaw) * side,
+      y: seat.basePosition.y,
+      z: seat.basePosition.z - Math.sin(yaw) * side
+    };
+    return true;
+  }
+
   holdSeatAnchor() {
     const seat = this.benchSeat;
     if (!seat?.seatPosition) return false;
-    this.body.setNextKinematicTranslation(seat.seatPosition);
+    const current = this.body.translation();
+    const target = seat.seatPosition;
+    this.body.setNextKinematicTranslation({
+      x: current.x + (target.x - current.x) * .18,
+      y: target.y,
+      z: current.z + (target.z - current.z) * .18
+    });
     this.horizontalVelocity.set(0, 0, 0);
     this.verticalVelocity = 0;
     this.grounded = true;
@@ -2293,6 +2326,7 @@ export class Player {
     if (!seat) return false;
     this.exitFishing();
     this.benchSeat = null;
+    this.onSeatCleared?.(seat.id);
     this.cancelEmote();
     if (seat.exitPosition) this.teleport(seat.exitPosition, seat.facingYaw);
     return true;

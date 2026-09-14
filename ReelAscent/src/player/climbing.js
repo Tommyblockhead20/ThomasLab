@@ -80,7 +80,11 @@ export class ClimbingController {
         || outwardSeparation >= CLIMBING_CONFIG.sameSurfaceClearSeparation
         || (this.sameSurfaceBlockTimer <= 0
           && (physicalSeparation >= CLIMBING_CONFIG.sameSurfaceMinimumDistance
-            || outwardSeparation >= CLIMBING_CONFIG.sameSurfaceMinimumSeparation))) {
+            || outwardSeparation >= CLIMBING_CONFIG.sameSurfaceMinimumSeparation
+            // The push impulse can be stopped by nearby geometry. Once its brief
+            // anti-stick window has elapsed, recontact is a valid new grab rather
+            // than a permanent blacklist of this collider.
+            || physicalSeparation < CLIMBING_CONFIG.sameSurfaceMinimumDistance))) {
         this.blockedSurfaceHandle = null;
       }
     }
@@ -261,7 +265,9 @@ export class ClimbingController {
     this.output.sourceSurfaceHandle = null;
 
     if (!gripHeld) {
-      this.detach(CLIMBING_CONFIG.releaseReattachDelay);
+      // Releasing Grip is itself deliberate. A new press on a still-reachable face
+      // should not be swallowed by an arbitrary quarter-second delay.
+      this.detach(0);
       this.output.type = 'released';
       return this.output;
     }

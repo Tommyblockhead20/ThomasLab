@@ -22,7 +22,8 @@ export class SongVoteOutbox {
     const row = {
       ...feedback,
       vote: value.vote,
-      reason: value.vote === 'down' ? (value.reason ?? null) : null
+      reason: value.vote === 'down' ? (value.reason ?? null) : null,
+      playerName: typeof value.playerName === 'string' ? value.playerName.replace(/\s+/g, ' ').trim().slice(0, 18) || null : null
     };
     this.pending.set(key, row);
     if (persist) this.persist();

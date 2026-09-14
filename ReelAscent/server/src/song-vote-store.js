@@ -24,7 +24,9 @@ export function normalizeSongVote(value = {}) {
     : value.vote === 'up' || value.vote === 'down' ? value.vote : undefined;
   if (!voterId || !speciesId || !songId.startsWith('song:') || vote === undefined) return null;
   const reason = vote === 'down' ? normalizeReason(value.reason) : null;
-  return { voterId, speciesId, songId, songRevision, vote, reason };
+  const playerName = typeof value.playerName === 'string'
+    ? value.playerName.replace(/\s+/g, ' ').trim().slice(0, 18) || null : null;
+  return { voterId, speciesId, songId, songRevision, vote, reason, playerName };
 }
 
 const aggregate = (record, upVotes = 0, downVotes = 0) => {
@@ -131,6 +133,7 @@ export class PostgresSongVoteStore {
         song_revision INTEGER NOT NULL CHECK (song_revision > 0),
         vote VARCHAR(4) NOT NULL CHECK (vote IN ('up', 'down')),
         downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument'))),
+        player_name VARCHAR(18) NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         PRIMARY KEY (voter_id, species_id, song_revision)
@@ -138,6 +141,7 @@ export class PostgresSongVoteStore {
     `);
     // Existing v16.3 databases receive the nullable column without losing vote history.
     await this.pool.query('ALTER TABLE reel_ascent_song_votes ADD COLUMN IF NOT EXISTS downvote_reason VARCHAR(32) NULL');
+    await this.pool.query('ALTER TABLE reel_ascent_song_votes ADD COLUMN IF NOT EXISTS player_name VARCHAR(18) NULL');
     // Drop the prior taxonomy constraint before migrating. The v17.1 `bugged` code has
     // an exact replacement; ambiguous v17.2 categories remain queryable historical data.
     // Every new write is still normalized against SONG_DOWNVOTE_REASON_IDS above.
@@ -191,14 +195,15 @@ export class PostgresSongVoteStore {
       } else {
         await client.query(`
           INSERT INTO reel_ascent_song_votes
-            (voter_id, species_id, song_id, song_revision, vote, downvote_reason)
-          VALUES ($1, $2, $3, $4, $5, $6)
+            (voter_id, species_id, song_id, song_revision, vote, downvote_reason, player_name)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           ON CONFLICT (voter_id, species_id, song_revision) DO UPDATE SET
             song_id = EXCLUDED.song_id,
             vote = EXCLUDED.vote,
             downvote_reason = EXCLUDED.downvote_reason,
+            player_name = EXCLUDED.player_name,
             updated_at = NOW()
-        `, [record.voterId, record.speciesId, record.songId, record.songRevision, record.vote, record.reason]);
+        `, [record.voterId, record.speciesId, record.songId, record.songRevision, record.vote, record.reason, record.playerName]);
       }
       const result = await client.query(`
         SELECT

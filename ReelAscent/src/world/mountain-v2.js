@@ -136,7 +136,9 @@ export const SUMMIT_BENCH_CONFIGS = Object.freeze([
     seatHeight: .65,
     interactionDistance: 2.35,
     fishingFacing: 'summit-tarn'
-  })
+  }),
+  Object.freeze({ id: 'summit-bench-north', angle: 132, radius: 6.55, seatHeight: .65, interactionDistance: 2.35, fishingFacing: 'summit-tarn' }),
+  Object.freeze({ id: 'summit-bench-south', angle: 312, radius: 6.55, seatHeight: .65, interactionDistance: 2.35, fishingFacing: 'summit-tarn' })
 ]);
 export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
   angle: AQUARIUM_WORLD_LOCATION?.angle ?? 103,
@@ -1186,6 +1188,9 @@ export class MountainWorld extends TestWorld {
     this.rockIds = new Map();
     this.rejectedRocks = [];
     this.homeInteractions = [];
+    this.scalableBenches = new Map();
+    this.boatRailDebugEntities = [];
+    this.benchPopulation = 1;
     this.homeTrophies = [];
     this.islandEntities = new Map();
     this.locationLoadGroups = new Map();
@@ -1258,6 +1263,7 @@ export class MountainWorld extends TestWorld {
     this.buildLandmarks();
     this.buildSummitCrown();
     this.buildSummitBench();
+    this.setBenchPopulation(1);
     this.buildCrownRoutes();
     this.buildHighAltitudeInfill();
     this.buildThreeToSevenHundredRockField();
@@ -1266,6 +1272,7 @@ export class MountainWorld extends TestWorld {
     this.buildEnvironmentAesthetics();
     this.rockSupportAudit = this.auditSolidRockSupport();
     this.buildFishingLocations();
+    this.indexMapDebugObjects();
     this.setActiveLocation(this.activeLocationId);
   }
 
@@ -1562,8 +1569,10 @@ export class MountainWorld extends TestWorld {
       { x: 4.7, y: .22, z: 3.8 }, this.materials.cabinRoof, { y: yaw });
     for (const side of [-1, 1]) {
       const rail = localPoint(side * 3.45, 1.8);
-      this.addBox(`Bluewater Reach rail ${side}`, { ...rail, y: OCEAN_SURFACE_Y + 1.05 },
-        { x: .12, y: 1.05, z: 8.5 }, this.materials.cabinTrim, { y: yaw });
+      const railEntity = this.addBox(`Bluewater Reach rail ${side}`, { ...rail, y: OCEAN_SURFACE_Y + .98 },
+        { x: .12, y: .91, z: 8.5 }, this.materials.cabinTrim, { y: yaw });
+      railEntity.mapDebugId = `BOAT-RAIL-${side < 0 ? 'PORT' : 'STARBOARD'}-01`;
+      this.boatRailDebugEntities.push(railEntity);
     }
     this.addCylinder('Bluewater Reach mast', { ...wheelhouse, y: OCEAN_SURFACE_Y + 3.15 },
       { x: .14, y: 3.5, z: .14 }, this.materials.deepRock);
@@ -1583,28 +1592,36 @@ export class MountainWorld extends TestWorld {
     this.addBox('Bluewater Reach pilot seat back', { ...localPoint(0, 1.72), y: OCEAN_SURFACE_Y + 1.18 },
       { x: 1.1, y: .84, z: .16 }, this.materials.cabinFabric, { x: -6, y: yaw });
 
-    const fishingSeat = localPoint(BLUEWATER_SIDE_SEAT_CONFIG.side, BLUEWATER_SIDE_SEAT_CONFIG.forward);
-    const fishingSeatSurfaceY = OCEAN_SURFACE_Y + .81;
-    this.addBox('Bluewater Reach portside fishing seat', { ...fishingSeat, y: OCEAN_SURFACE_Y + .72 },
-      { x: .72, y: .18, z: 2.35 }, this.materials.woodLight, { y: yaw });
-    for (const forwardOffset of [-.82, .82]) {
-      const leg = localPoint(BLUEWATER_SIDE_SEAT_CONFIG.side, BLUEWATER_SIDE_SEAT_CONFIG.forward + forwardOffset);
-      this.addBox(`Bluewater Reach fishing seat leg ${forwardOffset < 0 ? 'aft' : 'fore'}`,
-        { ...leg, y: OCEAN_SURFACE_Y + .5 }, { x: .44, y: .48, z: .22 }, this.materials.wood, { y: yaw });
+    const seatLayouts = [
+      { id: 'bluewater-side-fishing-seat', side: -2.65, forward: 1.75, label: 'port forward' },
+      { id: 'bluewater-starboard-fishing-seat', side: 2.65, forward: 1.75, label: 'starboard forward' },
+      { id: 'bluewater-port-aft-fishing-seat', side: -2.65, forward: 4.45, label: 'port aft' },
+      { id: 'bluewater-starboard-aft-fishing-seat', side: 2.65, forward: 4.45, label: 'starboard aft' }
+    ];
+    for (const [index, layout] of seatLayouts.entries()) {
+      const fishingSeat = localPoint(layout.side, layout.forward);
+      const fishingSeatSurfaceY = OCEAN_SURFACE_Y + .81;
+      const parts = [this.addBox(`Bluewater Reach ${layout.label} fishing seat`, { ...fishingSeat, y: OCEAN_SURFACE_Y + .72 },
+        { x: .72, y: .18, z: 2.35 }, this.materials.woodLight, { y: yaw })];
+      for (const forwardOffset of [-.82, .82]) {
+        const leg = localPoint(layout.side, layout.forward + forwardOffset);
+        parts.push(this.addBox(`Bluewater Reach ${layout.label} fishing seat leg ${forwardOffset < 0 ? 'aft' : 'fore'}`,
+          { ...leg, y: OCEAN_SURFACE_Y + .5 }, { x: .44, y: .48, z: .22 }, this.materials.wood, { y: yaw }));
+      }
+      const fishingSeatExit = localPoint(layout.side < 0 ? -1.45 : 1.45, layout.forward);
+      const interaction = {
+        id: layout.id, label: `SIT & FISH OFF THE ${layout.side < 0 ? 'PORT' : 'STARBOARD'} SIDE`,
+        action: 'bench', seatKind: 'boat fishing seat', enabled: false,
+        position: { ...fishingSeat, y: fishingSeatSurfaceY },
+        seatPosition: { ...fishingSeat, y: fishingSeatSurfaceY + PLAYER_FOOT_OFFSET + .03 },
+        exitPosition: { ...fishingSeatExit, y: OCEAN_SURFACE_Y + .5 + PLAYER_FOOT_OFFSET + .12 },
+        facingYaw: yaw + (layout.side < 0 ? -90 : 90),
+        fishingFacing: 'bluewater-reach-water', fishingLabel: 'open water',
+        range: BLUEWATER_SIDE_SEAT_CONFIG.interactionDistance
+      };
+      this.homeInteractions.push(interaction);
+      this.scalableBenches.set(layout.id, { index, parts, interaction });
     }
-    const fishingSeatExit = localPoint(-1.45, BLUEWATER_SIDE_SEAT_CONFIG.forward);
-    this.homeInteractions.push({
-      id: 'bluewater-side-fishing-seat',
-      label: 'SIT & FISH OFF THE PORT SIDE',
-      action: 'bench',
-      seatKind: 'boat fishing seat',
-      position: { ...fishingSeat, y: fishingSeatSurfaceY },
-      seatPosition: { ...fishingSeat, y: fishingSeatSurfaceY + PLAYER_FOOT_OFFSET + .03 },
-      exitPosition: { ...fishingSeatExit, y: OCEAN_SURFACE_Y + .5 + PLAYER_FOOT_OFFSET + .12 },
-      facingYaw: yaw - 90,
-      fishingFacing: 'bluewater-reach-water',
-      range: BLUEWATER_SIDE_SEAT_CONFIG.interactionDistance
-    });
     const boardingPosition = { ...localPoint(0, 3.25), y: OCEAN_SURFACE_Y + 1.68 };
     for (const side of [-1, 1]) {
       const ladderCenter = localPoint(side * 3.7, 3.25);
@@ -1817,6 +1834,48 @@ export class MountainWorld extends TestWorld {
         }, this.materials.athenaeumMist, { y: index * 31 }, { castShadows: false, receiveShadows: false });
       }
     }
+    const islandBench = {
+      'shop-island': { radial: 7.6, tangent: 8.8, towardCenter: false },
+      'aquarium-island': { radial: 50, tangent: 35, towardCenter: false },
+      'cave-fishing-island': { radial: 6.2, tangent: 8.3, towardCenter: false },
+      'normal-fishing-island': { radial: -9.4, tangent: -1.4, towardCenter: false },
+      'cold-island': { radial: 8.6, tangent: 1.8, towardCenter: true }
+    }[location.id];
+    if (islandBench) this.buildAuthoredIslandBench(location, islandBench);
+  }
+
+  buildAuthoredIslandBench(location, { radial, tangent, towardCenter }) {
+    const groundY = location.elevation + .08;
+    const angle = location.angle;
+    const yaw = inwardYaw(angle) + (towardCenter ? 0 : 180);
+    const point = (height, radialDelta = 0) => this.point(angle,
+      location.radius + radial + radialDelta, groundY + height, tangent);
+    const name = `${location.displayName} shore rest bench`;
+    const mapDebugId = `BENCH-${location.id.toUpperCase()}-SHORE-BENCH`;
+    const seatPart = this.addBox(`${name} seat`, point(.46),
+      { x: 2.35, y: .18, z: .74 }, this.materials.woodLight, { y: yaw });
+    seatPart.mapDebugId = mapDebugId;
+    const backPart = this.addBox(`${name} back`, point(.93, towardCenter ? .34 : -.34),
+      { x: 2.35, y: .78, z: .15 }, this.materials.wood, { x: -7, y: yaw });
+    backPart.mapDebugId = mapDebugId;
+    for (const side of [-1, 1]) {
+      const leg = point(.22);
+      const rad = yaw * Math.PI / 180;
+      leg.x += Math.cos(rad) * side * .88;
+      leg.z -= Math.sin(rad) * side * .88;
+      const legPart = this.addBox(`${name} ${side < 0 ? 'left' : 'right'} leg`, leg,
+        { x: .18, y: .44, z: .42 }, this.materials.wood, { y: yaw });
+      legPart.mapDebugId = mapDebugId;
+    }
+    const surface = point(.55);
+    this.homeInteractions.push({
+      id: `${location.id}-shore-bench`, action: 'bench', label: 'SIT & FISH',
+      seatKind: 'shore fishing bench', fishingLabel: towardCenter ? 'the pond' : 'the ocean',
+      position: surface,
+      seatPosition: { ...surface, y: surface.y + PLAYER_FOOT_OFFSET + .03 },
+      exitPosition: point(PLAYER_FOOT_OFFSET + .08, towardCenter ? .92 : -.92),
+      facingYaw: yaw, range: 2.4
+    });
   }
 
   buildSkyreachFoundation(location) {
@@ -3232,6 +3291,55 @@ export class MountainWorld extends TestWorld {
       if (distance >= nearestDistance) continue;
       nearestDistance = distance;
       nearest = { id: rock.rockId, name: rock.name, distance, entity: rock.entity };
+    }
+    return nearest;
+  }
+
+  indexMapDebugObjects() {
+    const objects = [];
+    const add = (id, name, position, entity = null) => {
+      if (!id || !position || ![position.x, position.y, position.z].every(Number.isFinite)) return;
+      if (entity) entity.mapDebugId = id;
+      objects.push({ id, name, position: { x: position.x, y: position.y, z: position.z }, entity });
+    };
+    const slug = (value) => String(value ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+    for (const rock of this.rockPlacements) {
+      if (rock.rockId) add(rock.rockId, rock.name, rock.position, rock.entity);
+    }
+    for (const interaction of this.homeInteractions) {
+      const category = interaction.action === 'bench' || /bench|fishing log/i.test(interaction.seatKind ?? '')
+        ? 'BENCH' : interaction.action === 'boat' || interaction.action === 'board'
+          ? 'DOCK' : ['shop', 'appearance', 'aquarium', 'elevator'].includes(interaction.action)
+            ? 'BUILDING' : null;
+      if (category) add(`${category}-${slug(interaction.id)}`, interaction.label, interaction.position);
+    }
+    for (const [id, bench] of this.scalableBenches) {
+      for (const part of bench.parts) part.mapDebugId = `BENCH-${slug(id)}`;
+    }
+    for (const entity of this.boatRailDebugEntities) add(entity.mapDebugId, entity.name, entity.getPosition(), entity);
+    for (const water of this.getMapData().waters) {
+      if (water.waterType === 'ocean') continue;
+      add(`${['pond', 'summit-pond'].includes(water.waterType) ? 'POND' : 'WATER'}-${slug(water.id)}`,
+        water.label, water.center);
+    }
+    for (const [id, entity] of [
+      ['BUILDING-HEARTHWARD-CABIN-01', this.homeCabinRoot],
+      ['BUILDING-OUTFITTER-01', this.shopRoot],
+      ['BUILDING-GLASSWATER-AQUARIUM-01', this.publicAquariumRoot],
+      ['BUILDING-ESB-01', this.skyreachRoot]
+    ]) if (entity) add(id, entity.name, entity.getPosition(), entity);
+    this.mapDebugObjects = objects;
+  }
+
+  getNearestMapDebug(point, maximumDistance = 12) {
+    if (![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
+    let nearest = null;
+    let best = maximumDistance;
+    for (const object of this.mapDebugObjects ?? []) {
+      const distance = Math.hypot(point.x - object.position.x, point.y - object.position.y, point.z - object.position.z);
+      if (distance >= best) continue;
+      best = distance;
+      nearest = { id: object.id, name: object.name, distance, entity: object.entity };
     }
     return nearest;
   }
@@ -4779,32 +4887,52 @@ export class MountainWorld extends TestWorld {
       const angle = config.angle;
       const radius = config.radius;
       const yaw = inwardYaw(angle);
-      const name = index === 0 ? 'Summit west rest bench' : 'Summit east rest bench';
+      const name = ['Summit west rest bench', 'Summit east rest bench', 'Summit north rest bench', 'Summit south rest bench'][index];
       const seat = this.point(angle, radius, SUMMIT_HEIGHT + .56);
-      this.addBox(`${name} seat`, seat,
-        { x: 2.35, y: .18, z: .72 }, this.materials.wood, { y: yaw });
+      const parts = [this.addBox(`${name} seat`, seat,
+        { x: 2.35, y: .18, z: .72 }, this.materials.wood, { y: yaw })];
       const back = this.point(angle, radius + .34, SUMMIT_HEIGHT + 1.08);
-      this.addBox(`${name} back`, back,
-        { x: 2.35, y: .86, z: .16 }, this.materials.wood, { x: -7, y: yaw });
+      parts.push(this.addBox(`${name} back`, back,
+        { x: 2.35, y: .86, z: .16 }, this.materials.wood, { x: -7, y: yaw }));
       for (const side of [-1, 1]) {
         const tangent = side * .88;
-        this.addBox(`${name} ${side < 0 ? 'left' : 'right'} leg`,
+        parts.push(this.addBox(`${name} ${side < 0 ? 'left' : 'right'} leg`,
           this.point(angle, radius, SUMMIT_HEIGHT + .24, tangent),
-          { x: .18, y: .48, z: .46 }, this.materials.wood, { y: yaw });
+          { x: .18, y: .48, z: .46 }, this.materials.wood, { y: yaw }));
       }
       const seatSurface = this.point(angle, radius, SUMMIT_HEIGHT + config.seatHeight);
       const exitSurface = this.point(angle, radius, SUMMIT_HEIGHT + PLAYER_FOOT_OFFSET + .16, 1.72);
-      this.homeInteractions.push({
+      const interaction = {
         id: config.id,
         label: 'CLICK TO SIT & FISH AT THE TARN',
         action: 'bench',
+        enabled: false,
         position: seatSurface,
         seatPosition: { ...seatSurface, y: seatSurface.y + PLAYER_FOOT_OFFSET + .03 },
         exitPosition: exitSurface,
         facingYaw: yaw,
         fishingFacing: config.fishingFacing,
         range: config.interactionDistance
-      });
+      };
+      this.homeInteractions.push(interaction);
+      this.scalableBenches.set(config.id, { index, parts, interaction });
+    }
+  }
+
+  setBenchPopulation(count = 1, occupiedIds = [], playerPositions = []) {
+    this.benchPopulation = Math.max(1, Math.min(4, Math.floor(Number(count) || 1)));
+    const occupied = new Set(occupiedIds);
+    for (const [id, bench] of this.scalableBenches) {
+      const wanted = bench.index < this.benchPopulation || occupied.has(id);
+      const nearPlayer = playerPositions.some((point) => point
+        && Math.hypot(point.x - bench.interaction.position.x, point.z - bench.interaction.position.z) < 1.4
+        && Math.abs(point.y - bench.interaction.position.y) < 2.5);
+      const enabled = wanted && (bench.interaction.enabled !== false || occupied.has(id) || !nearPlayer);
+      bench.interaction.enabled = enabled;
+      for (const part of bench.parts) {
+        part.enabled = enabled;
+        part.physicsCollider?.setEnabled?.(enabled);
+      }
     }
   }
 

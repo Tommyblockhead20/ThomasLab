@@ -206,6 +206,7 @@ export class PlayerInput {
     this.rhythmLaneInput = new RhythmLaneInputState();
     this.touchPointers = new Map();
     this.touchActions = new Set();
+    this.mobileSprintToggled = false;
     this.mobileContextAction = 'interact';
     this.mobileControls = document.querySelector('#mobile-controls');
     this.forceMobile = new URLSearchParams(window.location.search).get('mobile') === '1';
@@ -358,6 +359,7 @@ export class PlayerInput {
     document.addEventListener('visibilitychange', this.onVisibilityChange);
 
     this.mobileButtons = [...document.querySelectorAll('[data-touch-action]')];
+    this.setMobileSprint(false);
     this.onTouchActionDown = (event) => {
       if ((event.pointerType === 'mouse' && !this.forceMobile) || event.button > 0) return;
       event.preventDefault();
@@ -367,6 +369,10 @@ export class PlayerInput {
       const effectiveAction = action === 'context-action'
         ? this.mobileContextAction
         : action;
+      if (action === 'sprint') {
+        this.setMobileSprint(!this.mobileSprintToggled);
+        return;
+      }
       const alreadyHeld = this.touchActions.has(effectiveAction);
       const rhythmPress = this.rhythmCapture && TOUCH_DIRECTIONS.has(action);
       const rhythmSource = `touch:${event.pointerId}`;
@@ -414,11 +420,22 @@ export class PlayerInput {
 
   setMobileMode(enabled) {
     this.mobileMode = this.forceMobile || enabled;
+    if (!this.mobileMode) this.setMobileSprint(false);
     document.body.classList.toggle('mobile-mode', this.mobileMode);
     if (this.mobileControls) this.mobileControls.hidden = !this.mobileMode;
   }
 
+  setMobileSprint(active) {
+    this.mobileSprintToggled = Boolean(active);
+    for (const button of this.mobileButtons ?? []) {
+      if (button.dataset.touchAction !== 'sprint') continue;
+      button.classList.toggle('is-held', this.mobileSprintToggled);
+      button.setAttribute('aria-pressed', String(this.mobileSprintToggled));
+    }
+  }
+
   clearTouchActions() {
+    this.setMobileSprint(false);
     for (const [pointerId, pointer] of this.touchPointers) {
       pointer.button?.classList.remove('is-held');
       if (pointer.effectiveAction === 'grip') this.releasePrimary(`touch-${pointerId}`);
@@ -476,7 +493,7 @@ export class PlayerInput {
   }
 
   get sprintHeld() {
-    return bindingCodes('sprint', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('sprint');
+    return bindingCodes('sprint', this.bindings).some((code) => this.held.has(code)) || this.mobileSprintToggled;
   }
 
   get slideHeld() {
@@ -576,7 +593,10 @@ export class PlayerInput {
 
   hasDeliberateClick() { return this.deliberateClickQueued; }
   discardDeliberateClick() { this.deliberateClickQueued = false; }
-  setFishingActive(active) { this.fishingActive = Boolean(active); }
+  setFishingActive(active) {
+    this.fishingActive = Boolean(active);
+    if (this.fishingActive) this.setMobileSprint(false);
+  }
   setMobileActionModes({ context = 'interact' } = {}) {
     this.mobileContextAction = ['interact', 'grip', 'fish'].includes(context) ? context : 'interact';
   }
