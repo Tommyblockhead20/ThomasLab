@@ -7,6 +7,7 @@ import {
 import { FishingZone } from '../src/fishing/fishing-zone.js';
 import {
   ALL_FISHING_WATER_DESCRIPTORS,
+  AUTHORED_STONEVEIL_CORE_ACTIVE,
   BLUEWATER_REACH_DESCRIPTOR,
   COASTAL_SHELF_RADIUS,
   CROWN_DENSITY_CONFIG,
@@ -180,6 +181,12 @@ test('every cave entrance descends to its water surface', () => {
   for (const location of MOUNTAIN_FISHING_LOCATIONS.filter((water) => water.cave)) {
     const entrance = caveMap.get(location.id)?.position;
     assert.ok(entrance);
+    // A frozen core owns the main cave entrance/floor topology; the legacy polar
+    // entrance calculation is no longer a physical surface to compare to authored water.
+    if (AUTHORED_STONEVEIL_CORE_ACTIVE && !location.offshore) {
+      assert.ok(Number.isFinite(location.y), `${location.label} keeps an authored water level`);
+      continue;
+    }
     const minimumDrop = location.offshore ? .6 : 3.3;
     assert.ok(entrance.y - location.y >= minimumDrop,
       `${location.label} water is recessed below its entrance`);

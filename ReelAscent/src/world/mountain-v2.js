@@ -6,6 +6,8 @@ import {
   applyMapEditorHeight,
   applyMapEditorProfileHeight,
   applyWorldObjectPatch,
+  getBakedTerrainBoundarySamples,
+  hasAuthoritativeBakedTerrain,
   installMapEditorBridge,
   terrainTriangleIsCut
 } from './map-editor-runtime.js';
@@ -56,6 +58,10 @@ export const OCEAN_WADE_DISTANCE = OCEAN_FLOOR_OUTER_RADIUS - OCEAN_WATER_INNER_
 export const MOUNTAIN_FAILURE_RADIUS = OCEAN_FLOOR_OUTER_RADIUS;
 export const OUT_OF_WORLD_FALL_Y = -18;
 export const INTENTIONAL_OVERHANGS = Object.freeze([]);
+export const AUTHORED_STONEVEIL_CORE_ACTIVE = hasAuthoritativeBakedTerrain(MAP_EDITOR_PATCH);
+export function shouldBuildLegacyCaveShell(location, authoredCoreActive = AUTHORED_STONEVEIL_CORE_ACTIVE) {
+  return Boolean(location?.cave && (!authoredCoreActive || location.offshore));
+}
 
 const TERRAIN_OUTER_RADIUS = 208;
 export const MOUNTAIN_FOOT_RADIUS = 181;
@@ -1226,6 +1232,10 @@ export class MountainWorld extends TestWorld {
     this.activeLocationId = MAIN_WORLD_LOCATION.id;
     this.movingSurfaceMotion = new Map();
     this.summitRadius = CROWN_TOP_RADIUS + 1.5;
+    this.authoredStoneveilCoreActive = AUTHORED_STONEVEIL_CORE_ACTIVE;
+    if (this.authoredStoneveilCoreActive) {
+      console.info('Stoneveil: authored baked core active; legacy main-mountain cave shells disabled.');
+    }
 
     // Mid-value palette on purpose: navigation/readability comes before mood in V2.0.
     this.materials.sand = makeMaterial([.78, .7, .51], { gloss: .04 });
@@ -3746,7 +3756,13 @@ export class MountainWorld extends TestWorld {
     // A dense shared shoreline profile avoids a capsule-catching chord between the old
     // 210.5 m seam and the 221 m water edge. It is still the same continuous collider;
     // there is no new safety wall, and the deep-ocean hazard remains much farther out.
-    const ringRadii = createOceanShelfRingRadii(outerRadius);
+    const authoredBoundary = this.authoredStoneveilCoreActive
+      ? getBakedTerrainBoundarySamples(MAP_EDITOR_PATCH, MOUNTAIN_CENTER, TERRAIN_SEGMENTS)
+      : null;
+    const authoredJoinRadius = authoredBoundary?.maximumRadius ?? innerRadius;
+    const ringRadii = createOceanShelfRingRadii(outerRadius)
+      .filter((radius, index) => index === 0 || radius > authoredJoinRadius + .5);
+    ringRadii[0] = authoredJoinRadius;
     const vertices = [];
     const ringStarts = [];
     const segments = TERRAIN_SEGMENTS;
@@ -3758,13 +3774,16 @@ export class MountainWorld extends TestWorld {
       for (let segment = 0; segment < segments; segment += 1) {
         const angle = segment * 360 / segments;
         const radians = degreesToRadians(angle);
-        const terrainJoin = terrainHeightAt(angle, innerRadius);
+        const boundaryPoint = ringIndex === 0 ? authoredBoundary?.samples?.[segment] : null;
+        const terrainJoin = boundaryPoint?.[1] ?? terrainHeightAt(angle, innerRadius);
         const shorelineY = Math.min(-.28, terrainJoin);
         const floorY = ringIndex === 0
           ? terrainJoin
           : oceanFloorHeightAt(radius, shorelineY)
             + Math.sin(degreesToRadians(angle * 4 + radius * .75)) * .06 * outward;
-        vertices.push([Math.cos(radians) * radius, floorY, Math.sin(radians) * radius]);
+        vertices.push(boundaryPoint
+          ? [boundaryPoint[0], floorY, boundaryPoint[2]]
+          : [Math.cos(radians) * radius, floorY, Math.sin(radians) * radius]);
       }
     }
 
@@ -3835,6 +3854,14 @@ export class MountainWorld extends TestWorld {
     this.ocean.setPosition(MOUNTAIN_CENTER.x, OCEAN_SURFACE_Y - .06, MOUNTAIN_CENTER.z);
     this.buildTarget.addChild(this.ocean);
     this.buildWadeableOceanShelf();
+
+    // A frozen editor mesh is the production Stoneveil core. Keep the procedural height
+    // function available to the still-procedural rock/decor placement pass, but do not
+    // construct its obsolete visible mesh or combined collider beneath the authored core.
+    if (this.authoredStoneveilCoreActive) {
+      this.terrainSurface = null;
+      return;
+    }
 
     const vertices = [];
     const sourceVertices = [];
@@ -6103,7 +6130,11 @@ export class MountainWorld extends TestWorld {
 
     if (location.summit) return;
     if (location.cave) {
-      this.buildCaveInteriorShell(location);
+      // The frozen Stoneveil core already owns every main-mountain cave surface.
+      // Offshore Basalt Grotto is outside that authored mesh and keeps its island shell.
+      if (shouldBuildLegacyCaveShell(location, this.authoredStoneveilCoreActive)) {
+        this.buildCaveInteriorShell(location);
+      }
       return;
     }
     // Main-mountain ponds can use polar route coordinates. Offshore water cannot: a 4.6°

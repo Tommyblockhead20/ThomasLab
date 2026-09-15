@@ -640,6 +640,77 @@ function validBakedTerrainMesh(patch) {
   return mesh;
 }
 
+export function hasAuthoritativeBakedTerrain(patch) {
+  return Boolean(validBakedTerrainMesh(patch));
+}
+
+// The frozen mesh stores world-space positions. Its outermost radial band is the
+// authoritative Stoneveil/beach join, even after later editor exports reshape it.
+// Resample that band onto the runtime shelf's regular angular grid so the first
+// rendered/collision ring meets the authored edge rather than the old height function.
+export function getBakedTerrainBoundarySamples(patch, center = centerFallback(), sampleCount = 360) {
+  const baked = validBakedTerrainMesh(patch);
+  if (!baked) return null;
+  const positions = baked.positions;
+  const cx = finite(center?.x);
+  const cz = finite(center?.z);
+  let maximumRadius = 0;
+  for (let index = 0; index < positions.length; index += 3) {
+    maximumRadius = Math.max(maximumRadius, Math.hypot(
+      finite(positions[index]) - cx,
+      finite(positions[index + 2]) - cz
+    ));
+  }
+  if (!(maximumRadius > 1)) return null;
+
+  const candidates = [];
+  const edgeBand = Math.max(1.5, maximumRadius * .012);
+  for (let index = 0; index < positions.length; index += 3) {
+    const x = finite(positions[index]) - cx;
+    const y = finite(positions[index + 1]);
+    const z = finite(positions[index + 2]) - cz;
+    const radius = Math.hypot(x, z);
+    if (radius < maximumRadius - edgeBand) continue;
+    let angle = Math.atan2(z, x);
+    if (angle < 0) angle += Math.PI * 2;
+    candidates.push({ x, y, z, radius, angle });
+  }
+  if (candidates.length < 3) return null;
+
+  // Several editor operations can leave subdivided vertices at nearly the same angle.
+  // The radially outermost one is the actual open boundary at that bearing.
+  const angularBins = new Map();
+  for (const point of candidates) {
+    const key = Math.round(point.angle * 180 / Math.PI * 1000);
+    const current = angularBins.get(key);
+    if (!current || point.radius > current.radius) angularBins.set(key, point);
+  }
+  const boundary = [...angularBins.values()].sort((left, right) => left.angle - right.angle);
+  if (boundary.length < 3) return null;
+
+  const count = Math.max(12, Math.floor(sampleCount));
+  const samples = [];
+  let rightIndex = 0;
+  for (let index = 0; index < count; index += 1) {
+    const angle = index / count * Math.PI * 2;
+    while (rightIndex < boundary.length && boundary[rightIndex].angle < angle) rightIndex += 1;
+    const right = boundary[rightIndex % boundary.length];
+    const left = boundary[(rightIndex - 1 + boundary.length) % boundary.length];
+    const leftAngle = left.angle > angle ? left.angle - Math.PI * 2 : left.angle;
+    const rightAngle = right.angle < angle ? right.angle + Math.PI * 2 : right.angle;
+    const t = Math.max(0, Math.min(1, (angle - leftAngle) / Math.max(.000001, rightAngle - leftAngle)));
+    samples.push([
+      left.x + (right.x - left.x) * t,
+      left.y + (right.y - left.y) * t,
+      left.z + (right.z - left.z) * t
+    ]);
+  }
+  return Object.freeze({
+    maximumRadius,
+    samples: Object.freeze(samples.map((point) => Object.freeze(point)))
+  });
+}
+
 function addBakedTerrainMesh(world, patch, center = centerFallback()) {
   const baked = validBakedTerrainMesh(patch);
   if (!baked || !world?.app?.graphicsDevice || !world?.RAPIER || !world?.physicsWorld) return null;
@@ -672,29 +743,28 @@ function addBakedTerrainMesh(world, patch, center = centerFallback()) {
   entity.render.castShadows = false;
   (world.buildTarget ?? world.root).addChild(entity);
 
+  // Keep the baked core and adapted ocean shelf in one collision owner. Their meshes
+  // touch only at the shared authored boundary; no legacy mountain collider or second
+  // coplanar seam collider remains to make the controller alternate contacts.
+  const floor = world.oceanFloorSurface;
+  const floorVertices = floor?.vertices?.length
+    ? floor.vertices.map(([x, y, z]) => [x + finite(center?.x), y, z + finite(center?.z)])
+    : [];
+  const floorTriangles = floor?.triangles?.length ? floor.triangles : [];
+  const bakedVertexCount = positions.length / 3;
+  const collisionPositions = floorVertices.length
+    ? [...positions, ...floorVertices.flat()]
+    : positions;
+  const collisionIndices = floorTriangles.length
+    ? [...indices, ...floorTriangles.flatMap((triangle) => triangle.map((index) => bakedVertexCount + index))]
+    : indices;
   const colliderDesc = world.RAPIER.ColliderDesc.trimesh(
-    new Float32Array(positions),
-    new Uint32Array(indices)
+    new Float32Array(collisionPositions),
+    new Uint32Array(collisionIndices)
   ).setFriction(.94).setRestitution(0);
   entity.physicsCollider = world.physicsWorld.createCollider(colliderDesc);
   entity.mapObjectId = 'EDITOR-BAKED-TERRAIN';
-
-  // The old collider also carried the wading/ocean floor. Recreate that collision only.
-  const floor = world.oceanFloorSurface;
-  if (floor?.vertices?.length && floor?.triangles?.length) {
-    const floorEntity = new pc.Entity('Map Editor restored ocean-floor collision');
-    (world.buildTarget ?? world.root).addChild(floorEntity);
-    const floorDesc = world.RAPIER.ColliderDesc.trimesh(
-      new Float32Array(floor.vertices.flat()),
-      new Uint32Array(floor.triangles.flat())
-    )
-      .setTranslation(finite(center?.x), 0, finite(center?.z))
-      .setFriction(.94)
-      .setRestitution(0);
-    floorEntity.physicsCollider = world.physicsWorld.createCollider(floorDesc);
-    floorEntity.mapObjectId = 'EDITOR-RESTORED-OCEAN-FLOOR';
-    entity.editorOceanFloorColliderEntity = floorEntity;
-  }
+  entity.editorIncludesOceanFloorCollision = floorTriangles.length > 0;
 
   // Expose the baked mesh as the visible terrain source for diagnostics. Procedural rocks
   // were already created before this replacement; once their layout is curated, the rock
