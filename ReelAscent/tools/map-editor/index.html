@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Reel Ascent — Stoneveil Map Editor</title>
+  <link rel="stylesheet" href="./editor.css" />
+  <style>
+    #walkthrough-hud {
+      position: absolute; left: 14px; bottom: 42px; z-index: 20;
+      width: min(430px, calc(100% - 28px)); padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.18); border-radius: 10px;
+      background: rgba(9,14,18,.86); backdrop-filter: blur(6px);
+      color: #f4f7f8; font-size: 13px; line-height: 1.35;
+    }
+    #walkthrough-hud[hidden] { display: none !important; }
+    #walkthrough-hud .walkthrough-head { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    #walkthrough-hud .walkthrough-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    #walkthrough-mode { font-weight: 800; letter-spacing: .04em; }
+    #walkthrough-note { margin-top: 6px; opacity: .86; }
+    body.walkthrough-active #left-panel, body.walkthrough-active #right-panel, body.walkthrough-active #topbar { opacity: .38; }
+    body.walkthrough-active #view-toolbar > :not(#walkthrough-toggle):not(.walkthrough-persistent) { opacity: .38; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <main id="editor-shell">
+    <header id="topbar">
+      <div class="brand">
+        <strong>REEL ASCENT</strong>
+        <span>STONEVEIL MAP EDITOR</span>
+      </div>
+      <div class="top-actions">
+        <button id="undo" title="Ctrl+Z">Undo</button>
+        <button id="redo" title="Ctrl+Y">Redo</button>
+        <button id="checkpoint" title="Store a browser-local safety checkpoint before a risky edit">Checkpoint</button>
+        <button id="restore-checkpoint" title="Restore your latest manual safety checkpoint">Restore Checkpoint</button>
+        <button id="reload-project-patch" title="Reload src/world/map-editor-patch.json from the dev server">Reload Project Patch</button>
+        <button id="open-patch">Open Patch</button>
+        <button id="import-snapshot">Import Runtime Snapshot</button>
+        <button id="bake-snapshot" disabled>Bake Rocks Into Editor</button>
+        <button id="freeze-core" title="Convert the current finished heightfield into a true editable 3D triangle mesh">Freeze Core to 3D Mesh</button>
+        <button id="save-patch" class="primary">Save Patch</button>
+        <input id="patch-file" type="file" accept="application/json,.json" hidden />
+        <input id="snapshot-file" type="file" accept="application/json,.json" hidden />
+      </div>
+    </header>
+
+    <aside id="left-panel" class="panel">
+      <section>
+        <h2>Tool</h2>
+        <div id="tool-grid" class="tool-grid">
+          <button data-tool="select" class="active">Select</button>
+          <button data-tool="raise">Raise</button>
+          <button data-tool="lower">Lower</button>
+          <button data-tool="smooth">Smooth</button>
+          <button data-tool="indent">Indent Core</button>
+          <button data-tool="pull-core">Pull Core Out</button>
+          <button data-tool="connect-cave" title="Click two nearby cave dead-end surfaces to open and weld them into a continuous loop">Connect Cave Ends</button>
+          <button data-tool="rock">Place Rock</button>
+          <button data-tool="plant">Place Plant</button>
+          <button data-tool="decor">Place Decor</button>
+          <button data-tool="move-water">Move Water</button>
+        </div>
+      </section>
+
+      <section id="brush-section">
+        <h2>Terrain Brush</h2>
+        <label>Radius <output id="brush-radius-out">8 m</output><input id="brush-radius" type="range" min="1" max="25" value="8" step="1" /></label>
+        <label>Brush amount / strength <output id="brush-strength-out">2</output><input id="brush-strength" type="range" min="0.25" max="6" value="2" step="0.25" /></label>
+        <p class="hint">In <strong>3D Mesh mode</strong>, small brushes add/refine geometry only along the connected surface immediately around the cursor. A 1 m brush gets a true vertex at the click, with a round-ish organic footprint and no multi-meter refinement halo. <strong>Connect Cave Ends</strong> uses this Radius as the opening size, capped at 6 m for topology safety.</p>
+      </section>
+      <section id="mesh-mode-section">
+        <h2>Core Mode</h2>
+        <div id="mesh-mode-status" class="hint"><strong>Heightfield mode.</strong> Finish the large mountain shape, then use <strong>Freeze Core to 3D Mesh</strong>. After freezing, Indent Core pushes the actual surface inward along its 3D normal, so it can form roofs and overhangs.</div>
+        <div class="row-actions"><button id="return-heightfield" class="subtle" disabled>Return to Heightfield</button><button id="clear-legacy-caves" class="subtle" title="Remove old v1.5–v1.7 Cave Brush tunnels and manual Punch Hole cuts">Clear Legacy Cave Experiments</button></div>
+        <p class="hint">In 3D Mesh mode, use a small brush (about 3–6 m) and modest depth (about 0.5–2 m). Repeated clicks on the recessed back wall extend a cave naturally. To make a loop/donut cave, bring two tunnel dead ends close, choose <strong>Connect Cave Ends</strong>, click the first end, then the second. It performs a local topology stitch on the same terrain mesh; it does not create a legacy Punch Hole/collar/tunnel object.</p>
+      </section>
+
+      <section>
+        <h2>Rock Palette</h2>
+        <select id="rock-kind"></select>
+        <div class="triple">
+          <label>X <input id="rock-x" type="number" min="0.2" max="25" step="0.1" value="3.2" /></label>
+          <label>Y <input id="rock-y" type="number" min="0.2" max="25" step="0.1" value="2.6" /></label>
+          <label>Z <input id="rock-z" type="number" min="0.2" max="25" step="0.1" value="2.8" /></label>
+        </div>
+        <p class="hint">After importing a game snapshot, <strong>Bake Rocks Into Editor</strong> stores that snapshot inside your map patch so the rocks stay visible next time. This is an editor bake only; it does not yet skip procedural generation in gameplay.</p>
+        <label>Climb material
+          <select id="rock-material">
+            <option value="rough">Rough</option>
+            <option value="normal" selected>Normal</option>
+            <option value="smooth">Smooth</option>
+            <option value="ice">Ice</option>
+            <option value="ungrippable">Ungrippable</option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>Plant Palette</h2>
+        <select id="plant-kind">
+          <option value="grass">Grass tuft</option>
+          <option value="tall-grass">Tall grass</option>
+          <option value="fern">Fern</option>
+          <option value="shrub">Shrub</option>
+          <option value="flower">Flower cluster</option>
+          <option value="reed">Reeds</option>
+          <option value="cattail">Cattails</option>
+          <option value="pine">Pine</option>
+          <option value="broadleaf">Broadleaf tree</option>
+          <option value="dead-tree">Dead tree</option>
+          <option value="alpine-scrub">Alpine scrub</option>
+        </select>
+        <label>Size <input id="plant-size" type="range" min="0.35" max="3" step="0.05" value="1" /><output id="plant-size-out">1.00×</output></label>
+      </section>
+
+      <section>
+        <h2>Decor Palette</h2>
+        <select id="decor-kind">
+          <option value="bench">Bench</option>
+          <option value="crate">Crate</option>
+          <option value="log">Log</option>
+          <option value="sign">Trail sign</option>
+          <option value="lantern">Lantern post</option>
+        </select>
+      </section>
+    </aside>
+
+    <section id="viewport-wrap">
+      <canvas id="editor-canvas"></canvas>
+      <div id="view-toolbar">
+        <button data-view="perspective" class="active">Perspective</button>
+        <button data-view="top">Top</button>
+        <button data-view="north">North Side</button>
+        <button data-view="west">West Side</button>
+        <button id="walkthrough-toggle" title="First-person terrain playtest using the game's player capsule, gravity, jump and slope settings">Walkthrough</button>
+        <label><input id="show-waters" type="checkbox" checked /> Waters</label>
+        <label title="Temporarily ghost the mountain core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
+        <label class="walkthrough-persistent" title="Editor-only ambient light floor. Keeps dark cave geometry readable without changing the saved map or production lighting." style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+          Min brightness <output id="minimum-brightness-out">55%</output>
+          <input id="minimum-brightness" type="range" min="35" max="85" step="5" value="55" style="width:100px;" />
+        </label>
+        <label id="existing-rocks-label" title="Import a runtime snapshot once, or bake it into the editor patch so it persists"><input id="show-snapshot-rocks" type="checkbox" checked disabled /> Existing rocks (import snapshot)</label>
+      </div>
+      <div id="walkthrough-hud" hidden>
+        <div class="walkthrough-head">
+          <div><strong>WALKTHROUGH</strong> · <span id="walkthrough-mode">WALK</span></div>
+          <div class="walkthrough-actions">
+            <button id="walkthrough-fly-toggle" type="button">Switch to Fly (F)</button>
+            <button id="walkthrough-exit" type="button">Exit Walkthrough</button>
+          </div>
+        </div>
+        <div>Mouse: look · WASD: move · Shift: sprint · Space: jump · F: Walk/Fly · R: reset · Esc: exit</div>
+        <div>Fly: WASD follows view · Q/E (or Ctrl/Space) down/up · Shift = fast fly</div>
+<div class="hint" style="margin-top:6px;">Use the always-visible <strong>Min brightness</strong> slider in the viewport toolbar for cave visibility. It is editor-only and does not change saved map lighting.</div>
+        <div id="walkthrough-note">Walk uses the current game's capsule and movement constants against the current terrain mesh.</div>
+      </div>
+      <div id="statusbar"><span id="status">Ready</span><span id="cursor-info"></span></div>
+    </section>
+
+    <aside id="right-panel" class="panel">
+      <section>
+        <h2>Mountain Profile</h2>
+        <p class="hint">Maps current elevation → edited elevation while still in Heightfield mode. Once the core is frozen to a 3D mesh these controls are locked; the frozen mesh becomes the source of truth.</p>
+        <canvas id="profile-chart" width="360" height="190"></canvas>
+        <div id="profile-rows"></div>
+        <div class="row-actions">
+          <button id="preset-middle">Raise middle plateau +150 ft</button>
+          <button id="reset-profile">Reset Profile</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Selected</h2>
+        <div id="selection-empty" class="hint">Nothing selected. Click a placed object, imported rock, or water.</div>
+        <div id="selection-editor" hidden>
+          <strong id="selected-name"></strong>
+          <code id="selected-id"></code>
+          <div id="selection-fields"></div>
+          <div class="row-actions">
+            <button id="duplicate-selected">Duplicate</button>
+            <button id="hide-selected" class="danger">Hide / Delete</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Patch Summary</h2>
+        <dl id="summary"></dl>
+        <button id="clear-local" class="danger subtle">Clear Editor Patch</button>
+      </section>
+
+      <section>
+        <h2>Camera</h2>
+        <label>Move speed <output id="camera-move-value">22%</output><input id="camera-move-speed" type="range" min="10" max="150" step="1" value="22" /></label>
+        <label>Wheel zoom <output id="camera-zoom-value">24%</output><input id="camera-zoom-speed" type="range" min="5" max="150" step="1" value="24" /></label>
+        <p class="hint">These are editor-only preferences. Normal movement is tuned for close cave work; Shift keeps the previous fast traversal speed.</p>
+        <p class="hint">WASD: move camera · Q/E: down/up · Shift: faster · Right-drag: orbit · Shift+right-drag or middle-drag: pan · Wheel: zoom · F: focus selected · X: X-Ray Core · Home: reset view · <strong>Walkthrough</strong>: first-person terrain test with gravity/jump plus F fly/noclip · Left click/drag: use tool · In 3D Mesh mode, Indent Core pushes the real surface inward, Pull Core Out reverses it, and Connect Cave Ends joins two nearby dead ends · Delete: remove selected object · Ctrl+Z/Y: undo/redo · Checkpoint before risky terrain work</p>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

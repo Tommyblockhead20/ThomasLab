@@ -39,11 +39,15 @@ import { TrailBadgeMenu } from './ui/trail-badges.js';
 import { TutorialSystem } from './tutorial/tutorial-system.js';
 import { OceanSharkHazard } from './world/ocean-shark-hazard.js';
 import { SongFeedbackDashboard } from './ui/song-feedback-dashboard.js';
+import { markStartup } from './debug/startup-timings.js';
+import { GamepadController } from './input/gamepad-controller.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
     onProgress('Loading the physics trail');
+    markStartup('physics:init-start');
     await RAPIER.init();
+    markStartup('physics:init-ready');
     return new Game(canvas, RAPIER, onProgress);
   }
 
@@ -70,12 +74,15 @@ export class Game {
     this.app.scene.fog.end = 425;
     this.app.scene.exposure = 1.06;
     this.app.scene.toneMapping = pc.TONEMAP_ACES;
+    markStartup('playcanvas:app-ready');
 
     this.physicsWorld = new physics.World({ x: 0, y: -PLAYER_CONFIG.gravity, z: 0 });
     this.physicsWorld.timestep = 1 / 60;
 
     this.createLighting();
+    markStartup('world:build-start');
     this.world = new MountainWorld(this.app, physics, this.physicsWorld);
+    markStartup('world:build-ready');
     const initialStart = this.world.getHomeArrival?.() ?? this.world.chooseStart();
     const worldLocations = this.world.getWorldLocations?.() ?? [];
     const initialWorldLocation = worldLocations.find((location) => location.id === initialStart.locationId)
@@ -110,6 +117,7 @@ export class Game {
     this.rockDebugEnabled = false;
     this.rockDebugTarget = null;
     this.saveSystem = new SaveSystem();
+    markStartup('save:ready');
     this.storageWarningShown = false;
     this.hud = new Hud(this.saveSystem.multiplayerPlayerId);
     this.progression = new ProgressionSystem(this.saveSystem);
@@ -127,6 +135,7 @@ export class Game {
       initialStart.position,
       this.progression
     );
+    markStartup('player:ready');
     this.camera = new OrbitCamera(
       this.app,
       canvas,
@@ -136,6 +145,7 @@ export class Game {
       this.hud
     );
     this.fishing = new FishingController(this.app, this.player, this.world, { progression: this.progression });
+    markStartup('fishing:ready');
     this.ecologyGuide = new EcologyGuidePanel(this.fishing);
     this.fishingPerformance = new FishingPerformanceMenu(this.fishing);
     this.inventory = new InventoryMenu(this.progression, this.player);
@@ -247,6 +257,7 @@ export class Game {
       },
       onCloseMultiplayer: () => this.multiplayerMenu.close()
     });
+    markStartup('ui:ready');
 
     this.onResize = () => this.app.resizeCanvas();
     this.onVisibilityChange = () => {
@@ -357,8 +368,11 @@ export class Game {
     window.addEventListener('keydown', this.onDebugKeyDown, true);
     this.mobilePauseButton?.addEventListener('pointerdown', this.onMobilePausePointerDown);
 
+    this.gamepadController = new GamepadController(this);
     this.app.on('update', (rawDt) => this.update(Math.min(rawDt, 0.05)));
+    this.app.once('frameend', () => markStartup('gameplay:first-interactive-frame'));
     this.app.start();
+    markStartup('playcanvas:app-started');
     this.hud.show();
 
     // A tiny debug surface supports smoke tests without coupling game logic to the HUD.
@@ -423,6 +437,7 @@ export class Game {
 
   update(dt) {
     if (this.destroyed) return;
+    this.gamepadController.poll(dt);
     const modalOpen = this.isGameplayModalOpen();
     const localGameplayPaused = this.localPause.active;
     if (!modalOpen && !localGameplayPaused) {
@@ -1045,6 +1060,7 @@ export class Game {
 
   destroy() {
     this.destroyed = true;
+    this.gamepadController?.destroy();
     this.flushActivePlaytime();
     this.player.destroy();
     this.fishing.destroy();

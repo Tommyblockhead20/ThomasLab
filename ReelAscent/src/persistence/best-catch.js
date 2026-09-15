@@ -14,7 +14,7 @@ export function scoreBestCatch(specimen = {}) {
     ? clamp01(Number(specimen.weightFraction) / 1.65)
     : clamp01((Number(specimen.weight) - (species?.minWeight ?? 0) * .55) / weightRange);
   const sizePoints = Math.round((lengthPerformance * .6 + weightPerformance * .4) * 30 * 100) / 100;
-  const rarity = String(specimen.rarityLabel ?? specimen.rarity ?? species?.rarity ?? 'Common').toLowerCase();
+  const rarity = String(species?.rarity ?? specimen.rarityLabel ?? specimen.rarity ?? 'Common').toLowerCase();
   return {
     sizePoints,
     score: (RARITY_POINTS[rarity] ?? 0) + sizePoints + (specimen.shiny ? 25 : 0)

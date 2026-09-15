@@ -107,14 +107,14 @@ test('save names and all six summary values remain slot-specific through portabl
 
 test('Best Catch compares rarity, species-normalized size, and shiny within one save', () => {
   const commonHuge = { speciesId: 'bluegill', rarity: 'Common', sizeFraction: 1.6, weightFraction: 1.6, length: 13, weight: 5 };
-  const rareOrdinary = { speciesId: 'rainbow-trout', rarity: 'Rare', sizeFraction: .5, weightFraction: .5, length: 15, weight: 2 };
+  const rareOrdinary = { speciesId: 'cave-tetra', rarity: 'Rare', sizeFraction: .5, weightFraction: .5, length: 5, weight: .2 };
   assert.ok(scoreBestCatch(rareOrdinary).score > scoreBestCatch(commonHuge).score);
   assert.equal(scoreBestCatch({ ...rareOrdinary, rarity: 'rare' }).score, scoreBestCatch(rareOrdinary).score);
   assert.ok(isBetterCatch({ ...rareOrdinary, shiny: true }, rareOrdinary));
   const saves = new SaveSystem(memoryStorage());
   saves.recordCatch({ ...commonHuge, name: 'Bluegill' });
-  saves.recordCatch({ ...rareOrdinary, name: 'Rainbow Trout' });
-  assert.equal(saves.getLifetimeSnapshot().bestCatch.speciesId, 'rainbow_trout');
+  saves.recordCatch({ ...rareOrdinary, name: 'Cave Tetra' });
+  assert.equal(saves.getLifetimeSnapshot().bestCatch.speciesId, 'cave_tetra');
   saves.createSlot('slot-2');
   assert.equal(saves.getSlotSnapshot('slot-2').lifetime.bestCatch, null);
 });

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "game": "Reel Ascent",
+  "map": "main-mountain",
+  "updatedAt": null,
+  "terrain": {
+    "profile": [
+      { "sourceFt": 0, "targetFt": 0 },
+      { "sourceFt": 250, "targetFt": 250 },
+      { "sourceFt": 375, "targetFt": 375 },
+      { "sourceFt": 500, "targetFt": 650 },
+      { "sourceFt": 650, "targetFt": 767 },
+      { "sourceFt": 800, "targetFt": 863 },
+      { "sourceFt": 925, "targetFt": 943 },
+      { "sourceFt": 1000, "targetFt": 1000 }
+    ],
+    "strokes": [],
+    "cuts": []
+  },
+  "hiddenObjectIds": [],
+  "objectOverrides": {},
+  "placedObjects": [],
+  "fishingOverrides": {}
+}

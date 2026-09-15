@@ -3,11 +3,10 @@ import { FISH_SPECIES, getWeightedSpeciesTable } from './fish-data.js';
 export const ECOLOGY_TARGETS = Object.freeze({
   waters: 30,
   species: 300,
-  // The v7.1 summit promotions and v8 replacement roster intentionally moved four
-  // creatures from the shared pool into location-specific discoveries. Individual
-  // waters now vary modestly instead of all carrying exactly four exclusives.
-  exclusiveSpecies: 94,
-  sharedSpecies: 206,
+  // Current catchable species are counted separately from future-reserved roster
+  // entries. Individual waters vary instead of carrying a fixed exclusive quota.
+  exclusiveSpecies: FISH_SPECIES.filter((fish) => !fish.futureReserved && fish.habitat?.exclusiveWaterId).length,
+  sharedSpecies: FISH_SPECIES.filter((fish) => !fish.futureReserved && !fish.habitat?.exclusiveWaterId).length,
   minimumExclusivePerWater: 2,
   maximumExclusivePerWater: 9,
   maximumSpeciesShare: .25
@@ -22,6 +21,24 @@ const TYPE_FAMILIES = Object.freeze({
   cave: new Set(['cave-pool', 'cave-tarn'])
 });
 const THEMES = Object.freeze(['sunwash', 'fernwood', 'blackstone']);
+const OBLIGATE_CAVE_SPECIES = new Set([
+  'blind-cave-eel', 'cave-tetra', 'ashen-cave-snail', 'basalt-cave-shrimp',
+  'chimeblind-shrimp', 'pallid-cave-crab', 'whisper-eel',
+  'echo-cave-salamander', 'glass-cave-lobster', 'obsidian-blindfish'
+]);
+const STRONG_CAVE_SPECIES = new Set(['stone-loach']);
+
+const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+function localAbundance(speciesId, waterId) {
+  const hash = stableIndex(`${speciesId}:${waterId}`, 10001);
+  return .75 + hash / 10000 * .60;
+}
+
+function waterSizeWeight(fish, habitat) {
+  const speciesScale = clamp((Math.log1p(Math.max(.1, fish.maxLength ?? 20)) - Math.log1p(24)) / Math.log(8), -1, 1);
+  const waterScale = clamp((Math.log1p(habitat.equivalentRadius ?? 7) - Math.log1p(7)) / Math.log(14), -1, 1);
+  return clamp(1 + speciesScale * waterScale * .34, .65, 1.5);
+}
 
 function stableIndex(value, size) {
   let hash = 2166136261;
@@ -59,6 +76,7 @@ export function getZoneHabitat(zone, point = zone.center) {
   const tier = zone.tier ?? 'lower';
   const rarityTier = zone.probabilityGroup === 'cloudstep-lake' ? 'cloudstep'
     : isOcean ? 'ocean'
+    : Boolean(zone.cave || waterType.includes('cave')) ? 'cave'
     : (zone.waterfall || waterType === 'waterfall-pool') ? 'waterfall'
       : tier;
   return Object.freeze({
@@ -76,17 +94,24 @@ export function getZoneHabitat(zone, point = zone.center) {
     cave: Boolean(zone.cave || waterType.includes('cave')),
     ice: waterType === 'ice-pool',
     waterfall: Boolean(zone.waterfall || waterType === 'waterfall-pool'),
-    summit: zone.tier === 'summit' || waterType === 'summit-pond'
+    summit: zone.tier === 'summit' || waterType === 'summit-pond',
+    equivalentRadius: Math.max(.5, zone.shape === 'annulus'
+      ? (zone.outerRadius - zone.innerRadius) * .5
+      : zone.shape === 'path' ? zone.pathWidth * 2
+        : Math.sqrt(Math.max(.25, (zone.radii?.x ?? 7) * (zone.radii?.z ?? 7))))
   });
 }
 
 export function getHabitatWeight(fish, habitat) {
+  if (fish.futureReserved) return 0;
+  if (OBLIGATE_CAVE_SPECIES.has(fish.id) && !habitat.cave) return 0;
   const preference = fish.habitat ?? {};
   const compatibleWaterIds = new Set([habitat.zoneId, ...(habitat.habitatAliasIds ?? [])]);
   if (preference.exclusiveWaterId) {
-    if (!compatibleWaterIds.has(preference.exclusiveWaterId)) return 0;
+    if (habitat.zoneId !== preference.exclusiveWaterId) return 0;
     // This is a strong Stage-B preference only. Rarity has already been chosen separately.
-    return ({ Common: 4.2, Uncommon: 4.8, Rare: 5.6, Legendary: 6.4 })[fish.rarity] ?? 4.8;
+    return (({ Common: 4.2, Uncommon: 4.8, Rare: 5.6, Legendary: 6.4 })[fish.rarity] ?? 4.8)
+      * waterSizeWeight(fish, habitat) * localAbundance(fish.id, habitat.zoneId);
   }
   if (preference.salinity && preference.salinity !== 'both' && preference.salinity !== habitat.salinity) return 0;
   if (preference.tiers?.length && !preference.tiers.includes(habitat.tier)) return 0;
@@ -110,11 +135,15 @@ export function getHabitatWeight(fish, habitat) {
         : (({ Common: 1.6, Uncommon: 1.9, Rare: 2.6 })[fish.rarity] ?? 2))
     : 1;
   let featureWeight = 1;
-  if (habitat.cave) featureWeight *= preference.waterTypes?.some((type) => type.includes('cave')) ? 1.3 : .78;
+  if (habitat.cave) featureWeight *= OBLIGATE_CAVE_SPECIES.has(fish.id) ? 2.1
+    : STRONG_CAVE_SPECIES.has(fish.id) ? 1.8
+      : preference.waterTypes?.some((type) => type.includes('cave')) ? 1.35 : .26;
+  else if (STRONG_CAVE_SPECIES.has(fish.id)) featureWeight *= .07;
   if (habitat.ice) featureWeight *= preference.tiers?.includes('upper') ? 1.2 : .78;
   if (habitat.waterfall) featureWeight *= preference.waterTypes?.includes('waterfall-pool') ? 1.28 : .84;
   if (habitat.summit) featureWeight *= preference.tiers?.includes('summit') ? 1.24 : .8;
-  return Math.max(.05, typeWeight * themeWeight * featureWeight * favoredWaterWeight);
+  return Math.max(.001, typeWeight * themeWeight * featureWeight * favoredWaterWeight
+    * waterSizeWeight(fish, habitat) * localAbundance(fish.id, habitat.zoneId));
 }
 
 export function getEcologySelection(zone, point = zone.center) {
@@ -185,15 +214,19 @@ export function auditFishingEcology(zones) {
       )).length
     };
   });
-  const zeroWaterSpecies = [...watersBySpecies].filter(([, ids]) => ids.length === 0).map(([id]) => id);
-  const exclusive = FISH_SPECIES.filter((fish) => Boolean(fish.habitat?.exclusiveWaterId));
-  const shared = FISH_SPECIES.filter((fish) => !fish.habitat?.exclusiveWaterId);
+  const zeroWaterSpecies = FISH_SPECIES.filter((fish) => !fish.futureReserved
+    && (watersBySpecies.get(fish.id)?.length ?? 0) === 0).map((fish) => fish.id);
+  const futureReservedSpecies = FISH_SPECIES.filter((fish) => fish.futureReserved).map((fish) => fish.id);
+  const exclusive = FISH_SPECIES.filter((fish) => !fish.futureReserved && Boolean(fish.habitat?.exclusiveWaterId));
+  const shared = FISH_SPECIES.filter((fish) => !fish.futureReserved && !fish.habitat?.exclusiveWaterId);
   const mostDiversePool = [...pools].sort((a, b) => b.poolSize - a.poolSize)[0] ?? null;
   return Object.freeze({
     waterCount: zones.length,
     uniqueWaterCount: waterIds.size,
     speciesCount: FISH_SPECIES.length,
     zeroWaterSpecies,
+    futureReservedSpecies,
+    accidentallyUnreachable: zeroWaterSpecies,
     exclusiveCount: exclusive.length,
     sharedCount: shared.length,
     invalidExclusiveWaters: exclusive

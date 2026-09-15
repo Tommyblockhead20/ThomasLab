@@ -6,7 +6,7 @@ export const AQUARIUM_TANK_CAPACITY = 30;
 export const AQUARIUM_MAX_TANKS = 10;
 export const AQUARIUM_TANK_UPGRADES = Object.freeze([
   Object.freeze({ tankCount: 1, capacity: 30, price: 0 }),
-  Object.freeze({ tankCount: 2, capacity: 60, price: 2500 }),
+  Object.freeze({ tankCount: 2, capacity: 60, price: 1800 }),
   Object.freeze({ tankCount: 3, capacity: 90, price: 5000 }),
   Object.freeze({ tankCount: 4, capacity: 120, price: 9000 }),
   Object.freeze({ tankCount: 5, capacity: 150, price: 15000 }),

@@ -1,4 +1,5 @@
-import { canonicalSpeciesId } from '../fishing/fish-data.js';
+import { canonicalSpeciesId, resolveSpecies } from '../fishing/fish-data.js';
+import { getCatchValue } from './economy.js';
 import { DEFAULT_APPEARANCE, normalizeAppearance } from '../player/appearance.js';
 import { COSMETIC_BY_ID } from './cosmetics.js';
 import { MAP_ITEMS } from '../world/world-locations.js';
@@ -73,13 +74,14 @@ export function normalizeSpecimen(value = {}, fallbackOwnerId = '') {
   const specimenId = typeof value.specimenId === 'string' ? value.specimenId.slice(0, 160) : '';
   const speciesId = canonicalSpeciesId(typeof value.speciesId === 'string' ? value.speciesId : '').slice(0, 160);
   if (!specimenId || !speciesId) return null;
+  const species = resolveSpecies(speciesId, true);
   const suppliedOwnerId = typeof value.ownerId === 'string' ? value.ownerId : '';
-  return {
+  const specimen = {
     specimenId,
     ownerId: !suppliedOwnerId || suppliedOwnerId === 'local-player' ? fallbackOwnerId : suppliedOwnerId.slice(0, 160),
     speciesId,
-    name: typeof value.name === 'string' ? value.name.slice(0, 120) : speciesId,
-    rarity: typeof value.rarity === 'string' ? value.rarity : 'Common',
+    name: species?.id === 'siren-ray' ? 'Siren' : typeof value.name === 'string' ? value.name.slice(0, 120) : species?.name ?? speciesId,
+    rarity: species?.rarity ?? (typeof value.rarity === 'string' ? value.rarity : 'Common'),
     length: Math.max(0, finite(value.length)),
     weight: Math.max(0, finite(value.weight)),
     expectedWeight: Math.max(0, finite(value.expectedWeight)),
@@ -109,6 +111,10 @@ export function normalizeSpecimen(value = {}, fallbackOwnerId = '') {
       elevation: finite(value.provenance?.elevation ?? value.elevation)
     }
   };
+  // The specimen's identity and measurements are historical; rarity and sale value are
+  // derived from the current species roster whenever an old save is opened.
+  if (species && !species.retired) specimen.value = getCatchValue(specimen);
+  return specimen;
 }
 
 function normalizeSpecimenList(values, playerId) {

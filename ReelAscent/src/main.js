@@ -1,4 +1,8 @@
+import { markStartup, getStartupTimings, reportStartupTimings } from './debug/startup-timings.js';
 import { Game } from './game.js';
+
+markStartup('js:module-evaluated');
+globalThis.__reelAscentStartup = getStartupTimings;
 
 const canvas = document.querySelector('#game-canvas');
 const loading = document.querySelector('#loading');
@@ -8,11 +12,14 @@ const errorMessage = document.querySelector('#error-message');
 
 async function start() {
   try {
+    markStartup('bootstrap:start');
     await Game.create(canvas, (status) => {
       loadingStatus.textContent = status;
     });
     loading.hidden = true;
     canvas.focus();
+    markStartup('bootstrap:loading-hidden');
+    reportStartupTimings();
   } catch (error) {
     console.error(error);
     loading.hidden = true;

@@ -1,17 +1,5 @@
 import * as pc from 'playcanvas';
-// REEL_ASCENT_MAP_EDITOR_V1: begin
-import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
-import {
-  applyFishingLayoutPatch,
-  applyMapEditorHeight,
-  applyMapEditorProfileHeight,
-  applyWorldObjectPatch,
-  installMapEditorBridge,
-  terrainTriangleIsCut
-} from './map-editor-runtime.js';
-// REEL_ASCENT_MAP_EDITOR_V1: end
 import { PLAYER_FOOT_OFFSET } from '../config.js';
-import { markStartup } from '../debug/startup-timings.js';
 import { attachZoneEcology, ECOLOGY_TARGETS } from '../fishing/fish-ecology.js';
 import { FishingZone } from '../fishing/fishing-zone.js';
 import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
@@ -62,7 +50,6 @@ export const MOUNTAIN_FOOT_RADIUS = 181;
 const CROWN_BASE_RADIUS = 41;
 const CROWN_TOP_RADIUS = 8;
 const CROWN_BASE_HEIGHT = 215;
-const MAP_EDITOR_CROWN_BASE_HEIGHT = applyMapEditorProfileHeight(CROWN_BASE_HEIGHT, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
 export const UPPER_SHOULDER_START_RADIUS = 72;
 const UPPER_SHOULDER_LIFT = 75;
 const TERRAIN_SEGMENTS = 360;
@@ -296,18 +283,18 @@ export const MOUNTAIN_BANDS = Object.freeze([
   Object.freeze({ id: 'coast', radius: 181, bottom: -.55, top: 22, routeCount: 50 }),
   Object.freeze({ id: 'lower', radius: 145, bottom: 22, top: 58, routeCount: 50 }),
   Object.freeze({ id: 'middle', radius: 104, bottom: 58, top: 101, routeCount: 42 }),
-  Object.freeze({ id: 'alpine', radius: 68, bottom: 101, top: MAP_EDITOR_CROWN_BASE_HEIGHT, routeCount: 34 }),
-  Object.freeze({ id: 'summit', radius: CROWN_TOP_RADIUS, bottom: MAP_EDITOR_CROWN_BASE_HEIGHT, top: SUMMIT_HEIGHT, routeCount: 26 })
+  Object.freeze({ id: 'alpine', radius: 68, bottom: 101, top: CROWN_BASE_HEIGHT, routeCount: 34 }),
+  Object.freeze({ id: 'summit', radius: CROWN_TOP_RADIUS, bottom: CROWN_BASE_HEIGHT, top: SUMMIT_HEIGHT, routeCount: 26 })
 ]);
 
 export const MOUNTAIN_MASS_PROFILES = Object.freeze([
   Object.freeze({
-    id: 'continuous-body', bottom: -.55, top: MAP_EDITOR_CROWN_BASE_HEIGHT,
+    id: 'continuous-body', bottom: -.55, top: CROWN_BASE_HEIGHT,
     bottomRadius: TERRAIN_OUTER_RADIUS, topRadius: CROWN_BASE_RADIUS,
     segments: TERRAIN_SEGMENTS, offsetX: 0, offsetZ: 0, seed: 20
   }),
   Object.freeze({
-    id: 'summit-crown', bottom: MAP_EDITOR_CROWN_BASE_HEIGHT, top: SUMMIT_HEIGHT,
+    id: 'summit-crown', bottom: CROWN_BASE_HEIGHT, top: SUMMIT_HEIGHT,
     bottomRadius: CROWN_BASE_RADIUS, topRadius: CROWN_TOP_RADIUS,
     segments: 18, offsetX: 0, offsetZ: 0, seed: 21
   })
@@ -637,10 +624,6 @@ const FISHING_LAYOUT = Object.freeze([
   Object.freeze({ id: 'fallglass-cascade', label: 'Fallglass Cascade', physicalZone: 'Waterfall', tier: 'waterfall', waterType: 'waterfall-pool', theme: 'fallglass', waterfall: true, uniformProbabilities: true, probabilityGroup: 'fallglass-cascade', angle: 183, radius: 156, radii: [5.7, 3.8], depth: 'shallow', basinDepth: 1.9, fish: ['creek-chub', 'longnose-dace', 'rainbow-trout', 'smallmouth-bass'], size: 1.08, rarityBias: 0.58, trophyChance: 1.18 })
 ]);
 
-const EDITOR_FISHING_LAYOUT = Object.freeze(
-  applyFishingLayoutPatch(FISHING_LAYOUT, MAP_EDITOR_PATCH).map((location) => Object.freeze(location))
-); // REEL_ASCENT_MAP_EDITOR_V1
-
 // The visible ocean is one annular fishing zone. The hollow center is essential: treating
 // it as a giant ellipse would incorrectly make every inland cast an ocean cast.
 export const OCEAN_FISHING_DESCRIPTOR = Object.freeze({
@@ -696,7 +679,7 @@ export const FISHING_WATER_COUNTS = Object.freeze({
 export function terrainHeightAt(angle, radius) {
   let height = rawTerrainHeightAt(angle, radius);
   const point = localPolarPoint(angle, radius);
-  for (const basin of EDITOR_FISHING_LAYOUT) {
+  for (const basin of FISHING_LAYOUT) {
     if (basin.summit || basin.offshore) continue;
     const center = localPolarPoint(basin.angle, basin.radius);
     const dx = point.x - center.x;
@@ -719,7 +702,7 @@ export function terrainHeightAt(angle, radius) {
     }
 
   }
-  return applyMapEditorHeight(applyCoreRestTerraces(angle, radius, height), angle, radius, MOUNTAIN_CENTER, MAP_EDITOR_PATCH);
+  return applyCoreRestTerraces(angle, radius, height);
 }
 
 function waterSurfaceY(location) {
@@ -730,10 +713,10 @@ function waterSurfaceY(location) {
     // pool's inward radius. This guarantees that the lined entrance descends to water even
     // on the steep middle and Alpine faces instead of climbing dozens of meters underground.
     const entranceRadius = location.radius + caveDepthAt(location);
-    const entranceY = applyMapEditorHeight(rawTerrainHeightAt(location.angle, entranceRadius), location.angle, entranceRadius, MOUNTAIN_CENTER, MAP_EDITOR_PATCH);
+    const entranceY = rawTerrainHeightAt(location.angle, entranceRadius);
     return entranceY - Math.max(3.35, location.basinDepth + 1.25);
   }
-  return terrainHeightAt(location.angle, location.radius) + .45;
+  return rawTerrainHeightAt(location.angle, location.radius) - location.basinDepth + .45;
 }
 
 function caveDepthAt(location) {
@@ -844,7 +827,7 @@ function triangleIntersectsCaveEntrance(a, b, c) {
     [(c[0] * 2 + a[0] + b[0]) * .25, 0, (c[2] * 2 + a[2] + b[2]) * .25],
     [(a[0] + b[0] + c[0]) / 3, 0, (a[2] + b[2] + c[2]) / 3]
   ];
-  return EDITOR_FISHING_LAYOUT.some((cave) => {
+  return FISHING_LAYOUT.some((cave) => {
     if (!cave.cave || cave.offshore) return false;
     if (triangleSamples.some((point) => isCaveEntranceSurfacePoint(point[0], point[2], cave))) return true;
     // Also remove a face that completely spans a narrow part of the aperture even when no
@@ -856,7 +839,7 @@ function triangleIntersectsCaveEntrance(a, b, c) {
 
 export function deformCaveCoreVertex(x, y, z) {
   let result = { x, y, z, maximumRecess: 0 };
-  for (const cave of EDITOR_FISHING_LAYOUT) {
+  for (const cave of FISHING_LAYOUT) {
     if (!cave.cave || cave.offshore) continue;
     const { outward, lateral } = caveEntranceLocalCoordinates(result.x, result.z, cave);
     const caveDepth = caveDepthAt(cave);
@@ -896,7 +879,7 @@ export function climateThemeAt(angle) {
   return 'blackstone';
 }
 
-export const MOUNTAIN_FISHING_LOCATIONS = Object.freeze(EDITOR_FISHING_LAYOUT.map((location) => Object.freeze({
+export const MOUNTAIN_FISHING_LOCATIONS = Object.freeze(FISHING_LAYOUT.map((location) => Object.freeze({
   ...location,
   // The centered summit tarn has its own alpine ecology rather than inheriting the
   // arbitrary sunwash wedge from angle zero. Every other water keeps its prior theme.
@@ -920,18 +903,16 @@ export const MAP_ELEVATION_AREAS = Object.freeze(MOUNTAIN_BANDS.map((band) => Ob
   maximumHeight: band.top
 })));
 
-function mapContourAtHeight(height, samples = 120, terrainSamples = null) {
+function mapContourAtHeight(height, samples = 120) {
   const points = [];
   for (let index = 0; index < samples; index += 1) {
     const angle = index * 360 / samples;
-    let radius = height >= MAP_EDITOR_CROWN_BASE_HEIGHT ? CROWN_BASE_RADIUS : TERRAIN_OUTER_RADIUS;
-    if (height < MAP_EDITOR_CROWN_BASE_HEIGHT) {
+    let radius = height >= CROWN_BASE_HEIGHT ? CROWN_BASE_RADIUS : TERRAIN_OUTER_RADIUS;
+    if (height < CROWN_BASE_HEIGHT) {
       let best = TERRAIN_OUTER_RADIUS;
       let bestDelta = Infinity;
-      let sampleIndex = 0;
-      for (let sampleRadius = TERRAIN_OUTER_RADIUS; sampleRadius >= 38; sampleRadius -= .5, sampleIndex += 1) {
-        const sampledHeight = terrainSamples?.[index]?.[sampleIndex] ?? terrainHeightAt(angle, sampleRadius);
-        const delta = Math.abs(sampledHeight - height);
+      for (let sampleRadius = TERRAIN_OUTER_RADIUS; sampleRadius >= 38; sampleRadius -= .5) {
+        const delta = Math.abs(terrainHeightAt(angle, sampleRadius) - height);
         if (delta < bestDelta) {
           bestDelta = delta;
           best = sampleRadius;
@@ -939,7 +920,7 @@ function mapContourAtHeight(height, samples = 120, terrainSamples = null) {
       }
       radius = best;
     } else {
-      const t = clamp((height - MAP_EDITOR_CROWN_BASE_HEIGHT) / (SUMMIT_HEIGHT - MAP_EDITOR_CROWN_BASE_HEIGHT), 0, 1);
+      const t = clamp((height - CROWN_BASE_HEIGHT) / (SUMMIT_HEIGHT - CROWN_BASE_HEIGHT), 0, 1);
       radius = lerp(CROWN_BASE_RADIUS, CROWN_TOP_RADIUS, t)
         * (1 + Math.sin(degreesToRadians(angle * (t > .5 ? 4 : 3) + 17)) * .035);
     }
@@ -949,19 +930,9 @@ function mapContourAtHeight(height, samples = 120, terrainSamples = null) {
 }
 
 export function createMountainMapData() {
-  // All four lower contour bands sample the same angle/radius grid. Reuse exact height
-  // evaluations instead of re-running terrain and authored-patch deformation for each band.
-  const terrainSamples = Array.from({ length: 120 }, (_, index) => {
-    const angle = index * 3;
-    const heights = [];
-    for (let radius = TERRAIN_OUTER_RADIUS; radius >= 38; radius -= .5) {
-      heights.push(terrainHeightAt(angle, radius));
-    }
-    return heights;
-  });
   const contours = MAP_ELEVATION_AREAS.map((area) => ({
     ...area,
-    points: mapContourAtHeight(area.minimumHeight, 120, terrainSamples)
+    points: mapContourAtHeight(area.minimumHeight)
   }));
   const waters = MOUNTAIN_FISHING_LOCATIONS.map((water, index) => {
     const center = water.localOffset
@@ -1280,19 +1251,15 @@ export class MountainWorld extends TestWorld {
     // use pointed, slanted, narrow, or leaning forms that are poor stamina-reset perches.
     this.fracturedRockForms = FRACTURED_ROCK_FORM_KINDS
       .map((kind, seed) => this.createFracturedRockForm(seed, kind));
-    markStartup('world:materials-and-rock-forms');
 
     this.buildOceanAndContinuousTerrain();
-    markStartup('world:terrain-and-colliders');
     this.buildOceanIslands();
     this.buildStarts();
     this.buildTravelDocks();
     this.buildHomeCabin();
     this.buildShopOutpost();
     this.buildPublicAquarium();
-    markStartup('world:islands-and-structures');
     this.buildContinuousClimbWeb();
-    markStartup('world:primary-climb-web');
     this.buildLandmarks();
     this.buildSummitCrown();
     this.buildSummitBench();
@@ -1302,20 +1269,11 @@ export class MountainWorld extends TestWorld {
     this.buildThreeToSevenHundredRockField();
     this.buildMidHighTraversalAnchors();
     this.buildSparseRegionInfill();
-    markStartup('world:procedural-rocks');
     this.buildEnvironmentAesthetics();
-    markStartup('world:vegetation-and-decor');
     this.rockSupportAudit = this.auditSolidRockSupport();
-    markStartup('world:rock-support-audit');
     this.buildFishingLocations();
-    markStartup('world:fishing-waters');
     this.indexMapDebugObjects();
-    markStartup('world:debug-id-index');
     this.setActiveLocation(this.activeLocationId);
-    markStartup('world:active-location');
-    applyWorldObjectPatch(this, MAP_EDITOR_PATCH, MOUNTAIN_CENTER);
-    markStartup('world:map-editor-overrides');
-    installMapEditorBridge(this, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
   }
 
   point(angle, radius, y, tangentOffset = 0) {
@@ -3297,7 +3255,7 @@ export class MountainWorld extends TestWorld {
       const localZ = position.z - MOUNTAIN_CENTER.z;
       const angle = (Math.atan2(localZ, localX) * 180 / Math.PI + 360) % 360;
       if (position.y < 4) environmentIndex = 1;
-      else if (position.y > MAP_EDITOR_CROWN_BASE_HEIGHT) environmentIndex = 5;
+      else if (position.y > CROWN_BASE_HEIGHT) environmentIndex = 5;
       else if (position.y > 105) environmentIndex = 4;
       else if (angle >= 70 && angle <= 155) environmentIndex = 3;
       else if (angle >= 245 && angle <= 345) environmentIndex = 2;
@@ -3359,15 +3317,10 @@ export class MountainWorld extends TestWorld {
       for (const part of bench.parts) part.mapDebugId = `BENCH-${slug(id)}`;
     }
     for (const entity of this.boatRailDebugEntities) add(entity.mapDebugId, entity.name, entity.getPosition(), entity);
-    // Debug indexing only needs stable water descriptors. Building full map contours here
-    // cost nearly two seconds and was repeated by the map UI during startup.
-    for (const water of ALL_FISHING_WATER_DESCRIPTORS) {
+    for (const water of this.getMapData().waters) {
       if (water.waterType === 'ocean') continue;
-      const center = water.center ?? (water.localOffset
-        ? this.point(water.angle, water.radius + water.localOffset.z, water.y, -water.localOffset.x)
-        : this.point(water.angle, water.radius, water.y));
       add(`${['pond', 'summit-pond'].includes(water.waterType) ? 'POND' : 'WATER'}-${slug(water.id)}`,
-        water.label, center);
+        water.label, water.center);
     }
     for (const [id, entity] of [
       ['BUILDING-HEARTHWARD-CABIN-01', this.homeCabinRoot],
@@ -3519,14 +3472,14 @@ export class MountainWorld extends TestWorld {
     const radialProjections = localVertices.map((vertex) => vertex.x * radialUnit.x + vertex.z * radialUnit.z);
     const radialSpan = Math.max(...radialProjections) - Math.min(...radialProjections);
 
-    const usingCrownShell = Boolean(this.crownSideTriangles?.length) && position.y >= MAP_EDITOR_CROWN_BASE_HEIGHT - 3;
+    const usingCrownShell = Boolean(this.crownSideTriangles?.length) && position.y >= CROWN_BASE_HEIGHT - 3;
     const desiredOverlap = usingCrownShell
       ? clamp(radialSpan * .28, .32, 2.6)
       : clamp(Math.min(size.x, size.y, size.z) * .14 + verticalSpan * .015, .2, .82);
 
     const crownGapsAt = (candidate) => localVertices.flatMap((vertex) => {
       const worldY = candidate.y + vertex.y;
-      if (worldY < MAP_EDITOR_CROWN_BASE_HEIGHT - 4 || worldY > SUMMIT_HEIGHT + 1.5) return [];
+      if (worldY < CROWN_BASE_HEIGHT - 4 || worldY > SUMMIT_HEIGHT + 1.5) return [];
       const worldX = candidate.x + vertex.x;
       const worldZ = candidate.z + vertex.z;
       let angle = Math.atan2(worldZ - MOUNTAIN_CENTER.z, worldX - MOUNTAIN_CENTER.x) * 180 / Math.PI;
@@ -3660,7 +3613,7 @@ export class MountainWorld extends TestWorld {
       size: { ...size },
       radius: Math.hypot(localX, localZ),
       angle,
-      crown: groundedPosition.y >= MAP_EDITOR_CROWN_BASE_HEIGHT - 3,
+      crown: groundedPosition.y >= CROWN_BASE_HEIGHT - 3,
       supported: placement.support.supported,
       contactCount: placement.support.contactCount,
       maximumExposure: placement.exposure?.maximum ?? null,
@@ -3879,8 +3832,7 @@ export class MountainWorld extends TestWorld {
       const a = sourceVertices[triangle[0]];
       const b = sourceVertices[triangle[1]];
       const c = sourceVertices[triangle[2]];
-      return !triangleIntersectsCaveEntrance(a, b, c)
-        && !terrainTriangleIsCut(a, b, c, MOUNTAIN_CENTER, MAP_EDITOR_PATCH);
+      return !triangleIntersectsCaveEntrance(a, b, c);
     });
 
     const geometry = new pc.Geometry();
@@ -4870,7 +4822,6 @@ export class MountainWorld extends TestWorld {
       !triangleIntersectsCaveEntrance(
         vertices[triangle[0]], vertices[triangle[1]], vertices[triangle[2]]
       )
-      && !terrainTriangleIsCut(vertices[triangle[0]], vertices[triangle[1]], vertices[triangle[2]], MOUNTAIN_CENTER, MAP_EDITOR_PATCH)
     ));
     const topTriangles = [];
     for (let index = 0; index < segments; index += 1) {
@@ -4986,7 +4937,7 @@ export class MountainWorld extends TestWorld {
   }
 
   crownRadiusAtHeight(y) {
-    const t = clamp((y - MAP_EDITOR_CROWN_BASE_HEIGHT) / (SUMMIT_HEIGHT - MAP_EDITOR_CROWN_BASE_HEIGHT), 0, 1);
+    const t = clamp((y - CROWN_BASE_HEIGHT) / (SUMMIT_HEIGHT - CROWN_BASE_HEIGHT), 0, 1);
     return lerp(CROWN_BASE_RADIUS, CROWN_TOP_RADIUS, t);
   }
 
@@ -5003,7 +4954,7 @@ export class MountainWorld extends TestWorld {
 
       for (let stage = 0; stage < stageCount; stage += 1) {
         const t = (stage + .55) / stageCount;
-        const centerY = lerp(MAP_EDITOR_CROWN_BASE_HEIGHT + 1.2, SUMMIT_HEIGHT - 2.15, t);
+        const centerY = lerp(CROWN_BASE_HEIGHT + 1.2, SUMMIT_HEIGHT - 2.15, t);
         const extraDifficulty = .07 + t * .16;
         const zigzag = Math.sin(t * Math.PI * 4 + routeIndex * .37) * (1.25 + baseDifficulty * .7);
         const secondary = Math.sin(t * Math.PI * 9 + routeIndex * .71) * .32;
@@ -5157,7 +5108,7 @@ export class MountainWorld extends TestWorld {
       { t: .87, count: CROWN_DENSITY_CONFIG.beltCounts[5], phase: 3.9 }
     ];
     crownBelts.forEach((belt, beltIndex) => {
-      const centerY = lerp(MAP_EDITOR_CROWN_BASE_HEIGHT + 1.3, SUMMIT_HEIGHT - 4.0, belt.t);
+      const centerY = lerp(CROWN_BASE_HEIGHT + 1.3, SUMMIT_HEIGHT - 4.0, belt.t);
       const shellRadius = this.crownRadiusAtHeight(centerY);
       for (let index = 0; index < belt.count; index += 1) {
         const spacing = 360 / belt.count;
@@ -5367,7 +5318,7 @@ export class MountainWorld extends TestWorld {
 
   isRockInProtectedWaterApproach(angle, radius) {
     const point = localPolarPoint(angle, radius);
-    return EDITOR_FISHING_LAYOUT.some((water) => {
+    return FISHING_LAYOUT.some((water) => {
       if (water.summit) return false;
       const center = localPolarPoint(water.angle, water.radius);
       const dx = point.x - center.x;
@@ -6198,14 +6149,14 @@ export class MountainWorld extends TestWorld {
     if (y < 24) return 'Coast / foothills';
     if (y < 62) return 'Lower mountain';
     if (y < 105) return 'Middle mountain';
-    if (y < MAP_EDITOR_CROWN_BASE_HEIGHT) return 'Upper / alpine';
+    if (y < CROWN_BASE_HEIGHT) return 'Upper / alpine';
     if (y < SUMMIT_HEIGHT - 1) return 'Summit crown';
     return 'Summit';
   }
 
   inferGroundMaterial(point, climbMaterial = null) {
     if (climbMaterial) return climbMaterial;
-    if (point.y >= MAP_EDITOR_CROWN_BASE_HEIGHT) return 'crown climb web / sheer summit rock';
+    if (point.y >= CROWN_BASE_HEIGHT) return 'crown climb web / sheer summit rock';
     if (point.y >= 105) return 'alpine rock / snow';
     const sector = this.getSector(point);
     if (sector.includes('Waterfall')) return 'smooth rock';
@@ -6251,7 +6202,7 @@ export class MountainWorld extends TestWorld {
       Digit7: { label: 'Lower climb web sample', position: this.point(20, escarpmentRadiusAt(ESCARPMENTS[0], 20) + ESCARPMENTS[0].width + 3, this.terrainY(20, escarpmentRadiusAt(ESCARPMENTS[0], 20) + ESCARPMENTS[0].width + 3) + 1.25), facingYaw: inwardYaw(20) },
       Digit8: { label: 'Middle climb web sample', position: this.point(183, escarpmentRadiusAt(ESCARPMENTS[1], 183) + ESCARPMENTS[1].width + 3, this.terrainY(183, escarpmentRadiusAt(ESCARPMENTS[1], 183) + ESCARPMENTS[1].width + 3) + 1.25, 1.5), facingYaw: inwardYaw(183) },
       Digit9: { label: 'Alpine climb web sample', position: this.point(265, escarpmentRadiusAt(ESCARPMENTS[2], 265) + ESCARPMENTS[2].width + 3, this.terrainY(265, escarpmentRadiusAt(ESCARPMENTS[2], 265) + ESCARPMENTS[2].width + 3) + 1.25), facingYaw: inwardYaw(265) },
-      Digit0: { label: 'Crown climb web sample', position: this.point(125, CROWN_BASE_RADIUS + 3, MAP_EDITOR_CROWN_BASE_HEIGHT + 1.25), facingYaw: inwardYaw(125) },
+      Digit0: { label: 'Crown climb web sample', position: this.point(125, CROWN_BASE_RADIUS + 3, CROWN_BASE_HEIGHT + 1.25), facingYaw: inwardYaw(125) },
       KeyT: { label: 'Mechanics course', position: { x: -14, y: 2.1, z: 12 }, facingYaw: 0 },
       KeyV: { label: 'Grip test wall', position: { x: -14, y: 2.8, z: 8.45 }, facingYaw: 0 },
       KeyY: { label: 'Upper climb web traverse', position: this.point(147, 74, this.terrainY(147, 74) + 1.25), facingYaw: inwardYaw(147) },

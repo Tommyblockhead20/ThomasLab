@@ -1,8 +1,10 @@
 import { defaultProgressionState, normalizeProgressionState } from '../progression/progression-save.js';
-import { canonicalSpeciesId } from '../fishing/fish-data.js';
+import { canonicalSpeciesId, resolveSpecies } from '../fishing/fish-data.js';
 import { isBetterCatch } from './best-catch.js';
+import { LEGACY_CATCH_REWARD_BY_SPECIES } from '../progression/cosmetics.js';
+import { getCatchValue } from '../progression/economy.js';
 
-export const SAVE_SCHEMA_VERSION = 14;
+export const SAVE_SCHEMA_VERSION = 15;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -120,10 +122,15 @@ export function normalizeSave(value = {}) {
   const collection = value.collection && typeof value.collection === 'object' ? value.collection : {};
   for (const [speciesId, entry] of Object.entries(collection)) {
     const canonicalId = canonicalSpeciesId(speciesId);
-    if (canonicalId) normalized.collection[canonicalId] = mergeEntries(
-      normalized.collection[canonicalId],
-      normalizeEntry(entry)
-    );
+    if (canonicalId) {
+      const currentSpecies = resolveSpecies(canonicalId, true);
+      const current = normalizeEntry(entry);
+      if (currentSpecies && !currentSpecies.retired) {
+        current.rarity = currentSpecies.rarity;
+        if (currentSpecies.id === 'siren-ray') current.name = 'Siren';
+      }
+      normalized.collection[canonicalId] = mergeEntries(normalized.collection[canonicalId], current);
+    }
   }
   const lifetime = value.lifetime && typeof value.lifetime === 'object' ? value.lifetime : {};
   normalized.lifetime.fishCaught = Math.max(0, Math.floor(finiteNumber(lifetime.fishCaught)));
@@ -136,8 +143,8 @@ export function normalizeSave(value = {}) {
   const bestCatch = lifetime.bestCatch && typeof lifetime.bestCatch === 'object' ? lifetime.bestCatch : null;
   normalized.lifetime.bestCatch = bestCatch ? {
     speciesId: canonicalSpeciesId(bestCatch.speciesId ?? ''),
-    name: typeof bestCatch.name === 'string' ? bestCatch.name.slice(0, 120) : '',
-    rarity: normalizeRarity(bestCatch.rarity),
+    name: resolveSpecies(bestCatch.speciesId, true)?.id === 'siren-ray' ? 'Siren' : typeof bestCatch.name === 'string' ? bestCatch.name.slice(0, 120) : '',
+    rarity: resolveSpecies(bestCatch.speciesId, true)?.rarity ?? normalizeRarity(bestCatch.rarity),
     shiny: Boolean(bestCatch.shiny),
     weight: Math.max(0, finiteNumber(bestCatch.weight)),
     length: Math.max(0, finiteNumber(bestCatch.length)),
@@ -146,6 +153,9 @@ export function normalizeSave(value = {}) {
     value: Math.max(0, finiteNumber(bestCatch.value)),
     caughtAt: Math.max(0, finiteNumber(bestCatch.caughtAt))
   } : null;
+  if (normalized.lifetime.bestCatch && resolveSpecies(normalized.lifetime.bestCatch.speciesId, false)) {
+    normalized.lifetime.bestCatch.value = getCatchValue(normalized.lifetime.bestCatch);
+  }
   normalized.lifetime.fishingWatersCaught = [...new Set((Array.isArray(lifetime.fishingWatersCaught) ? lifetime.fishingWatersCaught : [])
     .filter((id) => typeof id === 'string' && id).map((id) => id.slice(0, 160)))];
   normalized.lifetime.boatTrips = Math.max(0, Math.floor(finiteNumber(lifetime.boatTrips)));
@@ -175,6 +185,16 @@ export function normalizeSave(value = {}) {
     }))
     : [];
   normalized.progression = normalizeProgressionState(value.progression);
+  for (const specimen of [...normalized.progression.inventory, ...normalized.progression.aquarium]) {
+    if (specimen.provenance?.legitimate === false) continue;
+    const candidate = {
+      speciesId: specimen.speciesId, name: specimen.name, rarity: specimen.rarity,
+      shiny: specimen.shiny, weight: specimen.weight, length: specimen.length,
+      sizeFraction: specimen.sizeFraction, weightFraction: specimen.weightFraction,
+      value: specimen.value, caughtAt: specimen.provenance?.caughtAt ?? 0
+    };
+    if (isBetterCatch(candidate, normalized.lifetime.bestCatch)) normalized.lifetime.bestCatch = candidate;
+  }
   return normalized;
 }
 
@@ -253,7 +273,19 @@ const MIGRATIONS = Object.freeze({
     worldMilestones: Array.isArray(value.worldMilestones) ? value.worldMilestones : [],
     progression: normalizeProgressionState(value.progression)
   }),
-  13: (value) => ({ ...value, version: 14, slotName: value.slotName ?? '' })
+  13: (value) => ({ ...value, version: 14, slotName: value.slotName ?? '' }),
+  14: (value) => {
+    const owned = new Set(Array.isArray(value.progression?.ownedCosmetics) ? value.progression.ownedCosmetics : []);
+    for (const [speciesId, rewardId] of Object.entries(LEGACY_CATCH_REWARD_BY_SPECIES)) {
+      if (Object.entries(value.collection ?? {}).some(([id, entry]) => (
+        canonicalSpeciesId(id) === speciesId && Number(entry?.catches) > 0
+      ))) owned.add(rewardId);
+    }
+    return {
+      ...value, version: 15,
+      progression: { ...value.progression, ownedCosmetics: [...owned] }
+    };
+  }
 });
 
 export function migrate(value) {

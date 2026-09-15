@@ -184,6 +184,11 @@ export class PlayerInput {
     };
     globalThis.window?.addEventListener?.('reel-ascent:key-bindings-changed', this.onBindingsChanged);
     this.held = new Set();
+    this.gamepadAxes = { x: 0, z: 0 };
+    this.gamepadSprintHeld = false;
+    this.gamepadSlideHeld = false;
+    this.gamepadGripHeld = false;
+    this.gamepadCastHeld = false;
     this.jumpQueued = false;
     this.fishingToggleQueued = false;
     this.mobileInteractionQueued = false;
@@ -486,31 +491,31 @@ export class PlayerInput {
     const forward = heldAction('forward') || this.touchActions.has('up');
     const backward = heldAction('backward') || this.touchActions.has('down');
 
-    return {
-      x: Number(right) - Number(left),
-      z: Number(forward) - Number(backward)
-    };
+    const x = Number(right) - Number(left) + this.gamepadAxes.x;
+    const z = Number(forward) - Number(backward) + this.gamepadAxes.z;
+    const magnitude = Math.hypot(x, z);
+    return magnitude > 1 ? { x: x / magnitude, z: z / magnitude } : { x, z };
   }
 
   get sprintHeld() {
-    return bindingCodes('sprint', this.bindings).some((code) => this.held.has(code)) || this.mobileSprintToggled;
+    return bindingCodes('sprint', this.bindings).some((code) => this.held.has(code)) || this.mobileSprintToggled || this.gamepadSprintHeld;
   }
 
   get slideHeld() {
-    return bindingCodes('slide', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('slide');
+    return bindingCodes('slide', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('slide') || this.gamepadSlideHeld;
   }
 
   get rawGripHeld() {
-    return bindingCodes('grip', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('grip') || this.primaryHeld;
+    return bindingCodes('grip', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('grip') || this.primaryHeld || this.gamepadGripHeld;
   }
 
   get gripHeld() {
     return !this.gripInteractionSuppressed && (bindingCodes('grip', this.bindings).some((code) => this.held.has(code))
-      || this.touchActions.has('grip') || (this.primaryHeld && !this.primarySuppressed));
+      || this.touchActions.has('grip') || this.gamepadGripHeld || (this.primaryHeld && !this.primarySuppressed));
   }
 
   get fishingCastHeld() {
-    return bindingCodes('forward', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('up');
+    return bindingCodes('forward', this.bindings).some((code) => this.held.has(code)) || this.touchActions.has('up') || this.gamepadCastHeld;
   }
 
   consumeJump() {

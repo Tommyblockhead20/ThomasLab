@@ -1,4 +1,34 @@
-# REEL ASCENT v19 — CURRENT IMPLEMENTATION STATE
+# REEL ASCENT v20 — CURRENT IMPLEMENTATION STATE (PARTIAL)
+
+Status (2026-09-14): v20 roster, current-water ecology, save migration, startup profiling/one major bottleneck reduction, controller core, and targeted early-economy changes are implemented locally. **v20 as a whole is not complete or deployed.** The final authored Stoneveil export is not in this tree; cloud accounts, vote-guided song revisions, and non-Stoneveil visual polish remain open. No commit, push, or deploy was made. The immediately preceding v19 section below is historical.
+
+## Source-of-truth / authored Stoneveil
+
+The uncommitted Map Editor files present before this pass (`READMEeditor.md`, `example-middle-plateau-plus-150.json`, `src/world/map-editor-patch.json`, `src/world/map-editor-runtime.js`, `src/world/mountain-v2.pre-map-editor.js`, `tools/map-editor/`, plus modifications in `src/world/mountain-v2.js`) belong to the user's in-progress editor work and were preserved. The current `map-editor-patch.json` has `updatedAt: null`, identity profile, no strokes/cuts, no hidden/placed/overridden objects, no fishing overrides, and **no frozen 3D mesh or baked rocks/decor**. `READMEeditor.md` says editor snapshots are editor-only and gameplay remains generated. Therefore the production world still runs its old heightfield/procedural rock and vegetation builders. This pass did **not** replace them with a guessed geometry or scatter new objects over the intended final map. When the final export lands, production terrain, Rapier collision, baked objects, edited water and climbing/fishing alignment must be integrated and tested; until then checklist items 3–9 below are unverified/unavailable. A Node JSON import attribute was added to the user-owned mountain import for current Node syntax checks, and the no-op object override scan is skipped for an empty patch; authored edits still take precedence when present. During the local dev-server session the Map Editor logged that **localStorage autosave is full; IndexedDB recovery remains active**. No editor data was deleted here; export a file backup of the active editor session before closing that browser tab.
+
+## Startup and load measurements
+
+New opt-in `src/debug/startup-timings.js` records module/bootstrap, physics/app, world sub-builds, save, player, fishing, UI, loading dismissal and first interactive frame. `window.__reelAscentStartup()` returns the trace; `?startup` displays it and logs a table without adding normal-play UI. Instruments are in `src/main.js`, `src/game.js`, and `src/world/mountain-v2.js`. Before the optimization, one warm local Vite browser run reached first interactivity in **~9.0s**: terrain/collision ~0.93s, climb web ~1.46s, procedural rocks ~2.65s, old debug index/map build ~1.5s, UI ~1.49s. Afterward, runs reached **~6.1–7.6s** (latest browser smoke ~7.65s): terrain/collision ~0.95–1.27s, climb web ~1.39–1.98s, procedural rocks ~2.5–2.9s, debug ID index ~2–3ms, UI including one map contour build ~0.37–0.41s. The actual bottleneck fix: debug indexing now uses the 28 source water descriptors rather than calling costly `getMapData()` just to get water IDs; lower map contours share the exact same angle/radius terrain sample grid instead of recomputing it four times. No authored-rock speedup can be claimed because no bake exists. This is warm local desktop timing, **not** a cold production connection benchmark. The old procedural rock/climb builders are still the largest stages and must not simply be removed until a faithful bake replaces them.
+
+## Roster, ecology, reservations, and saves
+
+- `src/fishing/fish-data.js` applies 30 final-tier overrides after historical definitions, preserving all stable IDs: **Common→Uncommon:** Mudskipper, Flying Gurnard, Giant Caribbean Anemone, American Mink, Staghorn Coral. **Uncommon→Common:** Freshwater Mussel, Sea Scallop, Brook Trout, Blue Crab, Freshwater Drum. **Uncommon→Rare:** Vampire Squid, Diving Bell Spider, Leafy Seadragon, Giant Isopod, North American River Otter. **Rare→Uncommon:** Fairy Shrimp, Remora, Diving Beetle, Freshwater Eel, Split Rock Trout. **Rare→Legendary:** Ahuizotl, Goblin Shark, American Alligator, Giant Panda, Green Sea Turtle. **Legendary→Rare:** Starfall Minnow, Violet Crayfish, Whisper Eel, Peaklight Koi, Plungepool Crab. Runtime roster = **300 / 75 Common / 75 Uncommon / 75 Rare / 75 Legendary**, unique IDs.
+- `src/fishing/future-reservations.js` labels 22 stable IDs for future Pirate (Flying Fish, Chambered Nautilus, Green Moray, Great Barracuda, Siren, Mermaid, Sea Serpent, Kraken) or Skyscraper locations (Sand Dollar, Horseshoe Crab, Goldfish, Guppy, Piranha, American Alligator, Betta, Seahorse, Hippocampus, Blue Mussel, Sea Scallop, American Lobster, Giant Clam, Japanese Spider Crab). `src/fishing/rarity-selection.js` and ecology hard-exclude them from all *current legitimate* selections. Existing owned specimens/discoveries are kept. Lionfish stays current. Treasure Chest is **not** added to the 300-species roster; its separate catch-type foundation is deferred until future treasure gameplay has an outcome API.
+- `siren-ray` remains the historical lookup/song-vote ID; visible name becomes **Siren** and the current visual archetype changes from ray to the existing sirenian body. That is a compatibility-preserving model direction, not a claim that a custom Siren model is final.
+- `src/fishing/fish-ecology.js` applies hard reservation/cave/true destination exclusions first, then the rarity-first Stage A profile and within-rarity Stage B habitat weights. Cave pools have a distinct 20/25/40/15 rarity profile. Obligate cave creatures cannot spill onto surface waters, Strong Cave Stone Loach is very unlikely outside caves, ordinary surface fish are downweighted in caves; water-size suitability is soft (~0.65–1.5) and stable species/water abundance varies ~0.75–1.35. Six over-wide freshwater species receive narrower water lists. Yellowfin Tuna, Sailfish, and Moonwake Squid are now Bluewater Reach-only; Outer Ocean retains its own exclusives. Frosthook Lake gains Arctic Char and Dolly Varden exclusivity alongside Lernaean Hydra. `scripts/ecology-audit.mjs` reports each of 28 waters' eligible count, exclusives, rarity mix, top 10, and each species' water count/top waters. Current audit: **22 future reserved; 0 accidentally unreachable**. Cold Ocean has only five eligible exclusive creatures, flagged as a thin table for manual feel-check, not silently filled with warm-water species.
+- Save schema `14→15` in `src/persistence/save-system.js` and `src/progression/progression-save.js`: old Inventory/Aquarium specimens preserve IDs, sizes and provenance while taking current rarity and recomputed sale value; collection and per-save Best Catch use canonical current rarity. Five outgoing Legendary cosmetic IDs remain in catalog and are preserved/granted to pre-v20 saves with the historic catch; fresh catches of their demoted species do not grant those legacy rewards. New Legendary reward recipes: Ahuizotl Water-Shadow Scarf, Goblin Shark Visor, Alligator Scale Mantle, Panda Ear Hood, Sea Turtle Shell Pack. `src/persistence/best-catch.js` scores canonical rarity even for stale records. Future-reserved owned specimen regression passes.
+
+## Controller, economy, and remaining scope
+
+`src/input/gamepad-controller.js` and `src/player/movement.js` use a standard connected Gamepad as a separate input source: left stick move, right stick look, A jump/confirm (hook during fishing), B Escape/back, X interact, Y fish toggle, LB grip, RB sprint, LT slide, RT held cast/release, D-pad four rhythm lanes and fishing-result Up recast (hold/release), Down stay, Left dislike, Right like, Start pause/resume. Visible dialogs support left stick/D-pad focus navigation, A activation, B back, LB/RB tabs, focus scrolling and range-slider adjustments. Disconnect clears held axes/actions; no controller toast appears until a pad actually connects. **No physical controller was available in this pass**; test movement/camera/climb/cast/rhythm/recast/menus with a real pad before release. `src/version.js` now says v20.
+
+Economy audit used typical GOOD mid-size values Common $8 / Uncommon $21 / Rare $54 / Legendary $156; the lower-tier rarity mix yields ~$18 per successful catch before shiny/quality/gear. Targeted early reductions in `src/progression/equipment.js`: Common Field Notes $400→$225, Fast-Bite Chum $1250→$800, Precision Tip Rod $1500→$900, Trail Runners $1250→$900. The second Aquarium tank drops $2500→$1800 in `src/progression/aquarium.js`; later tanks and expensive aspiration equipment remain unchanged. These are price assumptions, not a measured playtime/income study; feel-check actual catch cadence and Aquarium passive income.
+
+**Open v20 work:** no account authentication/cloud slots/local→cloud migration/conflict UI/account-backed vote identity; signed-out local four slots/export/import remain. No server/database code was changed, so there is no new Render schema or server redeploy from this partial pass. A read-only live aggregate vote request received 401; an attempt to supply an unverified browser Origin was blocked by workspace security review, so no vote data was read and no song revision/instrument changed. Obtain an approved aggregate export/access path before vote-guided rhythm changes. Non-Stoneveil buildings/shore/vegetation visual polish and manual item-by-item value testing also remain. The final authored map bake is the largest external dependency; do not label the current procedural map as integrated.
+
+Validation: `node --test test/v20-core.test.js test/v20-gamepad.test.js test/v20-economy.test.js test/v19-focused.test.js test/save-system.test.js test/mountain.test.js` focused suites; `npm run build`; changed JS syntax checks; `node scripts/ecology-audit.mjs`; local browser startup smoke. The generated `dist/` is intentionally tracked and rebuilt, but not published. The prior v19 server behavior was not modified. No live Neon, cold hosted load, physical controller, two-player, or authored-map playtest is claimed.
+
+# REEL ASCENT v19 — HISTORICAL IMPLEMENTATION STATE
 
 Status: v19 existing-game polish is implemented in the current source tree and built locally. Automated focused tests pass. Several spatial, visual, touch, two-browser, and live-Neon checks below still need a human game session; do not interpret the code checks as those playtests. The earlier v17.6-and-older entries below are historical, not the current release state. The current tree began this pass at the completed v18 commit `d97f8c7`.
 
@@ -997,3 +1027,38 @@ This section supersedes older statements below where the two differ.
 57. **Frontend build** — Yes. The v9.2 `npm run build` completed successfully (1,274 modules; only the existing large-chunk warning). Focused roster/ecology, binding, aquarium/Sell All, appearance, and server-allowlist checks pass; changed JavaScript passes syntax checks; the multiplayer server started successfully on the alternate smoke-test port 18787 because the normal local port 8787 was already occupied; `git diff --check` reports only Windows line-ending notices.
 
 58. **Highest-value manual tests** — Sail once to any small island and return to verify a random main dock; inspect the six island shore/dock joins and Cave Island entrance; walk Cloudstep→Fallglass→ocean looking for clipping; buy/use both maps and check GPS with a second player; exercise Shop/Aquarium/Cabin interactions; migrate/switch/import/reset a nonprimary save; tap then hold F1 and try F3/F7/F9.
+
+## v20 manual playtest checklist (current release gate)
+
+The authored-map and cloud items cannot pass until those assets/services are implemented. Use these as release checks, not claims of automated verification.
+
+1. [ ] Time from load until I can actually move/play
+2. [ ] Starting-area visual load/pop-in
+3. [ ] Final authored Stoneveil mountain shape
+4. [ ] Cave/overhang collision
+5. [ ] Climbing on edited terrain
+6. [ ] Baked rock climbing/collision
+7. [ ] Baked vegetation/decor placement
+8. [ ] Edited water location/size/depth/color
+9. [ ] Fishing from moved/resized waters
+10. [ ] Several ordinary pond catch tables
+11. [ ] Cave-pool catch tables
+12. [ ] Frosthook Lake
+13. [ ] Cold Ocean
+14. [ ] Outer Ocean vs Bluewater Reach
+15. [ ] Summit/hard destination exclusives
+16. [ ] Existing save containing a promoted species
+17. [ ] Existing save containing a demoted species
+18. [ ] Sale value after rarity migration
+19. [ ] Best Catch after rarity migration
+20. [ ] Previously unlocked Legendary cosmetics
+21. [ ] Controller movement
+22. [ ] Controller camera
+23. [ ] Controller climbing
+24. [ ] Controller fishing
+25. [ ] Controller rhythm
+26. [ ] Controller menu navigation
+27. [ ] Local-save → account/cloud migration (not implemented yet)
+28. [ ] Four cloud save slots (not implemented yet)
+29. [ ] Account sign-out/local fallback (not implemented yet)
+30. [ ] Export/import after v20 migration

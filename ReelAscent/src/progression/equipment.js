@@ -8,7 +8,7 @@ const item = (id, category, name, price, effect, modifiers = {}, metadata = {}) 
 
 export const EQUIPMENT_CATALOG = Object.freeze([
   item('trail-rod', 'rod', 'Trail Rod', 0, 'Balanced starter rod.'),
-  item('precision-tip-rod', 'rod', 'Precision Tip Rod', 1500, '12% wider successful timing window; PERFECT stays precise.', { successWindowMultiplier: 1.12 }),
+  item('precision-tip-rod', 'rod', 'Precision Tip Rod', 900, '12% wider successful timing window; PERFECT stays precise.', { successWindowMultiplier: 1.12 }),
   item('virtuoso-rod', 'rod', 'Virtuoso Rod', 6000, '11% faster songs; any landed catch is at least GREAT.', { tempoMultiplier: 1.11, minimumSuccessfulQuality: 'GREAT' }),
 
   item('creek-reel', 'reel', 'Creek Reel', 0, 'Balanced starter reel.'),
@@ -21,7 +21,7 @@ export const EQUIPMENT_CATALOG = Object.freeze([
   item('braided-lifeline', 'line', 'Braided Lifeline', 7500, 'Ordinary creatures allow roughly twice as many mistakes.', { mistakeAllowanceMultiplier: 2 }),
 
   item('plain-spoon', 'lure', 'Plain Spoon', 0, 'Simple starter tackle.'),
-  item('fast-bite-chum', 'lure', 'Fast-Bite Chum', 1250, 'Cuts average bite waiting time in half.', { biteDelayMultiplier: .5 }),
+  item('fast-bite-chum', 'lure', 'Fast-Bite Chum', 800, 'Cuts average bite waiting time in half.', { biteDelayMultiplier: .5 }),
   item('silverflash-spoon', 'lure', 'Silverfish Spoon', 2000, 'Increases the odds of Rare creatures by 20 percentage points.', { rareProbabilityBonus: .20 }),
   item('oddity-bait', 'lure', 'Oddity Bait', 3000, 'Doubles eligible non-fish creature odds within the chosen rarity.', { nonFishWeightMultiplier: 2 }),
   item('mythlight-lure', 'lure', 'Mythlight Lure', 10000, 'Increases the odds of Legendary creatures by 10 percentage points.', { legendaryProbabilityBonus: .10 }),
@@ -35,7 +35,7 @@ export const EQUIPMENT_CATALOG = Object.freeze([
     'A brass-eyed deepwater float that waits until a bite seems worth bothering you about.', {},
     { bobberMode: 'trophy' }),
 
-  item('common-field-notes', 'guide', 'Common Field Notes', 400, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),
+  item('common-field-notes', 'guide', 'Common Field Notes', 225, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),
   item('uncommon-field-notes', 'guide', 'Uncommon Field Notes', 800, 'Shows the five likeliest Uncommon creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Uncommon' }),
   item('rare-field-notes', 'guide', 'Rare Field Notes', 2000, 'Shows the five likeliest Rare creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Rare' }),
   item('legendary-field-notes', 'guide', 'Legendary Field Notes', 5000, 'Shows the five likeliest Legendary creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Legendary' }),
@@ -47,7 +47,7 @@ export const EQUIPMENT_CATALOG = Object.freeze([
   item('trail-kit', 'climbingTool', 'Trail Kit', 0, 'Standard climbing tool with no traversal bonus.'),
   item('empty-chalk-loop', 'chalk', 'Empty Chalk Loop', 0, 'Starter belt loop with no stamina bonus.'),
   item('trail-harness', 'harness', 'Trail Harness', 0, 'Balanced starter harness and pack.'),
-  item('trail-runners', 'boots', 'Trail Runners', 1250, 'Sprint speed increases by 15%.', { sprintSpeedMultiplier: 1.15 }),
+  item('trail-runners', 'boots', 'Trail Runners', 900, 'Sprint speed increases by 15%.', { sprintSpeedMultiplier: 1.15 }),
   // Keep the durable id so existing saves migrate cleanly, but this is the v9 replacement item.
   item('endurance-belt', 'boots', 'Endurance Boots', 1750, 'Normal sprinting consumes no stamina.', { sprintDrain: 0 }),
   item('chalk-gloves', 'gloves', 'Climbing Gloves', 2000, 'Climbing and grip stamina costs decrease by 20%.', { gripDrain: .8 }),

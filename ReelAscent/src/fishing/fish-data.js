@@ -1,6 +1,7 @@
 import { SHINY_CONFIG } from '../config.js';
 import { EXPANDED_SPECIES_DEFINITIONS } from './species-expansion.js';
 import { buildTwoStageProbabilityTable } from './rarity-selection.js';
+import { FUTURE_CREATURE_RESERVATIONS } from './future-reservations.js';
 
 export const FISH_SONG_TEMPO_MULTIPLIER = .85;
 
@@ -515,6 +516,21 @@ const V11_RARITY_OVERRIDES = Object.freeze({
   nokken: 'Rare',
   'green-sea-turtle': 'Rare'
 });
+// v20 changes are applied at the final roster projection, after historical source overrides.
+const V20_RARITY_OVERRIDES = Object.freeze({
+  mudskipper: 'Uncommon', flying_gurnard: 'Uncommon', giant_caribbean_anemone: 'Uncommon',
+  'american-mink': 'Uncommon', staghorn_coral: 'Uncommon',
+  'freshwater-mussel': 'Common', 'sea-scallop': 'Common', 'brook-trout': 'Common',
+  'blue-crab': 'Common', 'freshwater-drum': 'Common',
+  vampire_squid: 'Rare', diving_bell_spider: 'Rare', leafy_seadragon: 'Rare',
+  giant_isopod: 'Rare', 'north-american-river-otter': 'Rare',
+  'fairy-shrimp': 'Uncommon', remora: 'Uncommon', 'diving-beetle': 'Uncommon',
+  'freshwater-eel': 'Uncommon', 'split-rock-trout': 'Uncommon',
+  ahuizotl: 'Legendary', goblin_shark: 'Legendary', american_alligator: 'Legendary',
+  giant_panda: 'Legendary', 'green-sea-turtle': 'Legendary',
+  'starfall-minnow': 'Rare', 'violet-crayfish': 'Rare', 'whisper-eel': 'Rare',
+  'peaklight-koi': 'Rare', 'plungepool-crab': 'Rare'
+});
 const V11_CATCH_WEIGHTS = Object.freeze({ Common: 12, Uncommon: 8, Rare: 4, Legendary: 1.8 });
 const FROSTHOOK_MARINE_HABITAT = Object.freeze({
   salinity: 'salt', tiers: Object.freeze(['ocean']), waterTypes: Object.freeze(['cold-ocean']),
@@ -529,27 +545,62 @@ const V11_HABITAT_OVERRIDES = Object.freeze({
   'blue-ice-codling': FROSTHOOK_MARINE_HABITAT,
   'frostglass-shrimp': FROSTHOOK_MARINE_HABITAT
 });
+const V20_LIMITED_WATERS = Object.freeze({
+  'american-eel': ['blackstone-inlet', 'red-river-bend', 'mossbell-lake', 'split-rock-pool', 'obsidian-cup', 'crown-vault', 'twilight-basin'],
+  'stone-loach': ['basalt-grotto', 'echo-cave-pool', 'obsidian-cup', 'high-cirque-tarn', 'crown-vault', 'split-rock-pool'],
+  'diving-beetle': ['fernwater-pond', 'sheltered-mirror', 'windcut-tarn', 'hidden-ridge-pool', 'blue-ice-melt', 'crooked-peak-tarn', 'crown-vault'],
+  'freshwater-drum': ['mossbell-lake', 'pineglass-lake', 'red-river-bend', 'twilight-basin', 'gull-crag-pond'],
+  walleye: ['mossbell-lake', 'pineglass-lake', 'cloudstep-lake', 'red-river-bend', 'twilight-basin', 'blue-ice-melt'],
+  'freshwater-eel': ['sheltered-mirror', 'red-river-bend', 'fernwater-pond', 'mossbell-lake', 'twilight-basin', 'split-rock-pool', 'crown-vault']
+});
+const V20_BLUEWATER_EXCLUSIVES = new Set(['yellowfin_tuna', 'sailfish', 'moonwake-squid']);
+const V20_FROSTHOOK_LAKE_EXCLUSIVES = new Set(['arctic-char', 'dolly-varden']);
+function currentHabitat(fish) {
+  const original = V11_HABITAT_OVERRIDES[fish.id] ?? fish.habitat;
+  if (V20_FROSTHOOK_LAKE_EXCLUSIVES.has(fish.id)) return Object.freeze({
+    ...original,
+    exclusiveWaterId: 'blue-ice-melt',
+    waterIds: Object.freeze(['blue-ice-melt']),
+    favoredWaterIds: Object.freeze(['blue-ice-melt'])
+  });
+  if (V20_BLUEWATER_EXCLUSIVES.has(fish.id)) return Object.freeze({
+    ...original,
+    exclusiveWaterId: 'bluewater-reach-water',
+    waterIds: Object.freeze(['bluewater-reach-water']),
+    favoredWaterIds: Object.freeze(['bluewater-reach-water'])
+  });
+  const limited = V20_LIMITED_WATERS[fish.id];
+  return limited ? Object.freeze({ ...original, waterIds: Object.freeze(limited) }) : original;
+}
 const preparedSpecies = [...SPECIES, ...NEW_ACTIVE_SPECIES, ...V92_ACTIVE_SPECIES].map((fish) => {
   const adjustment = REAL_SPECIES_ADJUSTMENTS[fish.id];
   const length = adjustment?.length ?? [fish.minLength, fish.maxLength];
   const weight = adjustment?.weight ?? [fish.minWeight, fish.maxWeight];
   const canonicalId = adjustment?.canonicalId ?? canonicalize(fish.id);
-  const rarity = V11_RARITY_OVERRIDES[fish.id] ?? fish.rarity;
+  const rarity = V20_RARITY_OVERRIDES[fish.id] ?? V11_RARITY_OVERRIDES[fish.id] ?? fish.rarity;
   return {
     ...fish,
     rarity,
     rarityLabel: rarity,
     catchWeight: rarity === fish.rarity ? fish.catchWeight : V11_CATCH_WEIGHTS[rarity],
-    habitat: V11_HABITAT_OVERRIDES[fish.id] ?? fish.habitat,
+    habitat: currentHabitat(fish),
     canonicalId,
     legacyIds: Object.freeze([...new Set([fish.id, canonicalize(fish.id)])]),
-    name: adjustment?.name ?? fish.name,
+    name: fish.id === 'siren-ray' ? 'Siren' : adjustment?.name ?? fish.name,
+    futureReserved: Boolean(FUTURE_CREATURE_RESERVATIONS[fish.id]),
+    futureLocation: FUTURE_CREATURE_RESERVATIONS[fish.id] ?? null,
     taxonomy: adjustment?.taxonomy ?? '',
-    flavor: adjustment?.flavor ?? fish.flavor,
+    flavor: fish.id === 'siren-ray'
+      ? 'A haunting sea singer whose call draws unwary sailors toward hidden reefs.'
+      : adjustment?.flavor ?? fish.flavor,
     minLength: length[0], maxLength: length[1],
     minWeight: weight[0], maxWeight: weight[1],
+    visual: fish.id === 'siren-ray'
+      ? Object.freeze({ ...fish.visual, ...ARCHETYPE_PROPORTIONS.sirenian, archetype: 'sirenian' })
+      : fish.visual,
     sizeModel: Object.freeze({
       ...fish.sizeModel,
+      ...(fish.id === 'siren-ray' ? ARCHETYPE_PROPORTIONS.sirenian : {}),
       typicalLength: Object.freeze([...length]),
       typicalWeight: Object.freeze([...weight])
     }),

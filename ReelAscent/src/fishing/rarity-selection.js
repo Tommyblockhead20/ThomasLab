@@ -13,6 +13,7 @@ export const TIER_RARITY_PROFILES = Object.freeze({
   middle: Object.freeze({ Common: .35, Uncommon: .26, Rare: .27, Legendary: .12 }),
   upper: Object.freeze({ Common: .05, Uncommon: .18, Rare: .64, Legendary: .13 }),
   summit: Object.freeze({ Common: 0, Uncommon: .20, Rare: .45, Legendary: .35 }),
+  cave: Object.freeze({ Common: .20, Uncommon: .25, Rare: .40, Legendary: .15 }),
   cloudstep: PHYSICAL_WATER_RARITY_PROFILES.cloudstep,
   waterfall: PHYSICAL_WATER_RARITY_PROFILES.waterfall,
   ocean: PHYSICAL_WATER_RARITY_PROFILES.ocean
@@ -127,7 +128,8 @@ function naturallyLargeSpeciesWeight(fish, bias = 0) {
 
 export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) {
   const ids = new Set(fishIds ?? []);
-  const eligible = species.filter((fish) => ids.has(fish.id));
+  const eligible = species.filter((fish) => ids.has(fish.id)
+    && (!fish.futureReserved || modifiers.allowFutureReserved === true));
   if (!eligible.length) return [];
   const availableRarities = [...new Set(eligible.map((fish) => fish.rarity))];
   const rarityProfile = getRarityProfile(modifiers, availableRarities);

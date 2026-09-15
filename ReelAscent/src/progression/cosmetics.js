@@ -110,8 +110,30 @@ const LEGENDARY_OVERRIDES = Object.freeze({
   pufferfish: ['Puffer Puff Collar', 'faceAccessory', 'puff'],
   kraken: ['Kraken Wake Cape', 'backAccessory', 'tentacle'],
   narwhal: ['Narwhal Horn Crown', 'headwear', 'horn'],
-  crowned_sunray: ['Sunray Crown', 'headwear', 'sun']
+  crowned_sunray: ['Sunray Crown', 'headwear', 'sun'],
+  ahuizotl: ['Ahuizotl Water-Shadow Scarf', 'faceAccessory', 'serpent'],
+  goblin_shark: ['Goblin Shark Visor', 'eyewear', 'visor'],
+  american_alligator: ['Alligator Scale Mantle', 'backAccessory', 'cape'],
+  giant_panda: ['Panda Ear Hood', 'headwear', 'hood'],
+  'green-sea-turtle': ['Sea Turtle Shell Pack', 'backAccessory', 'shell']
 });
+
+// The five v19 Legendary rewards are retired from future catch grants, but old saves
+// may still own them. Their IDs and geometry remain renderable after the rarity swap.
+export const LEGACY_CATCH_REWARD_BY_SPECIES = Object.freeze({
+  starfall_minnow: 'catch-starfall_minnow',
+  violet_crayfish: 'catch-violet_crayfish',
+  whisper_eel: 'catch-whisper_eel',
+  peaklight_koi: 'catch-peaklight_koi',
+  plungepool_crab: 'catch-plungepool_crab'
+});
+const legacyCatchCosmetics = Object.freeze([
+  item('catch-starfall_minnow', 'Starfall Minnow Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'scarf'),
+  item('catch-violet_crayfish', 'Violet Crayfish Crest', 'headwear', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'hood'),
+  item('catch-whisper_eel', 'Whisper Eel Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'necklace'),
+  item('catch-peaklight_koi', 'Peaklight Koi Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'scarf'),
+  item('catch-plungepool_crab', 'Plungepool Crab Mantle', 'backAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'flag')
+]);
 
 const SLOT_ROTATION = Object.freeze(['headwear', 'eyewear', 'faceAccessory', 'backAccessory']);
 const VISUALS = Object.freeze({
@@ -152,6 +174,7 @@ export const COSMETIC_CATALOG = Object.freeze([
   ...EXISTING_REWARD_COSMETICS,
   ...badgeCosmetics,
   ...legendaryCosmetics,
+  ...legacyCatchCosmetics,
   ...CASINO_EXCLUSIVE_COSMETICS
 ]);
 export const PREVIOUS_ACTIVE_COSMETIC_COUNT = 17;
