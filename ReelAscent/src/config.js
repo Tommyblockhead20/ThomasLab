@@ -24,9 +24,9 @@ export const PLAYER_CONFIG = Object.freeze({
   terminalVelocity: 32,
   coyoteTime: 0.12,
   jumpBufferTime: 0.14,
-  maxSlopeDegrees: 47,
-  slideSlopeDegrees: 51,
-  slideExitSlopeDegrees: 46,
+  maxSlopeDegrees: 46,
+  slideSlopeDegrees: 50,
+  slideExitSlopeDegrees: 45,
   slideAutoEnterDelay: 0.11,
   slideAutoExitDelay: 0.2,
   // Physics can enter a slide immediately, but the full feet-forward render pose waits

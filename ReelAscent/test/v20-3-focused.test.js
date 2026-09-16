@@ -28,8 +28,8 @@ const session = (id, name) => {
   return result;
 };
 
-test('v20.3 is the active displayed build version', () => {
-  assert.equal(GAME_VERSION, 'v20.3');
+test('v20.4 is the active displayed build version', () => {
+  assert.equal(GAME_VERSION, 'v20.4');
 });
 
 test('authored ground query uses upward baked surfaces and ignores downward ceilings', () => {
@@ -44,20 +44,32 @@ test('authored ground query uses upward baked surfaces and ignores downward ceil
   assert.equal(query(4, 4), null);
 });
 
-test('one canonical outfit color migrates old colors and is compacted for multiplayer', () => {
-  const migrated = normalizeAppearance({ shirtColor: 'plum', shirtTint: '#123456', headwear: 'trail-hat' });
-  assert.equal(migrated.outfitColor, 'plum');
-  assert.equal(migrated.outfitTint, '#123456');
-  assert.deepEqual(resolveAppearance(migrated).accessoryColor, resolveAppearance(migrated).shirtColorValue.color);
+test('shirt, hat, and accessory colors stay independent and legacy outfit data migrates', () => {
+  const independent = normalizeAppearance({
+    shirtColor: 'plum', hatColor: 'midnight', accessoryColor: 'sky',
+    shirtTint: '#123456', hatTint: '#654321', accessoryTint: '#abcdef', headwear: 'trail-hat'
+  });
+  assert.equal(independent.shirtColor, 'plum');
+  assert.equal(independent.hatColor, 'midnight');
+  assert.equal(independent.accessoryColor, 'sky');
+  assert.equal(independent.shirtTint, '#123456');
+  assert.equal(independent.hatTint, '#654321');
+  assert.equal(independent.accessoryTint, '#abcdef');
+  assert.notDeepEqual(resolveAppearance(independent).hatColor, resolveAppearance(independent).accessoryColor);
+  const migrated = normalizeAppearance({ outfitColor: 'plum', outfitTint: '#123456' });
+  assert.deepEqual(
+    [migrated.shirtColor, migrated.hatColor, migrated.accessoryColor],
+    ['plum', 'plum', 'plum']
+  );
   const compact = compactAppearance(migrated);
-  assert.equal(compact.outfitColor, 'plum');
-  assert.equal(compact.outfitTint, '#123456');
-  assert.equal('shirtColor' in compact, false);
-  assert.equal('accessoryTint' in compact, false);
-  const serverAppearance = sanitizeAppearance(compact);
-  assert.equal(serverAppearance.outfitColor, 'plum');
-  assert.equal('shirtColor' in serverAppearance, false);
-  assert.equal('shirtTint' in serverAppearance, false);
+  assert.equal(compact.shirtColor, 'plum');
+  assert.equal(compact.hatColor, 'plum');
+  assert.equal(compact.accessoryColor, 'plum');
+  assert.equal('outfitColor' in compact, false);
+  const serverAppearance = sanitizeAppearance(independent);
+  assert.equal(serverAppearance.shirtColor, 'plum');
+  assert.equal(serverAppearance.hatColor, 'midnight');
+  assert.equal(serverAppearance.accessoryColor, 'sky');
 });
 
 test('display names are unique per room, case-insensitively, until reservation removal', () => {

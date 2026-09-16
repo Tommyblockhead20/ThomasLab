@@ -29,9 +29,9 @@ test('authored main caves skip legacy shells while offshore Basalt remains proce
   assert.ok(caves.every((location) => shouldBuildLegacyCaveShell(location, false)));
 });
 
-test('v20.1 adds only the requested three-degree walking tolerance', () => {
-  assert.equal(PLAYER_CONFIG.maxSlopeDegrees, 47);
-  assert.equal(PLAYER_CONFIG.slideSlopeDegrees, 51);
-  assert.equal(PLAYER_CONFIG.slideExitSlopeDegrees, 46);
+test('v20.4 retains only a modest authored-plateau slope tolerance', () => {
+  assert.equal(PLAYER_CONFIG.maxSlopeDegrees, 46);
+  assert.equal(PLAYER_CONFIG.slideSlopeDegrees, 50);
+  assert.equal(PLAYER_CONFIG.slideExitSlopeDegrees, 45);
   assert.equal(PLAYER_CONFIG.hardNoStandSlopeDegrees, 55);
 });

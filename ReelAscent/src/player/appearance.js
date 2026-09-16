@@ -1,4 +1,4 @@
-import { COSMETIC_BY_ID, COSMETICS_BY_SLOT } from '../progression/cosmetics.js';
+import { COSMETICS_BY_SLOT } from '../progression/cosmetics.js';
 
 export const AVATAR_TYPES = Object.freeze([
   Object.freeze({ id: 'human', label: 'Human' }),
@@ -45,7 +45,9 @@ export const SHIRT_COLORS = Object.freeze([
   Object.freeze({ id: 'snow', label: 'Snow', color: [0.9, 0.91, 0.86] }),
   Object.freeze({ id: 'sunbeam', label: 'Sunbeam', color: [0.96, 0.72, 0.16] })
 ]);
-// v20.3 canonical name. The old exported catalog name remains for save/API migration.
+export const HAT_COLORS = SHIRT_COLORS;
+export const ACCESSORY_COLORS = SHIRT_COLORS;
+// Transitional export for older callers. v20.4 stores independent shirt/hat/accessory fields.
 export const OUTFIT_COLORS = SHIRT_COLORS;
 
 export const PANTS_COLORS = Object.freeze([
@@ -153,7 +155,9 @@ export function hairVisibilityForHeadwear(hairStyle, headwear) {
 }
 
 export const CUSTOM_COLOR_FIELDS = Object.freeze([
-  Object.freeze({ key: 'outfitTint', label: 'Custom outfit', optionKey: 'outfitColor', human: true }),
+  Object.freeze({ key: 'shirtTint', label: 'Custom shirt', optionKey: 'shirtColor', human: true }),
+  Object.freeze({ key: 'hatTint', label: 'Custom hat', optionKey: 'hatColor' }),
+  Object.freeze({ key: 'accessoryTint', label: 'Custom accessory', optionKey: 'accessoryColor' }),
   Object.freeze({ key: 'pantsTint', label: 'Custom pants', optionKey: 'pantsColor', human: true }),
   Object.freeze({ key: 'hairTint', label: 'Custom hair', optionKey: 'hairColor', human: true }),
   Object.freeze({ key: 'blobTint', label: 'Custom blob', resolvedKey: 'blobColor', blob: true })
@@ -162,7 +166,9 @@ export const CUSTOM_COLOR_FIELDS = Object.freeze([
 export const DEFAULT_APPEARANCE = Object.freeze({
   avatarType: 'human',
   skinTone: 'warm',
-  outfitColor: 'classic-orange',
+  shirtColor: 'classic-orange',
+  hatColor: 'sunbeam',
+  accessoryColor: 'sunbeam',
   pantsColor: 'classic-trail',
   hairStyle: 'tousled',
   hairColor: 'espresso',
@@ -173,17 +179,21 @@ export const DEFAULT_APPEARANCE = Object.freeze({
   backAccessory: 'none',
   backpackColor: 'classic-teal',
   blobColor: 'classic-blue',
-  outfitTint: null,
+  shirtTint: null,
+  hatTint: null,
+  accessoryTint: null,
   pantsTint: null,
   hairTint: null,
   blobTint: null
 });
 
-const OUTFIT_COLOR_IDS = new Set(OUTFIT_COLORS.map((entry) => entry.id));
+const CLOTHING_COLOR_IDS = new Set(SHIRT_COLORS.map((entry) => entry.id));
 const OPTION_SETS = Object.freeze({
   avatarType: new Set(AVATAR_TYPES.map((entry) => entry.id)),
   skinTone: new Set(SKIN_TONES.map((entry) => entry.id)),
-  outfitColor: OUTFIT_COLOR_IDS,
+  shirtColor: CLOTHING_COLOR_IDS,
+  hatColor: CLOTHING_COLOR_IDS,
+  accessoryColor: CLOTHING_COLOR_IDS,
   pantsColor: new Set(PANTS_COLORS.map((entry) => entry.id)),
   hairStyle: new Set(HAIR_STYLES.map((entry) => entry.id)),
   hairColor: new Set(HAIR_COLORS.map((entry) => entry.id)),
@@ -198,7 +208,9 @@ const OPTION_SETS = Object.freeze({
 
 const CATALOGS = Object.freeze({
   skinTone: SKIN_TONES,
-  outfitColor: OUTFIT_COLORS,
+  shirtColor: SHIRT_COLORS,
+  hatColor: HAT_COLORS,
+  accessoryColor: ACCESSORY_COLORS,
   pantsColor: PANTS_COLORS,
   hairColor: HAIR_COLORS,
   backpackColor: BACKPACK_COLORS,
@@ -238,23 +250,24 @@ export function normalizeAppearance(value = {}) {
     appearance.faceAccessory = OPTION_SETS.faceAccessory.has(legacy) ? legacy : 'none';
   }
   for (const field of CUSTOM_COLOR_FIELDS) appearance[field.key] = normalizeTint(source[field.key]);
-  const hasOutfitColor = Object.prototype.hasOwnProperty.call(source, 'outfitColor')
-    && OUTFIT_COLOR_IDS.has(source.outfitColor);
-  const hasLegacyShirtColor = Object.prototype.hasOwnProperty.call(source, 'shirtColor')
-    && OUTFIT_COLOR_IDS.has(source.shirtColor);
-  // Old callers often spread the then-current default object before replacing shirtColor.
-  // A mismatched pair therefore means the legacy field was the explicit choice.
-  const migratedOutfitColor = hasOutfitColor && hasLegacyShirtColor && source.outfitColor !== source.shirtColor
-    ? source.shirtColor
-    : hasOutfitColor ? source.outfitColor
-      : hasLegacyShirtColor ? source.shirtColor : DEFAULT_APPEARANCE.outfitColor;
-  const migratedOutfitTint = Object.prototype.hasOwnProperty.call(source, 'outfitTint')
-    ? normalizeTint(source.outfitTint)
-    : Object.prototype.hasOwnProperty.call(source, 'shirtTint')
-      ? normalizeTint(source.shirtTint)
-      : normalizeTint(source.accessoryTint);
-  appearance.outfitColor = migratedOutfitColor;
-  appearance.outfitTint = migratedOutfitTint;
+  // v20.3 briefly stored one outfit pair. Use it to seed every new channel only when that
+  // channel has no explicit value, preserving the player's existing visual on migration.
+  const legacyOutfitColor = CLOTHING_COLOR_IDS.has(source.outfitColor) ? source.outfitColor : null;
+  for (const key of ['shirtColor', 'hatColor', 'accessoryColor']) {
+    appearance[key] = CLOTHING_COLOR_IDS.has(source[key])
+      ? source[key]
+      : legacyOutfitColor ?? DEFAULT_APPEARANCE[key];
+  }
+  const legacyOutfitTint = Object.prototype.hasOwnProperty.call(source, 'outfitTint')
+    ? normalizeTint(source.outfitTint) : null;
+  // Before the temporary merged outfit pair, headwear shared the old accessory tint.
+  // Preserve that look when an old save has no explicit hat channel.
+  const legacyAccessoryTint = normalizeTint(source.accessoryTint);
+  for (const key of ['shirtTint', 'hatTint', 'accessoryTint']) {
+    appearance[key] = Object.prototype.hasOwnProperty.call(source, key)
+      ? normalizeTint(source[key])
+      : legacyOutfitTint ?? (key === 'hatTint' ? legacyAccessoryTint : null);
+  }
   return appearance;
 }
 
@@ -265,7 +278,9 @@ export function resolveAppearance(value = {}) {
     resolved[`${key}Value`] = catalog.find((entry) => entry.id === appearance[key]) ?? catalog[0];
   }
   const tintTargets = {
-    outfitTint: 'outfitColorValue',
+    shirtTint: 'shirtColorValue',
+    hatTint: 'hatColorValue',
+    accessoryTint: 'accessoryColorValue',
     pantsTint: 'pantsColorValue',
     hairTint: 'hairColorValue'
   };
@@ -273,19 +288,15 @@ export function resolveAppearance(value = {}) {
     if (!appearance[tintKey]) continue;
     resolved[targetKey] = { ...resolved[targetKey], color: hexToColor(appearance[tintKey]) };
   }
-  resolved.shirtColorValue = resolved.outfitColorValue;
-  const accessoryOption = COSMETIC_BY_ID.get(appearance.headwear)
-    ?? COSMETIC_BY_ID.get(appearance.eyewear)
-    ?? COSMETIC_BY_ID.get(appearance.faceAccessory);
-  const accessoryPreset = accessoryOption?.fixedColor ?? resolved.outfitColorValue.color;
-  resolved.accessoryColor = hexToColor(appearance.outfitTint, accessoryPreset);
+  resolved.hatColor = resolved.hatColorValue.color;
+  resolved.accessoryColor = resolved.accessoryColorValue.color;
   resolved.backpackColorValue = resolved.backpackColorValue ?? BACKPACK_COLORS[0];
-  const classicTrailLook = appearance.outfitColor === 'classic-orange'
+  const classicTrailLook = appearance.shirtColor === 'classic-orange'
     && appearance.pantsColor === 'classic-trail'
-    && appearance.outfitTint === null;
+    && appearance.shirtTint === null;
   resolved.shirtAccentColor = classicTrailLook
     ? [...LEGACY_CHARACTER_PALETTE.playerAccent]
-    : resolved.outfitColorValue.color.map((component) => Math.min(1, component * .72 + .08));
+    : resolved.shirtColorValue.color.map((component) => Math.min(1, component * .72 + .08));
   resolved.blobColor = hexToColor(appearance.blobTint, resolved.blobColorValue.color);
   return resolved;
 }
@@ -303,7 +314,9 @@ export function randomizeAppearance(random = Math.random) {
   return normalizeAppearance({
     avatarType,
     skinTone: randomEntry(SKIN_TONES, random).id,
-    outfitColor: randomEntry(OUTFIT_COLORS, random).id,
+    shirtColor: randomEntry(SHIRT_COLORS, random).id,
+    hatColor: randomEntry(HAT_COLORS, random).id,
+    accessoryColor: randomEntry(ACCESSORY_COLORS, random).id,
     pantsColor: randomEntry(PANTS_COLORS, random).id,
     hairStyle: randomEntry(HAIR_STYLES, random).id,
     hairColor: randomEntry(HAIR_COLORS, random).id,
@@ -314,7 +327,9 @@ export function randomizeAppearance(random = Math.random) {
     backAccessory: randomEntry(BACK_ACCESSORIES, random).id,
     backpackColor: randomEntry(BACKPACK_COLORS, random).id,
     blobColor: colorfulBlob ? randomEntry(nonBlueBlobColors, random).id : 'classic-blue',
-    outfitTint: null,
+    shirtTint: null,
+    hatTint: null,
+    accessoryTint: null,
     pantsTint: null,
     hairTint: null,
     blobTint: null

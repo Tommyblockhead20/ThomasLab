@@ -23,7 +23,27 @@ import {
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
-const FISHING_SAMPLE_BASE = `${import.meta.env.BASE_URL ?? '/'}audio/fishing/instruments/`;
+const GUIDE_RARITY_RANK = Object.freeze({ Legendary: 0, Rare: 1, Uncommon: 2, Common: 3 });
+
+export function selectEcologyGuideEntries(effectiveTable, guideMode, guideRarity, zoneId) {
+  const compareLiveOdds = (a, b) => b.probability - a.probability
+    || (GUIDE_RARITY_RANK[a.fish.rarity] ?? 99) - (GUIDE_RARITY_RANK[b.fish.rarity] ?? 99)
+    || a.fish.name.localeCompare(b.fish.name);
+  // 0.05% is the smallest value that can display above 0.0% at one decimal place.
+  const sorted = effectiveTable.filter((entry) => entry.probability >= .0005).sort(compareLiveOdds);
+  if (guideMode === 'rarity') {
+    return sorted.filter((entry) => entry.fish.rarity === guideRarity).slice(0, 5);
+  }
+  if (guideMode === 'exclusive') {
+    return sorted.filter((entry) => entry.fish.habitat?.exclusiveWaterId === zoneId);
+  }
+  const selected = ['Common', 'Uncommon', 'Rare', 'Legendary']
+    .flatMap((rarity) => sorted.filter((entry) => entry.fish.rarity === rarity).slice(0, 5));
+  selected.push(...sorted.filter((entry) => entry.fish.habitat?.exclusiveWaterId === zoneId));
+  return [...new Map(selected.map((entry) => [entry.fish.id, entry])).values()].sort(compareLiveOdds);
+}
+
+const FISHING_SAMPLE_BASE = `${import.meta.env?.BASE_URL ?? '/'}audio/fishing/instruments/`;
 
 // Non-fish caught creatures keep one authored silhouette. Actual specimen length chooses a
 // uniform baseline size from the authored X extent; weight condition then nudges the entire root
@@ -608,6 +628,7 @@ export class FishingController {
     this.rng = options.rng ?? Math.random;
     this.config = options.config ?? FISHING_CONFIG;
     this.progression = options.progression ?? null;
+    this.hasCaughtSpecies = options.hasCaughtSpecies ?? (() => false);
     this.audio = new FishingAudio();
     this.state = 'inactive';
     this.stateTime = 0;
@@ -3303,18 +3324,7 @@ export class FishingController {
         ? entry.probability * (bobberAcceptance[entry.fish.rarity] ?? 0) / acceptedTotal
         : 0
     }));
-    const sorted = [...effectiveTable].sort((a, b) => b.probability - a.probability);
-    let entries;
-    if (guide.guideMode === 'rarity') {
-      entries = sorted.filter((entry) => entry.fish.rarity === guide.guideRarity).slice(0, 5);
-    } else if (guide.guideMode === 'exclusive') {
-      entries = sorted.filter((entry) => entry.fish.habitat?.exclusiveWaterId === zone.id);
-    } else {
-      const selected = ['Common', 'Uncommon', 'Rare', 'Legendary']
-        .flatMap((rarity) => sorted.filter((entry) => entry.fish.rarity === rarity).slice(0, 5));
-      selected.push(...sorted.filter((entry) => entry.fish.habitat?.exclusiveWaterId === zone.id));
-      entries = [...new Map(selected.map((entry) => [entry.fish.id, entry])).values()];
-    }
+    const entries = selectEcologyGuideEntries(effectiveTable, guide.guideMode, guide.guideRarity, zone.id);
     return {
       guide: guide.name,
       mode: guide.guideMode,
@@ -3325,7 +3335,8 @@ export class FishingController {
         name: entry.fish.name,
         rarity: entry.fish.rarity,
         probability: entry.probability,
-        exclusive: entry.fish.habitat?.exclusiveWaterId === zone.id
+        exclusive: entry.fish.habitat?.exclusiveWaterId === zone.id,
+        caught: this.hasCaughtSpecies(entry.fish.canonicalId ?? entry.fish.id)
       }))
     };
   }

@@ -6,6 +6,8 @@ const APPEARANCE_OPTIONS = Object.freeze({
   skinTone: new Set(['porcelain', 'light', 'warm', 'honey', 'golden', 'bronze', 'umber', 'deep']),
   outfitColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose', 'sky', 'lavender', 'coral', 'spruce', 'snow', 'sunbeam']),
   shirtColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose', 'sky', 'lavender', 'coral', 'spruce', 'snow', 'sunbeam']),
+  hatColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose', 'sky', 'lavender', 'coral', 'spruce', 'snow', 'sunbeam']),
+  accessoryColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose', 'sky', 'lavender', 'coral', 'spruce', 'snow', 'sunbeam']),
   pantsColor: new Set(['classic-trail', 'pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand', 'navy', 'slate', 'mulberry', 'olive', 'cloud', 'black']),
   hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'long', 'bun', 'braids', 'bald']),
   hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink', 'ash', 'white', 'blue', 'green', 'rose-gold', 'auburn']),
@@ -18,13 +20,13 @@ const APPEARANCE_OPTIONS = Object.freeze({
   blobColor: new Set(['classic-blue', 'aqua', 'lime', 'sunny', 'orange', 'coral', 'pink', 'violet', 'indigo', 'silver', 'charcoal', 'cream'])
 });
 const DEFAULT_APPEARANCE = Object.freeze({
-  avatarType: 'human', skinTone: 'warm', outfitColor: 'classic-orange', pantsColor: 'classic-trail',
+  avatarType: 'human', skinTone: 'warm', shirtColor: 'classic-orange', hatColor: 'sunbeam', accessoryColor: 'sunbeam', pantsColor: 'classic-trail',
   hairStyle: 'tousled', hairColor: 'espresso', accessory: 'beanie', headwear: 'beanie',
   eyewear: 'none', faceAccessory: 'none', backAccessory: 'backpack', backpackColor: 'classic-teal',
-  blobColor: 'classic-blue', outfitTint: null,
+  blobColor: 'classic-blue', shirtTint: null, hatTint: null, accessoryTint: null,
   pantsTint: null, hairTint: null, blobTint: null
 });
-const APPEARANCE_TINTS = new Set(['outfitTint', 'pantsTint', 'hairTint', 'blobTint']);
+const APPEARANCE_TINTS = new Set(['shirtTint', 'hatTint', 'accessoryTint', 'pantsTint', 'hairTint', 'blobTint']);
 const COSMETIC_FIELDS = new Set(['headwear', 'eyewear', 'faceAccessory', 'backAccessory']);
 const SAFE_COSMETIC_ID = /^[a-z0-9][a-z0-9_-]{0,99}$/;
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -68,14 +70,21 @@ export function sanitizeAppearance(value = {}) {
     appearance.eyewear = APPEARANCE_OPTIONS.eyewear.has(legacy) ? legacy : 'none';
     appearance.faceAccessory = APPEARANCE_OPTIONS.faceAccessory.has(legacy) ? legacy : 'none';
   }
-  appearance.outfitColor = APPEARANCE_OPTIONS.outfitColor.has(source.outfitColor)
-    ? source.outfitColor
-    : APPEARANCE_OPTIONS.shirtColor.has(source.shirtColor) ? source.shirtColor : DEFAULT_APPEARANCE.outfitColor;
-  const rawOutfitTint = Object.prototype.hasOwnProperty.call(source, 'outfitTint')
-    ? source.outfitTint
-    : Object.prototype.hasOwnProperty.call(source, 'shirtTint') ? source.shirtTint : source.accessoryTint;
-  appearance.outfitTint = typeof rawOutfitTint === 'string' && COLOR_PATTERN.test(rawOutfitTint)
-    ? rawOutfitTint.toLowerCase() : null;
+  const legacyOutfitColor = APPEARANCE_OPTIONS.outfitColor.has(source.outfitColor) ? source.outfitColor : null;
+  for (const key of ['shirtColor', 'hatColor', 'accessoryColor']) {
+    appearance[key] = APPEARANCE_OPTIONS[key].has(source[key])
+      ? source[key] : legacyOutfitColor ?? DEFAULT_APPEARANCE[key];
+  }
+  const legacyOutfitTint = Object.prototype.hasOwnProperty.call(source, 'outfitTint')
+    && typeof source.outfitTint === 'string' && COLOR_PATTERN.test(source.outfitTint)
+    ? source.outfitTint.toLowerCase() : null;
+  const legacyAccessoryTint = typeof source.accessoryTint === 'string' && COLOR_PATTERN.test(source.accessoryTint)
+    ? source.accessoryTint.toLowerCase() : null;
+  for (const key of ['shirtTint', 'hatTint', 'accessoryTint']) {
+    appearance[key] = Object.prototype.hasOwnProperty.call(source, key)
+      ? (typeof source[key] === 'string' && COLOR_PATTERN.test(source[key]) ? source[key].toLowerCase() : null)
+      : legacyOutfitTint ?? (key === 'hatTint' ? legacyAccessoryTint : null);
+  }
   return appearance;
 }
 

@@ -811,33 +811,38 @@ body.song-feedback-dashboard-open #game-shell::after { position: absolute; z-ind
 .ecology-guide header small,
 .ecology-guide header span { color: #efd98b; font-size: .48rem; font-weight: 950; letter-spacing: .08em; }
 .ecology-guide header strong { font-size: .72rem; }
+.ecology-guide-key { justify-items: end; text-align: right; }
+.ecology-guide-exclusive-legend { display: none; color: rgb(237 246 233 / 64%); font-size: .42rem; font-weight: 750; line-height: 1.45; letter-spacing: .015em; text-transform: none; }
 .ecology-guide ol { display: grid; gap: .22rem; margin: .5rem 0 0; padding: 0; list-style: none; }
-.ecology-guide li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .3rem .38rem; background: rgb(255 255 255 / 5%); }
+.ecology-guide li { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .3rem .38rem; background: rgb(255 255 255 / var(--odds-bg-alpha, .05)); }
 .ecology-guide li span { display: grid; gap: .02rem; color: #edf6e9; font-size: .57rem; letter-spacing: 0; text-transform: none; }
+.ecology-guide li .ecology-guide-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ecology-guide li i { color: rgb(239 217 139 / 72%); font-style: normal; font-size: .86em; letter-spacing: .08em; }
 .ecology-guide li small { color: rgb(234 244 231 / 56%); font-size: .44rem; }
 .ecology-guide li strong { font-size: .58rem; }
 .ecology-guide[data-guide-mode="atlas"] {
   top: 5.5rem;
-  width: min(48rem, calc(100vw - 2rem));
+  width: min(25rem, calc(100vw - 2rem));
   max-height: calc(100vh - 6.5rem);
-  overflow: hidden;
+  overflow: auto;
 }
 .ecology-guide[data-guide-mode="atlas"] ol {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .22rem;
 }
+.ecology-guide[data-guide-mode="atlas"] .ecology-guide-exclusive-legend { display: block; }
 .ecology-guide[data-guide-mode="atlas"] li { min-width: 0; padding: .24rem .32rem; }
-.ecology-guide[data-guide-mode="atlas"] li span { min-width: 0; overflow: hidden; font-size: .54rem; text-overflow: ellipsis; white-space: nowrap; }
+.ecology-guide[data-guide-mode="atlas"] li > span { min-width: 0; overflow: hidden; font-size: .54rem; }
 .ecology-guide[data-guide-mode="atlas"] li small { font-size: .4rem; }
 .ecology-guide[data-guide-mode="atlas"] li strong { flex: 0 0 auto; font-size: .54rem; }
 
-@media (max-width: 760px) {
+@media (max-width: 600px) {
   .ecology-guide[data-guide-mode="atlas"] {
     top: max(.5rem, env(safe-area-inset-top));
     max-height: calc(100vh - max(1rem, env(safe-area-inset-top)));
     overflow: auto;
   }
-  .ecology-guide[data-guide-mode="atlas"] ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ecology-guide[data-guide-mode="atlas"] ol { grid-template-columns: minmax(0, 1fr); }
 }
 
 .catch-banner .catch-quality {

@@ -81,7 +81,8 @@ test('weighted species selection reaches every configured rarity tier', () => {
   assert.equal(chooseWeightedSpecies(allFishIds, () => 0.999999).id, completeTable.at(-1).fish.id);
 
   const table = getWeightedSpeciesTable(allFishIds, { rarityBias: .5 });
-  assert.equal(table.length, FISH_SPECIES.length);
+  assert.equal(table.length, FISH_SPECIES.filter((fish) => !fish.futureReserved).length);
+  assert.ok(table.every((entry) => !entry.fish.futureReserved));
   assert.ok(table.every((entry) => entry.probability > 0));
 
   const rng = seededRandom(42);

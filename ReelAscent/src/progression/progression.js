@@ -498,17 +498,20 @@ export class ProgressionSystem {
 
   setAppearance(value) {
     const requested = { ...value };
-    if (requested.outfitColor === undefined && requested.shirtColor !== undefined) {
-      requested.outfitColor = requested.shirtColor;
+    if (requested.outfitColor !== undefined) {
+      requested.shirtColor ??= requested.outfitColor;
+      requested.hatColor ??= requested.outfitColor;
+      requested.accessoryColor ??= requested.outfitColor;
     }
-    if (requested.outfitTint === undefined && (requested.shirtTint !== undefined || requested.accessoryTint !== undefined)) {
-      requested.outfitTint = requested.shirtTint ?? requested.accessoryTint;
+    if (requested.outfitTint !== undefined) {
+      requested.shirtTint ??= requested.outfitTint;
+      requested.hatTint ??= requested.outfitTint;
+      requested.accessoryTint ??= requested.outfitTint;
     }
-    // Legacy fields are accepted above as migration inputs but never persist beside the
-    // canonical outfit pair.
-    delete requested.shirtColor;
-    delete requested.shirtTint;
-    delete requested.accessoryTint;
+    // The merged v20.3 outfit pair remains input-only migration data. The three canonical
+    // channels below are independent and never write back into one another.
+    delete requested.outfitColor;
+    delete requested.outfitTint;
     const avatarType = requested.avatarType ?? this.state.appearance?.avatarType ?? 'human';
     for (const key of ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']) {
       if (!(key in requested) || requested[key] === 'none') continue;

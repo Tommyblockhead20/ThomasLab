@@ -144,7 +144,10 @@ export class Game {
       this.player,
       this.hud
     );
-    this.fishing = new FishingController(this.app, this.player, this.world, { progression: this.progression });
+    this.fishing = new FishingController(this.app, this.player, this.world, {
+      progression: this.progression,
+      hasCaughtSpecies: (speciesId) => this.saveSystem.hasCaughtSpecies(speciesId)
+    });
     markStartup('fishing:ready');
     this.ecologyGuide = new EcologyGuidePanel(this.fishing);
     this.fishingPerformance = new FishingPerformanceMenu(this.fishing);

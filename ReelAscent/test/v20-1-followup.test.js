@@ -35,7 +35,7 @@ test('Play This Save cannot overwrite its destination with the current full save
   assert.equal(saves.replaceSlotData('slot-2', second), true);
 
   assert.equal(progression.selectSaveSlot('slot-2', { freezeUntilReload: true }), true);
-  assert.equal(progression.getAppearance().outfitColor, 'moss');
+  assert.equal(progression.getAppearance().shirtColor, 'moss');
   assert.equal(progression.getSnapshot().money, 222);
   assert.equal(saves.data.collection.rainbow_trout.catches, 2);
   // Reproduce a late callback holding the previous game's complete payload. Persistence must
@@ -50,20 +50,20 @@ test('Play This Save cannot overwrite its destination with the current full save
   const reloaded = new SaveSystem(storage);
   assert.equal(reloaded.activeSlotId, 'slot-2');
   assert.equal(reloaded.data.progression.money, 222);
-  assert.equal(reloaded.data.progression.appearance.outfitColor, 'moss');
+  assert.equal(reloaded.data.progression.appearance.shirtColor, 'moss');
   assert.equal(reloaded.data.collection.rainbow_trout.catches, 2);
   assert.equal(reloaded.data.collection.bluegill, undefined);
 
   const reloadedProgression = new ProgressionSystem(reloaded);
   assert.equal(reloadedProgression.selectSaveSlot('slot-1'), true);
-  assert.equal(reloadedProgression.getAppearance().outfitColor, 'rose');
+  assert.equal(reloadedProgression.getAppearance().shirtColor, 'rose');
   assert.equal(reloadedProgression.getSnapshot().money, 111);
   assert.equal(reloaded.data.collection.bluegill.catches, 7);
   assert.equal(reloaded.data.collection.rainbow_trout, undefined);
   assert.equal(reloadedProgression.selectSaveSlot('slot-2'), true);
-  assert.equal(reloadedProgression.getAppearance().outfitColor, 'moss');
+  assert.equal(reloadedProgression.getAppearance().shirtColor, 'moss');
   reloadedProgression.commit();
-  assert.equal(reloaded.getSlotSnapshot('slot-2').progression.appearance.outfitColor, 'moss');
+  assert.equal(reloaded.getSlotSnapshot('slot-2').progression.appearance.shirtColor, 'moss');
 });
 
 test('fishing result controls mirror arrows with WASD', () => {
@@ -77,7 +77,7 @@ test('fishing result controls mirror arrows with WASD', () => {
   );
 });
 
-test('Master Atlas uses compact one-decimal odds and a multi-column screen layout', async () => {
+test('Master Atlas uses compact one-decimal odds and an exact two-column desktop layout', async () => {
   assert.equal(formatGuideOdds(.12345), '12.3%');
   assert.equal(formatGuideOdds(.01), '1.0%');
   const [guideSource, styleSource] = await Promise.all([
@@ -85,7 +85,8 @@ test('Master Atlas uses compact one-decimal odds and a multi-column screen layou
     readFile(new URL('../src/styles.css', import.meta.url), 'utf8')
   ]);
   assert.match(guideSource, /mode:\s*guide\.guideMode/);
-  assert.match(styleSource, /data-guide-mode="atlas"[\s\S]{0,300}repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styleSource, /data-guide-mode="atlas"[\s\S]{0,500}repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(styleSource, /@media \(max-width: 600px\)[\s\S]*data-guide-mode="atlas"[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
 });
 
 test('a shiny failure is terminal and ignores all later rhythm input', () => {

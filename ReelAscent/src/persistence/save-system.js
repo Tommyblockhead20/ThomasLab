@@ -644,6 +644,11 @@ export class SaveSystem {
     return copy(this.data);
   }
 
+  hasCaughtSpecies(speciesId) {
+    const canonicalId = canonicalSpeciesId(speciesId);
+    return Boolean(canonicalId && normalizeEntry(this.data.collection?.[canonicalId]).catches > 0);
+  }
+
   getLifetimeSnapshot() {
     return copy(this.data.lifetime ?? {});
   }

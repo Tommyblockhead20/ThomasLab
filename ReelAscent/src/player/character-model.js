@@ -29,6 +29,18 @@ export function auditCosmeticModelCoverage(catalog = []) {
   });
 }
 
+export function cosmeticVisualVariant(cosmetic, catalog = [...COSMETIC_BY_ID.values()]) {
+  if (!cosmetic) return Object.freeze({ index: 0, count: 0, fingerprint: 'missing' });
+  const peers = catalog.filter((entry) => entry.slot === cosmetic.slot && entry.visual === cosmetic.visual)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const index = Math.max(0, peers.findIndex((entry) => entry.id === cosmetic.id));
+  return Object.freeze({
+    index,
+    count: peers.length,
+    fingerprint: `${cosmetic.slot}:${cosmetic.visual}:${index}`
+  });
+}
+
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
 // Full primitive scales and joint-local anchors. Each child reaches slightly through its
@@ -180,7 +192,12 @@ function buildEyewear(humanRig, materials) {
   return result;
 }
 
-function buildGeneratedCosmetic(parent, cosmetic, materials, blob = false) {
+function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false) {
+  // Hats and non-hat accessories have independent player colors. Rebind only the recipe's
+  // primary tint material; authored glass, silver, dark, and pack details stay fixed.
+  const materials = cosmetic.slot === 'headwear'
+    ? { ...sourceMaterials, accessory: sourceMaterials.hat }
+    : sourceMaterials;
   const root = group(parent, `${blob ? 'Blob ' : ''}${cosmetic.label}`);
   const size = blob ? 1.16 : 1;
   const headY = blob ? 1.17 : .94;
@@ -356,6 +373,36 @@ function buildGeneratedCosmetic(parent, cosmetic, materials, blob = false) {
       add('pack', 'box', { x: 0, y: backY, z: blob ? .5 : .35 }, { x: .58, y: .7, z: .3 }, cosmetic.id === 'backpack' ? materials.pack : materials.accessory, { x: -7 });
     }
   }
+  const variant = cosmeticVisualVariant(cosmetic);
+  if (variant.count > 1) {
+    // Shared visual recipes get a substantial ID-stable silhouette/detail signature. This
+    // keeps separately earned items recognizable without changing their stable save IDs.
+    const side = variant.index % 2 ? 1 : -1;
+    const shape = ['cone', 'box', 'sphere'][variant.index % 3];
+    const tier = Math.floor(variant.index / 2);
+    if (cosmetic.slot === 'headwear') {
+      add(`distinctive side crest ${variant.index + 1}`, shape,
+        { x: side * (.28 + (tier % 3) * .055), y: headY + .25 + (variant.index % 4) * .055, z: .02 },
+        { x: .12 + (variant.index % 3) * .025, y: .3 + (variant.index % 5) * .045, z: .11 },
+        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (18 + (variant.index % 4) * 8) });
+    } else if (cosmetic.slot === 'eyewear') {
+      add(`distinctive temple wing ${variant.index + 1}`, shape,
+        { x: side * (.42 + (tier % 2) * .045), y: (blob ? .85 : .73) + (variant.index % 3) * .045, z: frontZ },
+        { x: .2 + (variant.index % 3) * .04, y: .08 + (variant.index % 2) * .035, z: .055 },
+        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (12 + (variant.index % 5) * 7) });
+    } else if (cosmetic.slot === 'faceAccessory') {
+      add(`distinctive hanging charm ${variant.index + 1}`, shape,
+        { x: side * (.13 + (tier % 2) * .055), y: (blob ? .44 : .45) - .27 - (variant.index % 3) * .055, z: frontZ + .04 },
+        { x: .12 + (variant.index % 2) * .035, y: .24 + (variant.index % 4) * .05, z: .07 },
+        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (10 + (variant.index % 4) * 9) });
+    } else {
+      const backY = blob ? .05 : -.03;
+      add(`distinctive back crest ${variant.index + 1}`, shape,
+        { x: side * (.2 + (tier % 3) * .05), y: backY + .32 + (variant.index % 4) * .07, z: blob ? .66 : .51 },
+        { x: .2 + (variant.index % 3) * .055, y: .42 + (variant.index % 5) * .06, z: .09 },
+        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (14 + (variant.index % 4) * 8) });
+    }
+  }
   root.enabled = false;
   return root;
 }
@@ -370,6 +417,7 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     trousers: surface(LEGACY_CHARACTER_PALETTE.trousers, .16),
     hair: surface([.08, .05, .035], .18),
     dark: surface(LEGACY_CHARACTER_PALETTE.dark, .4),
+    hat: surface(LEGACY_CHARACTER_PALETTE.playerAccent, .3),
     accessory: surface([.84, .42, .13], .3),
     blobBlue: surface([.28, .72, .95], .38),
     glass: surface([.2, .52, .62], .82),
@@ -422,16 +470,16 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     return root;
   };
   const beanie = makeAccessory('beanie', 'Beanie');
-  primitive(beanie, 'Beanie crown', 'cone', { x: 0, y: 1, z: 0 }, { x: .5, y: .34, z: .5 }, materials.accessory);
-  primitive(beanie, 'Beanie band', 'cylinder', { x: 0, y: .89, z: 0 }, { x: .51, y: .12, z: .51 }, materials.accessory);
+  primitive(beanie, 'Beanie crown', 'cone', { x: 0, y: 1, z: 0 }, { x: .5, y: .34, z: .5 }, materials.hat);
+  primitive(beanie, 'Beanie band', 'cylinder', { x: 0, y: .89, z: 0 }, { x: .51, y: .12, z: .51 }, materials.hat);
   const trailHat = makeAccessory('trail-hat', 'Trail hat');
-  primitive(trailHat, 'Trail hat brim', 'box', { x: 0, y: .94, z: -.05 }, { x: .72, y: .055, z: .62 }, materials.accessory);
-  primitive(trailHat, 'Trail hat crown', 'cylinder', { x: 0, y: 1.06, z: .02 }, { x: .46, y: .24, z: .46 }, materials.accessory);
+  primitive(trailHat, 'Trail hat brim', 'box', { x: 0, y: .94, z: -.05 }, { x: .72, y: .055, z: .62 }, materials.hat);
+  primitive(trailHat, 'Trail hat crown', 'cylinder', { x: 0, y: 1.06, z: .02 }, { x: .46, y: .24, z: .46 }, materials.hat);
   const cap = makeAccessory('fishing-cap', 'Fishing cap');
-  primitive(cap, 'Fishing cap crown', 'sphere', { x: 0, y: .96, z: .03 }, { x: .48, y: .21, z: .45 }, materials.accessory);
-  primitive(cap, 'Fishing cap bill', 'box', { x: 0, y: .91, z: -.38 }, { x: .48, y: .055, z: .35 }, materials.accessory, { x: -5 });
+  primitive(cap, 'Fishing cap crown', 'sphere', { x: 0, y: .96, z: .03 }, { x: .48, y: .21, z: .45 }, materials.hat);
+  primitive(cap, 'Fishing cap bill', 'box', { x: 0, y: .91, z: -.38 }, { x: .48, y: .055, z: .35 }, materials.hat, { x: -5 });
   const headlamp = makeAccessory('headlamp', 'Headlamp');
-  primitive(headlamp, 'Headlamp band', 'cylinder', { x: 0, y: .88, z: 0 }, { x: .49, y: .09, z: .49 }, materials.accessory);
+  primitive(headlamp, 'Headlamp band', 'cylinder', { x: 0, y: .88, z: 0 }, { x: .49, y: .09, z: .49 }, materials.hat);
   primitive(headlamp, 'Headlamp light', 'sphere', { x: 0, y: .89, z: -.27 }, { x: .14, y: .13, z: .11 }, materials.silver);
   const scarf = makeAccessory('scarf', 'Trail scarf');
   primitive(scarf, 'Scarf collar', 'cylinder', { x: 0, y: .44, z: 0 }, { x: .32, y: .17, z: .32 }, materials.accessory);
@@ -445,9 +493,9 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   primitive(necklace, 'Necklace cord', 'cylinder', { x: 0, y: .47, z: -.12 }, { x: .2, y: .035, z: .2 }, materials.accessory);
   primitive(necklace, 'Necklace pendant', 'sphere', { x: 0, y: .39, z: -.205 }, { x: .075, y: .1, z: .035 }, materials.accessory);
   const flowers = makeAccessory('flower-crown', 'Flower crown');
-  primitive(flowers, 'Flower crown band', 'cylinder', { x: 0, y: .91, z: 0 }, { x: .49, y: .06, z: .49 }, materials.accessory);
+  primitive(flowers, 'Flower crown band', 'cylinder', { x: 0, y: .91, z: 0 }, { x: .49, y: .06, z: .49 }, materials.hat);
   [-.3, -.15, 0, .15, .3].forEach((x, index) => primitive(flowers, `Flower crown bloom ${index + 1}`, 'sphere',
-    { x, y: .96 + index % 2 * .03, z: -.23 + Math.abs(x) * .14 }, { x: .1, y: .1, z: .08 }, materials.accessory));
+    { x, y: .96 + index % 2 * .03, z: -.23 + Math.abs(x) * .14 }, { x: .1, y: .1, z: .08 }, materials.hat));
 
   const backpackBody = primitive(humanRig, 'Backpack', 'box', { x: 0, y: -.03, z: .33 }, { x: .55, y: .66, z: .31 }, materials.pack, { x: -7 });
   const backpackFlap = primitive(humanRig, 'Backpack flap', 'box', { x: 0, y: .15, z: .495 }, { x: .45, y: .18, z: .05 }, materials.pack, { x: -7 });
@@ -462,7 +510,7 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   primitive(blobRig, 'Classic Blue Blob facing marker', 'box', { x: 0, y: .35, z: -.43 }, { x: .16, y: .16, z: .48 }, materials.blobBlue);
 
   let appearance = normalizeAppearance();
-  let cosmeticDiagnostic = Object.freeze({ avatarType: 'human', equippedIds: [], instantiatedIds: [], missingModelIds: [] });
+  let cosmeticDiagnostic = Object.freeze({ avatarType: 'human', equippedIds: [], instantiatedIds: [], rejectedIds: [], missingModelIds: [] });
   const instantiate = (target, id, rig, blob = false, back = false) => {
     if (id === 'none' || target.has(id)) return;
     const cosmetic = COSMETIC_BY_ID.get(id);
@@ -475,6 +523,7 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     }
   };
   const setAppearance = (value) => {
+    const requested = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
     appearance = normalizeAppearance(value);
     const resolved = resolveAppearance(appearance);
     recolor(materials.jacket, resolved.shirtColorValue.color);
@@ -482,6 +531,7 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     recolor(materials.skin, resolved.skinToneValue.color);
     recolor(materials.trousers, resolved.pantsColorValue.color);
     recolor(materials.hair, resolved.hairColorValue.color);
+    recolor(materials.hat, resolved.hatColor);
     recolor(materials.accessory, resolved.accessoryColor);
     recolor(materials.pack, resolved.backpackColorValue.color);
     recolor(materials.blobBlue, resolved.blobColor, .03);
@@ -506,11 +556,21 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     const activeAccessories = appearance.avatarType === 'human' ? accessories : blobAccessories;
     const activeBack = appearance.avatarType === 'human' ? backAccessoryRoots : blobBackAccessoryRoots;
     const instantiatedIds = equippedIds.filter((id) => activeAccessories.has(id) || activeBack.has(id));
+    const rejectedIds = ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']
+      .map((slot) => requested[slot])
+      .filter((id, index, ids) => typeof id === 'string' && id !== 'none'
+        && appearance[['headwear', 'eyewear', 'faceAccessory', 'backAccessory'][index]] !== id
+        && ids.indexOf(id) === index);
+    const missingModelIds = [...new Set([
+      ...rejectedIds,
+      ...equippedIds.filter((id) => !instantiatedIds.includes(id))
+    ])];
     cosmeticDiagnostic = Object.freeze({
       avatarType: appearance.avatarType,
       equippedIds: Object.freeze([...equippedIds]),
       instantiatedIds: Object.freeze([...instantiatedIds]),
-      missingModelIds: Object.freeze(equippedIds.filter((id) => !instantiatedIds.includes(id)))
+      rejectedIds: Object.freeze([...rejectedIds]),
+      missingModelIds: Object.freeze(missingModelIds)
     });
     return normalizeAppearance(appearance);
   };
