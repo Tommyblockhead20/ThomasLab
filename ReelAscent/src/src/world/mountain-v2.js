@@ -1,0 +1,6442 @@
+import * as pc from 'playcanvas';
+import SKYREACH_WORLD_EDITOR_LEVEL from './world-editor-levels/skyscraper.json' with { type: 'json' };
+import CAVE_FISHING_WORLD_EDITOR_LEVEL from './world-editor-levels/cave-fishing-island.json' with { type: 'json' };
+import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from './world-editor-v2-runtime.js';
+// REEL_ASCENT_MAP_EDITOR_V1: begin
+import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
+import {
+  applyFishingLayoutPatch,
+  applyMapEditorHeight,
+  applyMapEditorProfileHeight,
+  applyWorldObjectPatch,
+  createBakedTerrainGroundQuery,
+  getBakedTerrainBoundarySamples,
+  hasAuthoritativeBakedTerrain,
+  installMapEditorBridge,
+  terrainTriangleIsCut
+} from './map-editor-runtime.js';
+// REEL_ASCENT_MAP_EDITOR_V1: end
+import { PLAYER_FOOT_OFFSET } from '../config.js';
+import { markStartup } from '../debug/startup-timings.js';
+import { attachZoneEcology, ECOLOGY_TARGETS } from '../fishing/fish-ecology.js';
+import { FishingZone } from '../fishing/fishing-zone.js';
+import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
+import { getClimbMaterial } from '../player/climbing-materials.js';
+import { TestWorld } from './world.js';
+import {
+  MAIN_WORLD_LOCATION,
+  SMALL_ISLAND_LOCATIONS,
+  WORLD_LOCATIONS,
+  WORLD_MAP_RADIUS
+} from './world-locations.js';
+import {
+  auditRockDensity,
+  basinTerrainHeight,
+  oceanFloorProfile,
+  summitBasinHeight,
+  supportAdjustment
+} from './world-validation.js';
+
+// Mountain V2 is deliberately independent from the Milestone 5.x radial-band layout.
+// The old mountain.js remains in the project as the compatibility/reference implementation.
+export const MOUNTAIN_CENTER = Object.freeze({
+  x: MAIN_WORLD_LOCATION.worldPosition.x,
+  z: MAIN_WORLD_LOCATION.worldPosition.z
+});
+export const SUMMIT_HEIGHT = 304.8; // exactly 1,000 ft
+export const COASTAL_SHELF_RADIUS = 214;
+export const OCEAN_FLOOR_OUTER_RADIUS = WORLD_MAP_RADIUS + 48;
+export const OCEAN_SEABED_JOIN_RADIUS = 208;
+// Start the true ocean at the authored coastal shelf instead of leaving a 13 m
+// dry-cast moat between terrain and water. This is ocean-only; ponds and tiny
+// authored sources retain their own exact bounds.
+export const OCEAN_WATER_INNER_RADIUS = COASTAL_SHELF_RADIUS;
+export const OCEAN_SHALLOW_WALK_END_RADIUS = 239;
+export const OCEAN_SURFACE_Y = -.76;
+// Track the registry's global map extent so later far-away load groups still sit over
+// visible ocean without changing Mountain traversal/failure distances.
+export const OCEAN_VISUAL_OUTER_RADIUS = Math.max(380, WORLD_MAP_RADIUS + 24);
+export const OCEAN_WADE_DISTANCE = OCEAN_FLOOR_OUTER_RADIUS - OCEAN_WATER_INNER_RADIUS;
+// Compatibility name retained for older diagnostics. It marks generated floor extent only;
+// crossing this radius is not fatal and there is no invisible deep-water boundary.
+export const MOUNTAIN_FAILURE_RADIUS = OCEAN_FLOOR_OUTER_RADIUS;
+export const OUT_OF_WORLD_FALL_Y = -18;
+export const INTENTIONAL_OVERHANGS = Object.freeze([]);
+export const AUTHORED_STONEVEIL_CORE_ACTIVE = hasAuthoritativeBakedTerrain(MAP_EDITOR_PATCH);
+export function shouldBuildLegacyCaveShell(location, authoredCoreActive = AUTHORED_STONEVEIL_CORE_ACTIVE) {
+  return Boolean(location?.cave && (!authoredCoreActive || location.offshore));
+}
+
+const TERRAIN_OUTER_RADIUS = 208;
+export const MOUNTAIN_FOOT_RADIUS = 181;
+const CROWN_BASE_RADIUS = 41;
+const CROWN_TOP_RADIUS = 8;
+const CROWN_BASE_HEIGHT = 215;
+const MAP_EDITOR_CROWN_BASE_HEIGHT = applyMapEditorProfileHeight(CROWN_BASE_HEIGHT, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
+export const UPPER_SHOULDER_START_RADIUS = 72;
+const UPPER_SHOULDER_LIFT = 75;
+const TERRAIN_SEGMENTS = 360;
+export const FALLGLASS_WATERFALL_RADII = Object.freeze([
+  96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120, 122, 124, 126, 128,
+  130, 132, 134, 136, 138, 140, 142, 144, 146, 148, 150, 152, 154, 156, 158, 160,
+  162, 164, 166, 168, 170, 172, 174, 176, 178, 180, 182, 184, 186, 188, 190, 192,
+  194, 196, 198, 200, 202, 204, 206, 208, 210, 212, 214, 216, 218, 220, 222
+]);
+const fallglassPhaseAt = (radius) => (radius - FALLGLASS_WATERFALL_RADII[0]) / 4;
+const fallglassAngleAt = (radius) => 183 + Math.sin(fallglassPhaseAt(radius) * .82) * .28;
+const fallglassTangentAt = (radius) => Math.sin(fallglassPhaseAt(radius) * 1.37) * .22;
+export const SUMMIT_ROUTE_CONNECTOR = Object.freeze({
+  lipRadius: CROWN_TOP_RADIUS + .34,
+  thresholdRadius: CROWN_TOP_RADIUS - .28,
+  maximumVerticalGap: .82
+});
+export const CROWN_DENSITY_CONFIG = Object.freeze({
+  routeStages: 28,
+  branchStages: Object.freeze([4, 9, 14, 20, 25]),
+  beltCounts: Object.freeze([48, 44, 40, 36, 32, 28])
+});
+export const MOUNTAIN_REST_LEDGE_CONFIG = Object.freeze({
+  fiveHundred: Object.freeze({ targetHeight: 152.4, angle: 79, radius: 58.55, anchorIndex: 6, width: 10.6, depth: 7.2, coreTerrain: true, mantleApron: 1.7 }),
+  fiveFifty: Object.freeze({ targetHeight: 167.64, angle: 145, radius: 58.2, width: 12.2, depth: 8.4, coreTerrain: true, mantleApron: 1.9 }),
+  sixHundred: Object.freeze({ targetHeight: 182.88, angle: 222, radius: 50, width: 8.4, depth: 5.8, coreTerrain: true }),
+  sevenHundred: Object.freeze({ targetHeight: 213.36 })
+});
+export const MID_MOUNTAIN_SPIRAL_CONFIG = Object.freeze({
+  minimumHeight: 91.44,   // 300 ft
+  maximumHeight: 213.36, // 700 ft
+  routeCount: 12,
+  turns: 1.52,
+  generalStepHeight: 2.25,
+  // Compatibility value retained for diagnostics; placement uses the narrower sub-bands.
+  priority450To550StepHeight: 1.55,
+  priority500To550StepHeight: 1.35,
+  priority550To600StepHeight: 1.5,
+  priority600To650StepHeight: 1.3,
+  priority630To660StepHeight: 1.3,
+  priority660To700StepHeight: 1.18,
+  priority680To700StepHeight: .72,
+  branchEvery: 4
+});
+// Compatibility export retained for debug tooling that knew the older name. v9 no longer
+// describes these additions as altitude belts: the authored infill is a set of continuous
+// spiraling climb paths with deliberately reachable vertical step spacing.
+export const MID_MOUNTAIN_ROCK_DENSITY_CONFIG = MID_MOUNTAIN_SPIRAL_CONFIG;
+export const LOWLAND_TREE_CONFIG = Object.freeze({
+  candidateCount: 1440,
+  // Most of the 4× visual-density increase stays visual-only so the extra forest does
+  // not multiply physics/climb colliders at the same rate.
+  maximumClimbableTrees: 140,
+  minimumRadius: 141,
+  radiusSpan: 43
+});
+export const MOUNTAIN_BIOME_SECTORS = Object.freeze([
+  Object.freeze({ id: 'sunwash', label: 'Sunwash Scrub', startAngle: 330, endAngle: 90, forestDensity: .78 }),
+  Object.freeze({ id: 'blackstone', label: 'Blackstone Pinewood', startAngle: 90, endAngle: 210, forestDensity: .98 }),
+  Object.freeze({ id: 'fernwood', label: 'Fernwood Forest', startAngle: 210, endAngle: 330, forestDensity: 1 })
+]);
+const worldLocationById = (id) => SMALL_ISLAND_LOCATIONS.find((location) => location.id === id) ?? null;
+const HOME_WORLD_LOCATION = worldLocationById('home-island');
+const AQUARIUM_WORLD_LOCATION = worldLocationById('aquarium-island');
+const CAVE_FISHING_WORLD_LOCATION = worldLocationById('cave-fishing-island');
+const NORMAL_FISHING_WORLD_LOCATION = worldLocationById('normal-fishing-island');
+const FROSTHOOK_WORLD_LOCATION = worldLocationById('cold-island');
+const BLUEWATER_WORLD_LOCATION = worldLocationById('bluewater-reach');
+
+export const SUMMIT_BENCH_CONFIG = Object.freeze({
+  id: 'summit-bench',
+  angle: 222,
+  radius: 6.55,
+  seatHeight: .65,
+  interactionDistance: 2.35,
+  fishingFacing: 'summit-tarn'
+});
+export const SUMMIT_BENCH_CONFIGS = Object.freeze([
+  SUMMIT_BENCH_CONFIG,
+  Object.freeze({
+    id: 'summit-bench-opposite',
+    angle: (SUMMIT_BENCH_CONFIG.angle + 180) % 360,
+    radius: 6.55,
+    seatHeight: .65,
+    interactionDistance: 2.35,
+    fishingFacing: 'summit-tarn'
+  }),
+  Object.freeze({ id: 'summit-bench-north', angle: 132, radius: 6.55, seatHeight: .65, interactionDistance: 2.35, fishingFacing: 'summit-tarn' }),
+  Object.freeze({ id: 'summit-bench-south', angle: 312, radius: 6.55, seatHeight: .65, interactionDistance: 2.35, fishingFacing: 'summit-tarn' })
+]);
+export const PUBLIC_AQUARIUM_CONFIG = Object.freeze({
+  angle: AQUARIUM_WORLD_LOCATION?.angle ?? 103,
+  radius: AQUARIUM_WORLD_LOCATION?.radius ?? 278,
+  floorY: (AQUARIUM_WORLD_LOCATION?.elevation ?? .7) + .28,
+  width: 104,
+  depth: 42,
+  tankWidth: 18,
+  tankDepth: 14.5,
+  tankHeight: 8.8,
+  tankSpacingX: 19.4,
+  tankRowZ: 9,
+  glassThickness: .24,
+  waterFloorY: 1.08,
+  waterlineY: 9.42,
+  waterInset: .72,
+  interactionDistance: 2.65,
+  visibleResidentLimit: 300,
+  separateFromCabin: true
+});
+export const SKYREACH_TOWER_CONFIG = Object.freeze({
+  locationId: 'skyreach-foundation',
+  width: 32,
+  depth: 15.9252601603,
+  mainRoofHeight: 381,
+  spireHeight: 428.9898,
+  visualAssetUrl: './assets/models/empire-state-building.glb',
+  visualSourceRoofHeight: 8.8903,
+  visualSourceSpireHeight: 10.0101108551,
+  visualVerticalScale: 42.8556966582,
+  // These are the effective bounds of the authored ESB node after its embedded GLB
+  // transform. The v17.5 runtime deliberately preserves that direct-export hierarchy.
+  visualSourceWidth: 3.1562936306,
+  visualSourceDepth: 1.5707749128,
+  visualHorizontalScaleX: 10.1384737116,
+  // One horizontal scale preserves the supplied building's real footprint ratio.
+  visualHorizontalScaleZ: 10.1384737116,
+  visualGroundEmbed: .035,
+  collisionLayers: Object.freeze([
+    Object.freeze({ bottom: -.05, top: 82, width: 32, depth: 15.93 }),
+    Object.freeze({ bottom: 81, top: 98, width: 18.4, depth: 12.6 }),
+    Object.freeze({ bottom: 97, top: 118.5, width: 18.4, depth: 10.1 }),
+    Object.freeze({ bottom: 117.5, top: 274, width: 14.3, depth: 10.1 }),
+    Object.freeze({ bottom: 273, top: 308, width: 13.45, depth: 9.2 }),
+    Object.freeze({ bottom: 307, top: 326, width: 10.95, depth: 7.35 }),
+    Object.freeze({ bottom: 325, top: 333, width: 10.25, depth: 6.4 }),
+    Object.freeze({ bottom: 332, top: 340, width: 7.6, depth: 5.2 }),
+    Object.freeze({ bottom: 339, top: 346, width: 5, depth: 4.45 }),
+    Object.freeze({ bottom: 345, top: 366, width: 3.28, depth: 3.28 }),
+    Object.freeze({ bottom: 365, top: 382, width: 3.45, depth: 3.45 }),
+    Object.freeze({ bottom: 381, top: 391, width: 3.45, depth: 3.45 }),
+    Object.freeze({ bottom: 390, top: 429, width: 1, depth: 1.02 })
+  ])
+});
+
+export function skyreachRectanglePoint(progress, width = SKYREACH_TOWER_CONFIG.width, depth = SKYREACH_TOWER_CONFIG.depth) {
+  const t = ((progress % 1) + 1) % 1;
+  const perimeter = 2 * (width + depth);
+  let distance = t * perimeter;
+  if (distance < width) return { x: -width / 2 + distance, z: -depth / 2, side: 'north' };
+  distance -= width;
+  if (distance < depth) return { x: width / 2, z: -depth / 2 + distance, side: 'east' };
+  distance -= depth;
+  if (distance < width) return { x: width / 2 - distance, z: depth / 2, side: 'south' };
+  distance -= width;
+  return { x: -width / 2, z: depth / 2 - distance, side: 'west' };
+}
+
+export function deriveAquariumWaterBounds(config = PUBLIC_AQUARIUM_CONFIG) {
+  return Object.freeze({
+    minX: -config.tankWidth * .5 + config.waterInset,
+    maxX: config.tankWidth * .5 - config.waterInset,
+    minY: config.waterFloorY + .42,
+    maxY: config.waterlineY - .58,
+    minZ: -config.tankDepth * .5 + config.waterInset,
+    maxZ: config.tankDepth * .5 - config.waterInset,
+    floorY: config.waterFloorY,
+    waterlineY: config.waterlineY,
+    safeInset: config.waterInset
+  });
+}
+export const DOCK_DECK_LOWERING = .22;
+export const CAVE_TOPOLOGY_CONFIG = Object.freeze({
+  tunnelSegments: 12,
+  minimumDepth: 20,
+  // v9.3: the mouth is a literal omission in the gray mountain mesh. These values
+  // describe only that opening and no longer borrow the much larger rear-pool radii.
+  entranceCutDepth: 4.35,
+  entranceOuterPad: .62,
+  coreConcavityOuterDepth: 8,
+  coreConcavityHorizontalInset: 3.4,
+  coreConcavityVerticalInset: 4.2,
+  mouthHalfWidth: 2.18,
+  throatStartInset: .3,
+  archMinimumInset: 1.85,
+  roofClearance: .55,
+  hiddenRadialOverlap: 5.5,
+  hiddenSideOverlap: 3.4,
+  hiddenFloorOverlap: 2.6,
+  enclosed: true,
+  exteriorTrench: false
+});
+export const HOME_CABIN_CONFIG = Object.freeze({
+  angle: HOME_WORLD_LOCATION?.angle ?? 318,
+  radius: HOME_WORLD_LOCATION?.radius ?? 272,
+  floorY: (HOME_WORLD_LOCATION?.elevation ?? .72) + .26,
+  width: 8.4,
+  depth: 6.8,
+  wallHeight: 3.45,
+  interactionDistance: 2.15
+});
+export const MAIN_ISLAND_DOCK_CONFIG = Object.freeze({ centerRadius: 216, length: 21 });
+export const BLUEWATER_SIDE_SEAT_CONFIG = Object.freeze({
+  side: -2.65,
+  forward: 1.75,
+  interactionDistance: 2.4
+});
+export const ISLAND_UNDERWATER_PROFILE = Object.freeze({
+  radiusFactors: Object.freeze([2.35, 1.72, 1.28, 1]),
+  intermediateDepth: 1.35
+});
+export const ROCK_COLLISION_PROXY_CONFIG = Object.freeze({
+  kind: 'rounded-box',
+  halfExtentScale: .42,
+  borderScale: .045
+});
+export const FRACTURED_ROCK_FORM_KINDS = Object.freeze([
+  'chunk', 'chunk', 'spire', 'spire', 'blade', 'lean', 'wedge', 'column',
+  'needle', 'shelfblade', 'crooked', 'shard', 'hook', 'knuckle', 'slab',
+  'anvil', 'tooth', 'fin', 'bulb', 'terrace', 'prow', 'twist', 'crouch'
+]);
+// V2.8 raises the static terrain resolution so small/medium fishing basins are actually
+// represented by the core mesh rather than being approximated by huge triangular facets.
+// Important escarpment radii are kept explicitly alongside an approximately 3 m cadence.
+const TERRAIN_RADII = Object.freeze([
+  208, 205, 202, 199, 196, 193, 190, 187, 184, 181, 178, 176, 175, 172, 170, 169, 166, 164, 163, 160, 158, 157, 154, 152, 151, 149, 148, 147, 145, 143, 142, 141, 139, 136, 133, 130, 127, 124, 121, 118, 115, 112, 109, 108, 106, 104, 103, 102, 100, 97, 95, 94, 91, 90, 88, 85, 84, 82, 79, 78, 76, 73, 70, 68, 67, 66, 64, 61, 60, 59, 58, 57, 56, 55, 54, 52, 51, 50, 49, 48, 47, 46, 44, 43, 41, 40, 38
+]);
+
+// Compatibility exports retained for tooling/tests that inspect the mountain module.
+// They describe V2's broad regions/masses; they are not used to construct stacked rings.
+export const MOUNTAIN_BANDS = Object.freeze([
+  Object.freeze({ id: 'coast', radius: 181, bottom: -.55, top: 22, routeCount: 50 }),
+  Object.freeze({ id: 'lower', radius: 145, bottom: 22, top: 58, routeCount: 50 }),
+  Object.freeze({ id: 'middle', radius: 104, bottom: 58, top: 101, routeCount: 42 }),
+  Object.freeze({ id: 'alpine', radius: 68, bottom: 101, top: MAP_EDITOR_CROWN_BASE_HEIGHT, routeCount: 34 }),
+  Object.freeze({ id: 'summit', radius: CROWN_TOP_RADIUS, bottom: MAP_EDITOR_CROWN_BASE_HEIGHT, top: SUMMIT_HEIGHT, routeCount: 26 })
+]);
+
+export const MOUNTAIN_MASS_PROFILES = Object.freeze([
+  Object.freeze({
+    id: 'continuous-body', bottom: -.55, top: MAP_EDITOR_CROWN_BASE_HEIGHT,
+    bottomRadius: TERRAIN_OUTER_RADIUS, topRadius: CROWN_BASE_RADIUS,
+    segments: TERRAIN_SEGMENTS, offsetX: 0, offsetZ: 0, seed: 20
+  }),
+  Object.freeze({
+    id: 'summit-crown', bottom: MAP_EDITOR_CROWN_BASE_HEIGHT, top: SUMMIT_HEIGHT,
+    bottomRadius: CROWN_BASE_RADIUS, topRadius: CROWN_TOP_RADIUS,
+    segments: 18, offsetX: 0, offsetZ: 0, seed: 21
+  })
+]);
+
+export const TERRAIN_ANGLE_PROFILE = Object.freeze({
+  walkable: Object.freeze([0, 30]),
+  scramble: Object.freeze([30, 40]),
+  gripEncouraged: Object.freeze([40, 55]),
+  climbing: Object.freeze([55, 90]),
+  overhangCount: 0
+});
+
+const SECTORS = Object.freeze([
+  'Sandy Beach', 'Rocky Coast', 'Forest Inlet',
+  'Waterfall Basin', 'Boulder Coast', 'Sheltered Cove'
+]);
+
+const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (edge0, edge1, value) => {
+  const t = clamp((value - edge0) / Math.max(.0001, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+const degreesToRadians = (degrees) => degrees * Math.PI / 180;
+const inwardYaw = (angle) => 90 - angle;
+
+function stableNameHash(value) {
+  return [...value].reduce((hash, character) => ((hash * 31) + character.charCodeAt(0)) >>> 0, 2166136261);
+}
+
+
+function stableUnit(value) {
+  return (stableNameHash(value) % 10000) / 9999;
+}
+
+const ROCK_ID_SECTORS = Object.freeze(['E', 'NE', 'N', 'NW', 'W', 'SW', 'S', 'SE']);
+
+export function createStableRockId(name, position, center = MOUNTAIN_CENTER) {
+  const x = Number(position?.x) || 0;
+  const y = Number(position?.y) || 0;
+  const z = Number(position?.z) || 0;
+  const angle = (Math.atan2(z - center.z, x - center.x) * 180 / Math.PI + 360) % 360;
+  const sector = ROCK_ID_SECTORS[Math.round(angle / 45) % ROCK_ID_SECTORS.length];
+  const feet = Math.max(0, Math.round(y / .3048));
+  const identity = `${String(name)}:${x.toFixed(2)}:${y.toFixed(2)}:${z.toFixed(2)}`;
+  const suffix = stableNameHash(identity).toString(36).toUpperCase().padStart(5, '0').slice(-5);
+  return `R-${String(feet).padStart(3, '0')}-${sector}-${suffix}`;
+}
+
+// Difficulty intentionally rises with elevation but also waves around the circumference,
+// creating easier and harder faces without reintroducing named mandatory routes.
+function climbDifficultyAt(angle, level) {
+  const verticalBase = [0.14, 0.34, 0.58, 0.79][level] ?? 0.5;
+  const broadVariation = Math.sin(degreesToRadians(angle * 2.65 + level * 61 + 17)) * 0.11;
+  const fineVariation = Math.sin(degreesToRadians(angle * 5.4 - level * 37 + 83)) * 0.07;
+  const hardPocket = Math.max(
+    1 - smoothstep(0, 34, angularDistance(angle, 112)),
+    1 - smoothstep(0, 31, angularDistance(angle, 188)),
+    1 - smoothstep(0, 36, angularDistance(angle, 302))
+  ) * 0.12;
+  return clamp(verticalBase + broadVariation + fineVariation + hardPocket, 0.03, 0.98);
+}
+
+function chooseClimbMaterial(level, angle, stage, salt = 0, extraDifficulty = 0) {
+  const difficulty = clamp(climbDifficultyAt(angle, level) + extraDifficulty, 0, 1);
+  const rough = clamp(0.64 - difficulty * 0.59, 0.06, 0.64);
+  const normal = clamp(0.30 - difficulty * 0.04, 0.22, 0.31);
+  const smooth = 0.06 + difficulty * 0.39;
+  const ice = level >= 2 ? clamp((difficulty - 0.5) * 0.5, 0, 0.25) : 0;
+  const total = rough + normal + smooth + ice;
+  let roll = stableUnit(`${level}:${Math.round(angle * 10)}:${stage}:${salt}`) * total;
+  if ((roll -= rough) <= 0) return 'rough';
+  if ((roll -= normal) <= 0) return 'normal';
+  if ((roll -= smooth) <= 0) return 'smooth';
+  return 'ice';
+}
+
+function radialPoint(angle, radius, y, tangentOffset = 0) {
+  const radians = degreesToRadians(angle);
+  const radialX = Math.cos(radians);
+  const radialZ = Math.sin(radians);
+  return {
+    x: MOUNTAIN_CENTER.x + radialX * radius - radialZ * tangentOffset,
+    y,
+    z: MOUNTAIN_CENTER.z + radialZ * radius + radialX * tangentOffset
+  };
+}
+
+function localPolarPoint(angle, radius) {
+  const radians = degreesToRadians(angle);
+  return { x: Math.cos(radians) * radius, z: Math.sin(radians) * radius };
+}
+
+function angularDistance(a, b) {
+  return Math.abs(((a - b + 540) % 360) - 180);
+}
+
+// The world-location registry owns each satellite island's normalized shoreline outline.
+// Rendering and all map UIs consume the same data so a separately loaded island never grows
+// a second, contradictory "map shape" inside this module.
+function outlineRadiusAt(location, angle) {
+  const outline = location?.outline;
+  if (!outline?.length) return 1;
+  const wrapped = ((angle % 360) + 360) % 360;
+  const rawIndex = wrapped / 360 * outline.length;
+  const indexA = Math.floor(rawIndex) % outline.length;
+  const indexB = (indexA + 1) % outline.length;
+  const t = rawIndex - Math.floor(rawIndex);
+  const radiusA = Math.hypot(outline[indexA].x, outline[indexA].z);
+  const radiusB = Math.hypot(outline[indexB].x, outline[indexB].z);
+  return lerp(radiusA, radiusB, t);
+}
+
+export function islandFootprintScale(locationId, angle) {
+  const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === locationId);
+  return outlineRadiusAt(location, angle);
+}
+
+export function triangleSurfaceHeightAt(vertices, triangles, x, z, fallback = null) {
+  let highest = -Infinity;
+  for (const triangle of triangles ?? []) {
+    const [a, b, c] = triangle.map((index) => vertices?.[index]);
+    if (!a || !b || !c) continue;
+    const denominator = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+    if (Math.abs(denominator) < 1e-9) continue;
+    const u = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / denominator;
+    const v = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / denominator;
+    const w = 1 - u - v;
+    if (u < -1e-6 || v < -1e-6 || w < -1e-6) continue;
+    highest = Math.max(highest, u * a[1] + v * b[1] + w * c[1]);
+  }
+  return Number.isFinite(highest) ? highest : fallback;
+}
+
+export function createIslandOutline(location, samples = location?.outline?.length ?? 28) {
+  if (!location?.worldPosition || !location?.radii) return [];
+  if (location.outline?.length) {
+    return location.outline.map((point) => ({
+      x: location.worldPosition.x + point.x * location.radii.x,
+      z: location.worldPosition.z + point.z * location.radii.z
+    }));
+  }
+  const points = [];
+  for (let index = 0; index < samples; index += 1) {
+    const angle = index * 360 / samples;
+    const radians = degreesToRadians(angle);
+    points.push({
+      x: location.worldPosition.x + Math.cos(radians) * location.radii.x,
+      z: location.worldPosition.z + Math.sin(radians) * location.radii.z
+    });
+  }
+  return points;
+}
+
+function pointToSegmentDistance2D(point, start, end) {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const lengthSquared = dx * dx + dz * dz;
+  const t = lengthSquared > 0
+    ? clamp(((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSquared, 0, 1)
+    : 0;
+  return Math.hypot(point.x - (start.x + dx * t), point.z - (start.z + dz * t));
+}
+
+export function distanceFromPolygonSafeEdge(point, polygon = []) {
+  if (![point?.x, point?.z].every(Number.isFinite) || polygon.length < 3) return Infinity;
+  let inside = false;
+  let edgeDistance = Infinity;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const a = polygon[previous];
+    const b = polygon[index];
+    edgeDistance = Math.min(edgeDistance, pointToSegmentDistance2D(point, a, b));
+    const crosses = (a.z > point.z) !== (b.z > point.z)
+      && point.x < (b.x - a.x) * (point.z - a.z) / ((b.z - a.z) || Number.EPSILON) + a.x;
+    if (crosses) inside = !inside;
+  }
+  return inside ? 0 : edgeDistance;
+}
+
+// These broad fields shape one continuous mountain rather than creating altitude rings.
+// The values are intentionally low-frequency so the silhouette reads as ridges/valleys,
+// while authored route rocks provide the local traversal detail.
+const TERRAIN_FIELDS = Object.freeze([
+  Object.freeze({ angle: 24, amplitude: 4.2, width: 33, start: .18, end: .94 }),
+  Object.freeze({ angle: 108, amplitude: -3.7, width: 30, start: .2, end: .82 }),
+  Object.freeze({ angle: 183, amplitude: -4.6, width: 31, start: .16, end: .86 }),
+  Object.freeze({ angle: 268, amplitude: 3.8, width: 37, start: .2, end: .9 }),
+  Object.freeze({ angle: 326, amplitude: 2.2, width: 28, start: .35, end: .8 })
+]);
+
+// Three steep, visibly irregular cliff systems still provide the mountain's vertical
+// structure, but V2.5 no longer funnels the player through privileged corridors and varies climb-line density by elevation.
+// The continuous terrain itself remains non-grippable; a dense circumferential web of
+// small climbable formations is layered over each escarpment so a climb can be attempted
+// from essentially any direction while local material/gap difficulty varies by sector.
+export const ESCARPMENTS = Object.freeze([
+  Object.freeze({ id: 'lower-wall', baseRadius: 145, width: 6.2, rise: 14.5, waveA: 5.4, waveB: 2.2, phase: 19 }),
+  Object.freeze({ id: 'middle-wall', baseRadius: 104, width: 5.7, rise: 16.5, waveA: 4.6, waveB: 2.6, phase: 73 }),
+  Object.freeze({ id: 'alpine-wall', baseRadius: 68, width: 5.2, rise: 18.2, waveA: 4.1, waveB: 2.1, phase: 137 })
+]);
+
+function escarpmentRadiusAt(escarpment, angle) {
+  const radians = degreesToRadians(angle);
+  return escarpment.baseRadius
+    + Math.sin(radians * 2 + degreesToRadians(escarpment.phase)) * escarpment.waveA
+    + Math.sin(radians * 5 - degreesToRadians(escarpment.phase * .47)) * escarpment.waveB;
+}
+
+function escarpmentStepAt(escarpment, angle, radius) {
+  const center = escarpmentRadiusAt(escarpment, angle);
+  const outer = center + escarpment.width * .5;
+  const inner = center - escarpment.width * .5;
+  return (1 - smoothstep(inner, outer, radius)) * escarpment.rise;
+}
+
+function rawTerrainHeightAt(angle, radius) {
+  if (radius >= MOUNTAIN_FOOT_RADIUS) {
+    const shore = clamp((TERRAIN_OUTER_RADIUS - radius) / (TERRAIN_OUTER_RADIUS - MOUNTAIN_FOOT_RADIUS), 0, 1);
+    return -.55 + shore * .72 + Math.sin(degreesToRadians(angle * 3 + 17)) * .08 * shore;
+  }
+
+  const progress = clamp((MOUNTAIN_FOOT_RADIUS - radius) / (MOUNTAIN_FOOT_RADIUS - CROWN_BASE_RADIUS), 0, 1);
+  // V2.1 is substantially steeper than V2.0. A ~32° underlying body is interrupted by
+  // three 55–75° escarpments. Off-route terrain cannot be gripped, so these cliffs gate
+  // progress without invisible collision walls.
+  let height = .1 + 90.4 * Math.pow(progress, 1.04);
+  for (const escarpment of ESCARPMENTS) height += escarpmentStepAt(escarpment, angle, radius);
+
+  for (const field of TERRAIN_FIELDS) {
+    const angleBlend = 1 - smoothstep(0, field.width, angularDistance(angle, field.angle));
+    const verticalBlend = smoothstep(field.start - .08, field.start + .08, progress)
+      * (1 - smoothstep(field.end - .08, field.end + .08, progress));
+    height += field.amplitude * angleBlend * verticalBlend;
+  }
+
+  // V2.12 extends the inner alpine shoulder slightly onto the middle plateau. At radius
+  // 72 this contributes nothing; by the crown base it adds ~75 m and reaches the same
+  // crown-base height, widening the gray core without turning the middle into a cylinder.
+  const upperShoulderProgress = clamp(
+    (UPPER_SHOULDER_START_RADIUS - radius) / (UPPER_SHOULDER_START_RADIUS - CROWN_BASE_RADIUS),
+    0, 1
+  );
+  height += UPPER_SHOULDER_LIFT * Math.pow(upperShoulderProgress, 1.06);
+
+  const broadFacet = Math.sin(degreesToRadians(angle * 2.35 + radius * .34)) * 1.0 * progress;
+  const chippedFacet = Math.sin(degreesToRadians(angle * 5.1 - radius * .72 + 31)) * .38 * (0.25 + progress * .75);
+  return height + broadFacet + chippedFacet;
+}
+
+// These are genuine terraces in the continuous terrain mesh, not props. A nearly flat
+// center gives reliable standing/support contact while smooth radial and angular shoulders
+// merge each shelf back into the mountain. The sector is broad enough to approach from
+// nearby climb lines without creating a circumferential shortcut.
+export function applyCoreRestTerraces(angle, radius, sourceHeight) {
+  let height = sourceHeight;
+  for (const ledge of [
+    MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred,
+    MOUNTAIN_REST_LEDGE_CONFIG.fiveFifty,
+    MOUNTAIN_REST_LEDGE_CONFIG.sixHundred
+  ]) {
+    const flatHalfAngle = ledge.width * .5 / ledge.radius * 180 / Math.PI;
+    const angleBlend = 1 - smoothstep(flatHalfAngle, flatHalfAngle + 5.5, angularDistance(angle, ledge.angle));
+    const radialDistance = Math.abs(radius - ledge.radius);
+    const radialBlend = 1 - smoothstep(ledge.depth * .34, ledge.depth * .64, radialDistance);
+    const target = ledge.targetHeight
+      + (ledge.radius - radius) * .025
+      + Math.sin(degreesToRadians(angle - ledge.angle)) * .08;
+    height = lerp(height, target, angleBlend * radialBlend);
+  }
+  return height;
+}
+
+export function oceanFloorHeightAt(radius, shorelineY = -.32) {
+  return oceanFloorProfile(radius, {
+    joinRadius: OCEAN_SEABED_JOIN_RADIUS,
+    waterRadius: OCEAN_WATER_INNER_RADIUS,
+    shallowEndRadius: OCEAN_SHALLOW_WALK_END_RADIUS,
+    outerRadius: OCEAN_FLOOR_OUTER_RADIUS,
+    shorelineY,
+    surfaceY: OCEAN_SURFACE_Y
+  });
+}
+
+export function createOceanShelfRingRadii(outerRadius = OCEAN_FLOOR_OUTER_RADIUS) {
+  const nearLimit = Math.min(270, outerRadius);
+  const ringRadii = [TERRAIN_OUTER_RADIUS];
+  for (let radius = TERRAIN_OUTER_RADIUS + 2; radius < nearLimit; radius += 2) ringRadii.push(radius);
+  for (const authoredRadius of [OCEAN_WATER_INNER_RADIUS, OCEAN_SHALLOW_WALK_END_RADIUS]) {
+    if (authoredRadius > TERRAIN_OUTER_RADIUS && authoredRadius < nearLimit) ringRadii.push(authoredRadius);
+  }
+  ringRadii.sort((left, right) => left - right);
+  for (let radius = Math.max(275, ringRadii.at(-1) + 5); radius < Math.min(360, outerRadius); radius += 5) {
+    ringRadii.push(radius);
+  }
+  for (const radius of [420, 520, 650, 800, 1000, 1250, 1500, outerRadius]) {
+    if (radius > ringRadii.at(-1) && radius <= outerRadius) ringRadii.push(radius);
+  }
+  return ringRadii;
+}
+
+const FISHING_LAYOUT = Object.freeze([
+  // LOWER MOUNTAIN — 10 waters
+  Object.freeze({
+    id: 'hearthward-pond', label: 'Hearthward Tutorial Pond', tier: 'lower', waterType: 'pond',
+    theme: 'fernwood', ecologyThemes: ['sunwash', 'fernwood'], offshore: 'home-island',
+    angle: HOME_WORLD_LOCATION?.angle ?? 222, radius: HOME_WORLD_LOCATION?.radius ?? 980,
+    localOffset: { x: 7.8, z: 8.25 }, waterY: .78, radii: [4.1, 3.15], depth: 'shallow', basinDepth: .5,
+    fish: ['bluegill', 'pumpkinseed', 'golden-shiner'], allowedRarities: ['Common'],
+    size: .9, rarityBias: -.4, trophyChance: .7, biteRate: 1.3, tutorialWater: true
+  }),
+  Object.freeze({ id: 'sunwash-tidepool', label: 'Sunwash Tidepool', tier: 'lower', waterType: 'tidepool', theme: 'sunwash', angle: 348, radius: 190, radii: [6, 4.8], depth: 'shallow', basinDepth: .35, fish: ['sardine', 'anchovy', 'tidepool-sculpin', 'striped-mullet'], size: .94, rarityBias: 0.08, trophyChance: .9 }),
+  Object.freeze({ id: 'blackstone-inlet', label: 'Blackstone Inlet', tier: 'lower', waterType: 'inlet', theme: 'blackstone', angle: 62, radius: 188, radii: [7, 5.3], depth: 'deep', basinDepth: .45, fish: ['mackerel', 'rockfish', 'sea-bass', 'flounder'], size: 1, rarityBias: 0.1, trophyChance: 1 }),
+  Object.freeze({ id: 'fernwater-pond', label: 'Fernwater Pond', tier: 'lower', waterType: 'pond', theme: 'fernwood', angle: 104, radius: 164, radii: [6.2, 4.7], depth: 'shallow', basinDepth: 2.2, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'largemouth-bass', 'common-carp'], size: 1, rarityBias: 0.09, trophyChance: 1 }),
+  Object.freeze({ id: 'amber-reed-pond', label: 'Mangrove Lagoon', tier: 'lower', waterType: 'lagoon', theme: 'mangrove', ecologyThemes: ['sunwash', 'fernwood'], offshore: 'normal-fishing-island', angle: NORMAL_FISHING_WORLD_LOCATION?.angle ?? 344, radius: NORMAL_FISHING_WORLD_LOCATION?.radius ?? 300, waterY: .62, radii: [7.8, 5.8], depth: 'shallow', basinDepth: .8, fish: ['bluegill', 'pumpkinseed', 'golden-shiner', 'black-crappie'], size: 1, rarityBias: 0.12, trophyChance: 1.01 }),
+  Object.freeze({ id: 'basalt-grotto', label: 'Basalt Grotto', tier: 'lower', waterType: 'cave-pool', theme: 'fallglass', offshore: 'cave-fishing-island', cave: true, entranceDepth: 11.5, angle: CAVE_FISHING_WORLD_LOCATION?.angle ?? 164, radius: CAVE_FISHING_WORLD_LOCATION?.radius ?? 300, waterY: .22, radii: [4.8, 3.9], depth: 'shallow', basinDepth: 1.15, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.01, rarityBias: 0.16, trophyChance: 1.04 }),
+  Object.freeze({ id: 'boulder-lagoon', label: 'Boulder Coast Lagoon', tier: 'lower', waterType: 'lagoon', theme: 'blackstone', angle: 226, radius: 177, radii: [9.5, 7.2], depth: 'deep', basinDepth: .7, fish: ['rockfish', 'flounder', 'striped-mullet', 'sea-bass'], size: 1.01, rarityBias: 0.1, trophyChance: 1.02 }),
+  Object.freeze({ id: 'gull-crag-pond', label: 'Gull Crag Pond', tier: 'lower', waterType: 'pond', theme: 'blackstone', angle: 263, radius: 160, radii: [6.5, 5.1], depth: 'shallow', basinDepth: 2.5, fish: ['yellow-perch', 'black-crappie', 'freshwater-drum', 'channel-catfish'], size: 1.03, rarityBias: 0.14, trophyChance: 1.05 }),
+  Object.freeze({ id: 'sheltered-mirror', label: 'Sheltered Mirror', tier: 'lower', waterType: 'pond', theme: 'sunwash', angle: 306, radius: 168, radii: [3.5, 2.55], depth: 'shallow', basinDepth: 2.0, fish: ['bluegill', 'golden-shiner', 'common-carp', 'largemouth-bass'], size: 1, rarityBias: 0.11, trophyChance: 1.01 }),
+  Object.freeze({ id: 'redbank-pool', label: 'Redbank Pool', tier: 'lower', waterType: 'pool', theme: 'sunwash', angle: 18, radius: 158, radii: [4.8, 3.5], depth: 'shallow', basinDepth: 2.15, fish: ['longnose-dace', 'white-sucker', 'smallmouth-bass', 'rainbow-trout'], size: 1.02, rarityBias: 0.13, trophyChance: 1.04 }),
+  Object.freeze({ id: 'pineglass-lake', label: 'Pineglass Lake', tier: 'lower', waterType: 'lake', theme: 'fernwood', angle: 80, radius: 151, radii: [12.2, 9.1], depth: 'deep', basinDepth: 2.7, fish: ['yellow-perch', 'black-crappie', 'largemouth-bass', 'channel-catfish'], size: 1.03, rarityBias: 0.15, trophyChance: 1.05 }),
+
+  // MIDDLE MOUNTAIN — 7 waters
+  Object.freeze({ id: 'red-river-bend', label: 'Red River Bend', tier: 'middle', waterType: 'stream-pool', theme: 'sunwash', angle: 47, radius: 126, radii: [6.6, 4.8], depth: 'shallow', basinDepth: 2.1, fish: ['longnose-dace', 'white-sucker', 'smallmouth-bass', 'rainbow-trout'], size: 1.04, rarityBias: 0.34, trophyChance: 1.08 }),
+  Object.freeze({ id: 'echo-cave-pool', label: 'Echo Cave Pool', tier: 'middle', waterType: 'cave-pool', theme: 'fernwood', cave: true, entranceDepth: 21, angle: 139, radius: 112, radii: [5.7, 4.5], depth: 'shallow', basinDepth: 2.3, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.08, rarityBias: 0.42, trophyChance: 1.16 }),
+  Object.freeze({ id: 'mossbell-lake', label: 'Mossbell Lake', tier: 'middle', waterType: 'lake', theme: 'fernwood', angle: 92, radius: 119, radii: [13.1, 9.7], depth: 'deep', basinDepth: 2.65, fish: ['rainbow-trout', 'brook-trout', 'yellow-perch', 'smallmouth-bass'], size: 1.07, rarityBias: 0.38, trophyChance: 1.13 }),
+  Object.freeze({ id: 'split-rock-pool', label: 'Split Rock Pool', tier: 'middle', waterType: 'pool', theme: 'sunwash', angle: 315, radius: 116, radii: [5.6, 4.2], depth: 'shallow', basinDepth: 1.9, fish: ['brook-trout', 'longnose-dace', 'white-sucker', 'smallmouth-bass'], size: 1.06, rarityBias: 0.4, trophyChance: 1.12 }),
+  Object.freeze({ id: 'obsidian-cup', label: 'Obsidian Cup', tier: 'middle', waterType: 'cave-pool', theme: 'fallglass', cave: true, entranceDepth: 19, angle: 222, radius: 102, radii: [4.9, 3.8], depth: 'shallow', basinDepth: 2.25, fish: ['stone-loach', 'cave-tetra', 'blind-cave-eel', 'burbot'], size: 1.09, rarityBias: 0.46, trophyChance: 1.18 }),
+  Object.freeze({ id: 'windcut-tarn', label: 'Windcut Tarn', tier: 'middle', waterType: 'tarn', theme: 'blackstone', angle: 278, radius: 121, radii: [6.1, 4.5], depth: 'shallow', basinDepth: 2.1, fish: ['brook-trout', 'cutthroat-trout', 'mountain-whitefish', 'burbot'], size: 1.08, rarityBias: 0.43, trophyChance: 1.17 }),
+  Object.freeze({ id: 'twilight-basin', label: 'Twilight Basin', tier: 'middle', waterType: 'pond', theme: 'sunwash', angle: 344, radius: 112, radii: [6.3, 4.8], depth: 'shallow', basinDepth: 2.2, fish: ['rainbow-trout', 'brook-trout', 'mountain-whitefish', 'cutthroat-trout'], size: 1.09, rarityBias: 0.41, trophyChance: 1.2 }),
+
+  // UPPER / ALPINE — 4 waters
+  Object.freeze({ id: 'cloudstep-lake', label: 'Cloudstep Lake', physicalZone: 'Cloudstep Lake', tier: 'upper', waterType: 'lake', theme: 'fallglass', uniformProbabilities: true, probabilityGroup: 'cloudstep-lake', angle: 183, radius: 89, radii: [12.8, 9.4], depth: 'deep', basinDepth: 2.8, fish: ['rainbow-trout', 'brook-trout', 'mountain-whitefish', 'cutthroat-trout'], size: 1.11, rarityBias: 0.68, trophyChance: 1.24 }),
+  Object.freeze({ id: 'hidden-ridge-pool', label: 'Hidden Ridge Pool', tier: 'upper', waterType: 'tarn', theme: 'sunwash', angle: 335, radius: 82, radii: [3.6, 2.6], depth: 'shallow', basinDepth: 2.0, fish: ['brook-trout', 'cutthroat-trout', 'mountain-whitefish', 'burbot'], size: 1.12, rarityBias: 0.72, trophyChance: 1.28 }),
+  Object.freeze({ id: 'blue-ice-melt', label: 'Frosthook Lake', tier: 'upper', waterType: 'ice-pool', theme: 'blackstone', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], offshore: 'cold-island', angle: FROSTHOOK_WORLD_LOCATION?.angle ?? 230, radius: FROSTHOOK_WORLD_LOCATION?.radius ?? 286, waterY: .96, radii: [5.8, 4.6], depth: 'shallow', basinDepth: .75, fish: ['brook-trout', 'mountain-whitefish', 'cutthroat-trout', 'alpine-char'], size: 1.14, rarityBias: 0.76, trophyChance: 1.34 }),
+  Object.freeze({ id: 'high-cirque-tarn', label: 'High Cirque Tarn', tier: 'upper', waterType: 'cave-tarn', theme: 'fernwood', cave: true, entranceDepth: 19, angle: 69, radius: 58, radii: [4.8, 3.8], depth: 'shallow', basinDepth: 1.8, fish: ['mountain-whitefish', 'cutthroat-trout', 'alpine-char', 'burbot'], size: 1.16, rarityBias: 0.8, trophyChance: 1.42 }),
+
+  // CROWN / SUMMIT — one fixed-aperture cave plus the summit tarn
+  Object.freeze({ id: 'crown-vault', label: 'Crown Vault', tier: 'summit', waterType: 'cave-tarn', theme: 'blackstone', cave: true, entranceDepth: 20, angle: 302, radius: 18.5, radii: [4.5, 3.45], depth: 'shallow', basinDepth: 1.7, fish: ['mountain-whitefish', 'cutthroat-trout', 'alpine-char', 'burbot'], size: 1.18, rarityBias: .92, trophyChance: 1.5 }),
+  Object.freeze({ id: 'crooked-peak-tarn', label: 'Stoneveil Tarn', tier: 'summit', waterType: 'summit-pond', theme: 'summit', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], angle: 0, radius: 0, radii: [3.7, 3.1], fishingRadiiScale: .82, depth: 'shallow', basinDepth: 0, summit: true, fish: ['rainbow-trout', 'cutthroat-trout', 'alpine-char', 'channel-catfish'], size: 1.18, rarityBias: 1.0, trophyChance: 1.55, maximumSpeciesProbability: .05 }),
+
+  // WATERFALL — 1 dedicated fishable plunge pool
+  Object.freeze({ id: 'fallglass-cascade', label: 'Fallglass Cascade', physicalZone: 'Waterfall', tier: 'waterfall', waterType: 'waterfall-pool', theme: 'fallglass', waterfall: true, uniformProbabilities: true, probabilityGroup: 'fallglass-cascade', angle: 183, radius: 156, radii: [5.7, 3.8], depth: 'shallow', basinDepth: 1.9, fish: ['creek-chub', 'longnose-dace', 'rainbow-trout', 'smallmouth-bass'], size: 1.08, rarityBias: 0.58, trophyChance: 1.18 })
+]);
+
+const EDITOR_FISHING_LAYOUT = Object.freeze(
+  applyFishingLayoutPatch(FISHING_LAYOUT, MAP_EDITOR_PATCH).map((location) => Object.freeze(location))
+); // REEL_ASCENT_MAP_EDITOR_V1
+
+// The visible ocean is one annular fishing zone. The hollow center is essential: treating
+// it as a giant ellipse would incorrectly make every inland cast an ocean cast.
+export const OCEAN_FISHING_DESCRIPTOR = Object.freeze({
+  id: 'outer-ocean', label: 'Outer Ocean', physicalZone: 'Ocean', tier: 'ocean', waterType: 'ocean', theme: 'coastal',
+  ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], uniformProbabilities: true, probabilityGroup: 'outer-ocean',
+  center: MOUNTAIN_CENTER, innerRadius: OCEAN_WATER_INNER_RADIUS, outerRadius: OCEAN_VISUAL_OUTER_RADIUS - 5,
+  fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
+});
+
+export const FROSTHOOK_COLD_OCEAN_DESCRIPTOR = Object.freeze({
+  id: 'frosthook-cold-ocean', label: 'Frosthook Cold Ocean', physicalZone: 'Frosthook Cold Ocean',
+  tier: 'ocean', waterType: 'cold-ocean', theme: 'polar',
+  ecologyThemes: ['blackstone'], uniformProbabilities: true, probabilityGroup: 'frosthook-cold-ocean',
+  center: FROSTHOOK_WORLD_LOCATION?.worldPosition ?? MOUNTAIN_CENTER,
+  // The annulus slightly overlaps Frosthook's shortest shoreline radius so there is no
+  // exposed Outer Ocean strip between the island mesh and its dedicated cold water.
+  innerRadius: 18.25, outerRadius: 44, radii: [44, 39],
+  fish: ['polar_bear', 'penguin', 'qallupilluk', 'blue-ice-codling', 'frostglass-shrimp']
+});
+
+export const BLUEWATER_REACH_DESCRIPTOR = Object.freeze({
+  id: 'bluewater-reach-water', label: 'Bluewater Reach', physicalZone: 'Bluewater Reach',
+  tier: 'ocean', waterType: 'bluewater-ocean', theme: 'coastal',
+  ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], uniformProbabilities: true,
+  probabilityGroup: 'bluewater-reach', habitatAliasIds: ['outer-ocean'],
+  center: BLUEWATER_WORLD_LOCATION?.worldPosition ?? MOUNTAIN_CENTER,
+  innerRadius: 8, outerRadius: 50, radii: [50, 50],
+  specimenSizeBias: .08,
+  largeSpeciesWeightBias: .12,
+  fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
+});
+
+// Kept as an empty compatibility export for map/test consumers from v17-v17.2.
+// The v17.3 hard reset deliberately removes the failed toilet and rooftop-pool scenes.
+export const SKYREACH_FISHING_DESCRIPTORS = Object.freeze([]);
+
+function isFrosthookColdOceanPoint(point, margin = 0) {
+  const descriptor = FROSTHOOK_COLD_OCEAN_DESCRIPTOR;
+  const radius = Math.hypot(point.x - descriptor.center.x, point.z - descriptor.center.z);
+  return radius >= descriptor.innerRadius + margin && radius <= descriptor.outerRadius - margin;
+}
+
+function isBluewaterReachPoint(point, margin = 0) {
+  const descriptor = BLUEWATER_REACH_DESCRIPTOR;
+  const radius = Math.hypot(point.x - descriptor.center.x, point.z - descriptor.center.z);
+  return radius >= descriptor.innerRadius + margin && radius <= descriptor.outerRadius - margin;
+}
+
+export const FISHING_WATER_COUNTS = Object.freeze({
+  ocean: 3, lower: 11, middle: 7, upper: 4, summit: 2, waterfall: 1, total: 28
+});
+
+export function terrainHeightAt(angle, radius) {
+  let height = rawTerrainHeightAt(angle, radius);
+  const point = localPolarPoint(angle, radius);
+  for (const basin of EDITOR_FISHING_LAYOUT) {
+    if (basin.summit || basin.offshore) continue;
+    const center = localPolarPoint(basin.angle, basin.radius);
+    const dx = point.x - center.x;
+    const dz = point.z - center.z;
+    // FishingZone is currently axis-aligned, so the terrain carve deliberately matches
+    // that same ellipse exactly. The old circular carve was the reason flat water visibly
+    // crossed the sides of its triangular divot.
+    const normalizedDistance = Math.hypot(
+      dx / Math.max(.1, basin.radii[0]),
+      dz / Math.max(.1, basin.radii[1])
+    );
+    const basinCenterHeight = rawTerrainHeightAt(basin.angle, basin.radius);
+    if (!basin.cave && normalizedDistance < 1.48) {
+      height = basinTerrainHeight(
+        height,
+        basinCenterHeight,
+        basin.basinDepth,
+        normalizedDistance
+      );
+    }
+
+  }
+  return applyMapEditorHeight(applyCoreRestTerraces(angle, radius, height), angle, radius, MOUNTAIN_CENTER, MAP_EDITOR_PATCH);
+}
+
+function waterSurfaceY(location) {
+  if (Number.isFinite(location.waterY)) return location.waterY;
+  if (location.summit) return SUMMIT_HEIGHT - .12;
+  if (location.cave) {
+    // Cave pools are authored relative to their mouth, not the much higher terrain at the
+    // pool's inward radius. This guarantees that the lined entrance descends to water even
+    // on the steep middle and Alpine faces instead of climbing dozens of meters underground.
+    const entranceRadius = location.radius + caveDepthAt(location);
+    const entranceY = applyMapEditorHeight(rawTerrainHeightAt(location.angle, entranceRadius), location.angle, entranceRadius, MOUNTAIN_CENTER, MAP_EDITOR_PATCH);
+    return entranceY - Math.max(3.35, location.basinDepth + 1.25);
+  }
+  return terrainHeightAt(location.angle, location.radius) + .45;
+}
+
+function caveDepthAt(location) {
+  if (location.offshore) return location.entranceDepth ?? 9.5;
+  return Math.max(CAVE_TOPOLOGY_CONFIG.minimumDepth,
+    location.entranceDepth ?? location.radii[0] * 4.6);
+}
+
+function caveMouthHalfWidthAt(cave) {
+  // Fishing-pool dimensions are intentionally NOT cave-mouth dimensions. The previous
+  // implementation used radii[1] here, producing 8–11 m wide dark mouths that read like
+  // attached structures. Keep a human-scale aperture and let the tunnel widen only after
+  // it is already inside the mountain.
+  const depthAdjustment = clamp((caveDepthAt(cave) - 19) * .025, -.08, .16);
+  return CAVE_TOPOLOGY_CONFIG.mouthHalfWidth + depthAdjustment;
+}
+
+function caveEntranceLocalCoordinates(x, z, cave) {
+  const center = localPolarPoint(cave.angle, cave.radius);
+  const radians = degreesToRadians(cave.angle);
+  const dx = x - center.x;
+  const dz = z - center.z;
+  return {
+    outward: dx * Math.cos(radians) + dz * Math.sin(radians),
+    lateral: -dx * Math.sin(radians) + dz * Math.cos(radians)
+  };
+}
+
+function caveApertureProfileAtDepth(cave, depthT) {
+  const t = clamp(depthT, 0, 1);
+  // A broad lower-middle and narrower inner/top edge gives the omitted terrain a crude,
+  // natural arch footprint instead of a rectangular trench. Small deterministic asymmetry
+  // keeps opposite sides from reading like a manufactured doorway.
+  const archBulge = Math.sin(t * Math.PI);
+  const widthScale = .62 + archBulge * .42 - t * .1;
+  const phase = stableUnit(`cave-mouth:${cave.id}`) * Math.PI * 2;
+  const sideWobble = Math.sin(t * Math.PI * 2.2 + phase) * .075;
+  const centerShift = Math.sin(t * Math.PI * 1.35 + phase * .7) * .16;
+  return {
+    halfWidth: caveMouthHalfWidthAt(cave) * Math.max(.48, widthScale + sideWobble),
+    centerShift
+  };
+}
+
+function isCaveEntranceSurfacePoint(x, z, cave) {
+  const { outward, lateral } = caveEntranceLocalCoordinates(x, z, cave);
+  const caveDepth = caveDepthAt(cave);
+  // Only the inner throat is omitted. The much broader outer approach remains part of the
+  // gray core and is physically deformed by deformCaveCoreVertex into a staged recess.
+  const outerEdge = caveDepth - 1.2;
+  const innerEdge = caveDepth - CAVE_TOPOLOGY_CONFIG.entranceCutDepth;
+  if (outward < innerEdge || outward > outerEdge) return false;
+  const depthT = (outerEdge - outward) / Math.max(.001, outerEdge - innerEdge);
+  const profile = caveApertureProfileAtDepth(cave, depthT);
+  return Math.abs(lateral - profile.centerShift) <= profile.halfWidth;
+}
+
+function pointInTriangleXZ(point, a, b, c) {
+  const sign = (p1, p2, p3) => (
+    (p1[0] - p3[0]) * (p2[2] - p3[2]) - (p2[0] - p3[0]) * (p1[2] - p3[2])
+  );
+  const d1 = sign(point, a, b);
+  const d2 = sign(point, b, c);
+  const d3 = sign(point, c, a);
+  const hasNegative = d1 < 0 || d2 < 0 || d3 < 0;
+  const hasPositive = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(hasNegative && hasPositive);
+}
+
+const CAVE_APERTURE_SAMPLE_CACHE = new WeakMap();
+function caveApertureCoverageSamples(cave) {
+  const cached = CAVE_APERTURE_SAMPLE_CACHE.get(cave);
+  if (cached) return cached;
+  const center = localPolarPoint(cave.angle, cave.radius);
+  const radians = degreesToRadians(cave.angle);
+  const radialX = Math.cos(radians);
+  const radialZ = Math.sin(radians);
+  const tangentX = -radialZ;
+  const tangentZ = radialX;
+  const caveDepth = caveDepthAt(cave);
+  const outerEdge = caveDepth - 1.2;
+  const innerEdge = caveDepth - CAVE_TOPOLOGY_CONFIG.entranceCutDepth;
+  const samples = [];
+  for (const depthT of [0, .18, .38, .58, .78, 1]) {
+    const outward = lerp(outerEdge, innerEdge, depthT);
+    const profile = caveApertureProfileAtDepth(cave, depthT);
+    for (const side of [-.82, 0, .82]) {
+      const lateral = profile.centerShift + profile.halfWidth * side;
+      samples.push([
+        center.x + radialX * outward + tangentX * lateral,
+        0,
+        center.z + radialZ * outward + tangentZ * lateral
+      ]);
+    }
+  }
+  CAVE_APERTURE_SAMPLE_CACHE.set(cave, samples);
+  return samples;
+}
+
+function triangleIntersectsCaveEntrance(a, b, c) {
+  const triangleSamples = [
+    a, b, c,
+    [(a[0] + b[0]) * .5, 0, (a[2] + b[2]) * .5],
+    [(b[0] + c[0]) * .5, 0, (b[2] + c[2]) * .5],
+    [(c[0] + a[0]) * .5, 0, (c[2] + a[2]) * .5],
+    [(a[0] * 2 + b[0] + c[0]) * .25, 0, (a[2] * 2 + b[2] + c[2]) * .25],
+    [(b[0] * 2 + a[0] + c[0]) * .25, 0, (b[2] * 2 + a[2] + c[2]) * .25],
+    [(c[0] * 2 + a[0] + b[0]) * .25, 0, (c[2] * 2 + a[2] + b[2]) * .25],
+    [(a[0] + b[0] + c[0]) / 3, 0, (a[2] + b[2] + c[2]) / 3]
+  ];
+  return EDITOR_FISHING_LAYOUT.some((cave) => {
+    if (!cave.cave || cave.offshore) return false;
+    if (triangleSamples.some((point) => isCaveEntranceSurfacePoint(point[0], point[2], cave))) return true;
+    // Also remove a face that completely spans a narrow part of the aperture even when no
+    // triangle vertex happens to land inside it. This prevents one invisible/visible sliver
+    // from sealing an otherwise open mouth.
+    return caveApertureCoverageSamples(cave).some((point) => pointInTriangleXZ(point, a, b, c));
+  });
+}
+
+export function deformCaveCoreVertex(x, y, z) {
+  let result = { x, y, z, maximumRecess: 0 };
+  for (const cave of EDITOR_FISHING_LAYOUT) {
+    if (!cave.cave || cave.offshore) continue;
+    const { outward, lateral } = caveEntranceLocalCoordinates(result.x, result.z, cave);
+    const caveDepth = caveDepthAt(cave);
+    const outerEdge = caveDepth + CAVE_TOPOLOGY_CONFIG.coreConcavityOuterDepth;
+    const throatEdge = caveDepth - 1.2;
+    if (outward > outerEdge || outward < throatEdge - .8) continue;
+    const broadHalfWidth = caveMouthHalfWidthAt(cave) + 4.1;
+    const lateralBlend = 1 - smoothstep(caveMouthHalfWidthAt(cave) + .45, broadHalfWidth, Math.abs(lateral));
+    if (lateralBlend <= 0) continue;
+    const depthBlend = 1 - smoothstep(throatEdge, outerEdge, outward);
+    const stagedDepth = depthBlend < .34
+      ? smoothstep(0, .34, depthBlend) * .18
+      : depthBlend < .72
+        ? lerp(.18, .58, smoothstep(.34, .72, depthBlend))
+        : lerp(.58, 1, smoothstep(.72, 1, depthBlend));
+    const recess = stagedDepth * lateralBlend * CAVE_TOPOLOGY_CONFIG.coreConcavityHorizontalInset;
+    const drop = stagedDepth * lateralBlend * CAVE_TOPOLOGY_CONFIG.coreConcavityVerticalInset
+      * lerp(.42, 1, 1 - Math.min(1, Math.abs(lateral) / broadHalfWidth));
+    const radians = degreesToRadians(cave.angle);
+    result = {
+      x: result.x - Math.cos(radians) * recess,
+      y: result.y - drop,
+      z: result.z - Math.sin(radians) * recess,
+      maximumRecess: Math.max(result.maximumRecess, recess)
+    };
+  }
+  return result;
+}
+
+// Three broad ecological wedges correspond to roughly 12–4, 4–8, and 8–12 o'clock.
+// Keeping theme independent from elevation/waterType lets the fishing pass weight a
+// shared species by climate, altitude, and habitat separately.
+export function climateThemeAt(angle) {
+  const clockDegrees = (90 - angle + 360) % 360;
+  if (clockDegrees < 120) return 'sunwash';
+  if (clockDegrees < 240) return 'fernwood';
+  return 'blackstone';
+}
+
+export const MOUNTAIN_FISHING_LOCATIONS = Object.freeze(EDITOR_FISHING_LAYOUT.map((location) => Object.freeze({
+  ...location,
+  // The centered summit tarn has its own alpine ecology rather than inheriting the
+  // arbitrary sunwash wedge from angle zero. Every other water keeps its prior theme.
+  theme: location.summit || location.offshore || location.waterfall ? location.theme : climateThemeAt(location.angle),
+  y: waterSurfaceY(location)
+})));
+
+export const ALL_FISHING_WATER_DESCRIPTORS = Object.freeze([
+  ...MOUNTAIN_FISHING_LOCATIONS,
+  FROSTHOOK_COLD_OCEAN_DESCRIPTOR,
+  BLUEWATER_REACH_DESCRIPTOR,
+  ...SKYREACH_FISHING_DESCRIPTORS,
+  OCEAN_FISHING_DESCRIPTOR
+]);
+
+export const MAP_ELEVATION_AREAS = Object.freeze(MOUNTAIN_BANDS.map((band) => Object.freeze({
+  id: band.id,
+  label: band.id === 'coast' ? 'Coast / foothills'
+    : band.id === 'summit' ? 'Crown / summit' : `${band.id[0].toUpperCase()}${band.id.slice(1)} mountain`,
+  minimumHeight: band.bottom,
+  maximumHeight: band.top
+})));
+
+function mapContourAtHeight(height, samples = 120, terrainSamples = null) {
+  const points = [];
+  for (let index = 0; index < samples; index += 1) {
+    const angle = index * 360 / samples;
+    let radius = height >= MAP_EDITOR_CROWN_BASE_HEIGHT ? CROWN_BASE_RADIUS : TERRAIN_OUTER_RADIUS;
+    if (height < MAP_EDITOR_CROWN_BASE_HEIGHT) {
+      let best = TERRAIN_OUTER_RADIUS;
+      let bestDelta = Infinity;
+      let sampleIndex = 0;
+      for (let sampleRadius = TERRAIN_OUTER_RADIUS; sampleRadius >= 38; sampleRadius -= .5, sampleIndex += 1) {
+        const sampledHeight = terrainSamples?.[index]?.[sampleIndex] ?? terrainHeightAt(angle, sampleRadius);
+        const delta = Math.abs(sampledHeight - height);
+        if (delta < bestDelta) {
+          bestDelta = delta;
+          best = sampleRadius;
+        }
+      }
+      radius = best;
+    } else {
+      const t = clamp((height - MAP_EDITOR_CROWN_BASE_HEIGHT) / (SUMMIT_HEIGHT - MAP_EDITOR_CROWN_BASE_HEIGHT), 0, 1);
+      radius = lerp(CROWN_BASE_RADIUS, CROWN_TOP_RADIUS, t)
+        * (1 + Math.sin(degreesToRadians(angle * (t > .5 ? 4 : 3) + 17)) * .035);
+    }
+    points.push({ angle, radius, ...radialPoint(angle, radius, height) });
+  }
+  return points;
+}
+
+export function createMountainMapData() {
+  // All four lower contour bands sample the same angle/radius grid. Reuse exact height
+  // evaluations instead of re-running terrain and authored-patch deformation for each band.
+  const terrainSamples = Array.from({ length: 120 }, (_, index) => {
+    const angle = index * 3;
+    const heights = [];
+    for (let radius = TERRAIN_OUTER_RADIUS; radius >= 38; radius -= .5) {
+      heights.push(terrainHeightAt(angle, radius));
+    }
+    return heights;
+  });
+  const contours = MAP_ELEVATION_AREAS.map((area) => ({
+    ...area,
+    points: mapContourAtHeight(area.minimumHeight, 120, terrainSamples)
+  }));
+  const waters = MOUNTAIN_FISHING_LOCATIONS.map((water, index) => {
+    const center = water.localOffset
+      ? radialPoint(water.angle, water.radius + water.localOffset.z, water.y, -water.localOffset.x)
+      : radialPoint(water.angle, water.radius, water.y);
+    const entranceRadius = water.cave ? water.radius + caveDepthAt(water) : null;
+    const offshoreIsland = water.offshore
+      ? SMALL_ISLAND_LOCATIONS.find((location) => location.id === water.offshore)
+      : null;
+    return {
+      id: water.id, label: water.label, index: index + 2, tier: water.tier,
+      waterType: water.waterType, theme: water.theme, cave: Boolean(water.cave),
+      ecologyTheme: water.theme === 'fallglass' ? climateThemeAt(water.angle) : water.theme,
+      center, radii: [...water.radii],
+      entrance: water.cave ? radialPoint(water.angle, entranceRadius,
+        offshoreIsland ? offshoreIsland.elevation + .05 : rawTerrainHeightAt(water.angle, entranceRadius)) : null
+    };
+  });
+  waters.unshift({
+    id: OCEAN_FISHING_DESCRIPTOR.id,
+    label: OCEAN_FISHING_DESCRIPTOR.label,
+    index: 1,
+    tier: 'ocean',
+    waterType: 'ocean',
+    theme: 'coastal',
+    ecologyTheme: 'sunwash',
+    center: { ...MOUNTAIN_CENTER },
+    innerRadius: OCEAN_FISHING_DESCRIPTOR.innerRadius,
+    outerRadius: OCEAN_FISHING_DESCRIPTOR.outerRadius
+  });
+  waters.push({
+    id: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.id,
+    label: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.label,
+    index: waters.length + 1,
+    tier: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.tier,
+    waterType: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.waterType,
+    theme: FROSTHOOK_COLD_OCEAN_DESCRIPTOR.theme,
+    ecologyTheme: 'polar',
+    center: { ...FROSTHOOK_COLD_OCEAN_DESCRIPTOR.center },
+    radii: [...FROSTHOOK_COLD_OCEAN_DESCRIPTOR.radii]
+  });
+  waters.push({
+    id: BLUEWATER_REACH_DESCRIPTOR.id,
+    label: BLUEWATER_REACH_DESCRIPTOR.label,
+    index: waters.length + 1,
+    tier: BLUEWATER_REACH_DESCRIPTOR.tier,
+    waterType: BLUEWATER_REACH_DESCRIPTOR.waterType,
+    theme: BLUEWATER_REACH_DESCRIPTOR.theme,
+    ecologyTheme: 'coastal',
+    center: { ...BLUEWATER_REACH_DESCRIPTOR.center },
+    radii: [...BLUEWATER_REACH_DESCRIPTOR.radii]
+  });
+  for (const descriptor of SKYREACH_FISHING_DESCRIPTORS) {
+    waters.push({
+      id: descriptor.id,
+      label: descriptor.label,
+      index: waters.length + 1,
+      tier: descriptor.tier,
+      waterType: descriptor.waterType,
+      theme: descriptor.theme,
+      ecologyTheme: descriptor.theme,
+      center: { ...descriptor.center },
+      radii: [...descriptor.radii],
+      swimmable: descriptor.swimmable === true
+    });
+  }
+  return {
+    center: { ...MOUNTAIN_CENTER },
+    outerRadius: WORLD_MAP_RADIUS,
+    mountainRadius: Math.max(...contours[0].points.map((point) => point.radius)),
+    contours,
+    biomes: MOUNTAIN_BIOME_SECTORS.map((biome) => ({ ...biome })),
+    waters,
+    starts: START_LOCATIONS.map((start) => ({ id: start.id, label: start.label, position: { ...start.dockPosition } })),
+    locations: WORLD_LOCATIONS.map((location) => ({
+      id: location.id,
+      label: location.displayName,
+      type: location.type,
+      // Map data is explicitly GLOBAL even if a future renderer loads this destination
+      // into a convenient local frame. The registry remains the source of truth.
+      coordinateSpace: 'global-world',
+      globalPosition: { ...location.worldPosition },
+      position: { ...location.worldPosition },
+      radii: { ...location.radii },
+      loadGroup: location.loadGroup ?? null,
+      alwaysLoaded: location.alwaysLoaded ?? true,
+      outline: location === MAIN_WORLD_LOCATION ? null : createIslandOutline(location),
+      dock: location.dock ? { ...location.dock.worldPosition } : null,
+      arrival: location.dock?.arrivalPosition ? { ...location.dock.arrivalPosition } : null
+    })),
+    docks: [
+      ...START_LOCATIONS.map((start) => ({ id: `${start.id}-dock`, label: start.label, position: { ...start.dockPosition } })),
+      ...SMALL_ISLAND_LOCATIONS.map((location) => ({ id: location.dock.id, label: location.displayName, position: { ...location.dock.worldPosition } }))
+    ],
+    caves: waters.filter((water) => water.cave).map((water) => ({ id: water.id, label: water.label, position: water.entrance })),
+    ledges: [
+      { id: '500ft-rest', label: '500 ft rest ledge', position: radialPoint(MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred.angle, MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred.radius, MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred.targetHeight) },
+      { id: '550ft-alpine', label: '550 ft Alpine core ledge', position: radialPoint(MOUNTAIN_REST_LEDGE_CONFIG.fiveFifty.angle, MOUNTAIN_REST_LEDGE_CONFIG.fiveFifty.radius, MOUNTAIN_REST_LEDGE_CONFIG.fiveFifty.targetHeight) },
+      { id: '600ft-rest', label: '600 ft core shelf', position: radialPoint(MOUNTAIN_REST_LEDGE_CONFIG.sixHundred.angle, MOUNTAIN_REST_LEDGE_CONFIG.sixHundred.radius, MOUNTAIN_REST_LEDGE_CONFIG.sixHundred.targetHeight) }
+    ],
+    landmarks: [
+      ...LANDMARKS.map((landmark) => ({ id: landmark.id, label: landmark.label, position: radialPoint(landmark.angle, landmark.radius, terrainHeightAt(landmark.angle, landmark.radius)) })),
+      { id: 'summit-tarn', label: 'Summit Tarn + Benches', position: radialPoint(0, 0, SUMMIT_HEIGHT) }
+    ],
+    cascade: FALLGLASS_WATERFALL_RADII.map((radius) => {
+      const angle = fallglassAngleAt(radius);
+      return radialPoint(angle, radius, terrainHeightAt(angle, radius));
+    })
+  };
+}
+
+export const START_LOCATIONS = Object.freeze([
+  ...[352, 54, 111, 181, 254, 309].map((angle, index) => {
+    const arrivalRadius = 205.6;
+    const dockRadius = MAIN_ISLAND_DOCK_CONFIG.centerRadius;
+    const terrainY = terrainHeightAt(angle, arrivalRadius);
+    const arrivalY = Math.max(OCEAN_SURFACE_Y + PLAYER_FOOT_OFFSET + .45, terrainY + PLAYER_FOOT_OFFSET + .18);
+    const position = radialPoint(angle, arrivalRadius, arrivalY);
+    const dockPosition = radialPoint(angle, dockRadius, OCEAN_SURFACE_Y + .3);
+    return Object.freeze({
+      id: ['sandy-beach', 'rocky-coast', 'forest-inlet', 'waterfall-basin', 'boulder-coast', 'sheltered-cove'][index],
+      label: SECTORS[index], sector: SECTORS[index], angle,
+      locationId: MAIN_WORLD_LOCATION.id,
+      coordinateSpace: 'global-world',
+      position,
+      globalPosition: Object.freeze({ ...position }),
+      dockPosition,
+      safe: true,
+      facingYaw: inwardYaw(angle)
+    });
+  })
+]);
+
+// V2.5 keeps the old named route identities only as navigation/flavor anchors. They no
+// longer define where ascent is possible. Construction uses the circumferential climb web
+// below, which deliberately overlaps between neighboring angles.
+const NAMED_CLIMB_ANCHORS = Object.freeze([
+  Object.freeze({ id: 'ridge', label: 'Ridge Route', angle: 20, identity: 'readable scramble / exposed ribs' }),
+  Object.freeze({ id: 'split-rock', label: 'Split Rock Traverse', angle: 55, identity: 'diagonal ledges / broken face' }),
+  Object.freeze({ id: 'fern-spine', label: 'Fern Spine', angle: 90, identity: 'forest slabs / compact climbs' }),
+  Object.freeze({ id: 'chimney', label: 'Chimney / Cave Route', angle: 125, identity: 'protected crack / wall transfers' }),
+  Object.freeze({ id: 'cloudstep', label: 'Cloudstep Rib', angle: 150, identity: 'steep rib / fishing detour' }),
+  Object.freeze({ id: 'waterfall', label: 'Waterfall / Ravine Route', angle: 183, identity: 'wet slabs / lateral transfers' }),
+  Object.freeze({ id: 'talus', label: 'Talus Notch', angle: 219, identity: 'tight boulder scrambling' }),
+  Object.freeze({ id: 'boulder', label: 'Boulder Field Route', angle: 265, identity: 'stable jumps / alternate boulder line' }),
+  Object.freeze({ id: 'wind-shelf', label: 'Wind Shelf Route', angle: 300, identity: 'exposed shelves / short faces' }),
+  Object.freeze({ id: 'sunwash', label: 'Sunwash Spur', angle: 335, identity: 'broken slabs / rough final wall' })
+]);
+
+function makeStaggeredClimbAngles(count, phase, waveSeed) {
+  const spacing = 360 / count;
+  return Object.freeze(Array.from({ length: count }, (_, index) => {
+    const base = phase + index * spacing;
+    // Keep the requested route count exact, but prevent the lines from reading as an
+    // evenly spaced radial picket fence. Jitter stays well below half a spacing so the
+    // circumferential ordering remains stable and no accidental large holes are created.
+    const jitter = Math.sin(degreesToRadians(base * 2.7 + waveSeed * 31)) * spacing * .13
+      + Math.sin(degreesToRadians(base * 6.1 - waveSeed * 19)) * spacing * .055;
+    return (base + jitter + 360) % 360;
+  }));
+}
+
+// V2.6 explicitly tapers climb-line count as the circumference shrinks. The lowest
+// escarpment has 50 possible lines; higher layers use fewer lines but closer physical
+// spacing, preserving the near-continuous climb-web feel without stacking radial lanes.
+export const CLIMB_WEB_LAYERS = Object.freeze([
+  Object.freeze({ id: 'lower-wall', gateIndex: 0, count: 50, phase: 1.2, angles: makeStaggeredClimbAngles(50, 1.2, 11) }),
+  Object.freeze({ id: 'middle-wall', gateIndex: 1, count: 42, phase: 5.6, angles: makeStaggeredClimbAngles(42, 5.6, 23) }),
+  Object.freeze({ id: 'alpine-wall', gateIndex: 2, count: 34, phase: 2.9, angles: makeStaggeredClimbAngles(34, 2.9, 37) })
+]);
+
+// Compatibility export: older tooling expected one angle list. It now describes the
+// lowest and widest climb layer, where the requested route count is exactly 50.
+export const CLIMB_WEB_ANGLES = CLIMB_WEB_LAYERS[0].angles;
+export const ROUTE_FAMILIES = Object.freeze(CLIMB_WEB_ANGLES.map((angle, index) => Object.freeze({
+  id: `open-face-${String(index + 1).padStart(2, '0')}`,
+  label: `Open Climb Face ${String(index + 1).padStart(2, '0')}`,
+  angle,
+  identity: 'lowest circumferential climb web',
+  sway: index % 2 ? 1 : -1,
+  features: Object.freeze([])
+})));
+
+const CROWN_ANGLES = makeStaggeredClimbAngles(26, 7.4, 51);
+export const CROWN_ROUTES = Object.freeze(CROWN_ANGLES.map((angle, index) => Object.freeze({
+  id: `crown-face-${String(index + 1).padStart(2, '0')}`,
+  label: `Crown Face ${String(index + 1).padStart(2, '0')}`,
+  angle,
+  sway: index % 2 ? 1 : -1
+})));
+
+export const ROUTE_NETWORKS = ROUTE_FAMILIES;
+export const ROCK_FIELD_FORMATION_COUNT = CLIMB_WEB_LAYERS.reduce((total, layer) => total + layer.count, 0) + CROWN_ROUTES.length;
+
+const LANDMARKS = Object.freeze([
+  Object.freeze({ id: 'split-boulder', label: 'Split Boulder', angle: 35, radius: 119 }),
+  Object.freeze({ id: 'waterfall-basin', label: 'Fallglass Waterfall Basin', angle: 183, radius: 153 }),
+  Object.freeze({ id: 'tilted-slab', label: 'Giant Tilted Slab', angle: 268, radius: 112 }),
+  Object.freeze({ id: 'narrow-ravine', label: 'Narrow Ravine', angle: 183, radius: 162 }),
+  Object.freeze({ id: 'chimney-crack', label: 'Chimney Crack', angle: 125, radius: 91 }),
+  Object.freeze({ id: 'alpine-tarn', label: 'High Cirque Tarn', angle: 112, radius: 56 }),
+  Object.freeze({ id: 'summit-crown', label: 'Stoneveil Crown', angle: 0, radius: CROWN_BASE_RADIUS })
+]);
+
+function makeMaterial(values, options = {}) {
+  const material = new pc.StandardMaterial();
+  material.diffuse = new pc.Color(values[0], values[1], values[2], options.opacity ?? 1);
+  material.emissive = new pc.Color(...(options.emissive ?? [0, 0, 0]));
+  material.emissiveIntensity = options.emissiveIntensity ?? 1;
+  material.gloss = options.gloss ?? .12;
+  material.opacity = options.opacity ?? 1;
+  if (material.opacity < 1) {
+    material.blendType = pc.BLEND_NORMAL;
+    material.depthWrite = false;
+  }
+  if (options.doubleSided) {
+    material.cull = pc.CULLFACE_NONE;
+    material.twoSidedLighting = true;
+  }
+  material.update();
+  return material;
+}
+
+export function createEllipseSurfaceMeshData(center, radii, segments = 40) {
+  const segmentCount = Math.max(12, Math.floor(segments));
+  const vertices = [[center.x, center.y, center.z]];
+  for (let index = 0; index < segmentCount; index += 1) {
+    const phase = index / segmentCount * Math.PI * 2;
+    vertices.push([
+      center.x + Math.cos(phase) * radii.x,
+      center.y,
+      center.z + Math.sin(phase) * radii.z
+    ]);
+  }
+  const triangles = [];
+  for (let index = 0; index < segmentCount; index += 1) {
+    const current = index + 1;
+    const next = (index + 1) % segmentCount + 1;
+    // Counter-clockwise from above, giving the visible water surface an upward normal.
+    triangles.push([0, next, current]);
+  }
+  return { vertices, triangles };
+}
+
+export class MountainWorld extends TestWorld {
+  constructor(app, RAPIER, physicsWorld) {
+    super(app, RAPIER, physicsWorld);
+    this.root.name = 'Mountain V2.8 slide-and-density traversal graybox';
+    this.courseRoot.enabled = false;
+    this.buildTarget = this.root;
+    this.mountainWaters = [];
+    this.rockPlacements = [];
+    this.rockIds = new Map();
+    this.rejectedRocks = [];
+    this.homeInteractions = [];
+    this.scalableBenches = new Map();
+    this.boatRailDebugEntities = [];
+    this.benchPopulation = 1;
+    this.homeTrophies = [];
+    this.islandEntities = new Map();
+    this.islandTerrainSurfaces = new Map();
+    this.locationLoadGroups = new Map();
+    this.activeLocationId = MAIN_WORLD_LOCATION.id;
+    this.authoredTerrainGroundQuery = createBakedTerrainGroundQuery(MAP_EDITOR_PATCH);
+    this.proceduralGroundingAudit = {
+      source: this.authoredTerrainGroundQuery ? 'terrain.bakedMesh' : 'legacy-heightfield',
+      grounded: 0,
+      rejected: 0
+    };
+    this.movingSurfaceMotion = new Map();
+    this.summitRadius = CROWN_TOP_RADIUS + 1.5;
+    this.authoredStoneveilCoreActive = AUTHORED_STONEVEIL_CORE_ACTIVE;
+    if (this.authoredStoneveilCoreActive) {
+      console.info('Stoneveil: authored baked core active; legacy main-mountain cave shells disabled.');
+    }
+
+    // Mid-value palette on purpose: navigation/readability comes before mood in V2.0.
+    this.materials.sand = makeMaterial([.78, .7, .51], { gloss: .04 });
+    this.materials.coast = makeMaterial([.58, .61, .58], { gloss: .12 });
+    this.materials.forestFloor = makeMaterial([.43, .55, .37], { gloss: .05 });
+    this.materials.wetRock = makeMaterial([.45, .56, .58], { gloss: .68 });
+    this.materials.alpine = makeMaterial([.63, .66, .62], { gloss: .1 });
+    this.materials.snow = makeMaterial([.9, .92, .89], { gloss: .24 });
+    this.materials.deepRock = makeMaterial([.5, .52, .51], { gloss: .07 });
+    this.materials.cave = makeMaterial([.38, .41, .41], { gloss: .04 });
+    this.materials.shallowWater = makeMaterial([.27, .69, .7], { opacity: .66, gloss: .82, emissive: [.03, .13, .12], doubleSided: true });
+    this.materials.mangroveWater = makeMaterial([.18, .62, .46], { opacity: .54, gloss: .84, emissive: [.025, .1, .065], doubleSided: true });
+    this.materials.aquariumWater = makeMaterial([.3, .72, .76], { opacity: .3, gloss: .92, emissive: [.025, .1, .11], doubleSided: true });
+    this.materials.frostWater = makeMaterial([.54, .76, .82], { opacity: .36, gloss: .94, emissive: [.035, .09, .12], doubleSided: true });
+    // Opaque, depth-writing materials sit below the single global ocean surface. Using the
+    // ordinary transparent ice material here caused the cold shelf and spikes to sort through
+    // one another even when an exposed spike was physically in front.
+    this.materials.coldOceanBed = makeMaterial([.58, .76, .82], { gloss: .82, emissive: [.04, .1, .125], doubleSided: true });
+    this.materials.solidIce = makeMaterial([.67, .86, .91], { gloss: .92, emissive: [.028, .07, .085] });
+    this.materials.deepWater = makeMaterial([.14, .42, .51], { opacity: .78, gloss: .9, emissive: [.015, .07, .1], doubleSided: true });
+    this.materials.waterfall = makeMaterial([.64, .86, .88], { opacity: .74, gloss: .9, emissive: [.04, .13, .14], doubleSided: true });
+    this.materials.holdRough = makeMaterial([.72, .57, .37], { gloss: .04 });
+    this.materials.holdNormal = makeMaterial([.69, .71, .63], { gloss: .14 });
+    this.materials.holdSmooth = makeMaterial([.27, .42, .45], { gloss: .85 });
+    this.materials.holdIce = makeMaterial([.57, .82, .91], { gloss: .98, emissive: [.03, .08, .1] });
+    this.materials.rockCrack = makeMaterial([.28, .3, .29], { gloss: .025 });
+    this.materials.cabinWall = makeMaterial([.43, .25, .13], { gloss: .06 });
+    this.materials.cabinTrim = makeMaterial([.72, .56, .34], { gloss: .08 });
+    this.materials.cabinRoof = makeMaterial([.19, .24, .23], { gloss: .22 });
+    this.materials.cabinGlass = makeMaterial([.35, .68, .72], { opacity: .42, gloss: .92, emissive: [.018, .055, .06] });
+    this.materials.cabinFabric = makeMaterial([.66, .24, .18], { gloss: .04 });
+    this.materials.cabinWarm = makeMaterial([.91, .67, .24], { emissive: [.08, .045, .008], gloss: .22 });
+    this.materials.shrubDark = makeMaterial([.17, .35, .22], { gloss: .025 });
+    this.materials.shrubLight = makeMaterial([.34, .48, .26], { gloss: .025 });
+    this.materials.dryGrass = makeMaterial([.68, .59, .3], { gloss: .02 });
+    this.materials.flowerPink = makeMaterial([.82, .36, .48], { gloss: .12 });
+    this.materials.caveWall = makeMaterial([.23, .26, .26], { gloss: .025, doubleSided: true });
+    this.materials.islandGrass = makeMaterial([.36, .53, .31], { gloss: .04 });
+    this.materials.islandRock = makeMaterial([.47, .48, .45], { gloss: .08 });
+    this.materials.coldRock = makeMaterial([.62, .69, .72], { gloss: .3 });
+    this.materials.pondBank = makeMaterial([.38, .43, .24], { gloss: .035 });
+    this.materials.decoStone = makeMaterial([.58, .53, .43], { gloss: .16 });
+    this.materials.decoDark = makeMaterial([.12, .15, .16], { gloss: .48, metalness: .32 });
+    this.materials.decoBrass = makeMaterial([.72, .51, .19], { gloss: .72, metalness: .62, emissive: [.025, .014, .003] });
+    this.materials.decoGlass = makeMaterial([.19, .42, .5], { opacity: .56, gloss: .9, emissive: [.012, .045, .06] });
+    this.materials.decoTile = makeMaterial([.78, .74, .62], { gloss: .42 });
+    this.materials.athenaeumMist = makeMaterial([.56, .7, .7], { opacity: .085, gloss: .02, emissive: [.012, .02, .02], doubleSided: true });
+
+    this.rockMaterialVariants = new Map();
+    // A route should read as broken mountain rock, not a vertical row of cylinders.
+    // Chunk forms are still useful for explicit rest/exit shelves; most climbing pieces
+    // use pointed, slanted, narrow, or leaning forms that are poor stamina-reset perches.
+    this.fracturedRockForms = FRACTURED_ROCK_FORM_KINDS
+      .map((kind, seed) => this.createFracturedRockForm(seed, kind));
+    markStartup('world:materials-and-rock-forms');
+
+    this.buildOceanAndContinuousTerrain();
+    markStartup('world:terrain-and-colliders');
+    this.buildOceanIslands();
+    this.buildStarts();
+    this.buildTravelDocks();
+    this.buildHomeCabin();
+    this.buildShopOutpost();
+    this.buildPublicAquarium();
+    markStartup('world:islands-and-structures');
+    this.buildContinuousClimbWeb();
+    markStartup('world:primary-climb-web');
+    this.buildLandmarks();
+    this.buildSummitCrown();
+    this.buildSummitBench();
+    this.setBenchPopulation(1);
+    this.buildCrownRoutes();
+    this.buildHighAltitudeInfill();
+    this.buildThreeToSevenHundredRockField();
+    this.buildMidHighTraversalAnchors();
+    this.buildSparseRegionInfill();
+    markStartup('world:procedural-rocks');
+    this.buildEnvironmentAesthetics();
+    markStartup('world:vegetation-and-decor');
+    this.rockSupportAudit = this.auditSolidRockSupport();
+    markStartup('world:rock-support-audit');
+    this.buildFishingLocations();
+    markStartup('world:fishing-waters');
+    this.indexMapDebugObjects();
+    markStartup('world:debug-id-index');
+    this.setActiveLocation(this.activeLocationId);
+    markStartup('world:active-location');
+    applyWorldObjectPatch(this, MAP_EDITOR_PATCH, MOUNTAIN_CENTER);
+    markStartup('world:map-editor-overrides');
+    installMapEditorBridge(this, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
+  }
+
+  point(angle, radius, y, tangentOffset = 0) {
+    return radialPoint(angle, radius, y, tangentOffset);
+  }
+
+  terrainY(angle, radius) {
+    return terrainHeightAt(angle, radius);
+  }
+
+  homePoint(localX, localY, localZ) {
+    return this.point(
+      HOME_CABIN_CONFIG.angle,
+      HOME_CABIN_CONFIG.radius + localZ,
+      this.homeCabinFloorY + localY,
+      -localX
+    );
+  }
+
+  createStructureRoot(name, angle, radius, floorY, locationId = null) {
+    const root = new pc.Entity(name);
+    const center = this.point(angle, radius, floorY);
+    root.setPosition(center.x, center.y, center.z);
+    root.setEulerAngles(0, inwardYaw(angle), 0);
+    (this.locationLoadGroups.get(locationId) ?? this.buildTarget).addChild(root);
+    return root;
+  }
+
+  setActiveLocation(locationId = MAIN_WORLD_LOCATION.id) {
+    const nextId = WORLD_LOCATIONS.some((location) => location.id === locationId)
+      ? locationId : MAIN_WORLD_LOCATION.id;
+    this.activeLocationId = nextId;
+    for (const location of SMALL_ISLAND_LOCATIONS) {
+      const group = this.locationLoadGroups.get(location.id);
+      if (group) group.enabled = location.alwaysLoaded === true || location.id === nextId;
+    }
+    // The heavy saved-fish display follows Aquarium Island's load group. Physics/world
+    // metadata stays globally valid even when that render group is inactive.
+    return nextId;
+  }
+
+  addStructureBox(root, name, localPosition, size, material, rotation = {}, solid = true) {
+    const entity = new pc.Entity(name);
+    entity.addComponent('render', {
+      type: 'box', material, castShadows: true, receiveShadows: true
+    });
+    root.addChild(entity);
+    entity.setLocalPosition(localPosition.x, localPosition.y, localPosition.z);
+    entity.setLocalScale(size.x, size.y, size.z);
+    entity.setLocalEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+    if (!solid) return entity;
+
+    // Author the whole structure in one local coordinate frame, then give Rapier the
+    // exact composed world transform. This avoids the old mixed world-Euler rotations
+    // that twisted roofs, doors, and glass frames away from their adjoining pieces.
+    const position = entity.getPosition();
+    const quaternion = entity.getRotation();
+    const collider = this.RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2)
+      .setTranslation(position.x, position.y, position.z)
+      .setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w })
+      .setFriction(.9)
+      .setRestitution(0);
+    entity.physicsCollider = this.physicsWorld.createCollider(collider);
+    return entity;
+  }
+
+  syncStructureCollider(entity, enabled = true) {
+    const collider = entity?.physicsCollider;
+    if (!collider) return false;
+    collider.setEnabled?.(enabled);
+    if (!enabled) return true;
+    const position = entity.getPosition();
+    const quaternion = entity.getRotation();
+    collider.setTranslation({ x: position.x, y: position.y, z: position.z });
+    collider.setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w });
+    return true;
+  }
+
+  addCabinBox(name, localPosition, size, material, rotation = {}, solid = true) {
+    return this.addStructureBox(this.homeCabinRoot, name, localPosition, size, material, rotation, solid);
+  }
+
+  aquariumPoint(localX, localY, localZ) {
+    return this.point(
+      PUBLIC_AQUARIUM_CONFIG.angle,
+      PUBLIC_AQUARIUM_CONFIG.radius + localZ,
+      this.publicAquariumFloorY + localY,
+      -localX
+    );
+  }
+
+  addAquariumBox(name, localPosition, size, material, rotation = {}, solid = true) {
+    return this.addStructureBox(this.publicAquariumRoot, name, localPosition, size, material, rotation, solid);
+  }
+
+  createAquariumLabelMaterial(text) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#163a39';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = '#e9d386';
+    context.lineWidth = 8;
+    context.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+    context.fillStyle = '#fff5c7';
+    context.font = 'bold 54px sans-serif';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(String(text || 'TANK').toUpperCase().slice(0, 22), canvas.width / 2, canvas.height / 2 + 2);
+    const texture = new pc.Texture(this.app.graphicsDevice, { width: canvas.width, height: canvas.height, mipmaps: true });
+    texture.setSource(canvas);
+    const material = new pc.StandardMaterial();
+    material.diffuseMap = texture;
+    material.emissiveMap = texture;
+    material.emissive = new pc.Color(.22, .22, .22);
+    material.gloss = .2;
+    material.update();
+    material._aquariumLabelTexture = texture;
+    return material;
+  }
+
+  buildOceanIslands() {
+    for (const location of SMALL_ISLAND_LOCATIONS) this.buildOceanIsland(location);
+  }
+
+  buildOceanIsland(location) {
+    const group = new pc.Entity(`${location.displayName} load group`);
+    group.locationId = location.id;
+    this.buildTarget.addChild(group);
+    this.locationLoadGroups.set(location.id, group);
+    if (location.id === 'cave-fishing-island') {
+      // World Editor V2 authored objects use a stable island-local coordinate frame while the
+      // legacy island mesh itself is still generated in world coordinates. This bridge lets
+      // Basalt accumulate authored props/platforms now without claiming the approximate editor
+      // reference mesh is production-authoritative terrain.
+      const authoredRoot = new pc.Entity('Basalt Hollow World Editor V2 authored root');
+      authoredRoot.setLocalPosition(location.worldPosition.x, 0, location.worldPosition.z);
+      group.addChild(authoredRoot);
+      this.caveFishingWorldEditorState = attachWorldEditorLevelToStructure(
+        this, authoredRoot, CAVE_FISHING_WORLD_EDITOR_LEVEL
+      );
+    }
+    if (location.type === 'open-water-boat') {
+      this.buildBluewaterBoat(location, group);
+      return;
+    }
+    const segments = 36;
+    // End at a real center vertex. The old .035-radius 36-vertex micro-ring produced
+    // near-degenerate center triangles; on Basalt Hollow those could stretch into spikes.
+    // Broad submerged aprons replace the old near-vertical 1.2→1.0 shoreline drop.
+    // Everything at/above the waterline keeps its authored footprint and elevation.
+    // Hearthward gets enough interior rings for its small tutorial pond to be carved into
+    // the actual island mesh. Two broad top rings could only draw a flat triangle through it.
+    const topRingFactors = location.id === 'home-island' ? [.84, .68, .52, .36, .2]
+      : location.id === 'normal-fishing-island' ? [.84, .68, .52, .36, .2]
+        : [.68, .2];
+    const ringFactors = [...ISLAND_UNDERWATER_PROFILE.radiusFactors, ...topRingFactors];
+    const ringHeights = [
+      oceanFloorHeightAt(location.radius) + .12,
+      OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * 1.7,
+      OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * .68,
+      OCEAN_SURFACE_Y - .16,
+      ...topRingFactors.map((factor) => lerp(location.elevation + .06, location.elevation + .16,
+        1 - factor / Math.max(...topRingFactors)))
+    ];
+    const homePondCenter = location.id === 'home-island'
+      ? radialPoint(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius + 8.25, HOME_CABIN_CONFIG.floorY, -7.8)
+      : null;
+    const homeRadians = degreesToRadians(HOME_CABIN_CONFIG.angle);
+    const mangroveLagoonCenter = location.id === 'normal-fishing-island' ? location.worldPosition : null;
+    const vertices = [];
+    for (let ring = 0; ring < ringFactors.length; ring += 1) {
+      for (let segment = 0; segment < segments; segment += 1) {
+        const theta = segment * Math.PI * 2 / segments;
+        const angle = segment * 360 / segments;
+        const identityScale = islandFootprintScale(location.id, angle);
+        // Every connected ring samples the exact same authored outline. The former independent
+        // micro-wobble made adjacent triangles shimmer at the transparent ocean boundary.
+        const footprintScale = identityScale;
+        const vertexX = location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * footprintScale;
+        const vertexZ = location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * footprintScale;
+        let vertexY = ringHeights[ring];
+        if (location.id === 'cold-island' && ring >= 4) {
+          const lakeRadius = Math.hypot(
+            (vertexX - location.worldPosition.x) / 6.35,
+            (vertexZ - location.worldPosition.z) / 5.05
+          );
+          const basinBlend = 1 - smoothstep(.72, 1.18, lakeRadius);
+          vertexY = lerp(vertexY, .96 - .78, basinBlend);
+        }
+        if (homePondCenter && ring >= ISLAND_UNDERWATER_PROFILE.radiusFactors.length) {
+          const dx = vertexX - homePondCenter.x;
+          const dz = vertexZ - homePondCenter.z;
+          const pondLocalX = dx * Math.sin(homeRadians) - dz * Math.cos(homeRadians);
+          const pondLocalZ = dx * Math.cos(homeRadians) + dz * Math.sin(homeRadians);
+          const pondDistance = Math.hypot(pondLocalX / 4.95, pondLocalZ / 3.95);
+          if (pondDistance < 1.42) {
+            const basinFloor = HOME_CABIN_CONFIG.floorY - .32;
+            const shoreline = HOME_CABIN_CONFIG.floorY - .18;
+            const basinTarget = pondDistance <= .76
+              ? lerp(basinFloor, basinFloor + .04, smoothstep(0, .76, pondDistance))
+              : lerp(basinFloor + .04, shoreline, smoothstep(.76, 1.08, pondDistance));
+            vertexY = lerp(basinTarget, vertexY, smoothstep(1.08, 1.42, pondDistance));
+          }
+        }
+        if (mangroveLagoonCenter && ring >= ISLAND_UNDERWATER_PROFILE.radiusFactors.length) {
+          const lagoonDistance = Math.hypot(
+            (vertexX - mangroveLagoonCenter.x) / 8.3,
+            (vertexZ - mangroveLagoonCenter.z) / 6.2
+          );
+          if (lagoonDistance < 1.42) {
+            const basinFloor = location.elevation - .36;
+            const shoreline = location.elevation + .04;
+            const basinTarget = lagoonDistance <= .7
+              ? lerp(basinFloor, basinFloor + .04, smoothstep(0, .7, lagoonDistance))
+              : lerp(basinFloor + .04, shoreline, smoothstep(.7, 1.08, lagoonDistance));
+            vertexY = lerp(basinTarget, vertexY, smoothstep(1.08, 1.42, lagoonDistance));
+          }
+        }
+        vertices.push([vertexX, vertexY, vertexZ]);
+      }
+    }
+    const triangles = [];
+    for (let ring = 0; ring < ringFactors.length - 1; ring += 1) {
+      for (let segment = 0; segment < segments; segment += 1) {
+        const next = (segment + 1) % segments;
+        const localAngle = segment * 360 / segments;
+        const openingDelta = angularDistance(localAngle, location.id === 'cave-fishing-island' ? location.angle : -180);
+        // Basalt Hollow's old omission stopped at the shoreline rings. The remaining top
+        // rings then rebuilt a solid lid across the cave approach, so the visible mouth led
+        // directly into collision. Keep the authored wedge open through the center; the
+        // recessed apron, floor, walls, and tapered rear shell below provide its geometry.
+        if (location.id === 'cave-fishing-island' && ring >= 2 && openingDelta < 15) continue;
+        const outer = ring * segments + segment;
+        const inner = (ring + 1) * segments + segment;
+        const outerNext = ring * segments + next;
+        const innerNext = (ring + 1) * segments + next;
+        triangles.push([outer, inner, outerNext], [outerNext, inner, innerNext]);
+      }
+    }
+    const centerIndex = vertices.length;
+    vertices.push([
+      location.worldPosition.x,
+      location.id === 'cold-island' ? .96 - .78
+        : location.id === 'normal-fishing-island' ? location.elevation - .36
+          : location.elevation + .18,
+      location.worldPosition.z
+    ]);
+    const finalRingStart = (ringFactors.length - 1) * segments;
+    for (let segment = 0; segment < segments; segment += 1) {
+      const next = (segment + 1) % segments;
+      const localAngle = segment * 360 / segments;
+      if (location.id === 'cave-fishing-island'
+        && angularDistance(localAngle, location.angle) < 15) continue;
+      triangles.push([finalRingStart + segment, centerIndex, finalRingStart + next]);
+    }
+    const geometry = new pc.Geometry();
+    geometry.positions = [];
+    geometry.indices = [];
+    for (const triangle of triangles) {
+      for (const vertexIndex of triangle) {
+        geometry.positions.push(...vertices[vertexIndex]);
+        geometry.indices.push(geometry.indices.length);
+      }
+    }
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity(`${location.displayName} terrain core`);
+    entity.addComponent('render');
+    const material = location.id === 'cold-island' ? this.materials.snow
+      : location.id === 'cave-fishing-island' ? this.materials.islandRock
+        : this.materials.islandGrass;
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+    entity.render.castShadows = false;
+    group.addChild(entity);
+    entity.physicsCollider = this.physicsWorld.createCollider(
+      this.RAPIER.ColliderDesc.trimesh(
+        new Float32Array(vertices.flat()),
+        new Uint32Array(triangles.flat())
+      ).setFriction(.94).setRestitution(0)
+    );
+    this.islandEntities.set(location.id, entity);
+    this.islandTerrainSurfaces.set(location.id, { vertices, triangles });
+    const previousTarget = this.buildTarget;
+    this.buildTarget = group;
+    this.decorateOceanIsland(location);
+    this.buildTarget = previousTarget;
+  }
+
+  buildBluewaterBoat(location, group) {
+    const previousTarget = this.buildTarget;
+    this.buildTarget = group;
+    const { x, z } = location.worldPosition;
+    const yaw = inwardYaw(location.angle);
+    const radians = location.angle * Math.PI / 180;
+    const forward = { x: Math.cos(radians), z: Math.sin(radians) };
+    const sideward = { x: -forward.z, z: forward.x };
+    const localPoint = (side, forwardDistance) => ({
+      x: x + sideward.x * side + forward.x * forwardDistance,
+      z: z + sideward.z * side + forward.z * forwardDistance
+    });
+    // The old full-width lower box was a large invisible underside trap. Keep the visual
+    // hull silhouette, while the deck/wheelhouse/rails remain the boat's useful collision.
+    this.addBox('Bluewater Reach deep hull', { x, y: OCEAN_SURFACE_Y - .18, z },
+      { x: 6.8, y: 1.05, z: 12.8 }, this.materials.deepRock, { y: yaw }, false);
+    const deck = this.addBox('Bluewater Reach stable fishing deck', { x, y: OCEAN_SURFACE_Y + .34, z },
+      { x: 7.2, y: .32, z: 13.4 }, this.materials.woodLight, { y: yaw });
+    const wheelhouse = localPoint(0, -2.1);
+    this.addBox('Bluewater Reach wheelhouse', { ...wheelhouse, y: OCEAN_SURFACE_Y + 1.35 },
+      { x: 4.2, y: 1.75, z: 3.3 }, this.materials.cabinWall, { y: yaw });
+    this.addBox('Bluewater Reach wheelhouse roof', { ...wheelhouse, y: OCEAN_SURFACE_Y + 2.33 },
+      { x: 4.7, y: .22, z: 3.8 }, this.materials.cabinRoof, { y: yaw });
+    for (const side of [-1, 1]) {
+      const rail = localPoint(side * 3.45, 1.8);
+      const railEntity = this.addBox(`Bluewater Reach rail ${side}`, { ...rail, y: OCEAN_SURFACE_Y + .98 },
+        { x: .12, y: .91, z: 8.5 }, this.materials.cabinTrim, { y: yaw });
+      railEntity.mapDebugId = `BOAT-RAIL-${side < 0 ? 'PORT' : 'STARBOARD'}-01`;
+      this.boatRailDebugEntities.push(railEntity);
+    }
+    this.addCylinder('Bluewater Reach mast', { ...wheelhouse, y: OCEAN_SURFACE_Y + 3.15 },
+      { x: .14, y: 3.5, z: .14 }, this.materials.deepRock);
+
+    // A compact helm station makes this read as the travel boat instead of another dock.
+    // The fishing bench lives separately along the port rail and faces open water.
+    const helm = localPoint(0, .05);
+    this.addBox('Bluewater Reach travel helm console', { ...helm, y: OCEAN_SURFACE_Y + .96 },
+      { x: 1.9, y: .9, z: .68 }, this.materials.cabinTrim, { y: yaw });
+    this.addCylinder('Bluewater Reach steering wheel', { ...localPoint(0, .43), y: OCEAN_SURFACE_Y + 1.48 },
+      { x: .62, y: .09, z: .62 }, this.materials.cabinWarm, { x: 90, y: yaw });
+    this.addCylinder('Bluewater Reach helm hub', { ...localPoint(0, .38), y: OCEAN_SURFACE_Y + 1.48 },
+      { x: .14, y: .16, z: .14 }, this.materials.deepRock, { x: 90, y: yaw });
+    const pilotSeat = localPoint(0, 1.35);
+    this.addBox('Bluewater Reach pilot seat', { ...pilotSeat, y: OCEAN_SURFACE_Y + .72 },
+      { x: 1.1, y: .18, z: .8 }, this.materials.cabinFabric, { y: yaw });
+    this.addBox('Bluewater Reach pilot seat back', { ...localPoint(0, 1.72), y: OCEAN_SURFACE_Y + 1.18 },
+      { x: 1.1, y: .84, z: .16 }, this.materials.cabinFabric, { x: -6, y: yaw });
+
+    const seatLayouts = [
+      { id: 'bluewater-side-fishing-seat', side: -2.65, forward: 1.75, label: 'port forward' },
+      { id: 'bluewater-starboard-fishing-seat', side: 2.65, forward: 1.75, label: 'starboard forward' },
+      { id: 'bluewater-port-aft-fishing-seat', side: -2.65, forward: 4.45, label: 'port aft' },
+      { id: 'bluewater-starboard-aft-fishing-seat', side: 2.65, forward: 4.45, label: 'starboard aft' }
+    ];
+    for (const [index, layout] of seatLayouts.entries()) {
+      const fishingSeat = localPoint(layout.side, layout.forward);
+      const fishingSeatSurfaceY = OCEAN_SURFACE_Y + .81;
+      const parts = [this.addBox(`Bluewater Reach ${layout.label} fishing seat`, { ...fishingSeat, y: OCEAN_SURFACE_Y + .72 },
+        { x: .72, y: .18, z: 2.35 }, this.materials.woodLight, { y: yaw })];
+      for (const forwardOffset of [-.82, .82]) {
+        const leg = localPoint(layout.side, layout.forward + forwardOffset);
+        parts.push(this.addBox(`Bluewater Reach ${layout.label} fishing seat leg ${forwardOffset < 0 ? 'aft' : 'fore'}`,
+          { ...leg, y: OCEAN_SURFACE_Y + .5 }, { x: .44, y: .48, z: .22 }, this.materials.wood, { y: yaw }));
+      }
+      const fishingSeatExit = localPoint(layout.side < 0 ? -1.45 : 1.45, layout.forward);
+      const interaction = {
+        id: layout.id, label: `SIT & FISH OFF THE ${layout.side < 0 ? 'PORT' : 'STARBOARD'} SIDE`,
+        action: 'bench', seatKind: 'boat fishing seat', enabled: false,
+        position: { ...fishingSeat, y: fishingSeatSurfaceY },
+        seatPosition: { ...fishingSeat, y: fishingSeatSurfaceY + PLAYER_FOOT_OFFSET + .03 },
+        exitPosition: { ...fishingSeatExit, y: OCEAN_SURFACE_Y + .5 + PLAYER_FOOT_OFFSET + .12 },
+        facingYaw: yaw + (layout.side < 0 ? -90 : 90),
+        fishingFacing: 'bluewater-reach-water', fishingLabel: 'open water',
+        range: BLUEWATER_SIDE_SEAT_CONFIG.interactionDistance
+      };
+      this.homeInteractions.push(interaction);
+      this.scalableBenches.set(layout.id, { index, parts, interaction });
+    }
+    const boardingPosition = { ...localPoint(0, 3.25), y: OCEAN_SURFACE_Y + 1.68 };
+    for (const side of [-1, 1]) {
+      const ladderCenter = localPoint(side * 3.7, 3.25);
+      for (const forwardOffset of [-.42, .42]) {
+        const railPoint = localPoint(side * 3.7, 3.25 + forwardOffset);
+        this.addCylinder(`Bluewater Reach ladder ${side} rail ${forwardOffset}`, {
+          ...railPoint, y: OCEAN_SURFACE_Y - 1.25
+        }, { x: .09, y: 4.5, z: .09 }, this.materials.cabinTrim, {}, false);
+      }
+      for (let rung = 0; rung < 8; rung += 1) {
+        this.addBox(`Bluewater Reach ladder ${side} rung ${rung + 1}`, {
+          ...ladderCenter, y: OCEAN_SURFACE_Y + .45 - rung * .48
+        }, { x: .12, y: .08, z: .9 }, this.materials.cabinTrim, { y: yaw }, false);
+      }
+      this.homeInteractions.push({
+        id: `${location.id}-ladder-${side < 0 ? 'port' : 'starboard'}`,
+        label: 'BOARD BOAT', action: 'board', position: { ...ladderCenter, y: OCEAN_SURFACE_Y },
+        boardingPosition, facingYaw: yaw, range: 3,
+        distanceTo: (point) => Math.hypot(point.x - ladderCenter.x, point.z - ladderCenter.z),
+        contains: (point) => point.y > -14 && point.y < OCEAN_SURFACE_Y + 1.3
+      });
+    }
+    this.bluewaterRecovery = {
+      center: { x, z }, forward, sideward, boardingPosition, facingYaw: yaw
+    };
+    this.homeInteractions.push({
+      id: `${location.id}-boat`, label: 'USE HELM • TRAVEL / GO HOME', action: 'boat',
+      destinationId: location.id,
+      position: { ...helm, y: OCEAN_SURFACE_Y + .72 }, range: 3.2
+    });
+    this.islandEntities.set(location.id, deck);
+    this.buildTarget = previousTarget;
+  }
+
+  decorateOceanIsland(location) {
+    const { x, z } = location.worldPosition;
+    const y = location.elevation + .18;
+    if (location.id === SKYREACH_TOWER_CONFIG.locationId) {
+      this.buildSkyreachFoundation(location);
+    } else if (location.id === 'home-island') {
+      const pondCenter = radialPoint(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius + 8.25,
+        location.elevation, -7.8);
+      for (let index = 0; index < 9; index += 1) {
+        const theta = (index * 41 + 14) * Math.PI / 180;
+        let treeX = x + Math.cos(theta) * (10 + index % 3 * 2.2);
+        let treeZ = z + Math.sin(theta) * (7 + index % 2 * 2.4);
+        // The old deterministic ring happened to put one trunk through the new pond.
+        // Move any future conflicting candidate radially outward instead of special-casing
+        // one tree index, so pond edits cannot silently regrow it in the water.
+        const pondDistance = Math.hypot(treeX - pondCenter.x, treeZ - pondCenter.z);
+        if (pondDistance < 6.2) {
+          const scale = 6.2 / Math.max(.01, pondDistance);
+          treeX = pondCenter.x + (treeX - pondCenter.x) * scale;
+          treeZ = pondCenter.z + (treeZ - pondCenter.z) * scale;
+        }
+        this.addIslandTree(`${location.displayName} cozy tree ${index + 1}`,
+          treeX, treeZ, y,
+          .55 + index % 3 * .1, index % 2 ? 'broadleaf' : 'conifer');
+      }
+    } else if (location.id === 'shop-island') {
+      for (let index = 0; index < 6; index += 1) this.addBox(`Shop cargo crate ${index + 1}`,
+        { x: x - 8 + (index % 3) * 2.1, y: y + .48, z: z - 4 + Math.floor(index / 3) * 2 },
+        { x: 1.45, y: .95, z: 1.45 }, this.materials.wood, { y: index * 11 });
+    } else if (location.id === 'aquarium-island') {
+      for (let index = 0; index < 18; index += 1) {
+        const theta = index * Math.PI * 2 / 18;
+        this.createPrimitive(`Aquarium garden flower ${index + 1}`, 'sphere',
+          { x: x + Math.cos(theta) * 16, y: y + .24, z: z + Math.sin(theta) * 11 },
+          { x: .22, y: .32, z: .22 }, index % 2 ? this.materials.flowerPink : this.materials.flowers,
+          {}, { castShadows: false });
+      }
+    } else if (location.id === 'cave-fishing-island') {
+      for (let index = 0; index < 11; index += 1) {
+        const theta = (index * 31 + 40) * Math.PI / 180;
+        const decorationAngle = ((index * 31 + 40) % 360 + 360) % 360;
+        if (angularDistance(decorationAngle, location.angle) < 27) continue;
+        this.addMountainBoulder(`Cave island natural rock ${index + 1}`,
+          { x: x + Math.cos(theta) * (8 + index % 4 * 2), y: y + .55, z: z + Math.sin(theta) * (6 + index % 3 * 1.7) },
+          { x: 1.5 + index % 3 * .5, y: 1.1 + index % 4 * .55, z: 1.6 }, this.materials.islandRock,
+          { ensureCoreContact: false, supportKind: 'satellite-island' });
+      }
+    } else if (location.id === 'normal-fishing-island') {
+      // Mangrove Cay is a warm, muddy lagoon biome rather than another generic grass
+      // island. The broadleaf trunks are registered climb surfaces; root fans are low,
+      // visual shoreline structure and never seal the fishable banks.
+      // The lagoon is carved into the island terrain itself in buildOceanIsland. There is no
+      // separate mud disc here: the former overlapping cylinder was the source of shoreline
+      // depth fighting and could never produce a readable sloped bank.
+      for (let index = 0; index < 20; index += 1) {
+        const theta = (index * 18 + 14) * Math.PI / 180;
+        const treeX = x + Math.cos(theta) * (11.1 + index % 3 * 1.15);
+        const treeZ = z + Math.sin(theta) * (8.1 + index % 2 * 1.05);
+        const size = .68 + index % 3 * .08;
+        this.addIslandTree(`Mangrove Cay mangrove ${index + 1}`, treeX, treeZ, y, size, 'broadleaf');
+        for (const side of [-1, 1]) this.addCylinder(`Mangrove Cay root ${index + 1}-${side}`,
+          { x: treeX + Math.cos(theta + side * .75) * .6, y: y + .34, z: treeZ + Math.sin(theta + side * .75) * .6 },
+          { x: .11, y: 1.25, z: .11 }, this.materials.wood,
+          { x: side * 20, y: index * 36, z: side * 48 }, false);
+      }
+      for (let index = 0; index < 34; index += 1) {
+        const theta = index * Math.PI * 2 / 34;
+        this.createPrimitive(`Mangrove Lagoon reed ${index + 1}`, 'cone',
+          { x: x + Math.cos(theta) * 8.8, y: y + .33, z: z + Math.sin(theta) * 6.65 },
+          { x: .12, y: .95 + index % 4 * .16, z: .12 }, index % 3 ? this.materials.shrubLight : this.materials.dryGrass,
+          { z: index % 2 ? 5 : -5 }, { castShadows: false });
+      }
+      for (let index = 0; index < 48; index += 1) {
+        const theta = (index * 137.5 + 9) * Math.PI / 180;
+        const distance = Math.max(9.25, 4.8 + index % 7 * 1.25);
+        const groundX = x + Math.cos(theta) * distance;
+        const groundZ = z + Math.sin(theta) * distance * .76;
+        for (const side of [-1, 1]) this.createPrimitive(`Mangrove Cay tropical fern ${index + 1}-${side}`,
+          'cone', { x: groundX + side * .22, y: y + .28, z: groundZ },
+          { x: .36, y: .58 + index % 3 * .09, z: .11 },
+          index % 3 ? this.materials.shrubLight : this.materials.shrubDark,
+          { x: 0, y: index * 31, z: side * 62 }, { castShadows: false });
+      }
+      for (let index = 0; index < 6; index += 1) {
+        const theta = (index * 61 + 27) * Math.PI / 180;
+        this.addCylinder(`Mangrove Cay fallen jungle log ${index + 1}`, {
+          x: x + Math.cos(theta) * (7 + index % 3 * 2.1), y: y + .22,
+          z: z + Math.sin(theta) * (5.5 + index % 2 * 2)
+        }, { x: .34, y: 3.1 + index % 2, z: .34 }, this.materials.wood,
+        { x: 90, y: index * 37, z: 8 - index * 2 }, false);
+      }
+      for (let index = 0; index < 18; index += 1) {
+        const theta = (index * 47 + 5) * Math.PI / 180;
+        this.createPrimitive(`Mangrove Cay lush ground-cover mound ${index + 1}`, 'sphere', {
+          x: x + Math.cos(theta) * (9.2 + index % 5 * 1.05), y,
+          z: z + Math.sin(theta) * (6.8 + index % 4 * .72)
+        }, { x: .85 + index % 3 * .18, y: .28, z: .7 },
+        index % 2 ? this.materials.shrubDark : this.materials.shrubLight,
+        {}, { castShadows: false });
+      }
+      const logX = x + 9.25;
+      const logZ = z;
+      const logCenterY = location.elevation + .32;
+      this.addCylinder('Mangrove Lagoon sit-and-fish log', { x: logX, y: logCenterY, z: logZ },
+        { x: .72, y: 4.4, z: .72 }, this.materials.wood, { x: 90 });
+      for (const end of [-1, 1]) this.addCylinder(`Mangrove Lagoon log end ${end < 0 ? 'south' : 'north'}`,
+        { x: logX, y: logCenterY, z: logZ + end * 2.18 },
+        { x: .62, y: .035, z: .62 }, this.materials.woodLight, { x: 90 }, false);
+      this.homeInteractions.push({
+        id: 'mangrove-lagoon-fishing-log', label: 'SIT', action: 'bench', seatKind: 'fishing log',
+        position: { x: logX + .25, y: location.elevation + .04, z: logZ },
+        seatPosition: { x: logX - .08, y: logCenterY + .37 + PLAYER_FOOT_OFFSET, z: logZ },
+        exitPosition: { x: logX + 1.35, y: location.elevation + .08 + PLAYER_FOOT_OFFSET, z: logZ },
+        facingYaw: 90, fishingFacing: 'amber-reed-pond', fishingLabel: 'Mangrove Lagoon', range: 2.4
+      });
+    } else if (location.id === 'cold-island') {
+      // One large opaque/depth-writing seabed tint sits well below the one global ocean.
+      // Its visual radius intentionally exceeds the ecology annulus: Frosthook looks frozen
+      // throughout ordinary local view without changing which catches belong to Cold Ocean.
+      const coldShelf = this.addFishingWaterSurface('Frosthook submerged pale cold-ocean shelf', {
+        x, y: OCEAN_SURFACE_Y - .58, z
+      }, { x: 225, z: 195 }, this.materials.coldOceanBed);
+      coldShelf.render.castShadows = false;
+      for (let index = 0; index < 12; index += 1) {
+        const theta = (index * 29 + 8) * Math.PI / 180;
+        this.createPrimitive(`Frosthook ice formation ${index + 1}`, 'cone',
+          { x: x + Math.cos(theta) * (8 + index % 4 * 2), y: y + 1.15 + index % 3 * .35, z: z + Math.sin(theta) * (7 + index % 3 * 2) },
+          { x: .65 + index % 3 * .22, y: 2.3 + index % 4 * .7, z: .65 }, this.materials.solidIce,
+          { z: index % 2 ? 8 : -9 });
+      }
+      for (let index = 0; index < 18; index += 1) {
+        const theta = (index * 41 + 12) * Math.PI / 180;
+        const radius = 25 + index % 5 * 3.5;
+        this.createPrimitive(`Frosthook shoreline ice floe ${index + 1}`, 'sphere', {
+          x: x + Math.cos(theta) * radius, y: OCEAN_SURFACE_Y + .08,
+          z: z + Math.sin(theta) * radius * .88
+        }, { x: 1.2 + index % 4 * .45, y: .11 + index % 2 * .04, z: .8 + index % 3 * .35 },
+        index % 3 ? this.materials.solidIce : this.materials.snow,
+        { y: index * 29, z: index % 2 ? 3 : -3 }, { castShadows: false });
+      }
+      // Sparse, low opaque slush plates extend the frozen-sea read well beyond the beach
+      // while leaving most of the surface visibly liquid. Opaque ice remains depth-writing,
+      // so the global transparent ocean cannot sort in front of exposed spikes or floes.
+      for (let index = 0; index < 36; index += 1) {
+        const theta = (index * 137.5 + 6) * Math.PI / 180;
+        const radius = 38 + index % 9 * 13.5;
+        this.createPrimitive(`Frosthook offshore slush plate ${index + 1}`, 'sphere', {
+          x: x + Math.cos(theta) * radius,
+          y: OCEAN_SURFACE_Y + .035,
+          z: z + Math.sin(theta) * radius * .86
+        }, {
+          x: 1.8 + index % 5 * .72,
+          y: .035 + index % 2 * .012,
+          z: .75 + index % 4 * .42
+        }, index % 5 === 0 ? this.materials.snow : this.materials.solidIce,
+        { y: index * 47, z: index % 2 ? 1.5 : -1.5 }, { castShadows: false });
+      }
+    } else if (location.id === 'veiled-athenaeum') {
+      // Keep only an indistinct massing silhouette. Low-alpha, overlapping volumes create
+      // local mist around this island without changing the scene-wide fog settings.
+      this.addBox('Veiled Athenaeum obscured foundation', { x, y: y + .22, z },
+        { x: 12.8, y: .44, z: 10.2 }, this.materials.islandRock, { y: 8 });
+      this.addBox('Veiled Athenaeum distant silhouette', { x, y: y + 2.45, z: z + .3 },
+        { x: 9.2, y: 4.2, z: 6.9 }, this.materials.cave, { y: 8 });
+      this.addBox('Veiled Athenaeum softened roofline', { x, y: y + 4.82, z: z + .3 },
+        { x: 10.6, y: .48, z: 8.1 }, this.materials.cabinRoof, { x: 2, y: 8, z: -2 });
+      for (let index = 0; index < 12; index += 1) {
+        const theta = index * Math.PI * 2 / 12 + .17;
+        const radius = 8 + index % 4 * 4.1;
+        this.createPrimitive(`Veiled Athenaeum localized mist ${index + 1}`, 'sphere', {
+          x: x + Math.cos(theta) * radius,
+          y: y + 2.2 + index % 3 * .55,
+          z: z + Math.sin(theta) * radius * .72
+        }, {
+          x: 8.5 + index % 3 * 2.1,
+          y: 2.2 + index % 2 * .7,
+          z: 6.6 + index % 4 * 1.35
+        }, this.materials.athenaeumMist, { y: index * 31 }, { castShadows: false, receiveShadows: false });
+      }
+    }
+    const islandBench = {
+      'shop-island': { radial: 7.6, tangent: 8.8, towardCenter: false },
+      // Near the ocean-facing landscaped edge, clear of the 104 m Aquarium footprint.
+      'aquarium-island': { radial: 56, tangent: 24, towardCenter: false },
+      'cave-fishing-island': { radial: 6.2, tangent: 8.3, towardCenter: false },
+      'normal-fishing-island': { radial: -9.4, tangent: -1.4, towardCenter: false },
+      'cold-island': { radial: 8.6, tangent: 1.8, towardCenter: true }
+    }[location.id];
+    if (islandBench) this.buildAuthoredIslandBench(location, islandBench);
+  }
+
+  buildAuthoredIslandBench(location, { radial, tangent, towardCenter }) {
+    const angle = location.angle;
+    const yaw = inwardYaw(angle) + (towardCenter ? 0 : 180);
+    const horizontalPoint = (radialDelta = 0, tangentDelta = 0) => this.point(angle,
+      location.radius + radial + radialDelta, 0, tangent + tangentDelta);
+    const surface = this.islandTerrainSurfaces.get(location.id);
+    const groundAt = (point) => triangleSurfaceHeightAt(
+      surface?.vertices, surface?.triangles, point.x, point.z, location.elevation + .08
+    );
+    const rad = yaw * Math.PI / 180;
+    const legPoints = [-1, 1].map((side) => {
+      const point = horizontalPoint();
+      point.x += Math.cos(rad) * side * .88;
+      point.z -= Math.sin(rad) * side * .88;
+      return { ...point, groundY: groundAt(point), side };
+    });
+    const seatCenterY = Math.max(...legPoints.map((point) => point.groundY)) + .46;
+    const point = (height, radialDelta = 0, tangentDelta = 0) => ({
+      ...horizontalPoint(radialDelta, tangentDelta), y: seatCenterY + height
+    });
+    const name = `${location.displayName} shore rest bench`;
+    const mapDebugId = `BENCH-${location.id.toUpperCase()}-SHORE-BENCH`;
+    const seatPart = this.addBox(`${name} seat`, point(0),
+      { x: 2.35, y: .18, z: .74 }, this.materials.woodLight, { y: yaw });
+    seatPart.mapDebugId = mapDebugId;
+    const backPart = this.addBox(`${name} back`, point(.47, towardCenter ? .34 : -.34),
+      { x: 2.35, y: .78, z: .15 }, this.materials.wood, { x: -7, y: yaw });
+    backPart.mapDebugId = mapDebugId;
+    for (const leg of legPoints) {
+      const topY = seatCenterY - .05;
+      const bottomY = leg.groundY - .04;
+      const legPart = this.addBox(`${name} ${leg.side < 0 ? 'left' : 'right'} leg`,
+        { x: leg.x, y: (topY + bottomY) * .5, z: leg.z },
+        { x: .18, y: topY - bottomY, z: .42 }, this.materials.wood, { y: yaw });
+      legPart.mapDebugId = mapDebugId;
+    }
+    const seatSurface = point(.09);
+    const exit = horizontalPoint(towardCenter ? .92 : -.92);
+    this.homeInteractions.push({
+      id: `${location.id}-shore-bench`, action: 'bench', label: 'SIT & FISH',
+      seatKind: 'shore fishing bench', fishingLabel: towardCenter ? 'the pond' : 'the ocean',
+      position: seatSurface,
+      seatPosition: { ...seatSurface, y: seatSurface.y + PLAYER_FOOT_OFFSET + .03 },
+      exitPosition: { ...exit, y: groundAt(exit) + PLAYER_FOOT_OFFSET + .08 },
+      facingYaw: yaw, range: 2.4
+    });
+  }
+
+  buildSkyreachFoundation(location) {
+    const config = SKYREACH_TOWER_CONFIG;
+    const floorY = location.elevation + .18;
+    const root = this.createStructureRoot(
+      'Skyreach Foundation clean Empire State Building baseline',
+      location.angle,
+      location.radius,
+      floorY,
+      location.id
+    );
+    this.skyreachRoot = root;
+    this.loadSkyreachVisualShell(root);
+
+    // v17.4 keeps the island to one imported landmark and a compact invisible hull.
+    // These overlapping volumes follow the real model's setbacks, form a continuous
+    // hole-free solid, and stay out of the climb-surface registry.
+    for (const [index, layer] of config.collisionLayers.entries()) {
+      const collision = this.addStructureBox(
+        root,
+        `Skyreach non-climbable collision layer ${index + 1}`,
+        { x: 0, y: (layer.bottom + layer.top) / 2, z: 0 },
+        { x: layer.width, y: layer.top - layer.bottom, z: layer.depth },
+        this.materials.decoStone,
+        {},
+        true
+      );
+      collision.render.enabled = false;
+      collision.tags.add('non-climbable');
+    }
+    // World Editor V2 parkour content is authored in the same local frame as this
+    // structure root. The visual ESB remains the supplied SonnySee model; only authored
+    // traversal pieces are added here. Empty milestone data is a no-op.
+    this.skyreachWorldEditorState = attachWorldEditorLevelToStructure(this, root, SKYREACH_WORLD_EDITOR_LEVEL);
+  }
+  loadSkyreachVisualShell(root) {
+    this.app.assets.loadFromUrl(SKYREACH_TOWER_CONFIG.visualAssetUrl, 'container', (error, asset) => {
+      if (error || !asset?.resource || !root?.parent) {
+        console.warn('[reel-ascent] Skyreach visual shell unavailable; solid collision baseline remains active.');
+        return;
+      }
+      const imported = asset.resource.instantiateRenderEntity();
+      const sourceBuilding = imported.findByName?.('ESB');
+      if (!sourceBuilding) {
+        imported.destroy?.();
+        console.warn('[reel-ascent] The direct Skyreach GLB did not contain its authored ESB node.');
+        return;
+      }
+      // The artist's direct export also contains a Blender camera, sun, and 60×60 preview
+      // plane. Keep the ESB node and all of its authored mesh primitives/materials intact,
+      // while excluding only that unrelated presentation plane from the game world.
+      const previewPlane = imported.findByName?.('Plane');
+      if (previewPlane && previewPlane !== sourceBuilding) previewPlane.enabled = false;
+
+      const visual = new pc.Entity('Skyreach Empire State Building placement root — SonnySee CC BY 3.0');
+      visual.addChild(imported);
+      root.addChild(visual);
+      visual.setLocalScale(
+        SKYREACH_TOWER_CONFIG.visualHorizontalScaleX,
+        SKYREACH_TOWER_CONFIG.visualVerticalScale,
+        SKYREACH_TOWER_CONFIG.visualHorizontalScaleZ
+      );
+      visual.setLocalPosition(0, 0, 0);
+      for (const component of sourceBuilding.findComponents?.('render') ?? []) {
+        component.castShadows = true;
+        component.receiveShadows = true;
+      }
+      visual.syncHierarchy();
+
+      // Align from the instantiated render bounds, not the source pivot or hand-entered
+      // offsets. setPosition converts the exact world correction back through the radial
+      // island root, so this remains deterministic at any island angle.
+      let bounds = null;
+      for (const component of sourceBuilding.findComponents?.('render') ?? []) {
+        for (const meshInstance of component.meshInstances ?? []) {
+          if (!bounds) bounds = meshInstance.aabb.clone();
+          else bounds.add(meshInstance.aabb);
+        }
+      }
+      if (bounds) {
+        const islandCenter = root.getPosition();
+        const minimum = bounds.getMin();
+        const position = visual.getPosition();
+        visual.setPosition(
+          position.x + islandCenter.x - bounds.center.x,
+          position.y + islandCenter.y - SKYREACH_TOWER_CONFIG.visualGroundEmbed - minimum.y,
+          position.z + islandCenter.z - bounds.center.z
+        );
+      }
+      this.skyreachVisualShell = visual;
+    });
+  }
+
+  updateKinematics(dt = 1 / 60) {
+    this.movingSurfaceMotion.clear();
+    updateWorldEditorKinematics(this, dt);
+  }
+
+  getSurfaceMotion(collider) {
+    return collider ? this.movingSurfaceMotion.get(collider.handle) ?? null : null;
+  }
+
+  addIslandTree(name, x, z, baseY, size, style) {
+    const trunk = this.addCylinder(`${name} climbable trunk`, { x, y: baseY + 1.3 * size, z },
+      { x: .58 * size, y: 2.6 * size, z: .58 * size }, this.materials.wood);
+    this.registerClimbSurface(trunk, trunk.physicsCollider, 'rough', `${name} trunk`);
+    const crownType = style === 'broadleaf' ? 'sphere' : 'cone';
+    this.createPrimitive(`${name} crown`, crownType, { x, y: baseY + 3.45 * size, z },
+      { x: 2.1 * size, y: (style === 'broadleaf' ? 1.7 : 3.4) * size, z: 2.1 * size },
+      style === 'broadleaf' ? this.materials.shrubLight : this.materials.foliage);
+  }
+
+  addHomePondBank() {
+    const segments = 40;
+    const outer = { x: 4.95, z: 3.95, y: .02 };
+    const inner = { x: 4.18, z: 3.23, y: -.22 };
+    const center = { x: 7.8, z: 8.25 };
+    const localVertices = [];
+    const worldVertices = [];
+    for (const ring of [outer, inner]) {
+      for (let index = 0; index < segments; index += 1) {
+        const phase = index / segments * Math.PI * 2;
+        const local = {
+          x: center.x + Math.cos(phase) * ring.x,
+          y: ring.y,
+          z: center.z + Math.sin(phase) * ring.z
+        };
+        const world = this.homePoint(local.x, local.y, local.z);
+        localVertices.push([local.x, local.y, local.z]);
+        worldVertices.push([world.x, world.y, world.z]);
+      }
+    }
+    const triangles = [];
+    for (let index = 0; index < segments; index += 1) {
+      const next = (index + 1) % segments;
+      triangles.push([index, segments + index, next], [next, segments + index, segments + next]);
+    }
+    const geometry = new pc.Geometry();
+    geometry.positions = [];
+    geometry.indices = [];
+    for (const triangle of triangles) for (const vertexIndex of triangle) {
+      geometry.positions.push(...localVertices[vertexIndex]);
+      geometry.indices.push(geometry.indices.length);
+    }
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity('Hearthward pond connected sloped bank');
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.pondBank, entity)];
+    entity.render.castShadows = false;
+    this.homeCabinRoot.addChild(entity);
+    entity.physicsCollider = this.physicsWorld.createCollider(
+      this.RAPIER.ColliderDesc.trimesh(
+        new Float32Array(worldVertices.flat()), new Uint32Array(triangles.flat())
+      ).setFriction(.94).setRestitution(0)
+    );
+    return entity;
+  }
+
+  buildTravelDocks() {
+    const buildDock = (id, label, position, angle, length, destinationId) => {
+      const yaw = inwardYaw(angle);
+      const loadGroup = this.locationLoadGroups.get(destinationId) ?? null;
+      const deckPosition = { ...position, y: position.y - DOCK_DECK_LOWERING };
+      const deck = this.addBox(`${label} dock deck`, deckPosition, { x: 3.4, y: .28, z: length }, this.materials.woodLight, { y: yaw });
+      if (loadGroup) loadGroup.addChild(deck);
+      for (const side of [-1, 1]) for (const end of [-1, 1]) {
+        const theta = degreesToRadians(angle);
+        const tangentX = -Math.sin(theta) * side * 1.65;
+        const tangentZ = Math.cos(theta) * side * 1.65;
+        const radial = end * length * .38;
+        const pile = this.addCylinder(`${label} dock pile ${side}:${end}`, {
+          x: position.x + tangentX + Math.cos(theta) * radial,
+          y: OCEAN_SURFACE_Y - .18,
+          z: position.z + tangentZ + Math.sin(theta) * radial
+        }, { x: .28, y: 2.3, z: .28 }, this.materials.wood);
+        if (loadGroup) loadGroup.addChild(pile);
+      }
+      this.homeInteractions.push({
+        id, label: `BOARD BOAT • ${label}`, action: 'boat', destinationId,
+        position: { x: deckPosition.x, y: deckPosition.y + .14, z: deckPosition.z }, range: 2.5
+      });
+    };
+    for (const start of START_LOCATIONS) buildDock(
+      `${start.id}-boat`, start.label, start.dockPosition, start.angle,
+      MAIN_ISLAND_DOCK_CONFIG.length, MAIN_WORLD_LOCATION.id
+    );
+    for (const location of SMALL_ISLAND_LOCATIONS) {
+      if (location.type === 'open-water-boat') continue;
+      buildDock(`${location.id}-boat`, location.displayName, location.dock.worldPosition, location.angle,
+        location.dock.length, location.id);
+    }
+  }
+
+  buildShopOutpost() {
+    const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === 'shop-island');
+    const floorY = location.elevation + .2;
+    this.shopRoot = this.createStructureRoot('Shop island outfitter', location.angle, location.radius, floorY, location.id);
+    const box = (name, position, size, material, rotation = {}, solid = true) => (
+      this.addStructureBox(this.shopRoot, name, position, size, material, rotation, solid)
+    );
+    box('Outfitter floor', { x: 0, y: -.12, z: 0 }, { x: 10.5, y: .28, z: 7.4 }, this.materials.wood);
+    box('Outfitter back wall', { x: 0, y: 2, z: -3.5 }, { x: 10.5, y: 4, z: .28 }, this.materials.cabinWall);
+    for (const side of [-1, 1]) box(`Outfitter side wall ${side}`, { x: side * 5.1, y: 2, z: 0 }, { x: .28, y: 4, z: 7.2 }, this.materials.cabinWall);
+    for (const side of [-1, 1]) box(`Outfitter roof pitch ${side}`, { x: side * 2.7, y: 4.6, z: 0 },
+      { x: 5.8, y: .25, z: 8.2 }, this.materials.cabinRoof, { z: -side * 21 });
+    box('Outfitter gear counter', { x: -2.2, y: .85, z: 1.4 }, { x: 3.35, y: 1.7, z: 1 }, this.materials.cabinTrim);
+    box('Fishmonger sales counter', { x: 2.2, y: .85, z: 1.4 }, { x: 3.35, y: 1.7, z: 1 }, this.materials.woodLight);
+    // Compact but legible service identities: warm outfitter on the left, cool-apron fish
+    // buyer on the right. They are deliberately separate from the counters' trigger volumes.
+    const buildNpc = (prefix, localX, coatMaterial, hatMaterial) => {
+      box(`${prefix} boots`, { x: localX, y: .28, z: -.9 }, { x: .72, y: .55, z: .55 }, this.materials.deepRock, {}, false);
+      box(`${prefix} body`, { x: localX, y: 1.22, z: -.9 }, { x: 1.05, y: 1.45, z: .65 }, coatMaterial, {}, false);
+      box(`${prefix} head`, { x: localX, y: 2.25, z: -.9 }, { x: .68, y: .68, z: .62 }, this.materials.sand, {}, false);
+      box(`${prefix} hat brim`, { x: localX, y: 2.63, z: -.86 }, { x: 1.02, y: .1, z: .78 }, hatMaterial, {}, false);
+      box(`${prefix} hat crown`, { x: localX, y: 2.82, z: -.92 }, { x: .67, y: .34, z: .58 }, hatMaterial, {}, false);
+      for (const side of [-1, 1]) box(`${prefix} eye ${side}`, { x: localX + side * .15, y: 2.32, z: -.575 },
+        { x: .075, y: .09, z: .045 }, this.materials.caveWall, {}, false);
+      box(`${prefix} nose`, { x: localX, y: 2.18, z: -.54 },
+        { x: .09, y: .14, z: .09 }, this.materials.cabinWarm, {}, false);
+    };
+    buildNpc('Outfitter clerk', -2.2, this.materials.cabinFabric, this.materials.cabinWarm);
+    buildNpc('Fish buyer', 2.2, this.materials.deepWater, this.materials.deepRock);
+    box('OUTFITTER BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.cabinWarm, {}, false);
+    box('FISH MARKET SELL CATCHES counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.shallowWater, {}, false);
+    const glyphs = {
+      A: ['010', '101', '111', '101', '101'], B: ['110', '101', '110', '101', '110'],
+      C: ['111', '100', '100', '100', '111'], E: ['111', '100', '110', '100', '111'],
+      G: ['111', '100', '101', '101', '111'], H: ['101', '101', '111', '101', '101'],
+      L: ['100', '100', '100', '100', '111'], R: ['110', '101', '110', '101', '101'],
+      S: ['111', '100', '111', '001', '111'], T: ['111', '010', '010', '010', '010'],
+      U: ['101', '101', '101', '101', '111'], Y: ['101', '101', '010', '010', '010']
+    };
+    const addSignText = (text, centerX, centerY) => {
+      const cell = .052;
+      const width = [...text].reduce((sum, character) => sum + (character === ' ' ? 2 : 4), -1) * cell;
+      let cursor = centerX - width * .5;
+      for (const character of text) {
+        if (character === ' ') { cursor += cell * 2; continue; }
+        for (const [row, pixels] of (glyphs[character] ?? []).entries()) for (const [column, pixel] of [...pixels].entries()) {
+          if (pixel !== '1') continue;
+          box(`${text} sign letter ${character}-${row}-${column}`, {
+            x: cursor + column * cell, y: centerY + (.104 - row * cell), z: 2.005
+          }, { x: cell * .84, y: cell * .84, z: .025 }, this.materials.caveWall, {}, false);
+        }
+        cursor += cell * 4;
+      }
+    };
+    addSignText('BUY GEAR', -2.2, 1.74);
+    addSignText('SELL CATCHES', 2.2, 1.74);
+    box("Outfitter's Reach hanging sign", { x: 0, y: 3.45, z: 3.62 }, { x: 4.7, y: .78, z: .12 }, this.materials.woodLight, {}, false);
+    for (const side of [-1, 1]) {
+      box(`Outfitter sign rope ${side}`, { x: side * 1.7, y: 3.9, z: 3.58 }, { x: .06, y: .88, z: .06 }, this.materials.wood, {}, false);
+      box(`Outfitter lantern ${side}`, { x: side * 4.45, y: 2.75, z: 2.7 }, { x: .32, y: .58, z: .32 }, this.materials.cabinWarm, {}, false);
+      box(`Outfitter lantern hook ${side}`, { x: side * 4.45, y: 3.18, z: 2.7 }, { x: .08, y: .42, z: .08 }, this.materials.deepRock, {}, false);
+    }
+    box('Outfitter gear rack rail', { x: -4.25, y: 2.15, z: -2.85 }, { x: .2, y: 2.8, z: .2 }, this.materials.cabinTrim, {}, false);
+    for (let index = 0; index < 5; index += 1) {
+      box(`Outfitter hanging rod ${index + 1}`, { x: -4.02 + index * .34, y: 2.0, z: -2.78 },
+        { x: .07, y: 2.4 - index * .13, z: .07 }, index % 2 ? this.materials.cabinWarm : this.materials.deepRock,
+        { z: -5 + index * 2 }, false);
+    }
+    for (let index = 0; index < 4; index += 1) {
+      box(`Fish buyer barrel ${index + 1}`, { x: 3.55 + index % 2 * .82, y: .58, z: -2.35 + Math.floor(index / 2) * .9 },
+        { x: .7, y: 1.15, z: .7 }, this.materials.wood, { y: index * 17 }, false);
+      box(`Fish buyer barrel band ${index + 1}`, { x: 3.55 + index % 2 * .82, y: .58, z: -2.35 + Math.floor(index / 2) * .9 },
+        { x: .76, y: .12, z: .76 }, this.materials.deepRock, { y: index * 17 }, false);
+    }
+    for (let index = 0; index < 5; index += 1) box(`Outfitter compact cargo ${index + 1}`,
+      { x: -3.65 + index % 2 * 1.05, y: .39 + Math.floor(index / 4) * .75, z: -2.35 + Math.floor(index / 2) % 2 * 1.08 },
+      { x: .92, y: .78, z: .92 }, this.materials.woodLight, { y: index * 13 }, false);
+    // Countertop silhouettes use the same categories sold here, while the market side
+    // shows actual canonical creature models rather than fish-shaped placeholders.
+    box('Outfitter display boots', { x: -2.75, y: 1.93, z: 1.18 }, { x: .62, y: .38, z: .72 }, this.materials.deepRock, {}, false);
+    box('Outfitter display chalk bag', { x: -2.05, y: 1.98, z: 1.2 }, { x: .38, y: .48, z: .35 }, this.materials.snow, {}, false);
+    box('Outfitter display folded map', { x: -1.45, y: 1.79, z: 1.18 }, { x: .72, y: .035, z: .55 }, this.materials.cabinWarm, { y: 8 }, false);
+    box('Outfitter display ice axe handle', { x: -2.2, y: 2.15, z: 1.1 }, { x: .08, y: 1.25, z: .08 }, this.materials.deepRock, { z: -56 }, false);
+    box('Outfitter display ice axe head', { x: -1.9, y: 2.42, z: 1.1 }, { x: .65, y: .08, z: .1 }, this.materials.holdIce, { z: -12 }, false);
+    box('Fish Market balance scale post', { x: 2.7, y: 2.08, z: 1.2 }, { x: .08, y: .72, z: .08 }, this.materials.deepRock, {}, false);
+    box('Fish Market balance scale beam', { x: 2.7, y: 2.4, z: 1.2 }, { x: 1.15, y: .07, z: .08 }, this.materials.deepRock, {}, false);
+    if (this.app?.systems) {
+      for (const speciesId of ['sardine', 'blue-crab']) {
+        const model = createSpecimenModel({ speciesId, length: speciesId === 'sardine' ? 8 : 5, weight: 1, shiny: false }, {
+          name: `Fish Market ${speciesId} display`, maximumScale: .48, app: this.app
+        });
+        this.shopRoot.addChild(model.root);
+        model.root.setLocalPosition(speciesId === 'sardine' ? 1.62 : 2.08, 2.06, 1.1);
+        model.root.setLocalEulerAngles(0, speciesId === 'sardine' ? 0 : 25, 0);
+      }
+    }
+    const angleRadians = degreesToRadians(location.angle);
+    const radialX = Math.cos(angleRadians);
+    const radialZ = Math.sin(angleRadians);
+    const counterInteraction = (id, label, shopMode, tangentCenter) => ({
+      id, label, action: 'shop', shopMode,
+      position: this.point(location.angle, location.radius + 2.65, floorY + .08, tangentCenter),
+      range: 2.25,
+      contains: (point) => {
+        const offsetX = point.x - location.worldPosition.x;
+        const offsetZ = point.z - location.worldPosition.z;
+        const radialOffset = offsetX * radialX + offsetZ * radialZ;
+        const tangentOffset = -offsetX * radialZ + offsetZ * radialX;
+        const feetY = point.y - PLAYER_FOOT_OFFSET;
+        return radialOffset >= 2.0 && radialOffset <= 3.35
+          && Math.abs(tangentOffset - tangentCenter) <= 1.55
+          && feetY >= floorY - .4 && feetY <= floorY + 1.8;
+      }
+    });
+    this.homeInteractions.push(
+      counterInteraction('shop-counter', 'OPEN OUTFITTER', 'buy', 2.2),
+      counterInteraction('fishmonger-counter', 'SELL CARRIED CATCHES', 'sell', -2.2)
+    );
+  }
+
+  getWorldLocations() {
+    return WORLD_LOCATIONS;
+  }
+
+  getOceanSafetyDistance(point) {
+    if (![point?.x, point?.z].every(Number.isFinite)) return 0;
+    let nearest = Infinity;
+    for (const location of WORLD_LOCATIONS) {
+      const dx = point.x - location.worldPosition.x;
+      const dz = point.z - location.worldPosition.z;
+      // Stoneveil's rendered beach/shallow-water join is 221 m, not the old 208 m
+      // registry radius. Satellite islands and Bluewater use their authored shoreline
+      // polygons, so protruding beaches cannot accidentally be treated as open ocean.
+      const shoreDistance = location.id === MAIN_WORLD_LOCATION.id
+        ? Math.max(0, Math.hypot(dx, dz) - OCEAN_WATER_INNER_RADIUS)
+        : distanceFromPolygonSafeEdge(point, createIslandOutline(location));
+      nearest = Math.min(nearest, shoreDistance);
+      const dock = location.dock?.worldPosition;
+      if (dock) {
+        const theta = degreesToRadians(location.angle ?? 0);
+        const halfLength = Math.max(0, Number(location.dock.length) || 0) * .5;
+        const start = { x: dock.x - Math.cos(theta) * halfLength, z: dock.z - Math.sin(theta) * halfLength };
+        const end = { x: dock.x + Math.cos(theta) * halfLength, z: dock.z + Math.sin(theta) * halfLength };
+        nearest = Math.min(nearest, Math.max(0, pointToSegmentDistance2D(point, start, end) - 4.5));
+      }
+    }
+    // This distance is measured from the authored shoreline or dock safety edge.
+    // OceanSharkHazard applies its 75-foot threshold to this unshifted measurement.
+    return nearest;
+  }
+
+  chooseTravelArrival(destinationId, rng = Math.random) {
+    if (destinationId === MAIN_WORLD_LOCATION.id) {
+      const safeStarts = START_LOCATIONS.filter((start) => start.safe !== false);
+      const start = safeStarts[Math.floor(rng() * safeStarts.length)];
+      return {
+        location: MAIN_WORLD_LOCATION,
+        locationId: MAIN_WORLD_LOCATION.id,
+        coordinateSpace: 'global-world',
+        dockId: `${start.id}-dock`,
+        dockPosition: { ...start.dockPosition },
+        position: { ...start.position },
+        globalPosition: { ...start.position },
+        safe: true,
+        facingYaw: start.facingYaw
+      };
+    }
+    const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === destinationId);
+    if (!location) return null;
+    return {
+      location,
+      locationId: location.id,
+      coordinateSpace: 'global-world',
+      dockId: location.dock.id,
+      dockPosition: { ...location.dock.worldPosition },
+      position: { ...location.dock.arrivalPosition },
+      globalPosition: { ...location.dock.arrivalPosition },
+      safe: true,
+      facingYaw: location.dock.facingYaw
+    };
+  }
+
+  getHomeArrival() {
+    const floorY = this.homeCabinFloorY ?? HOME_CABIN_CONFIG.floorY;
+    return {
+      locationId: 'home-island',
+      id: 'home-cabin',
+      label: 'Hearthward Cabin',
+      location: HOME_WORLD_LOCATION,
+      coordinateSpace: 'global-world',
+      safe: true,
+      // Just beyond the lower porch step, centered on the open doorway and facing in.
+      position: this.point(
+        HOME_CABIN_CONFIG.angle,
+        HOME_CABIN_CONFIG.radius + 6.8,
+        floorY + PLAYER_FOOT_OFFSET + .12,
+        0
+      ),
+      facingYaw: inwardYaw(HOME_CABIN_CONFIG.angle)
+    };
+  }
+
+  getMultiplayerHomeArrival(slotIndex = 0) {
+    const base = this.getHomeArrival();
+    const slot = Math.max(0, Math.floor(Number(slotIndex) || 0)) % 10;
+    // Ten modest porch-lawn offsets keep a whole room together without stacking capsules
+    // or placing anyone inside the doorway, pond, trees, or cabin shell.
+    const tangentOffsets = [0, -1.15, 1.15, -2.3, 2.3, -.58, .58, -1.72, 1.72, 0];
+    const radialOffsets = [0, .65, .65, 1.3, 1.3, 1.95, 1.95, 2.6, 2.6, 3.2];
+    const floorY = this.homeCabinFloorY ?? HOME_CABIN_CONFIG.floorY;
+    return {
+      ...base,
+      id: `home-cabin-multiplayer-${slot + 1}`,
+      position: this.point(
+        HOME_CABIN_CONFIG.angle,
+        HOME_CABIN_CONFIG.radius + 6.8 + radialOffsets[slot],
+        floorY + PLAYER_FOOT_OFFSET + .12,
+        tangentOffsets[slot]
+      )
+    };
+  }
+
+  buildHomeCabin() {
+    const config = HOME_CABIN_CONFIG;
+    this.homeCabinFloorY = config.floorY ?? this.terrainY(config.angle, config.radius) + .22;
+    this.homeCabinRoot = this.createStructureRoot(
+      'Trail cabin aligned structure', config.angle, config.radius, this.homeCabinFloorY, HOME_WORLD_LOCATION?.id
+    );
+
+    this.addCabinBox('Trail cabin stable floor', { x: 0, y: -.16, z: 0 },
+      { x: config.width, y: .32, z: config.depth }, this.materials.wood);
+    this.addCabinBox('Trail cabin back wall', { x: 0, y: config.wallHeight * .5, z: -config.depth * .5 },
+      { x: config.width, y: config.wallHeight, z: .3 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin right wall',
+      { x: config.width * .5, y: config.wallHeight * .5, z: 0 },
+      { x: .3, y: config.wallHeight, z: config.depth }, this.materials.cabinWall);
+    // The left wall has a true framed window opening rather than glass pasted onto a
+    // solid wall. Four broad pieces keep its collision simple and capsule-safe.
+    this.addCabinBox('Trail cabin left wall rear section', { x: -config.width * .5, y: config.wallHeight * .5, z: -2.4125 },
+      { x: .3, y: config.wallHeight, z: 1.975 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin left wall front section', { x: -config.width * .5, y: config.wallHeight * .5, z: 1.8125 },
+      { x: .3, y: config.wallHeight, z: 3.175 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin left window sill wall', { x: -config.width * .5, y: .625, z: -.6 },
+      { x: .3, y: 1.25, z: 1.65 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin left window header wall', { x: -config.width * .5, y: 3, z: -.6 },
+      { x: .3, y: .9, z: 1.65 }, this.materials.cabinWall);
+    const doorWidth = 1.55;
+    const frontSegmentWidth = (config.width - doorWidth) * .5;
+    this.addCabinBox('Trail cabin front wall left of door',
+      { x: -(doorWidth * .5 + frontSegmentWidth * .5), y: config.wallHeight * .5, z: config.depth * .5 },
+      { x: frontSegmentWidth, y: config.wallHeight, z: .3 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin front wall inner window pier', { x: 1.275, y: config.wallHeight * .5, z: config.depth * .5 },
+      { x: 1, y: config.wallHeight, z: .3 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin front wall outer window pier', { x: 3.7625, y: config.wallHeight * .5, z: config.depth * .5 },
+      { x: .875, y: config.wallHeight, z: .3 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin front window sill wall', { x: 2.55, y: .6375, z: config.depth * .5 },
+      { x: 1.55, y: 1.275, z: .3 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin front window header wall', { x: 2.55, y: 2.9875, z: config.depth * .5 },
+      { x: 1.55, y: .925, z: .3 }, this.materials.cabinWall);
+    // v15.1 deliberately uses one plain wall course above a literal opening. The old
+    // decorative header, jambs, and angled leaf all intersected the facade at different
+    // viewing angles. Removing that layered assembly leaves one coherent front/back wall.
+    this.addCabinBox('Trail cabin front wall above doorway', { x: 0, y: 3.085, z: config.depth * .5 },
+      { x: doorWidth, y: .73, z: .3 }, this.materials.cabinWall);
+
+    // Close the previously open triangular gable above the front wall with stepped timber
+    // courses. They meet rather than overlap the wall below, avoiding coplanar surfaces.
+    [
+      { y: 3.585, width: 8.05 },
+      { y: 3.855, width: 6.85 },
+      { y: 4.125, width: 5.65 },
+      { y: 4.395, width: 4.45 },
+      { y: 4.665, width: 3.2 }
+    ].forEach((course, index) => this.addCabinBox(`Trail cabin front gable course ${index + 1}`,
+      { x: 0, y: course.y, z: config.depth * .5 },
+      { x: course.width, y: .27, z: .3 }, this.materials.cabinWall));
+
+    // The rear had a full rectangular wall but no matching gable infill, leaving the
+    // triangular roof end visibly open. Mirror the clean front courses on the rear plane.
+    [
+      { y: 3.585, width: 8.05 },
+      { y: 3.855, width: 6.85 },
+      { y: 4.125, width: 5.65 },
+      { y: 4.395, width: 4.45 },
+      { y: 4.665, width: 3.2 }
+    ].forEach((course, index) => this.addCabinBox(`Trail cabin rear gable course ${index + 1}`,
+      { x: 0, y: course.y, z: -config.depth * .5 },
+      { x: course.width, y: .27, z: .3 }, this.materials.cabinWall));
+
+    for (const side of [-1, 1]) {
+      this.addCabinBox(`Trail cabin roof ${side < 0 ? 'west' : 'east'} pitch`,
+        { x: side * 2.16, y: 4.05, z: 0 }, { x: 4.85, y: .24, z: 7.65 },
+        this.materials.cabinRoof, { z: -side * 25 });
+    }
+    this.addCabinBox('Trail cabin roof ridge', { x: 0, y: 4.98, z: 0 },
+      { x: .24, y: .2, z: 7.75 }, this.materials.cabinTrim);
+
+    this.addCabinBox('Trail cabin porch', { x: 0, y: -.12, z: 4.45 },
+      { x: 7.2, y: .24, z: 2.1 }, this.materials.woodLight);
+    this.addCabinBox('Trail cabin upper step', { x: 0, y: -.28, z: 5.72 },
+      { x: 3.2, y: .24, z: .72 }, this.materials.cabinTrim);
+    this.addCabinBox('Trail cabin lower step', { x: 0, y: -.43, z: 6.35 },
+      { x: 3.65, y: .22, z: .65 }, this.materials.cabinTrim);
+    for (const side of [-1, 1]) {
+      this.addCabinBox(`Trail cabin porch post ${side < 0 ? 'left' : 'right'}`,
+        { x: side * 3.25, y: 1.55, z: 4.95 }, { x: .22, y: 3.1, z: .22 }, this.materials.cabinTrim);
+    }
+    this.addCabinBox('Trail cabin porch awning', { x: 0, y: 3.22, z: 4.55 },
+      { x: 7.25, y: .18, z: 2.55 }, this.materials.cabinRoof, { x: 7 });
+    for (const side of [-1, 1]) {
+      this.addCabinBox(`Trail cabin porch ${side < 0 ? 'left' : 'right'} handrail`,
+        { x: side * 3.25, y: .78, z: 4.43 }, { x: .16, y: .16, z: 1.35 }, this.materials.cabinTrim);
+    }
+
+    // The panes and mullions fill actual wall openings. They stay visual-only so the thin
+    // detail cannot snag the player capsule; the surrounding sill/header collision is solid.
+    this.addCabinBox('Trail cabin front window', { x: 2.55, y: 1.9, z: config.depth * .5 + .18 },
+      { x: 1.55, y: 1.25, z: .05 }, this.materials.cabinGlass, {}, false);
+    this.addCabinBox('Trail cabin side window', { x: -config.width * .5 - .18, y: 1.9, z: -.6 },
+      { x: .05, y: 1.3, z: 1.65 }, this.materials.cabinGlass, {}, false);
+    for (const x of [1.735, 2.55, 3.365]) {
+      this.addCabinBox(`Trail cabin front window frame ${x}`, { x, y: 1.9, z: config.depth * .5 + .22 },
+        { x: .07, y: 1.42, z: .07 }, this.materials.cabinTrim, {}, false);
+    }
+    for (const y of [1.25, 1.9, 2.55]) {
+      this.addCabinBox(`Trail cabin front window crossbar ${y}`, { x: 2.55, y, z: config.depth * .5 + .22 },
+        { x: 1.68, y: .07, z: .07 }, this.materials.cabinTrim, {}, false);
+    }
+    for (const z of [-1.46, -.6, .26]) {
+      this.addCabinBox(`Trail cabin side window frame ${z}`, { x: -config.width * .5 - .22, y: 1.9, z },
+        { x: .07, y: 1.44, z: .07 }, this.materials.cabinTrim, {}, false);
+    }
+    for (const y of [1.23, 1.9, 2.57]) {
+      this.addCabinBox(`Trail cabin side window crossbar ${y}`, { x: -config.width * .5 - .22, y, z: -.6 },
+        { x: .07, y: .07, z: 1.78 }, this.materials.cabinTrim, {}, false);
+    }
+    // Keep the doorway permanently and cleanly open. There is intentionally no separate
+    // door leaf or decorative frame surface to intersect either side of the facade.
+    for (const [index, x] of [-3.35, -1.75, 1.75, 3.35].entries()) {
+      this.addCabinBox(`Trail cabin floor board ${index + 1}`, { x, y: .012, z: 0 },
+        { x: .035, y: .025, z: config.depth - .18 }, this.materials.cabinTrim, {}, false);
+    }
+
+    // Bed and chair have broad, simple collision volumes so they feel solid without creating
+    // narrow gaps that can wedge the player capsule.
+    this.addCabinBox('Trail cabin bed frame', { x: -2.65, y: .32, z: -1.55 },
+      { x: 2.05, y: .55, z: 3.15 }, this.materials.woodLight);
+    this.addCabinBox('Trail cabin bedroll', { x: -2.65, y: .65, z: -1.55 },
+      { x: 1.85, y: .24, z: 2.9 }, this.materials.cabinFabric);
+    this.addCabinBox('Trail cabin pillow', { x: -2.65, y: .86, z: -2.45 },
+      { x: 1.42, y: .24, z: .58 }, this.materials.snow, {}, false);
+    this.addCabinBox('Trail cabin table top', { x: 2.15, y: 1.02, z: -.25 },
+      { x: 2.15, y: .18, z: 1.32 }, this.materials.woodLight);
+    this.addCabinBox('Trail cabin table pedestal', { x: 2.15, y: .5, z: -.25 },
+      { x: .55, y: 1, z: .55 }, this.materials.wood);
+    this.addCabinBox('Trail cabin chair seat', { x: 2.15, y: .58, z: 1.45 },
+      { x: 1.05, y: .22, z: 1.05 }, this.materials.woodLight);
+    this.addCabinBox('Trail cabin chair back', { x: 2.15, y: 1.25, z: 1.91 },
+      { x: 1.05, y: 1.38, z: .18 }, this.materials.woodLight);
+
+    this.addCabinBox('Trail cabin wardrobe', { x: -3.55, y: 1.28, z: 1.05 },
+      { x: 1.05, y: 2.55, z: 1.65 }, this.materials.cabinWall);
+    this.addCabinBox('Trail cabin wardrobe mirror', { x: -2.99, y: 1.5, z: 1.05 },
+      { x: .045, y: 1.55, z: .88 }, this.materials.cabinGlass, {}, false);
+    this.addCabinBox('Trail cabin wardrobe handle', { x: -2.94, y: 1.28, z: .73 },
+      { x: .06, y: .12, z: .08 }, this.materials.cabinWarm, {}, false);
+
+    for (let shelf = 0; shelf < 2; shelf += 1) {
+      this.addCabinBox(`Trail cabin trophy shelf ${shelf + 1}`, { x: 2.45, y: 1.48 + shelf * .72, z: -3.12 },
+        { x: 2.85, y: .12, z: .48 }, this.materials.cabinTrim);
+    }
+    this.addCabinBox('Trail Badges wall board', { x: .65, y: 2.72, z: -3.16 },
+      { x: 2.45, y: 1.05, z: .12 }, this.materials.woodLight, {}, false);
+    for (let index = 0; index < 10; index += 1) {
+      const badge = this.createPrimitive(`Trail Badge board medallion ${index + 1}`, 'cylinder',
+        this.homePoint(-.25 + index % 5 * .45, 2.48 + Math.floor(index / 5) * .45, -3.08),
+        { x: .13, y: .035, z: .13 }, index % 3 ? this.materials.cabinWarm : this.materials.shallowWater,
+        { x: 90, y: inwardYaw(config.angle), z: 0 }, { castShadows: false });
+      badge.enabled = true;
+    }
+    const trophyColors = [this.materials.holdRough, this.materials.shallowWater, this.materials.holdIce, this.materials.cabinWarm];
+    for (let index = 0; index < 4; index += 1) {
+      const trophy = this.createPrimitive(`Trail cabin progress trophy ${index + 1}`, index === 1 ? 'sphere' : 'cone',
+        this.homePoint(1.55 + index * .62, 1.83 + (index % 2) * .72, -3.0),
+        { x: .32, y: .48 + (index % 2) * .16, z: .22 }, trophyColors[index],
+        { x: index === 1 ? 0 : 90, y: inwardYaw(config.angle) + index * 23, z: 0 });
+      trophy.enabled = false;
+      this.homeTrophies.push(trophy);
+    }
+    this.addCabinBox('Trail cabin gear rack', { x: -.85, y: 1.75, z: -3.13 },
+      { x: 1.9, y: .14, z: .16 }, this.materials.cabinTrim, {}, false);
+    for (const [index, x] of [-1.45, -.82, -.18].entries()) {
+      this.addCylinder(`Trail cabin hanging gear ${index + 1}`, this.homePoint(x, 1.12, -3.0),
+        { x: .055, y: 1.15, z: .055 }, index === 1 ? this.materials.holdIce : this.materials.holdRough,
+        { x: 0, y: inwardYaw(config.angle), z: index % 2 ? 8 : -8 }, false);
+    }
+
+    // Finish the cabin as a lived-in mountain base: a real hearth/chimney, visible
+    // rafters, warm lantern, woven rug, and an exterior trail sign.
+    this.addCabinBox('Trail cabin stone hearth', { x: 2.95, y: .15, z: -2.7 },
+      { x: 1.75, y: .3, z: 1.1 }, this.materials.deepRock);
+    this.addCabinBox('Trail cabin fireplace back', { x: 2.95, y: 1.18, z: -3.05 },
+      { x: 1.6, y: 2.05, z: .45 }, this.materials.rock);
+    this.addCabinBox('Trail cabin fireplace opening', { x: 2.95, y: .72, z: -2.79 },
+      { x: .92, y: .82, z: .08 }, this.materials.caveWall, {}, false);
+    this.addCabinBox('Trail cabin fireplace glow', { x: 2.95, y: .5, z: -2.72 },
+      { x: .55, y: .35, z: .1 }, this.materials.cabinWarm, {}, false);
+    this.addCabinBox('Trail cabin stone chimney', { x: 3.55, y: 4.15, z: -2.45 },
+      { x: .82, y: 5.5, z: .82 }, this.materials.deepRock);
+    this.addCabinBox('Trail cabin chimney cap', { x: 3.55, y: 6.93, z: -2.45 },
+      { x: 1.05, y: .18, z: 1.05 }, this.materials.rock);
+    this.addCabinBox('Trail cabin woven rug', { x: 0, y: .035, z: -.15 },
+      { x: 2.25, y: .035, z: 3.25 }, this.materials.cabinFabric, {}, false);
+    for (const z of [-2.65, 0, 2.65]) {
+      for (const side of [-1, 1]) {
+        this.addCabinBox(`Trail cabin exposed rafter ${z} ${side < 0 ? 'west' : 'east'}`,
+          { x: side * 2.02, y: 4, z }, { x: 4.55, y: .12, z: .16 },
+          this.materials.cabinTrim, { z: -side * 25 }, false);
+      }
+    }
+    this.addCabinBox('Trail cabin hanging lantern', { x: 0, y: 3.1, z: .2 },
+      { x: .34, y: .55, z: .34 }, this.materials.cabinWarm, {}, false);
+    this.addCabinBox('Trail cabin Stoneveil Peak sign', { x: -2.15, y: 2.05, z: 5.03 },
+      { x: 2.35, y: .7, z: .11 }, this.materials.woodLight, { z: -2 }, false);
+
+    // Final cozy-detail pass: fascia closes the roof silhouette, shutters frame the facade,
+    // and small interior/porch props fill dead space without enlarging the footprint.
+    for (const side of [-1, 1]) {
+      this.addCabinBox(`Trail cabin front window ${side < 0 ? 'left' : 'right'} shutter`,
+        { x: 2.55 + side * 1.02, y: 1.9, z: config.depth * .5 + .25 },
+        { x: .34, y: 1.48, z: .08 }, this.materials.cabinTrim, { z: side * 3 }, false);
+      this.addCabinBox(`Trail cabin roof ${side < 0 ? 'west' : 'east'} fascia`,
+        { x: side * 3.95, y: 3.62, z: 0 }, { x: .16, y: .28, z: 7.6 },
+        this.materials.cabinTrim, { z: -side * 25 }, false);
+      this.addCabinBox(`Trail cabin porch planter ${side}`, { x: side * 2.65, y: .26, z: 5.12 },
+        { x: .82, y: .52, z: .72 }, this.materials.woodLight, {}, false);
+      this.addCabinBox(`Trail cabin porch planter foliage ${side}`, { x: side * 2.65, y: .68, z: 5.12 },
+        { x: .7, y: .46, z: .62 }, this.materials.shrubLight, { z: side * 5 }, false);
+    }
+    this.addCabinBox('Trail cabin kitchen wall shelf', { x: .2, y: 2.15, z: -3.12 },
+      { x: 1.45, y: .1, z: .42 }, this.materials.cabinTrim, {}, false);
+    for (let index = 0; index < 3; index += 1) this.addCabinBox(`Trail cabin shelf mug ${index + 1}`,
+      { x: -.25 + index * .42, y: 2.34, z: -2.98 }, { x: .22, y: .3, z: .22 },
+      index === 1 ? this.materials.cabinWarm : this.materials.shallowWater, {}, false);
+    this.addCabinBox('Trail cabin porch welcome mat', { x: 0, y: .035, z: 3.78 },
+      { x: 1.45, y: .035, z: .72 }, this.materials.cabinFabric, {}, false);
+    this.addCabinBox('Trail cabin field map frame', { x: 4.05, y: 2.05, z: .3 },
+      { x: .08, y: 1.45, z: 1.85 }, this.materials.cabinTrim, {}, false);
+    this.addCabinBox('Trail cabin field map print', { x: 4.0, y: 2.05, z: .3 },
+      { x: .035, y: 1.2, z: 1.55 }, this.materials.cabinWarm, {}, false);
+    this.addCabinBox('Trail cabin storage chest', { x: -3.05, y: .48, z: 2.25 },
+      { x: 1.65, y: .9, z: 1.05 }, this.materials.woodLight);
+    this.addCabinBox('Trail cabin storage chest lid', { x: -3.05, y: .98, z: 2.25 },
+      { x: 1.78, y: .16, z: 1.14 }, this.materials.cabinTrim, {}, false);
+    for (const side of [-1, 0, 1]) this.addCabinBox(`Trail cabin coat hook ${side}`, {
+      x: -1.1 + side * .42, y: 2.18, z: -3.24
+    }, { x: .08, y: .28, z: .18 }, this.materials.deepRock, { x: -18 }, false);
+
+    // A connected earthen annulus slopes down from the lawn to a waterline below it. The
+    // former short wooden platform read as a diving board and served no required interaction.
+    this.addHomePondBank();
+    this.addCabinBox('Hearthward pond bench seat', { x: 7.8, y: .48, z: 4.55 },
+      { x: 2.2, y: .18, z: .72 }, this.materials.woodLight);
+    this.addCabinBox('Hearthward pond bench back', { x: 7.8, y: 1.02, z: 4.08 },
+      { x: 2.2, y: .82, z: .14 }, this.materials.cabinTrim, { x: 7 });
+    for (const x of [7.02, 8.58]) this.addCabinBox(`Hearthward pond bench leg ${x}`,
+      { x, y: .2, z: 4.55 }, { x: .2, y: .4, z: .42 }, this.materials.cabinTrim);
+    for (let index = 0; index < 12; index += 1) {
+      const angle = index * Math.PI * 2 / 12;
+      const localX = 7.8 + Math.cos(angle) * (4.45 + (index % 2) * .25);
+      const localZ = 8.25 + Math.sin(angle) * (3.45 + (index % 3) * .16);
+      const point = this.homePoint(localX, .27 + (index % 3) * .06, localZ);
+      this.createPrimitive(`Hearthward pond reed ${index + 1}`, 'cone', point,
+        { x: .12, y: .72 + (index % 3) * .12, z: .12 }, this.materials.shrubLight,
+        { x: index % 2 ? 7 : -7, y: index * 31, z: 0 }, { castShadows: false });
+      if (index % 3 === 0) this.createPrimitive(`Hearthward pond flower ${index + 1}`, 'sphere',
+        this.homePoint(localX + .25, .28, localZ - .18), { x: .16, y: .12, z: .16 },
+        this.materials.cabinWarm, {}, { castShadows: false });
+    }
+    for (let index = 0; index < 5; index += 1) {
+      const angle = (index * 73 + 18) * Math.PI / 180;
+      this.createPrimitive(`Hearthward pond modest shoreline rock ${index + 1}`, 'sphere',
+        this.homePoint(7.8 + Math.cos(angle) * 4.48, -.08, 8.25 + Math.sin(angle) * 3.53),
+        { x: .42 + index % 2 * .12, y: .24, z: .36 }, this.materials.waterEdge,
+        { x: index * 7, y: index * 39, z: index % 2 ? 5 : -4 }, { castShadows: false });
+    }
+
+    const cabinYaw = inwardYaw(config.angle);
+    this.homeInteractions.push(
+      { id: 'wardrobe', label: 'OPEN APPEARANCE', action: 'appearance', position: this.homePoint(-2.75, .9, 1.05) },
+      {
+        id: 'bed', label: 'REST ON BED', action: 'rest', seatKind: 'bed',
+        position: this.homePoint(-1.4, PLAYER_FOOT_OFFSET + .08, -1.15),
+        seatPosition: this.homePoint(-2.65, .77 + PLAYER_FOOT_OFFSET + .03, -1.55),
+        exitPosition: this.homePoint(-1.22, PLAYER_FOOT_OFFSET + .08, -1.15),
+        facingYaw: cabinYaw + 180,
+        range: 2.15
+      },
+      {
+        id: 'chair', label: 'SIT BY THE TABLE', action: 'rest', seatKind: 'chair',
+        position: this.homePoint(2.15, PLAYER_FOOT_OFFSET + .08, 1.25),
+        seatPosition: this.homePoint(2.15, .69 + PLAYER_FOOT_OFFSET + .03, 1.45),
+        exitPosition: this.homePoint(.9, PLAYER_FOOT_OFFSET + .08, 1.55),
+        facingYaw: cabinYaw,
+        range: 1.95
+      },
+      {
+        id: 'hearthward-pond-bench', label: 'SIT', action: 'rest', seatKind: 'fishing bench',
+        position: this.homePoint(7.8, PLAYER_FOOT_OFFSET + .08, 4.15),
+        seatPosition: this.homePoint(7.8, .58 + PLAYER_FOOT_OFFSET, 4.55),
+        exitPosition: this.homePoint(5.95, PLAYER_FOOT_OFFSET + .08, 4.55),
+        facingYaw: cabinYaw + 180,
+        fishingFacing: 'hearthward-pond', range: 2.2
+      },
+      { id: 'trophies', label: 'OPEN TRAIL BADGES', action: 'trophies', position: this.homePoint(2.25, 1.1, -2.45) }
+    );
+  }
+
+  buildPublicAquarium() {
+    const config = PUBLIC_AQUARIUM_CONFIG;
+    this.publicAquariumFloorY = config.floorY ?? this.terrainY(config.angle, config.radius) + .28;
+    this.publicAquariumRoot = this.createStructureRoot(
+      'Shoreline aquarium aligned structure', config.angle, config.radius, this.publicAquariumFloorY, AQUARIUM_WORLD_LOCATION?.id
+    );
+    this.aquariumResidents = [];
+    this.aquariumResidentSignature = '';
+
+    // A broad public hall spans two exhibit wings with a clear central circulation aisle.
+    // The greatly enlarged island leaves landscaped breathing room around this footprint.
+    this.addAquariumBox('Glasswater Aquarium broad stone foundation', { x: 0, y: -.24, z: 0 },
+      { x: config.width + 8, y: .48, z: config.depth + 10 }, this.materials.deepRock);
+    this.addAquariumBox('Glasswater Aquarium public promenade', { x: 0, y: .04, z: 0 },
+      { x: config.width + 2, y: .18, z: config.depth + 3 }, this.materials.woodLight);
+    this.addAquariumBox('Glasswater Aquarium central aisle', { x: 0, y: .16, z: 0 },
+      { x: config.width - 3, y: .12, z: 4.4 }, this.materials.cabinTrim);
+    for (const side of [-1, 1]) {
+      this.addAquariumBox(`Glasswater Aquarium ${side < 0 ? 'west' : 'east'} wing canopy`,
+        { x: 0, y: config.waterlineY + 2.35, z: side * 10.1 },
+        { x: config.width + 1, y: .3, z: 18.2 }, this.materials.cabinRoof, { x: side * 2 });
+    }
+    const hallPostXs = [-.46, -.28, -.1, .1, .28, .46].map((ratio) => ratio * config.width);
+    for (const x of hallPostXs) for (const z of [-20.2, 20.2]) {
+      this.addAquariumBox(`Glasswater Aquarium hall post ${x}:${z}`, { x, y: 5.45, z },
+        { x: .38, y: 10.9, z: .38 }, this.materials.cabinTrim);
+    }
+    // A central clerestory, roof ribs, lighting, and furniture turn the two exhibit rows into
+    // a deliberate public gallery instead of isolated glass boxes under a flat pavilion.
+    this.addAquariumBox('Glasswater Aquarium central clerestory roof',
+      { x: 0, y: config.waterlineY + 3.05, z: 0 },
+      { x: config.width + 2, y: .32, z: 5.8 }, this.materials.cabinRoof, { z: 1.5 });
+    this.addAquariumBox('Glasswater Aquarium clerestory ridge',
+      { x: 0, y: config.waterlineY + 3.42, z: 0 },
+      { x: config.width + 2.6, y: .22, z: .32 }, this.materials.cabinTrim, {}, false);
+    for (let rib = -4; rib <= 4; rib += 1) {
+      const x = rib * config.width / 10;
+      this.addAquariumBox(`Glasswater Aquarium roof rib ${rib + 5}`, { x, y: config.waterlineY + 2.72, z: 0 },
+        { x: .24, y: .24, z: config.depth - 1 }, this.materials.cabinTrim, {}, false);
+      this.addAquariumBox(`Glasswater Aquarium warm gallery light ${rib + 5}`, { x, y: config.waterlineY + 2.4, z: 0 },
+        { x: 1.05, y: .12, z: .28 }, this.materials.cabinWarm, {}, false);
+    }
+    for (const x of [-config.width * .29, 0, config.width * .29]) {
+      for (const z of [-2.35, 2.35]) {
+        this.addAquariumBox(`Glasswater Aquarium visitor bench ${x}:${z}`, { x, y: .52, z },
+          { x: 3.8, y: .22, z: .72 }, this.materials.woodLight);
+        for (const offset of [-1.35, 1.35]) this.addAquariumBox(
+          `Glasswater Aquarium visitor bench leg ${x + offset}:${z}`,
+          { x: x + offset, y: .27, z }, { x: .24, y: .32, z: .46 }, this.materials.wood
+        );
+      }
+      this.addAquariumBox(`Glasswater Aquarium information board ${x}`, { x, y: 1.55, z: 0 },
+        { x: 3.1, y: 1.65, z: .16 }, this.materials.deepRock, {}, false);
+      this.addAquariumBox(`Glasswater Aquarium information face ${x}`, { x, y: 1.58, z: .1 },
+        { x: 2.7, y: 1.28, z: .06 }, this.materials.cabinWarm, {}, false);
+    }
+    this.addAquariumBox('Glasswater Aquarium entrance step', { x: 0, y: -.38, z: config.depth * .5 + 2.2 },
+      { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
+    this.addAquariumBox('Glasswater Aquarium rear approach step', { x: 0, y: -.38, z: -config.depth * .5 - 2.2 },
+      { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
+    this.addAquariumBox('Glasswater Aquarium collection sign', { x: 0, y: config.waterlineY + 1.15, z: config.depth * .5 + 1.1 },
+      { x: 8.8, y: 1.15, z: .18 }, this.materials.woodLight, {}, false);
+
+    // A thin packed-earth trail follows the actual generated island profile from the public
+    // entrance to the inward end of the dock. It is deliberately inset into the ground and
+    // visual-only: the continuous island/dock colliders remain the walking surface, so there
+    // are no raised decorative blocks for the capsule to clip through.
+    const dockArrival = AQUARIUM_WORLD_LOCATION?.dock?.arrivalPosition;
+    const dockArrivalDistance = dockArrival
+      ? Math.hypot(
+          dockArrival.x - AQUARIUM_WORLD_LOCATION.worldPosition.x,
+          dockArrival.z - AQUARIUM_WORLD_LOCATION.worldPosition.z
+        )
+      : config.depth * .5 + 32;
+    const pathStartZ = config.depth * .5 + 3.4;
+    const pathEndZ = Math.max(pathStartZ + 12, dockArrivalDistance - 1.4);
+    const shorelineDistance = dockArrivalDistance + 3.1;
+    const pathSurfaceY = (pathZ) => {
+      const footprintFactor = pathZ / Math.max(1, shorelineDistance);
+      if (footprintFactor <= .68) return lerp(
+        AQUARIUM_WORLD_LOCATION.elevation + .13,
+        AQUARIUM_WORLD_LOCATION.elevation + .06,
+        clamp((footprintFactor - .2) / .48, 0, 1)
+      );
+      return lerp(
+        AQUARIUM_WORLD_LOCATION.elevation + .06,
+        OCEAN_SURFACE_Y - .16,
+        clamp((footprintFactor - .68) / .32, 0, 1)
+      );
+    };
+    const pathSegmentCount = 22;
+    const segmentLength = (pathEndZ - pathStartZ) / (pathSegmentCount - 1) + .18;
+    for (let index = 0; index < pathSegmentCount; index += 1) {
+      const progress = index / (pathSegmentCount - 1);
+      const pathZ = lerp(pathStartZ, pathEndZ, progress);
+      const surfaceLocalY = pathSurfaceY(pathZ) - this.publicAquariumFloorY;
+      this.addAquariumBox(`Glasswater packed dock path ${index + 1}`,
+        { x: Math.sin(index * 1.31) * .08, y: surfaceLocalY - .015, z: pathZ },
+        { x: 4.1 + index % 3 * .12, y: .04, z: segmentLength },
+        this.materials.pondBank, { y: index % 2 ? 1.2 : -1.2 }, false);
+    }
+    for (const side of [-1, 1]) {
+      for (let index = 0; index < 4; index += 1) {
+        const pathZ = lerp(pathStartZ + 2, pathStartZ + (pathEndZ - pathStartZ) * .42, index / 3);
+        const plantHeight = .7 + index % 2 * .22;
+        this.addAquariumBox(`Glasswater path edging plant ${side < 0 ? 'west' : 'east'} ${index + 1}`,
+          { x: side * (2.15 + index % 2 * .22), y: pathSurfaceY(pathZ) - this.publicAquariumFloorY + plantHeight * .5, z: pathZ },
+          { x: .42 + index % 3 * .08, y: plantHeight, z: .42 },
+          index % 2 ? this.materials.shrubLight : this.materials.foliage,
+          { z: side * (5 + index * 2) }, false);
+      }
+    }
+    const signGroundY = pathSurfaceY(pathStartZ + 4.2) - this.publicAquariumFloorY;
+    this.addAquariumBox('Glasswater dock path sign post', { x: -2.9, y: signGroundY + 1.05, z: pathStartZ + 4.2 },
+      { x: .18, y: 2.1, z: .18 }, this.materials.wood, {}, false);
+    this.addAquariumBox('Glasswater dock path welcome sign', { x: -2.9, y: signGroundY + 1.72, z: pathStartZ + 4.2 },
+      { x: 2.3, y: .8, z: .16 }, this.materials.woodLight, { y: -4 }, false);
+
+    // Low garden beds and paths make the expanded grounds feel intentional without adding
+    // expensive simulation. They remain outside the exhibit/viewing circulation.
+    for (const side of [-1, 1]) {
+      this.addAquariumBox(`Glasswater ${side < 0 ? 'west' : 'east'} garden bed`,
+        { x: side * (config.width * .5 + 2.4), y: .18, z: 0 },
+        { x: 3.2, y: .36, z: config.depth - 4 }, this.materials.rockLight);
+      for (let index = 0; index < 7; index += 1) this.addAquariumBox(
+        `Glasswater ${side < 0 ? 'west' : 'east'} garden planting ${index + 1}`,
+        { x: side * (config.width * .5 + 2.4), y: .75, z: -15 + index * 5 },
+        { x: .35 + (index % 2) * .18, y: 1.1 + (index % 3) * .22, z: .35 },
+        index % 2 ? this.materials.shrubLight : this.materials.foliage, { z: side * (6 + index) }, false);
+    }
+
+    this.aquariumTankRoots = [];
+    this.aquariumTankCells = [];
+    this.aquariumTankLabels = [];
+    for (let index = 0; index < 10; index += 1) {
+      const column = index % 5;
+      const row = Math.floor(index / 5);
+      const centerX = (column - 2) * config.tankSpacingX;
+      const centerZ = row === 0 ? -config.tankRowZ : config.tankRowZ;
+      const root = new pc.Entity(`Aquarium Tank ${index + 1} module`);
+      root.setLocalPosition(centerX, 0, centerZ);
+      this.publicAquariumRoot.addChild(root);
+      const collisionEntities = [];
+      const addTankBox = (suffix, position, size, material, rotation = {}, solid = false) => {
+        const entity = this.addStructureBox(
+          root, `Aquarium Tank ${index + 1} ${suffix}`, position, size, material, rotation, solid
+        );
+        if (solid) collisionEntities.push(entity);
+        return entity;
+      };
+      const waterBounds = deriveAquariumWaterBounds(config);
+      const glassCenterY = config.waterFloorY + config.tankHeight * .5;
+      addTankBox('stone plinth', { x: 0, y: .48, z: 0 },
+        { x: config.tankWidth + .55, y: .96, z: config.tankDepth + .55 }, this.materials.deepRock, {}, true);
+      addTankBox('sand substrate', { x: 0, y: config.waterFloorY, z: 0 },
+        { x: config.tankWidth, y: .25, z: config.tankDepth }, this.materials.waterEdge);
+      addTankBox('front viewing glass', { x: 0, y: glassCenterY, z: config.tankDepth * .5 },
+        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass, {}, true);
+      addTankBox('rear viewing glass', { x: 0, y: glassCenterY, z: -config.tankDepth * .5 },
+        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass, {}, true);
+      addTankBox('left glass', { x: -config.tankWidth * .5, y: glassCenterY, z: 0 },
+        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass, {}, true);
+      addTankBox('right glass', { x: config.tankWidth * .5, y: glassCenterY, z: 0 },
+        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass, {}, true);
+      for (const side of [-1, 1]) {
+        addTankBox(`${side < 0 ? 'left' : 'right'} structural frame`,
+          { x: side * config.tankWidth * .5, y: glassCenterY, z: 0 },
+          { x: .38, y: config.tankHeight + .55, z: .38 }, this.materials.cabinTrim);
+      }
+      addTankBox('upper exhibit frame', { x: 0, y: config.waterlineY + .16, z: 0 },
+        { x: config.tankWidth + .55, y: .32, z: config.tankDepth + .55 }, this.materials.cabinTrim);
+      const tankWater = addTankBox('bounded water volume',
+        { x: 0, y: (config.waterFloorY + config.waterlineY) * .5, z: 0 },
+        { x: config.tankWidth - config.glassThickness * 2, y: config.waterlineY - config.waterFloorY, z: config.tankDepth - config.glassThickness * 2 },
+        this.materials.aquariumWater);
+      tankWater.render.castShadows = false;
+      for (let decor = 0; decor < 6; decor += 1) {
+        const decorX = -config.tankWidth * .31 + (decor % 3) * config.tankWidth * .31;
+        const decorZ = -4.7 + Math.floor(decor / 3) * 9.4;
+        addTankBox(`habitat stone ${decor + 1}`, { x: decorX, y: config.waterFloorY + .28, z: decorZ },
+          { x: 1.25 + (decor % 2) * .4, y: .58 + (decor % 3) * .18, z: 1.05 },
+          decor % 2 ? this.materials.rockLight : this.materials.rock, { x: decor * 7, y: decor * 29, z: decor % 2 ? 8 : -6 });
+        addTankBox(`habitat plant ${decor + 1}`, { x: decorX + .7, y: config.waterFloorY + .85, z: decorZ - .35 },
+          { x: .2, y: 1.55 + (decor % 3) * .38, z: .2 },
+          decor % 2 ? this.materials.shrubLight : this.materials.foliage, { z: decor % 2 ? 12 : -12 });
+      }
+      const labelMaterial = this.createAquariumLabelMaterial(`Tank ${index + 1}`);
+      const label = addTankBox('owner name label',
+        { x: 0, y: config.waterlineY + .72, z: config.tankDepth * .5 + .2 },
+        { x: 5.6, y: 1.05, z: .14 }, labelMaterial);
+      label._labelText = `Tank ${index + 1}`;
+      label._labelMaterial = labelMaterial;
+      const interaction = {
+        id: `aquarium-tank-${index + 1}`,
+        label: 'MANAGE AQUARIUM COLLECTION',
+        action: 'aquarium',
+        position: this.aquariumPoint(centerX, .6, centerZ + config.tankDepth * .5 + 1.25),
+        range: config.interactionDistance,
+        enabled: index === 0
+      };
+      this.homeInteractions.push(interaction);
+      root.enabled = index === 0;
+      if (!root.enabled) for (const entity of collisionEntities) this.syncStructureCollider(entity, false);
+      this.aquariumTankRoots.push(root);
+      this.aquariumTankCells.push({ root, label, interaction, collisionEntities, waterBounds, centerX, centerZ });
+      this.aquariumTankLabels.push(label);
+    }
+
+    const managementPoints = [
+      ['front', 0, config.depth * .5 + 2.25],
+      ['rear', 0, -config.depth * .5 - 2.25],
+      ['left', -config.width * .5 - 2.25, 0],
+      ['right', config.width * .5 + 2.25, 0]
+    ];
+    for (const [side, localX, localZ] of managementPoints) this.homeInteractions.push({
+      id: side === 'front' ? 'shoreline-aquarium' : `shoreline-aquarium-${side}`,
+      label: 'MANAGE AQUARIUM COLLECTION',
+      action: 'aquarium',
+      position: this.aquariumPoint(localX, .6, localZ),
+      range: config.interactionDistance
+    });
+  }
+
+  updateAquariumResidents(save = {}, socialShowcases = []) {
+    const progression = save.progression ?? save;
+    const stored = progression.aquarium ?? [];
+    const byId = new Map(stored.map((specimen) => [specimen.specimenId, specimen]));
+    const multiplayerDisplays = Array.isArray(socialShowcases) && socialShowcases.length
+      ? socialShowcases.slice(0, 10).map((entry) => {
+          const seen = new Set();
+          return {
+            owner: entry.displayName,
+            ownerId: entry.playerId,
+            specimens: (entry.specimens ?? []).filter((specimen) => {
+              if (!specimen?.specimenId || seen.has(specimen.specimenId)) return false;
+              seen.add(specimen.specimenId);
+              return true;
+            }).slice(0, 30)
+          };
+        })
+      : null;
+    const soloCount = Math.max(1, Math.min(10, Number(progression.aquariumTankCount) || 1));
+    const soloDisplays = Array.from({ length: soloCount }, (_, tankIndex) => ({
+      owner: `Tank ${tankIndex + 1}`,
+      ownerId: 'solo',
+      specimens: (progression.aquariumTankDisplays?.[tankIndex] ?? []).map((id) => byId.get(id)).filter(Boolean).slice(0, 30)
+    }));
+    const displays = multiplayerDisplays ?? soloDisplays;
+    const layoutCount = displays.length;
+    const galleryColumns = layoutCount <= 4 ? layoutCount : Math.ceil(layoutCount / 2);
+    this.aquariumTankRoots?.forEach((root, index) => {
+      root.enabled = index < layoutCount;
+      const cell = this.aquariumTankCells[index];
+      cell.interaction.enabled = root.enabled;
+      if (!root.enabled) {
+        for (const entity of cell.collisionEntities) this.syncStructureCollider(entity, false);
+        return;
+      }
+      const row = layoutCount <= 4 ? 0 : Math.floor(index / galleryColumns);
+      const countInRow = layoutCount <= 4 ? layoutCount : Math.min(galleryColumns, layoutCount - row * galleryColumns);
+      const column = layoutCount <= 4 ? index : index % galleryColumns;
+      const desiredX = (column - (countInRow - 1) * .5) * PUBLIC_AQUARIUM_CONFIG.tankSpacingX;
+      const desiredZ = layoutCount <= 4 ? 0 : (row === 0 ? -1 : 1) * PUBLIC_AQUARIUM_CONFIG.tankRowZ;
+      root.setLocalPosition(desiredX, 0, desiredZ);
+      cell.centerX = desiredX;
+      cell.centerZ = desiredZ;
+      const viewSide = layoutCount <= 4 || row === 0 ? 1 : -1;
+      cell.label.setLocalPosition(0, PUBLIC_AQUARIUM_CONFIG.waterlineY + .72,
+        viewSide * (PUBLIC_AQUARIUM_CONFIG.tankDepth * .5 + .2));
+      cell.label.setLocalEulerAngles(0, viewSide > 0 ? 0 : 180, 0);
+      for (const entity of cell.collisionEntities) this.syncStructureCollider(entity, true);
+      cell.interaction.position = this.aquariumPoint(
+        desiredX, .6, desiredZ + viewSide * (PUBLIC_AQUARIUM_CONFIG.tankDepth * .5 + 1.25)
+      );
+    });
+    this.aquariumTankLabels?.forEach((label, index) => {
+      const text = multiplayerDisplays ? (displays[index]?.owner || `Player ${index + 1}`) : `Tank ${index + 1}`;
+      if (!displays[index] || label._labelText === text) return;
+      const material = this.createAquariumLabelMaterial(text);
+      for (const meshInstance of label.render.meshInstances) meshInstance.material = material;
+      label._labelMaterial?._aquariumLabelTexture?.destroy?.();
+      label._labelMaterial?.destroy?.();
+      label._labelMaterial = material;
+      label._labelText = text;
+    });
+    const visible = displays.flatMap((display, tankIndex) => display.specimens.map((specimen, slotIndex) => ({
+      specimen, tankIndex, slotIndex, owner: display.owner, ownerId: display.ownerId
+    })))
+      .slice(0, PUBLIC_AQUARIUM_CONFIG.visibleResidentLimit);
+    const signature = `layout:${layoutCount}:${displays.map((display) => `${display.ownerId}:${display.owner}`).join(',')}|${visible.map(({ specimen, tankIndex, ownerId }) => (
+      `${tankIndex}:${ownerId}:${specimen.specimenId}:${specimen.length}:${specimen.weight}:${specimen.shiny ? 1 : 0}`
+    )).join('|')}`;
+    if (signature === this.aquariumResidentSignature) return this.aquariumResidents.length;
+    const reusable = new Map(this.aquariumResidents.map((resident) => [resident.cacheKey, resident.model]));
+    this.aquariumResidents = [];
+    this.aquariumResidentSignature = signature;
+
+    for (const [index, entry] of visible.entries()) {
+      const { specimen, tankIndex, slotIndex, ownerId } = entry;
+      const cell = this.aquariumTankCells[tankIndex];
+      if (!cell?.root?.enabled) continue;
+      const unit = stableUnit(`aquarium:${specimen.specimenId}`);
+      const cacheKey = `${ownerId}:${specimen.specimenId}:${specimen.speciesId}:${specimen.length}:${specimen.weight}:${specimen.shiny ? 1 : 0}`;
+      const model = reusable.get(cacheKey) ?? createSpecimenModel(specimen, {
+        name: `Tank ${tankIndex + 1} resident ${specimen.name} ${slotIndex + 1}`,
+        maximumScale: 4.25,
+        app: this.app
+      });
+      reusable.delete(cacheKey);
+      // Ownership is structural: a resident is a child of exactly one tank module. Moving
+      // or hiding that module therefore cannot strand the creature in world/midair space.
+      cell.root.addChild(model.root);
+      const bounds = cell.waterBounds;
+      const visualHalfLength = Math.min(3.8, Math.max(.28, (model.physicalLengthMeters ?? .6) * .5));
+      const bodyRadius = Math.min(1.65, Math.max(.28, model.scale * .45));
+      const largeCreature = visualHalfLength > 1.65 || bodyRadius > 1.15;
+      const bottomDweller = ['penguin', 'polar_bear', 'giant_panda'].includes(specimen.speciesId);
+      const motionBounds = Object.freeze({
+        minX: bounds.minX + visualHalfLength,
+        maxX: bounds.maxX - visualHalfLength,
+        minY: bounds.minY + bodyRadius,
+        maxY: bounds.maxY - bodyRadius,
+        minZ: bounds.minZ + bodyRadius,
+        maxZ: bounds.maxZ - bodyRadius
+      });
+      const depthLane = slotIndex % 5 / 4;
+      const heightLane = Math.floor(slotIndex / 5) % 6 / 5;
+      const centerZ = lerp(motionBounds.minZ, motionBounds.maxZ, depthLane);
+      const centerY = bottomDweller
+        ? motionBounds.minY + .18
+        : lerp(motionBounds.minY, motionBounds.maxY, heightLane);
+      const resident = {
+        cacheKey,
+        model,
+        tankIndex,
+        tankRoot: cell.root,
+        bounds,
+        motionBounds,
+        phase: unit * Math.PI * 2 + index * .71,
+        speed: (largeCreature ? .18 : .3) + (index % 7) * .025 + unit * .055,
+        centerX: 0,
+        range: Math.max(.18, (motionBounds.maxX - motionBounds.minX) * .5),
+        centerZ,
+        zRange: Math.min(1.15, Math.max(.18, (bounds.maxZ - bounds.minZ) * .08)),
+        centerY,
+        vertical: bottomDweller ? .035 : (largeCreature ? .1 : .18 + (index % 3) * .035),
+        roll: bottomDweller ? 0 : (largeCreature ? 1.2 : 2.5)
+      };
+      model.root.setLocalPosition(0, centerY, centerZ);
+      this.aquariumResidents.push(resident);
+    }
+    for (const model of reusable.values()) destroySpecimenModel(model);
+    return this.aquariumResidents.length;
+  }
+
+  updateAquariumSwimming() {
+    if (this.activeLocationId !== 'aquarium-island') return;
+    for (const [index, resident] of this.aquariumResidents.entries()) {
+      if (!resident.tankRoot?.enabled || resident.model.root.parent !== resident.tankRoot) continue;
+      const t = this.elapsed * resident.speed + resident.phase;
+      // At 300 residents, update one of three cohorts per frame; every fish still animates
+      // smoothly enough at the Aquarium while avoiding a 300-model full-frame transform pass.
+      if (this.aquariumResidents.length > 120 && index % 3 !== Math.floor(this.elapsed * 30) % 3) continue;
+      const x = clamp(resident.centerX + Math.sin(t) * resident.range,
+        resident.motionBounds.minX, resident.motionBounds.maxX);
+      const z = clamp(resident.centerZ + Math.sin(t * .63 + resident.phase) * resident.zRange,
+        resident.motionBounds.minZ, resident.motionBounds.maxZ);
+      const y = clamp(resident.centerY + Math.sin(t * .82 + resident.phase * .5) * resident.vertical,
+        resident.motionBounds.minY, resident.motionBounds.maxY);
+      const velocityX = Math.cos(t) * resident.range;
+      const velocityZ = Math.cos(t * .63 + resident.phase) * resident.zRange * .63;
+      const yaw = Math.atan2(-velocityZ, velocityX) * 180 / Math.PI;
+      resident.model.root.setLocalPosition(x, y, z);
+      resident.model.root.setLocalEulerAngles(0, yaw, Math.sin(t * .9) * resident.roll);
+      if (resident.model.tail) {
+        const base = resident.model.tailBaseEuler ?? resident.model.tail.getLocalEulerAngles().clone();
+        resident.model.tailBaseEuler = base;
+        resident.model.tail.setLocalEulerAngles(base.x, base.y + Math.sin(t * 7 + index) * 15, base.z);
+      }
+    }
+  }
+
+  getNearestHomeInteraction(point, maximumDistance = Math.max(
+    HOME_CABIN_CONFIG.interactionDistance,
+    SUMMIT_BENCH_CONFIG.interactionDistance,
+    PUBLIC_AQUARIUM_CONFIG.interactionDistance,
+    3.2 // Boat chart/ladder interactions intentionally have a slightly longer short range.
+  )) {
+    if (![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
+    let nearest = null;
+    let nearestDistance = maximumDistance;
+    for (const interaction of this.homeInteractions ?? []) {
+      if (interaction.enabled === false) continue;
+      if (![interaction.position?.x, interaction.position?.y, interaction.position?.z].every(Number.isFinite)) continue;
+      const distance = interaction.distanceTo
+        ? interaction.distanceTo(point)
+        : Math.hypot(
+            point.x - interaction.position.x,
+            (point.y - PLAYER_FOOT_OFFSET) - interaction.position.y,
+            point.z - interaction.position.z
+          );
+      const interactionRange = interaction.range ?? HOME_CABIN_CONFIG.interactionDistance;
+      if (interaction.contains && !interaction.contains(point)) continue;
+      if (distance > interactionRange || distance > nearestDistance) continue;
+      nearest = interaction;
+      nearestDistance = distance;
+    }
+    return nearest ? { ...nearest, distance: nearestDistance } : null;
+  }
+
+  getBoatSoftlockRecovery(point) {
+    const recovery = this.bluewaterRecovery;
+    if (!recovery || ![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
+    const dx = point.x - recovery.center.x;
+    const dz = point.z - recovery.center.z;
+    const along = dx * recovery.forward.x + dz * recovery.forward.z;
+    const across = dx * recovery.sideward.x + dz * recovery.sideward.z;
+    // Only the actual footprint below the former hull volume qualifies. Swimming/diving
+    // beside the boat does not arm the fallback.
+    if (Math.abs(along) > 6.55 || Math.abs(across) > 3.45 || point.y >= OCEAN_SURFACE_Y - .7) return null;
+    return {
+      position: { ...recovery.boardingPosition },
+      facingYaw: recovery.facingYaw
+    };
+  }
+
+  updateHomeProgress(save = {}) {
+    const discovered = Object.values(save.collection ?? {}).filter((entry) => entry?.discovered).length;
+    const aquarium = save.progression?.aquarium?.length ?? 0;
+    const summits = save.lifetime?.summitCount ?? 0;
+    const milestones = [discovered >= 1, discovered >= 12, aquarium >= 1, summits >= 1];
+    this.homeTrophies?.forEach((trophy, index) => { trophy.enabled = milestones[index]; });
+    this.homeProgressSummary = { discovered, aquarium, summits };
+    return this.homeProgressSummary;
+  }
+
+  createFracturedRockForm(seed, kind = 'chunk') {
+    const vertices = [];
+    const countByKind = {
+      chunk: 9, spire: 7, blade: 6, lean: 8, wedge: 7, column: 8, needle: 6,
+      shelfblade: 7, crooked: 8, shard: 6, hook: 7, knuckle: 10, slab: 8,
+      anvil: 8, tooth: 7, fin: 7, bulb: 9, terrace: 8, prow: 7, twist: 8, crouch: 10
+    };
+    const count = countByKind[kind] ?? 8;
+    const topRadiusByKind = {
+      chunk: .47, spire: .22, blade: .3, lean: .38, wedge: .34, column: .36, needle: .14,
+      shelfblade: .24, crooked: .28, shard: .12, hook: .2, knuckle: .5, slab: .57,
+      anvil: .62, tooth: .1, fin: .25, bulb: .56, terrace: .64, prow: .22, twist: .31, crouch: .59
+    };
+    const bottomRadiusByKind = {
+      chunk: .51, spire: .55, blade: .5, lean: .52, wedge: .54, column: .4, needle: .43,
+      shelfblade: .58, crooked: .5, shard: .48, hook: .56, knuckle: .47, slab: .61,
+      anvil: .42, tooth: .58, fin: .53, bulb: .38, terrace: .59, prow: .61, twist: .5, crouch: .66
+    };
+    const topRadiusBase = topRadiusByKind[kind] ?? .42;
+    const bottomRadiusBase = bottomRadiusByKind[kind] ?? .5;
+
+    for (let ring = 0; ring < 2; ring += 1) {
+      for (let index = 0; index < count; index += 1) {
+        const angle = index * Math.PI * 2 / count;
+        const variation = 1 + ((((index * 7 + ring * 5 + seed * 3) % 11) - 5) * .035);
+        const baseRadius = ring ? topRadiusBase : bottomRadiusBase;
+        let x = Math.cos(angle) * baseRadius * variation;
+        let z = Math.sin(angle) * baseRadius * (.82 + ((index + seed) % 4) * .055) * variation;
+        let y = ring ? .39 : -.42;
+
+        if (kind === 'spire') {
+          if (ring) {
+            x += .08 * Math.sin(seed * 1.7);
+            z += .06 * Math.cos(seed * 1.2);
+            y += Math.sin(angle * 2 + seed) * .11;
+          } else {
+            y += Math.sin(angle + seed) * .035;
+          }
+        } else if (kind === 'blade') {
+          z *= ring ? .58 : .72;
+          x += ring ? .12 : -.04;
+          y += ring ? Math.cos(angle + seed) * .13 : Math.sin(angle) * .025;
+        } else if (kind === 'lean') {
+          if (ring) {
+            x += .17;
+            z -= .08;
+            y += Math.cos(angle - .4) * .18;
+          }
+        } else if (kind === 'wedge') {
+          // A strongly sloped top makes this a useful grip surface but a bad rest platform.
+          y += ring ? Math.cos(angle) * .3 : Math.cos(angle) * .025;
+          if (ring) x += .08;
+        } else if (kind === 'needle') {
+          z *= .7;
+          if (ring) {
+            x += .12;
+            y += Math.cos(angle * 2 + seed) * .16;
+          }
+        } else if (kind === 'shelfblade') {
+          z *= ring ? .44 : .68;
+          if (ring) {
+            x += .14;
+            y += Math.cos(angle - .6) * .25;
+          }
+        } else if (kind === 'crooked') {
+          if (ring) {
+            x += .22;
+            z += .12;
+            y += Math.sin(angle * 2.3 + seed) * .18;
+          }
+        } else if (kind === 'shard') {
+          z *= ring ? .34 : .48;
+          if (ring) {
+            x += .15;
+            y += Math.cos(angle * 2 + seed) * .2;
+          }
+        } else if (kind === 'hook') {
+          z *= .72;
+          if (ring) {
+            x += .34;
+            z -= .16;
+            y += Math.sin(angle + seed) * .16;
+          }
+        } else if (kind === 'knuckle') {
+          x *= index % 3 === 0 ? 1.22 : .9;
+          z *= index % 2 ? .78 : 1.08;
+          if (ring) {
+            x += .08;
+            y += Math.sin(angle * 3 + seed) * .14;
+          }
+        } else if (kind === 'slab') {
+          z *= .72;
+          y = ring ? .23 + Math.cos(angle - .7) * .16 : -.34 + Math.sin(angle * 2 + seed) * .025;
+          if (ring) x += .1;
+        } else if (kind === 'anvil') {
+          z *= ring ? .54 : .82;
+          if (ring) {
+            x += .22;
+            y = .31 + Math.cos(angle - .3) * .11;
+          }
+        } else if (kind === 'tooth') {
+          z *= .76;
+          if (ring) {
+            x += .18;
+            z += .08;
+            y = .58 + Math.cos(angle * 2 + seed) * .14;
+          }
+        } else if (kind === 'fin') {
+          z *= ring ? .24 : .42;
+          y += ring ? Math.sin(angle + .8) * .24 : Math.sin(angle * 2) * .03;
+          if (ring) x += .2;
+        } else if (kind === 'bulb') {
+          z *= index % 2 ? .84 : 1.04;
+          if (ring) {
+            x -= .08;
+            y = .28 + Math.sin(angle * 3 + seed) * .16;
+          }
+        } else if (kind === 'terrace') {
+          z *= .8;
+          y = ring ? .2 + Math.cos(angle) * .08 : -.3 + Math.sin(angle * 2 + seed) * .02;
+          if (ring) x += .06;
+        } else if (kind === 'prow') {
+          z *= ring ? .32 : .58;
+          if (ring) {
+            x += .36;
+            y += Math.cos(angle - .4) * .2;
+          }
+        } else if (kind === 'twist') {
+          if (ring) {
+            x += .18 + Math.cos(angle) * .06;
+            z += .2 + Math.sin(angle) * .06;
+            y += Math.sin(angle * 3 + seed) * .12;
+          }
+        } else if (kind === 'crouch') {
+          x *= index % 3 ? 1.05 : 1.28;
+          z *= index % 2 ? .9 : 1.15;
+          y = ring ? .18 + Math.sin(angle * 2.5 + seed) * .12 : -.3;
+        } else if (kind === 'column') {
+          z *= .82;
+          y += ring ? Math.sin(angle * 2 + seed) * .12 : Math.sin(angle + seed) * .025;
+        } else {
+          y += (((index * 5 + seed * 2) % 7) - 3) * .014;
+        }
+        vertices.push([x, y, z]);
+      }
+    }
+
+    const bottomCenter = count * 2;
+    const topCenter = count * 2 + 1;
+    const topCenterY = kind === 'needle' || kind === 'shard' || kind === 'tooth' ? .68
+      : kind === 'spire' ? .62 : kind === 'slab' ? .34
+        : ['terrace', 'crouch'].includes(kind) ? .27 : kind === 'anvil' ? .36
+          : kind === 'shelfblade' ? .45 : kind === 'wedge' ? .43 : kind === 'blade' ? .49 : .5;
+    const topCenterX = ['hook', 'prow'].includes(kind) ? .38 : kind === 'knuckle' ? .1
+      : kind === 'crooked' ? .23 : kind === 'lean' ? .2
+        : kind === 'twist' ? .2 : kind === 'tooth' ? .18
+          : kind === 'needle' || kind === 'shard' ? .1 : kind === 'spire' ? .06 : 0;
+    const topCenterZ = kind === 'hook' ? -.18 : kind === 'twist' ? .2 : kind === 'lean' ? -.09 : 0;
+    vertices.push([-.05 + seed * .009, -.52, .03 - seed * .006]);
+    vertices.push([topCenterX, topCenterY, topCenterZ]);
+
+    const triangles = [];
+    for (let index = 0; index < count; index += 1) {
+      const next = (index + 1) % count;
+      triangles.push([index, count + next, next], [index, count + index, count + next]);
+      triangles.push([bottomCenter, index, next], [topCenter, count + next, count + index]);
+    }
+    const geometry = new pc.Geometry();
+    geometry.positions = [];
+    geometry.indices = [];
+    for (const triangle of triangles) {
+      for (const vertexIndex of triangle) {
+        geometry.positions.push(...vertices[vertexIndex]);
+        geometry.indices.push(geometry.indices.length);
+      }
+    }
+    geometry.calculateNormals();
+    const colors = new Uint8Array((geometry.positions.length / 3) * 4);
+    for (let vertex = 0; vertex < geometry.positions.length / 3; vertex += 1) {
+      const x = geometry.positions[vertex * 3];
+      const y = geometry.positions[vertex * 3 + 1];
+      const z = geometry.positions[vertex * 3 + 2];
+      const normalY = geometry.normals?.[vertex * 3 + 1] ?? 0;
+      const broad = Math.sin((x * 4.7 + z * 3.1 + seed * 1.9) * 2.2) * .08;
+      const grain = (stableUnit(`${seed}:${kind}:${vertex}:${Math.round((x + y + z) * 100)}`) - .5) * .1;
+      const underside = lerp(.66, 1.02, smoothstep(-.55, .5, normalY));
+      const crevice = y < -.18 ? .84 : 1;
+      const tone = clamp((.94 + broad + grain) * underside * crevice, .58, 1.08);
+      colors[vertex * 4] = Math.round(clamp(tone * 1.01, 0, 1) * 255);
+      colors[vertex * 4 + 1] = Math.round(clamp(tone, 0, 1) * 255);
+      colors[vertex * 4 + 2] = Math.round(clamp(tone * .96, 0, 1) * 255);
+      colors[vertex * 4 + 3] = 255;
+    }
+    geometry.colors = colors;
+    return {
+      kind,
+      mesh: pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry),
+      hull: vertices
+    };
+  }
+
+  getRockMaterial(baseMaterial, name, position = null) {
+    let variants = this.rockMaterialVariants.get(baseMaterial);
+    if (!variants) {
+      const environments = [
+        { factor: 1, cool: 0, warm: 0, green: 0, gloss: 1 },
+        { factor: .78, cool: .035, warm: 0, green: 0, gloss: 1.75 },
+        { factor: .94, cool: 0, warm: .045, green: -.005, gloss: .88 },
+        { factor: .9, cool: .012, warm: 0, green: .035, gloss: .8 },
+        { factor: .98, cool: .04, warm: 0, green: 0, gloss: .9 },
+        { factor: 1.1, cool: .045, warm: 0, green: 0, gloss: .82 }
+      ];
+      variants = environments.flatMap((environment, environmentIndex) => (
+        [.93, .985, 1.035, 1.085].map((factor, index) => {
+          const variant = makeMaterial([
+            clamp(baseMaterial.diffuse.r * factor * environment.factor
+              - environment.cool * .35 + environment.warm, 0, 1),
+            clamp(baseMaterial.diffuse.g * factor * environment.factor
+              + environment.cool * .25 + environment.green, 0, 1),
+            clamp(baseMaterial.diffuse.b * factor * environment.factor
+              + environment.cool - environment.warm * .45, 0, 1)
+          ], {
+            gloss: clamp(baseMaterial.gloss * environment.gloss * (.84 + index * .1), 0, 1),
+            opacity: baseMaterial.opacity,
+            emissive: [baseMaterial.emissive.r, baseMaterial.emissive.g, baseMaterial.emissive.b]
+          });
+          variant.diffuseVertexColor = true;
+          variant.vertexColorGamma = false;
+          variant.update();
+          variant._reelAscentEnvironment = environmentIndex;
+          return variant;
+        })
+      ));
+      this.rockMaterialVariants.set(baseMaterial, variants);
+    }
+    let environmentIndex = 0;
+    if (position) {
+      const localX = position.x - MOUNTAIN_CENTER.x;
+      const localZ = position.z - MOUNTAIN_CENTER.z;
+      const angle = (Math.atan2(localZ, localX) * 180 / Math.PI + 360) % 360;
+      if (position.y < 4) environmentIndex = 1;
+      else if (position.y > MAP_EDITOR_CROWN_BASE_HEIGHT) environmentIndex = 5;
+      else if (position.y > 105) environmentIndex = 4;
+      else if (angle >= 70 && angle <= 155) environmentIndex = 3;
+      else if (angle >= 245 && angle <= 345) environmentIndex = 2;
+    }
+    return variants[environmentIndex * 4 + stableNameHash(name) % 4];
+  }
+
+  registerClimbSurface(entity, collider, type, label = entity.name) {
+    const climbMaterial = getClimbMaterial(type);
+    if (!collider || !climbMaterial.grippable) return;
+    this.climbSurfaces.set(collider.handle, {
+      collider,
+      entity,
+      label,
+      rockId: entity.rockId ?? null,
+      type: climbMaterial.id,
+      material: climbMaterial,
+      staminaMultiplier: climbMaterial.staminaMultiplier
+    });
+  }
+
+  getNearestRockDebug(point, maximumDistance = 10) {
+    if (![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
+    let nearest = null;
+    let nearestDistance = maximumDistance;
+    for (const rock of this.rockPlacements) {
+      if (!rock.rockId || !rock.grippable) continue;
+      const distance = Math.hypot(
+        point.x - rock.position.x,
+        point.y - rock.position.y,
+        point.z - rock.position.z
+      );
+      if (distance >= nearestDistance) continue;
+      nearestDistance = distance;
+      nearest = { id: rock.rockId, name: rock.name, distance, entity: rock.entity };
+    }
+    return nearest;
+  }
+
+  indexMapDebugObjects() {
+    const objects = [];
+    const add = (id, name, position, entity = null) => {
+      if (!id || !position || ![position.x, position.y, position.z].every(Number.isFinite)) return;
+      if (entity) entity.mapDebugId = id;
+      objects.push({ id, name, position: { x: position.x, y: position.y, z: position.z }, entity });
+    };
+    const slug = (value) => String(value ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+    for (const rock of this.rockPlacements) {
+      if (rock.rockId) add(rock.rockId, rock.name, rock.position, rock.entity);
+    }
+    for (const interaction of this.homeInteractions) {
+      const category = interaction.action === 'bench' || /bench|fishing log/i.test(interaction.seatKind ?? '')
+        ? 'BENCH' : interaction.action === 'boat' || interaction.action === 'board'
+          ? 'DOCK' : ['shop', 'appearance', 'aquarium', 'elevator'].includes(interaction.action)
+            ? 'BUILDING' : null;
+      if (category) add(`${category}-${slug(interaction.id)}`, interaction.label, interaction.position);
+    }
+    for (const [id, bench] of this.scalableBenches) {
+      for (const part of bench.parts) part.mapDebugId = `BENCH-${slug(id)}`;
+    }
+    for (const entity of this.boatRailDebugEntities) add(entity.mapDebugId, entity.name, entity.getPosition(), entity);
+    // Debug indexing only needs stable water descriptors. Building full map contours here
+    // cost nearly two seconds and was repeated by the map UI during startup.
+    for (const water of ALL_FISHING_WATER_DESCRIPTORS) {
+      if (water.waterType === 'ocean') continue;
+      const center = water.center ?? (water.localOffset
+        ? this.point(water.angle, water.radius + water.localOffset.z, water.y, -water.localOffset.x)
+        : this.point(water.angle, water.radius, water.y));
+      add(`${['pond', 'summit-pond'].includes(water.waterType) ? 'POND' : 'WATER'}-${slug(water.id)}`,
+        water.label, center);
+    }
+    for (const [id, entity] of [
+      ['BUILDING-HEARTHWARD-CABIN-01', this.homeCabinRoot],
+      ['BUILDING-OUTFITTER-01', this.shopRoot],
+      ['BUILDING-GLASSWATER-AQUARIUM-01', this.publicAquariumRoot],
+      ['BUILDING-ESB-01', this.skyreachRoot]
+    ]) if (entity) add(id, entity.name, entity.getPosition(), entity);
+    this.mapDebugObjects = objects;
+  }
+
+  getNearestMapDebug(point, maximumDistance = 12) {
+    if (![point?.x, point?.y, point?.z].every(Number.isFinite)) return null;
+    let nearest = null;
+    let best = maximumDistance;
+    for (const object of this.mapDebugObjects ?? []) {
+      const distance = Math.hypot(point.x - object.position.x, point.y - object.position.y, point.z - object.position.z);
+      if (distance >= best) continue;
+      best = distance;
+      nearest = { id: object.id, name: object.name, distance, entity: object.entity };
+    }
+    return nearest;
+  }
+
+  terrainYAtWorldXZ(x, z) {
+    const localX = x - MOUNTAIN_CENTER.x;
+    const localZ = z - MOUNTAIN_CENTER.z;
+    const radius = Math.hypot(localX, localZ);
+    let angle = Math.atan2(localZ, localX) * 180 / Math.PI;
+    if (angle < 0) angle += 360;
+    return terrainHeightAt(angle, radius);
+  }
+
+  authoredGroundAtWorldXZ(x, z, options = {}) {
+    if (!this.authoredTerrainGroundQuery) return null;
+    return this.authoredTerrainGroundQuery(x, z, options);
+  }
+
+  proceduralGroundAt(angle, radius, options = {}) {
+    const point = this.point(angle, radius, 0, options.tangentOffset ?? 0);
+    if (!this.authoredTerrainGroundQuery) {
+      return { x: point.x, y: this.terrainY(angle, radius), z: point.z, normal: { x: 0, y: 1, z: 0 } };
+    }
+    const ground = this.authoredGroundAtWorldXZ(point.x, point.z, {
+      minimumNormalY: options.minimumNormalY ?? .52,
+      minimumY: options.allowUnderwater ? -Infinity : OCEAN_SURFACE_Y - .08
+    });
+    if (!ground || (!options.allowProtectedWater && this.isRockInProtectedWaterApproach(angle, radius))) {
+      this.proceduralGroundingAudit.rejected += 1;
+      return null;
+    }
+    this.proceduralGroundingAudit.grounded += 1;
+    return ground;
+  }
+
+  visibleTerrainYAtWorldXZ(x, z) {
+    const authored = this.authoredGroundAtWorldXZ(x, z, { minimumNormalY: .08 });
+    if (this.authoredTerrainGroundQuery) return authored?.y ?? Number.NaN;
+    if (!this.terrainSurface) return this.terrainYAtWorldXZ(x, z);
+    const localX = x - MOUNTAIN_CENTER.x;
+    const localZ = z - MOUNTAIN_CENTER.z;
+    const radius = Math.hypot(localX, localZ);
+    if (radius > TERRAIN_OUTER_RADIUS + .75 || radius < TERRAIN_RADII.at(-1) - 1) {
+      return this.terrainYAtWorldXZ(x, z);
+    }
+
+    const { vertices, ringStarts, segments } = this.terrainSurface;
+    const angle = (Math.atan2(localZ, localX) * 180 / Math.PI + 360) % 360;
+    const segmentCenter = Math.floor(angle / 360 * segments) % segments;
+    let nearestRing = 0;
+    let nearestDistance = Infinity;
+    for (let ring = 0; ring < TERRAIN_RADII.length; ring += 1) {
+      const distance = Math.abs(TERRAIN_RADII[ring] - radius);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestRing = ring;
+      }
+    }
+
+    const triangleHeight = (a, b, c) => {
+      const denominator = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+      if (Math.abs(denominator) < 1e-8) return null;
+      const u = ((b[2] - c[2]) * (localX - c[0]) + (c[0] - b[0]) * (localZ - c[2])) / denominator;
+      const v = ((c[2] - a[2]) * (localX - c[0]) + (a[0] - c[0]) * (localZ - c[2])) / denominator;
+      const w = 1 - u - v;
+      if (u < -1e-5 || v < -1e-5 || w < -1e-5) return null;
+      return u * a[1] + v * b[1] + w * c[1];
+    };
+    const vertexAt = (ring, segment) => vertices[ringStarts[ring] + ((segment % segments) + segments) % segments];
+
+    for (let ring = Math.max(0, nearestRing - 3); ring <= Math.min(TERRAIN_RADII.length - 2, nearestRing + 2); ring += 1) {
+      for (let offset = -2; offset <= 2; offset += 1) {
+        const segment = (segmentCenter + offset + segments) % segments;
+        const next = (segment + 1) % segments;
+        const outer = vertexAt(ring, segment);
+        const outerNext = vertexAt(ring, next);
+        const inner = vertexAt(ring + 1, segment);
+        const innerNext = vertexAt(ring + 1, next);
+        const candidates = (ring + segment) % 2
+          ? [[outer, inner, innerNext], [outer, innerNext, outerNext]]
+          : [[outer, inner, outerNext], [outerNext, inner, innerNext]];
+        for (const triangle of candidates) {
+          const y = triangleHeight(...triangle);
+          if (y !== null) return y;
+        }
+      }
+    }
+    return this.terrainYAtWorldXZ(x, z);
+  }
+
+  crownVisibleRadiusAt(angle, y) {
+    if (!this.crownSideTriangles?.length) return this.crownRadiusAtHeight(y);
+    const radians = degreesToRadians(angle);
+    const direction = { x: Math.cos(radians), y: 0, z: Math.sin(radians) };
+    const origin = { x: 0, y, z: 0 };
+    let nearest = Infinity;
+    const cross = (a, b) => ({
+      x: a.y * b.z - a.z * b.y,
+      y: a.z * b.x - a.x * b.z,
+      z: a.x * b.y - a.y * b.x
+    });
+    const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+    const subtract = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+
+    for (const triangle of this.crownSideTriangles) {
+      const a = { x: triangle[0][0], y: triangle[0][1], z: triangle[0][2] };
+      const b = { x: triangle[1][0], y: triangle[1][1], z: triangle[1][2] };
+      const c = { x: triangle[2][0], y: triangle[2][1], z: triangle[2][2] };
+      const edge1 = subtract(b, a);
+      const edge2 = subtract(c, a);
+      const h = cross(direction, edge2);
+      const determinant = dot(edge1, h);
+      if (Math.abs(determinant) < 1e-8) continue;
+      const inverse = 1 / determinant;
+      const s = subtract(origin, a);
+      const u = inverse * dot(s, h);
+      if (u < -1e-6 || u > 1 + 1e-6) continue;
+      const q = cross(s, edge1);
+      const v = inverse * dot(direction, q);
+      if (v < -1e-6 || u + v > 1 + 1e-6) continue;
+      const distance = inverse * dot(edge2, q);
+      if (distance >= 0 && distance < nearest) nearest = distance;
+    }
+    return Number.isFinite(nearest) ? nearest : this.crownRadiusAtHeight(y);
+  }
+
+  ensureRockCoreContact(position, size, quaternion, form, options = {}) {
+    const grounded = { ...position };
+    const externalSupport = ['map-editor', 'satellite-island'].includes(options.supportKind);
+    if (this.authoredTerrainGroundQuery && !externalSupport) {
+      const authoredGround = this.authoredGroundAtWorldXZ(position.x, position.z, { minimumNormalY: .08 });
+      if (!authoredGround || authoredGround.y < OCEAN_SURFACE_Y - .08) {
+        return { position: grounded, support: { supported: false, contactCount: 0, adjustment: 0 }, exposure: null };
+      }
+      // Keep every deterministic X/Z seed and its intended height above the former ground,
+      // but rebase that offset onto the authored mesh before exact hull-support sampling.
+      grounded.y += authoredGround.y - this.terrainYAtWorldXZ(position.x, position.z);
+    }
+    if (options.solid === false || options.ensureCoreContact === false) {
+      return { position: grounded, support: { supported: true, contactCount: 0 }, exposure: null };
+    }
+    const rotate = (x, y, z) => {
+      const qx = quaternion.x; const qy = quaternion.y; const qz = quaternion.z; const qw = quaternion.w;
+      const tx = 2 * (qy * z - qz * y);
+      const ty = 2 * (qz * x - qx * z);
+      const tz = 2 * (qx * y - qy * x);
+      return {
+        x: x + qw * tx + (qy * tz - qz * ty),
+        y: y + qw * ty + (qz * tx - qx * tz),
+        z: z + qw * tz + (qx * ty - qy * tx)
+      };
+    };
+    // These are the exact final-scale/final-rotation hull vertices used by the convex
+    // collider. Grounding therefore evaluates the same transformed rock the player sees.
+    const localVertices = form.hull.map((vertex) => rotate(
+      vertex[0] * size.x, vertex[1] * size.y, vertex[2] * size.z
+    ));
+    const verticalSpan = Math.max(...localVertices.map((vertex) => vertex.y))
+      - Math.min(...localVertices.map((vertex) => vertex.y));
+    const centerX = position.x - MOUNTAIN_CENTER.x;
+    const centerZ = position.z - MOUNTAIN_CENTER.z;
+    const centerRadius = Math.max(.0001, Math.hypot(centerX, centerZ));
+    const radialUnit = { x: centerX / centerRadius, z: centerZ / centerRadius };
+    const radialProjections = localVertices.map((vertex) => vertex.x * radialUnit.x + vertex.z * radialUnit.z);
+    const radialSpan = Math.max(...radialProjections) - Math.min(...radialProjections);
+
+    const usingCrownShell = !this.authoredTerrainGroundQuery
+      && Boolean(this.crownSideTriangles?.length) && position.y >= MAP_EDITOR_CROWN_BASE_HEIGHT - 3;
+    const desiredOverlap = usingCrownShell
+      ? clamp(radialSpan * .28, .32, 2.6)
+      : clamp(Math.min(size.x, size.y, size.z) * .14 + verticalSpan * .015, .2, .82);
+
+    const crownGapsAt = (candidate) => localVertices.flatMap((vertex) => {
+      const worldY = candidate.y + vertex.y;
+      if (worldY < MAP_EDITOR_CROWN_BASE_HEIGHT - 4 || worldY > SUMMIT_HEIGHT + 1.5) return [];
+      const worldX = candidate.x + vertex.x;
+      const worldZ = candidate.z + vertex.z;
+      let angle = Math.atan2(worldZ - MOUNTAIN_CENTER.z, worldX - MOUNTAIN_CENTER.x) * 180 / Math.PI;
+      if (angle < 0) angle += 360;
+      const actualShellRadius = this.crownVisibleRadiusAt(angle, worldY);
+      return [Math.hypot(worldX - MOUNTAIN_CENTER.x, worldZ - MOUNTAIN_CENTER.z) - actualShellRadius];
+    });
+    const terrainClearancesAt = (candidate) => localVertices.flatMap((vertex) => {
+      const worldX = candidate.x + vertex.x;
+      const worldY = candidate.y + vertex.y;
+      const worldZ = candidate.z + vertex.z;
+      const terrainY = this.visibleTerrainYAtWorldXZ(worldX, worldZ);
+      return Number.isFinite(terrainY) ? [worldY - terrainY] : [];
+    });
+    const exposureFrom = (clearances) => ({
+      maximum: Math.max(...clearances),
+      visibleFraction: clearances.filter((clearance) => clearance > .06).length / Math.max(1, clearances.length)
+    });
+
+    if (usingCrownShell) {
+      let support = supportAdjustment(crownGapsAt(grounded), desiredOverlap, 3);
+      for (let attempt = 0; attempt < 5 && !support.supported; attempt += 1) {
+        const adjustment = Math.max(support.adjustment, desiredOverlap * .28);
+        const currentX = grounded.x - MOUNTAIN_CENTER.x;
+        const currentZ = grounded.z - MOUNTAIN_CENTER.z;
+        const currentRadius = Math.max(.0001, Math.hypot(currentX, currentZ));
+        grounded.x -= currentX / currentRadius * adjustment;
+        grounded.z -= currentZ / currentRadius * adjustment;
+        support = supportAdjustment(crownGapsAt(grounded), desiredOverlap, 3);
+      }
+      return { position: grounded, support, exposure: exposureFrom(crownGapsAt(grounded)) };
+    }
+
+    const initialClearances = terrainClearancesAt(grounded);
+    if (this.authoredTerrainGroundQuery && initialClearances.length < 3) {
+      return { position: grounded, support: { supported: false, contactCount: initialClearances.length, adjustment: 0 }, exposure: null };
+    }
+    let support = supportAdjustment(initialClearances, desiredOverlap, 3);
+    for (let attempt = 0; attempt < 4 && !support.supported; attempt += 1) {
+      grounded.y -= Math.max(support.adjustment, desiredOverlap * .22);
+      support = supportAdjustment(terrainClearancesAt(grounded), desiredOverlap, 3);
+    }
+    return { position: grounded, support, exposure: exposureFrom(terrainClearancesAt(grounded)) };
+  }
+
+  addNaturalRock(name, position, size, material, rotation = {}, options = {}) {
+    const eligibleForms = options.formKind
+      ? this.fracturedRockForms.filter((candidate) => candidate.kind === options.formKind)
+      : this.fracturedRockForms;
+    const pool = eligibleForms.length ? eligibleForms : this.fracturedRockForms;
+    const form = pool[stableNameHash(name) % pool.length];
+    const quaternion = new pc.Quat().setFromEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+    const placement = this.ensureRockCoreContact(position, size, quaternion, form, options);
+    const groundedPosition = placement.position;
+    if ((options.solid !== false || (this.authoredTerrainGroundQuery
+      && !['map-editor', 'satellite-island'].includes(options.supportKind))) && !placement.support.supported) {
+      this.rejectedRocks.push(name);
+      return null;
+    }
+    if (options.solid !== false && !options.allowDeepEmbed && placement.exposure
+      && (placement.exposure.maximum < .14 || placement.exposure.visibleFraction < .1)) {
+      this.rejectedRocks.push(`${name} (buried)`);
+      return null;
+    }
+    if (options.solid !== false && !options.allowRockOverlap) {
+      const candidateRadius = Math.hypot(size.x, size.y, size.z) * .5;
+      const swallowed = this.rockPlacements.some((rock) => {
+        const existingRadius = Math.hypot(rock.size.x, rock.size.y, rock.size.z) * .5;
+        if (candidateRadius > existingRadius * 1.08) return false;
+        const distance = Math.hypot(
+          groundedPosition.x - rock.position.x,
+          groundedPosition.y - rock.position.y,
+          groundedPosition.z - rock.position.z
+        );
+        return distance + candidateRadius * .9 < existingRadius * .98;
+      });
+      if (swallowed) {
+        this.rejectedRocks.push(`${name} (inside rock)`);
+        return null;
+      }
+    }
+    const entity = new pc.Entity(name);
+    entity.rockId = createStableRockId(name, groundedPosition);
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(form.mesh, this.getRockMaterial(material, name, groundedPosition), entity)];
+    entity.render.castShadows = options.castShadows ?? false;
+    entity.setPosition(groundedPosition.x, groundedPosition.y, groundedPosition.z);
+    entity.setLocalScale(size.x, size.y, size.z);
+    entity.setEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+    this.buildTarget.addChild(entity);
+    if (options.solid === false) return entity;
+
+    const useRoundedProxy = options.collisionProxy === ROCK_COLLISION_PROXY_CONFIG.kind;
+    const points = new Float32Array(form.hull.flatMap((vertex) => [
+      vertex[0] * size.x,
+      vertex[1] * size.y,
+      vertex[2] * size.z
+    ]));
+    const proxyBorder = Math.min(size.x, size.y, size.z) * ROCK_COLLISION_PROXY_CONFIG.borderScale;
+    const colliderDesc = useRoundedProxy
+      ? this.RAPIER.ColliderDesc.roundCuboid(
+          Math.max(.05, size.x * ROCK_COLLISION_PROXY_CONFIG.halfExtentScale - proxyBorder),
+          Math.max(.05, size.y * ROCK_COLLISION_PROXY_CONFIG.halfExtentScale - proxyBorder),
+          Math.max(.05, size.z * ROCK_COLLISION_PROXY_CONFIG.halfExtentScale - proxyBorder),
+          proxyBorder
+        )
+      : this.RAPIER.ColliderDesc.convexHull(points);
+    if (!colliderDesc) {
+      entity.destroy();
+      this.rejectedRocks.push(`${name} (invalid collider hull)`);
+      return null;
+    }
+    colliderDesc
+      .setTranslation(groundedPosition.x, groundedPosition.y, groundedPosition.z)
+      .setRotation({ x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w })
+      .setFriction(.9)
+      .setRestitution(0);
+    entity.physicsCollider = this.physicsWorld.createCollider(colliderDesc);
+    let climbMaterial = options.climbMaterial;
+    if (climbMaterial === undefined && options.climbable !== false && options.decorative !== true) {
+      if (material === this.materials.unclimbable) climbMaterial = 'ungrippable';
+      else if (material === this.materials.roughRock || material === this.materials.holdRough) climbMaterial = 'rough';
+      else if (material === this.materials.smoothRock || material === this.materials.wetRock || material === this.materials.holdSmooth) climbMaterial = 'smooth';
+      else if (material === this.materials.ice || material === this.materials.holdIce) climbMaterial = 'ice';
+      else climbMaterial = 'normal';
+    }
+    if (climbMaterial) this.registerClimbSurface(entity, entity.physicsCollider, climbMaterial);
+    const localX = groundedPosition.x - MOUNTAIN_CENTER.x;
+    const localZ = groundedPosition.z - MOUNTAIN_CENTER.z;
+    let angle = Math.atan2(localZ, localX) * 180 / Math.PI;
+    if (angle < 0) angle += 360;
+    this.rockPlacements.push({
+      name,
+      rockId: entity.rockId,
+      entity,
+      position: { ...groundedPosition },
+      size: { ...size },
+      radius: Math.hypot(localX, localZ),
+      angle,
+      crown: groundedPosition.y >= MAP_EDITOR_CROWN_BASE_HEIGHT - 3,
+      supported: placement.support.supported,
+      contactCount: placement.support.contactCount,
+      maximumExposure: placement.exposure?.maximum ?? null,
+      visibleFraction: placement.exposure?.visibleFraction ?? null,
+      supportKind: options.supportKind ?? (useRoundedProxy ? 'mountain-core-rounded-proxy' : 'mountain-core'),
+      climbMaterial: climbMaterial ?? null,
+      grippable: Boolean(this.climbSurfaces.get(entity.physicsCollider.handle))
+    });
+    return entity;
+  }
+
+  addRadialRock(name, angle, radius, y, size, material, options = {}) {
+    const position = this.point(angle, radius, y, options.tangentOffset ?? 0);
+    const rotation = {
+      x: options.pitch ?? 0,
+      y: inwardYaw(angle) + (options.yawOffset ?? 0),
+      z: options.roll ?? 0
+    };
+    return this.addNaturalRock(name, position, size, material, rotation, options);
+  }
+
+  addMountainBoulder(name, position, scale, material = this.materials.rock, options = {}) {
+    const rotation = {
+      x: ((position.x * 17) % 30) - 8,
+      y: (position.z * 23) % 180,
+      z: ((position.z * 11) % 26) - 7
+    };
+    return this.addNaturalRock(name, position, scale, material, rotation, options);
+  }
+
+  materialForClimb(type) {
+    if (type === 'rough') return this.materials.roughRock;
+    if (type === 'smooth') return this.materials.smoothRock;
+    if (type === 'ice') return this.materials.ice;
+    if (type === 'ungrippable') return this.materials.unclimbable;
+    return this.materials.normalRock;
+  }
+
+  holdMaterial(type) {
+    return this.materials[`hold${type[0].toUpperCase()}${type.slice(1)}`] ?? this.materials.holdNormal;
+  }
+
+  addClimbFace(name, angle, radius, height, width, type, tangentOffset = 0, tilt = 0) {
+    const ground = this.terrainY(angle, radius);
+    const bottom = ground - .35;
+    const face = this.addRadialRock(name, angle, radius, bottom + height / 2,
+      { x: width, y: height, z: 1.55 }, this.materialForClimb(type), {
+        climbMaterial: type,
+        tangentOffset,
+        pitch: tilt
+      });
+    const counts = { rough: 5, normal: 4, smooth: 2, ice: 4 };
+    const count = counts[type] ?? 3;
+    for (let index = 0; index < count; index += 1) {
+      const row = Math.floor(index / 2);
+      const side = index % 2 ? 1 : -1;
+      const holdY = bottom + height * (.18 + (row + .45) / (Math.ceil(count / 2) + .35) * .68);
+      const holdWidth = type === 'rough' ? .72 : type === 'normal' ? .5 : .36;
+      this.addRadialRock(`${name} readable hold ${index + 1}`, angle, radius + .88, holdY,
+        { x: holdWidth, y: type === 'ice' ? .58 : .26, z: type === 'smooth' ? .12 : .3 },
+        this.holdMaterial(type), {
+          tangentOffset: tangentOffset + side * width * (.2 + row * .05),
+          roll: type === 'ice' ? side * 22 : side * 7,
+          solid: false
+        });
+    }
+    this.addRadialRock(`${name} crack`, angle, radius + .9, bottom + height * .5,
+      { x: .18, y: Math.min(2.8, height * .32), z: .08 }, this.materials.rockCrack, {
+        tangentOffset: tangentOffset - width * .13,
+        roll: 11,
+        solid: false
+      });
+    return face;
+  }
+
+  buildWadeableOceanShelf() {
+    // The rendered seabed continues far offshore, but its triangles are joined to the
+    // mountain's triangles in one Rapier collider below. A shared boundary with one support
+    // owner removes the alternating-contact jitter that two overlapping floor colliders made.
+    const innerRadius = TERRAIN_OUTER_RADIUS;
+    const waterEdge = OCEAN_WATER_INNER_RADIUS;
+    const outerRadius = OCEAN_FLOOR_OUTER_RADIUS;
+    // A dense shared shoreline profile avoids a capsule-catching chord between the old
+    // 210.5 m seam and the 221 m water edge. It is still the same continuous collider;
+    // there is no new safety wall, and the deep-ocean hazard remains much farther out.
+    const authoredBoundary = this.authoredStoneveilCoreActive
+      ? getBakedTerrainBoundarySamples(MAP_EDITOR_PATCH, MOUNTAIN_CENTER, TERRAIN_SEGMENTS)
+      : null;
+    const authoredJoinRadius = authoredBoundary?.maximumRadius ?? innerRadius;
+    const ringRadii = createOceanShelfRingRadii(outerRadius)
+      .filter((radius, index) => index === 0 || radius > authoredJoinRadius + .5);
+    ringRadii[0] = authoredJoinRadius;
+    const vertices = [];
+    const ringStarts = [];
+    const segments = TERRAIN_SEGMENTS;
+
+    for (let ringIndex = 0; ringIndex < ringRadii.length; ringIndex += 1) {
+      ringStarts.push(vertices.length);
+      const radius = ringRadii[ringIndex];
+      const outward = clamp((radius - waterEdge) / Math.max(.001, outerRadius - waterEdge), 0, 1);
+      for (let segment = 0; segment < segments; segment += 1) {
+        const angle = segment * 360 / segments;
+        const radians = degreesToRadians(angle);
+        const boundaryPoint = ringIndex === 0 ? authoredBoundary?.samples?.[segment] : null;
+        const terrainJoin = boundaryPoint?.[1] ?? terrainHeightAt(angle, innerRadius);
+        const shorelineY = Math.min(-.28, terrainJoin);
+        const floorY = ringIndex === 0
+          ? terrainJoin
+          : oceanFloorHeightAt(radius, shorelineY)
+            + Math.sin(degreesToRadians(angle * 4 + radius * .75)) * .06 * outward;
+        vertices.push(boundaryPoint
+          ? [boundaryPoint[0], floorY, boundaryPoint[2]]
+          : [Math.cos(radians) * radius, floorY, Math.sin(radians) * radius]);
+      }
+    }
+
+    const triangles = [];
+    for (let ring = 0; ring < ringRadii.length - 1; ring += 1) {
+      for (let segment = 0; segment < segments; segment += 1) {
+        const next = (segment + 1) % segments;
+        const outer = ringStarts[ring] + segment;
+        const outerNext = ringStarts[ring] + next;
+        const inner = ringStarts[ring + 1] + segment;
+        const innerNext = ringStarts[ring + 1] + next;
+        // ringRadii grow outward, so wind opposite the mountain mesh to keep normals upward.
+        triangles.push([outer, outerNext, inner], [outerNext, innerNext, inner]);
+      }
+    }
+    const geometry = new pc.Geometry();
+    geometry.positions = [];
+    geometry.indices = [];
+    for (const triangle of triangles) {
+      for (const vertexIndex of triangle) {
+        geometry.positions.push(...vertices[vertexIndex]);
+        geometry.indices.push(geometry.indices.length);
+      }
+    }
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity('Extended walkable ocean floor');
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.sand, entity)];
+    entity.render.castShadows = false;
+    entity.setPosition(MOUNTAIN_CENTER.x, 0, MOUNTAIN_CENTER.z);
+    this.buildTarget.addChild(entity);
+
+    this.oceanFloorSurface = { vertices, triangles };
+    this.oceanWadingShelf = entity;
+  }
+
+  buildOceanAndContinuousTerrain() {
+    // The old transparent cylinder was a full 760 m disk, so it remained rendered under
+    // the entire island and fought the beach/shore in the transparency pass. Render the
+    // same offshore water as a real annulus whose dry center matches the fishing/ecology
+    // boundary. It no longer exists underneath the mountain at all.
+    const waterVertices = [];
+    const waterTriangles = [];
+    for (let segment = 0; segment < TERRAIN_SEGMENTS; segment += 1) {
+      const radians = degreesToRadians(segment * 360 / TERRAIN_SEGMENTS);
+      for (const radius of [OCEAN_VISUAL_OUTER_RADIUS, OCEAN_WATER_INNER_RADIUS]) {
+        waterVertices.push([Math.cos(radians) * radius, 0, Math.sin(radians) * radius]);
+      }
+    }
+    for (let segment = 0; segment < TERRAIN_SEGMENTS; segment += 1) {
+      const next = (segment + 1) % TERRAIN_SEGMENTS;
+      const outer = segment * 2;
+      const inner = outer + 1;
+      const outerNext = next * 2;
+      const innerNext = outerNext + 1;
+      waterTriangles.push([outer, inner, outerNext], [outerNext, inner, innerNext]);
+    }
+    const waterGeometry = new pc.Geometry();
+    waterGeometry.positions = waterVertices.flat();
+    waterGeometry.indices = waterTriangles.flat();
+    waterGeometry.calculateNormals();
+    const waterMesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, waterGeometry);
+    this.ocean = new pc.Entity('Outer ocean annular surface');
+    this.ocean.addComponent('render');
+    this.ocean.render.meshInstances = [new pc.MeshInstance(waterMesh, this.materials.deepWater, this.ocean)];
+    this.ocean.render.castShadows = false;
+    this.ocean.setPosition(MOUNTAIN_CENTER.x, OCEAN_SURFACE_Y - .06, MOUNTAIN_CENTER.z);
+    this.buildTarget.addChild(this.ocean);
+    this.buildWadeableOceanShelf();
+
+    // A frozen editor mesh is the production Stoneveil core. Keep the procedural height
+    // function available to the still-procedural rock/decor placement pass, but do not
+    // construct its obsolete visible mesh or combined collider beneath the authored core.
+    if (this.authoredStoneveilCoreActive) {
+      this.terrainSurface = null;
+      return;
+    }
+
+    const vertices = [];
+    const sourceVertices = [];
+    const ringStarts = [];
+    for (let ringIndex = 0; ringIndex < TERRAIN_RADII.length; ringIndex += 1) {
+      ringStarts.push(vertices.length);
+      const nominalRadius = TERRAIN_RADII[ringIndex];
+      for (let segment = 0; segment < TERRAIN_SEGMENTS; segment += 1) {
+        const angle = segment * 360 / TERRAIN_SEGMENTS;
+        const boundaryFade = ringIndex < 4 ? (4 - ringIndex) / 4 : 0;
+        const jitter = ringIndex === 0
+          ? 0
+          : Math.sin(degreesToRadians(segment * 37 + ringIndex * 19)) * (.55 + boundaryFade * .35);
+        const radius = nominalRadius + jitter;
+        const y = terrainHeightAt(angle, radius)
+          + (ringIndex > 3 ? Math.sin(degreesToRadians(segment * 51 + ringIndex * 23)) * .11 : 0);
+        const radians = degreesToRadians(angle);
+        const source = [Math.cos(radians) * radius, y, Math.sin(radians) * radius];
+        const deformed = deformCaveCoreVertex(source[0], source[1], source[2]);
+        sourceVertices.push(source);
+        vertices.push([deformed.x, deformed.y, deformed.z]);
+      }
+    }
+
+    const triangles = [];
+    for (let ring = 0; ring < TERRAIN_RADII.length - 1; ring += 1) {
+      for (let segment = 0; segment < TERRAIN_SEGMENTS; segment += 1) {
+        const next = (segment + 1) % TERRAIN_SEGMENTS;
+        const outer = ringStarts[ring] + segment;
+        const outerNext = ringStarts[ring] + next;
+        const inner = ringStarts[ring + 1] + segment;
+        const innerNext = ringStarts[ring + 1] + next;
+        // Winding is intentionally upward-facing for the continuous surface.
+        if ((ring + segment) % 2) {
+          triangles.push([outer, inner, innerNext], [outer, innerNext, outerNext]);
+        } else {
+          triangles.push([outer, inner, outerNext], [outerNext, inner, innerNext]);
+        }
+      }
+    }
+    const visibleTriangles = triangles.filter((triangle) => {
+      const a = sourceVertices[triangle[0]];
+      const b = sourceVertices[triangle[1]];
+      const c = sourceVertices[triangle[2]];
+      return !triangleIntersectsCaveEntrance(a, b, c)
+        && !terrainTriangleIsCut(a, b, c, MOUNTAIN_CENTER, MAP_EDITOR_PATCH);
+    });
+
+    const geometry = new pc.Geometry();
+    geometry.positions = [];
+    geometry.indices = [];
+    for (const triangle of visibleTriangles) {
+      for (const vertexIndex of triangle) {
+        geometry.positions.push(...vertices[vertexIndex]);
+        geometry.indices.push(geometry.indices.length);
+      }
+    }
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity('Continuous irregular mountain body');
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.alpine, entity)];
+    entity.render.castShadows = false;
+    entity.setPosition(MOUNTAIN_CENTER.x, 0, MOUNTAIN_CENTER.z);
+    this.buildTarget.addChild(entity);
+
+    const seabedVertices = this.oceanFloorSurface?.vertices ?? [];
+    const seabedTriangles = this.oceanFloorSurface?.triangles ?? [];
+    const collisionVertices = [...vertices, ...seabedVertices.slice(TERRAIN_SEGMENTS)];
+    const collisionTriangles = [
+      ...visibleTriangles,
+      ...seabedTriangles.map((triangle) => triangle.map((index) => (
+        index < TERRAIN_SEGMENTS
+          ? ringStarts[0] + index
+          : vertices.length + index - TERRAIN_SEGMENTS
+      )))
+    ];
+    const colliderDesc = this.RAPIER.ColliderDesc.trimesh(
+      new Float32Array(collisionVertices.flat()),
+      new Uint32Array(collisionTriangles.flat())
+    )
+      .setTranslation(MOUNTAIN_CENTER.x, 0, MOUNTAIN_CENTER.z)
+      .setFriction(.94)
+      .setRestitution(0);
+    entity.physicsCollider = this.physicsWorld.createCollider(colliderDesc);
+    // Keep the exact rendered/collision mesh available for rock grounding. The authored
+    // terrain function is only the source used to build this triangulation; radial and
+    // vertical vertex jitter means it is not itself the final visible surface.
+    this.terrainSurface = { vertices, ringStarts, segments: TERRAIN_SEGMENTS };
+    // Deliberately NOT registered as a climb surface. Off-route mountain faces are
+    // terrain, not a universal Grip shortcut; authored route rocks carry climb metadata.
+  }
+
+  buildStarts() {
+    const floorMaterials = [
+      this.materials.sand,
+      this.materials.coast,
+      this.materials.forestFloor,
+      this.materials.wetRock,
+      this.materials.coast,
+      this.materials.sand
+    ];
+    START_LOCATIONS.forEach((start, index) => {
+      // Broad, low faceted pads are embedded through the coastal mesh rather than floating above it.
+      this.addRadialRock(`${start.label} safe start shelf`, start.angle, 204, -.12,
+        { x: 15, y: .55, z: 10 }, floorMaterials[index], {
+          tangentOffset: 0,
+          pitch: index % 2 ? 2 : -2,
+          roll: index % 3 ? 1 : -1
+        });
+      this.addRadialRock(`${start.label} inward trail marker`, start.angle, 198, .35,
+        { x: 1.8, y: 1.15, z: 1.8 }, this.materials.flowers, {
+          tangentOffset: index % 2 ? -5.5 : 5.5,
+          solid: false
+        });
+      for (let stone = 0; stone < 3; stone += 1) {
+        const point = this.point(start.angle, 208 + stone * 1.1, .05 + stone * .17, (stone - 1) * 4.4);
+        this.addMountainBoulder(`${start.label} shore marker ${stone + 1}`, point,
+          { x: 1.6 + stone * .35, y: 1.0 + (stone % 2) * .42, z: 1.8 },
+          index % 2 ? this.materials.coast : this.materials.waterEdge);
+      }
+    });
+  }
+
+  buildRouteFamily(route) {
+    // Retained as a compatibility helper for older tooling. V2.6 does not call this;
+    // ascent geometry is generated by buildContinuousClimbWeb().
+    route.features?.forEach((feature, index) => this.buildRouteFeature(route, feature, index));
+  }
+
+  buildContinuousClimbWeb() {
+    // Route density now follows circumference instead of cloning one angle list through
+    // every altitude: 50 lower, 42 middle, 34 alpine. Each layer has a different phase
+    // and deterministic jitter, so lower lines split/recombine into a broad web instead
+    // of continuing upward as obvious full-height radial lanes.
+    CLIMB_WEB_LAYERS.forEach((layer) => {
+      layer.angles.forEach((baseAngle, columnIndex) => {
+        this.buildEscarpmentWebPatch(baseAngle, layer.gateIndex, columnIndex);
+      });
+    });
+    this.buildShelfScrambleWeb();
+  }
+
+  buildEscarpmentWebPatch(baseAngle, gateIndex, columnIndex) {
+    const gate = ESCARPMENTS[gateIndex];
+    const angleDrift = Math.sin(degreesToRadians(baseAngle * 2.1 + gateIndex * 79)) * 2.6
+      + Math.sin(degreesToRadians(baseAngle * 5.3 - gateIndex * 31)) * 0.8;
+    const angle = (baseAngle + angleDrift + 360) % 360;
+    const difficulty = climbDifficultyAt(angle, gateIndex);
+    const centerRadius = escarpmentRadiusAt(gate, angle);
+    const outerRadius = centerRadius + gate.width * .79 + 2.4;
+    const innerRadius = centerRadius - gate.width * .79 - 2.5;
+    const outerY = this.terrainY(angle, outerRadius);
+    const innerY = this.terrainY(angle, innerRadius);
+    const stageCount = gateIndex === 0 ? 12 : gateIndex === 1 ? 13 : 14;
+    const routeSide = ((columnIndex + gateIndex) % 2) ? 1 : -1;
+    const lateralScale = 3.0 + difficulty * 1.8;
+    const tangentPattern = [0, -1.0, -2.0, -2.15, -1.15, .15, 1.45, 2.3, 2.05, .8, -.55, -1.8, -2.25, -.75];
+    const angularPattern = [0, .35, .9, 1.45, 1.75, 1.35, .65, -.15, -.85, -1.5, -1.75, -1.1, -.35, .45];
+    // Two near-flat progress intervals force a traverse before the next meaningful rise.
+    const verticalPattern = [.045, .13, .21, .27, .31, .405, .5, .555, .61, .705, .79, .855, .925, .985];
+    const baseTangent = Math.sin(degreesToRadians(baseAngle * 7 + gateIndex * 53)) * 1.4;
+    const label = `${gate.id} open face ${columnIndex + 1}`;
+
+    const entryMaterial = chooseClimbMaterial(gateIndex, angle, -1, columnIndex);
+    const entryPoint = this.point(angle, outerRadius + .15, outerY + .62, baseTangent);
+    this.addMountainBoulder(`${label} entry`, entryPoint,
+      { x: 3.8 - difficulty * .35, y: 1.7 + difficulty * .25, z: 3.15 },
+      this.materialForClimb(entryMaterial), { climbMaterial: entryMaterial, formKind: 'wedge' });
+
+    let lastTangent = baseTangent;
+    let lastAngle = angle;
+    for (let stage = 0; stage < stageCount; stage += 1) {
+      const t = verticalPattern[stage] ?? ((stage + .65) / stageCount);
+      const stageAngle = angle
+        + angularPattern[stage % angularPattern.length] * routeSide * (1.05 + difficulty * .38)
+        + Math.sin((stage + columnIndex) * 1.19) * .18;
+      lastAngle = stageAngle;
+      const targetY = lerp(outerY, innerY, t);
+      const radius = this.findRouteRadiusForHeight(stageAngle, outerRadius, innerRadius, targetY);
+      const localGround = this.terrainY(stageAngle, radius);
+      const tangent = baseTangent
+        + tangentPattern[stage % tangentPattern.length] * lateralScale * routeSide
+        + Math.sin((stage + columnIndex) * 1.31) * .5;
+      lastTangent = tangent;
+      const materialType = chooseClimbMaterial(gateIndex, stageAngle, stage, columnIndex,
+        gateIndex === 2 ? .055 : 0);
+      const isTall = ((stage + columnIndex * 2 + gateIndex) % 5 === 1)
+        || (gateIndex >= 1 && stage === 5 && columnIndex % 3 !== 0);
+      const formSequence = [
+        'spire', 'blade', 'wedge', 'lean', 'needle', 'crooked', 'shelfblade',
+        'column', 'hook', 'shard', 'knuckle'
+      ];
+      const formKind = isTall ? (((stage + columnIndex) % 2) ? 'column' : 'spire')
+        : formSequence[(stage + columnIndex + gateIndex * 2) % formSequence.length];
+      const hardShrink = difficulty * .42;
+      const height = isTall
+        ? 5.6 + gateIndex * .6 + difficulty * 1.45 + (stage % 2) * .75
+        : 2.35 + (stage % 4) * .36 + difficulty * .4;
+      const width = (isTall ? 2.7 : 3.35) - hardShrink + ((stage + 1) % 2) * .3;
+      const depth = (isTall ? 2.05 : 2.65) - difficulty * .18 + (stage % 2) * .28;
+      // Route pieces are oriented along the mountainside rather than standing like
+      // fence posts. Their centers sit on/in the terrain so every piece intersects the
+      // core slightly instead of visibly floating off the face.
+      const slopeLean = isTall
+        ? -(18 + gateIndex * 2.5 + difficulty * 4.5)
+        : -(7 + gateIndex * 1.5 + difficulty * 2.5);
+      this.addRadialRock(`${label} climb rock ${stage + 1}`, stageAngle, radius - .18,
+        localGround + height * (isTall ? .34 : .28),
+        { x: width, y: height, z: depth }, this.materialForClimb(materialType), {
+          tangentOffset: tangent,
+          pitch: slopeLean,
+          roll: routeSide * ((stage % 3) - 1) * 5,
+          climbMaterial: materialType,
+          formKind
+        });
+
+      // Instead of a branch that simply points upward, add a short same-height traverse.
+      // The next vertical gain is offset from it, so the player has to move laterally.
+      if (stage === 2 || stage === 5 || stage === 8 || (gateIndex >= 1 && stage === 11)) {
+        const branchSide = ((columnIndex + stage + gateIndex) % 2) ? 1 : -1;
+        for (let branchStep = 0; branchStep < 2; branchStep += 1) {
+          const branchOffset = branchSide * (2.7 + branchStep * 2.25 + difficulty * .45);
+          const branchAngle = stageAngle + branchSide * (.28 + branchStep * .3);
+          const branchType = chooseClimbMaterial(gateIndex, branchAngle, stage,
+            columnIndex + 91 + branchStep, gateIndex === 2 ? .06 : 0);
+          this.addRadialRock(`${label} lateral traverse ${stage + 1}-${branchStep + 1}`, branchAngle,
+            radius - .24 - .08 * branchStep, localGround + .72 + branchStep * .16,
+            { x: 2.55 - difficulty * .16, y: 2.15 + difficulty * .45, z: 2.2 },
+            this.materialForClimb(branchType), {
+              tangentOffset: tangent + branchOffset,
+              pitch: -(8 + gateIndex * 2),
+              roll: branchSide * 7,
+              climbMaterial: branchType,
+              formKind: branchStep ? 'shelfblade' : 'wedge'
+            });
+        }
+      }
+
+      // Real stamina-reset platforms are intentionally uncommon. Most climb rocks have
+      // pointed/slanted tops, so stopping on top is not the default rhythm of every line.
+      const addRest = stage === 4
+        && columnIndex % (gateIndex === 0 ? 3 : 4) === (gateIndex % (gateIndex === 0 ? 3 : 4))
+        && difficulty < (gateIndex === 2 ? .55 : .72);
+      if (addRest) {
+        const ledgeType = difficulty > .6 ? 'normal' : 'rough';
+        this.addRadialRock(`${label} rare rest ledge`, stageAngle, radius - .35,
+          localGround + .82,
+          { x: 3.2 - difficulty * .3, y: .62, z: 2.05 }, this.materialForClimb(ledgeType), {
+            tangentOffset: tangent + routeSide * .75,
+            pitch: 2,
+            roll: routeSide * -4,
+            climbMaterial: ledgeType,
+            formKind: 'chunk'
+          });
+      }
+
+      if (gateIndex >= 1 && difficulty > .58 && stage === (gateIndex === 2 ? 5 : 4)
+          && stableUnit(`${label}:blank`) < .58) {
+        const side = columnIndex % 2 ? 1 : -1;
+        this.addRadialRock(`${label} hard blank face`, stageAngle, radius + .25,
+          localGround + 2.25,
+          { x: 2.75, y: 4.8 + difficulty * 1.1, z: 1.7 }, this.materialForClimb('ungrippable'), {
+            tangentOffset: tangent + side * 4.2,
+            pitch: -7,
+            roll: side * 8,
+            climbMaterial: 'ungrippable',
+            formKind: 'blade'
+          });
+      }
+    }
+
+    const exitRadius = innerRadius - .45;
+    const exitGround = this.terrainY(lastAngle, exitRadius);
+    const exitType = difficulty > .72 ? 'normal' : 'rough';
+    this.addRadialRock(`${label} upper exit`, lastAngle, exitRadius, exitGround + .43,
+      { x: 3.75 - difficulty * .32, y: .76, z: 2.6 }, this.materialForClimb(exitType), {
+        tangentOffset: lastTangent * .65,
+        pitch: 3,
+        roll: routeSide * -5,
+        climbMaterial: exitType,
+        formKind: 'chunk'
+      });
+  }
+
+  buildShelfScrambleWeb() {
+    // Shelf formations are deliberately lateral: they invite traversing across the face
+    // and changing lines instead of reinforcing a stack of vertical cylinders.
+    const bands = [
+      { radius: 166, level: 0, phase: 2 },
+      { radius: 122, level: 1, phase: 7 },
+      { radius: 83, level: 2, phase: 3 },
+      { radius: 51, level: 2, phase: 10 }
+    ];
+    const lateralForms = ['wedge', 'blade', 'spire', 'lean', 'hook', 'knuckle'];
+    bands.forEach((band, bandIndex) => {
+      for (let baseAngle = band.phase; baseAngle < 360 + band.phase; baseAngle += 9) {
+        const angle = baseAngle % 360;
+        const difficulty = climbDifficultyAt(angle, band.level);
+        const side = ((Math.round(baseAngle / 9) + bandIndex) % 2) ? 1 : -1;
+        for (let step = 0; step < 4; step += 1) {
+          const stepAngle = angle + side * (step - 1) * (.38 + difficulty * .14);
+          const radius = band.radius - step * (.7 + difficulty * .2);
+          const ground = this.terrainY(stepAngle, radius);
+          const tangent = side * ((step - 1.5) * (2.15 + difficulty * .5))
+            + Math.sin(degreesToRadians(angle * 4 + bandIndex * 47)) * .7;
+          const type = chooseClimbMaterial(band.level, stepAngle, step, bandIndex + 211,
+            band.level >= 2 ? .04 : 0);
+          const tall = step === 1 && ((Math.round(angle) + bandIndex) % 4 === 0);
+          this.addRadialRock(`shelf traverse ${bandIndex + 1}-${Math.round(angle)}-${step + 1}`,
+            stepAngle, radius - .16, ground + (tall ? 1.45 : .68) + difficulty * .12,
+            { x: tall ? 2.35 : 2.7 - difficulty * .2, y: tall ? 5.1 : 1.9 + difficulty * .42, z: 2.18 },
+            this.materialForClimb(type), {
+              tangentOffset: tangent,
+              pitch: tall ? -(20 + difficulty * 5) : -7,
+              roll: side * (step % 2 ? 6 : -5),
+              climbMaterial: type,
+              formKind: tall ? ((bandIndex + step) % 2 ? 'crooked' : 'needle')
+                : lateralForms[(step + bandIndex) % lateralForms.length]
+            });
+        }
+        if (band.level >= 2 && difficulty > .68 && stableUnit(`shelf:${bandIndex}:${angle}`) < .42) {
+          this.addRadialRock(`shelf web hard slab ${bandIndex + 1}-${Math.round(angle)}`, angle,
+            band.radius - 1.4, this.terrainY(angle, band.radius - 1.4) + 2.05,
+            { x: 3.1, y: 4.5, z: 1.45 }, this.materialForClimb('smooth'), {
+              tangentOffset: side * (3.0 + difficulty * .5),
+              pitch: -9,
+              roll: side * 11,
+              climbMaterial: 'smooth',
+              formKind: 'blade'
+            });
+        }
+      }
+    });
+  }
+
+  findRouteRadiusForHeight(angle, outerRadius, innerRadius, targetY) {
+    // The escarpment profile is locally monotonic but faceted. A short deterministic
+    // sample is more robust than assuming an analytic inverse, and this runs only once
+    // while constructing the static world.
+    let bestRadius = outerRadius;
+    let bestDelta = Infinity;
+    const samples = 40;
+    for (let sample = 0; sample <= samples; sample += 1) {
+      const t = sample / samples;
+      const radius = lerp(outerRadius, innerRadius, t);
+      const delta = Math.abs(this.terrainY(angle, radius) - targetY);
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        bestRadius = radius;
+      }
+    }
+    return bestRadius;
+  }
+
+  buildEscarpmentScramble(route, feature, prefix, angle, chimneyStyle = false) {
+    const gate = ESCARPMENTS[feature.gateIndex] ?? ESCARPMENTS.reduce((best, candidate) => {
+      const distance = Math.abs(escarpmentRadiusAt(candidate, angle) - feature.radius);
+      return !best || distance < best.distance ? { gate: candidate, distance } : best;
+    }, null)?.gate;
+    if (!gate) return;
+
+    const centerRadius = feature.gateCenterRadius ?? escarpmentRadiusAt(gate, angle);
+    const outerRadius = centerRadius + gate.width * .78 + 2.25;
+    const innerRadius = centerRadius - gate.width * .78 - 2.35;
+    const outerY = this.terrainY(angle, outerRadius);
+    const innerY = this.terrainY(angle, innerRadius);
+    const stageCount = feature.gateIndex === 2 ? 9 : 8;
+    const tangentPattern = [-1.0, .35, 1.15, -.45, -1.25, .55, 1.0, -.25, -1.05];
+    const material = this.materialForClimb(feature.material);
+    const baseTangent = feature.tangent ?? 0;
+
+    const firstT = .4 / (stageCount - .12);
+    const firstTangent = baseTangent
+      + tangentPattern[0] * (chimneyStyle ? 1.15 : 1.65)
+      + route.sway * (firstT - .5) * .8;
+    const entryPoint = this.point(angle, outerRadius + .05, outerY + .72, firstTangent);
+    this.addMountainBoulder(`${prefix} entry stone`, entryPoint,
+      { x: 3.5, y: 2.1, z: 3.1 }, material, { climbMaterial: feature.material });
+
+    let lastTangent = firstTangent;
+    for (let stage = 0; stage < stageCount; stage += 1) {
+      const t = (stage + .4) / (stageCount - .12);
+      const targetY = lerp(outerY, innerY, t);
+      const radius = this.findRouteRadiusForHeight(angle, outerRadius, innerRadius, targetY);
+      const localGround = this.terrainY(angle, radius);
+      const tangent = baseTangent
+        + tangentPattern[stage] * (chimneyStyle ? 1.15 : 1.65)
+        + route.sway * (t - .5) * .8;
+      lastTangent = tangent;
+      const height = 2.9 + ((stage + feature.gateIndex) % 3) * .45 + (feature.gateIndex === 2 ? .15 : 0);
+      const width = 2.75 + ((stage + 1) % 3) * .48;
+      const depth = 2.35 + (stage % 2) * .46;
+      const point = this.point(angle, radius, localGround + height * .28, tangent);
+      this.addMountainBoulder(`${prefix} scramble rock ${stage + 1}`, point,
+        { x: width, y: height, z: depth }, material, { climbMaterial: feature.material });
+
+      if (stage === 2 || stage === 5 || (feature.gateIndex === 2 && stage === 7)) {
+        const ledgeRadius = radius - .42;
+        const ledgeGround = this.terrainY(angle, ledgeRadius);
+        this.addRadialRock(`${prefix} rest ledge ${stage + 1}`, angle, ledgeRadius,
+          Math.max(localGround, ledgeGround) + 1.05,
+          { x: 3.4 + (stage % 2) * .45, y: .68, z: 2.15 }, this.materialForClimb('rough'), {
+            tangentOffset: tangent + route.sway * .72,
+            pitch: 1,
+            roll: route.sway * (stage % 2 ? -5 : 5),
+            climbMaterial: 'rough'
+          });
+      }
+    }
+
+    // Explicitly overlaps the upper shelf so the route cannot strand the player at
+    // the top of a climbable object below the next terrain level.
+    const exitRadius = innerRadius - .35;
+    const exitGround = this.terrainY(angle, exitRadius);
+    this.addRadialRock(`${prefix} upper exit ledge`, angle, exitRadius, exitGround + .48,
+      { x: 4.25, y: .82, z: 3.15 }, this.materialForClimb('rough'), {
+        tangentOffset: lastTangent + route.sway * .18,
+        pitch: 2,
+        roll: route.sway * -4,
+        climbMaterial: 'rough'
+      });
+
+    if (chimneyStyle) {
+      // Broken side fins preserve the chimney identity without recreating two enormous
+      // rectangular walls. Gaps between them expose the actual mountain behind.
+      for (const side of [-1, 1]) {
+        for (let chunk = 0; chunk < 3; chunk += 1) {
+          const t = .2 + chunk * .3;
+          const chunkY = lerp(outerY, innerY, t);
+          const radius = this.findRouteRadiusForHeight(angle, outerRadius, innerRadius, chunkY);
+          const localGround = this.terrainY(angle, radius);
+          const chunkHeight = 3.8 + ((chunk + (side > 0 ? 1 : 0)) % 2) * 1.2;
+          this.addRadialRock(`${prefix} ${side < 0 ? 'west' : 'east'} chimney fin ${chunk + 1}`,
+            angle, radius, localGround + chunkHeight * .34,
+            { x: 2.4, y: chunkHeight, z: 2.8 + chunk * .35 }, material, {
+              tangentOffset: baseTangent + side * (3.0 + chunk * .18),
+              pitch: side * 3,
+              roll: side * -5,
+              climbMaterial: feature.material
+            });
+        }
+      }
+    }
+  }
+
+  buildParkourRun(route, feature, prefix, angle) {
+    const material = this.materialForClimb(feature.material);
+    const count = feature.kind === 'approach' ? 5 : feature.kind === 'ridge' ? 5 : 4;
+    const radialSpan = Math.max(8.5, Math.min(feature.length ?? 13, 14));
+    const spacing = radialSpan / Math.max(1, count - .35);
+    const tangentBase = feature.tangent ?? 0;
+    const tangentPattern = [-1.15, .55, 1.25, -.45, -.95];
+
+    for (let step = 0; step < count; step += 1) {
+      const radius = feature.radius - step * spacing;
+      const ground = this.terrainY(angle, radius);
+      const tangent = tangentBase + tangentPattern[step % tangentPattern.length] * 1.35;
+      if (step % 3 === 1) {
+        this.addRadialRock(`${prefix} parkour ledge ${step + 1}`, angle, radius, ground + .5,
+          { x: 3.25 + (step % 2) * .4, y: .78, z: 2.35 }, material, {
+            tangentOffset: tangent,
+            pitch: 2,
+            roll: route.sway * (step % 2 ? -5 : 5),
+            climbMaterial: feature.material
+          });
+      } else {
+        const height = 2.0 + (step % 2) * .55;
+        const point = this.point(angle, radius, ground + height * .3, tangent);
+        this.addMountainBoulder(`${prefix} parkour rock ${step + 1}`, point,
+          { x: 3.0 + (step % 3) * .38, y: height, z: 2.7 + ((step + 1) % 2) * .38 },
+          material, { climbMaterial: feature.material });
+      }
+    }
+  }
+
+  buildLedgeChain(route, feature, prefix, angle) {
+    const material = this.materialForClimb(feature.material);
+    for (let step = 0; step < 3; step += 1) {
+      const radius = feature.radius - step * 1.85;
+      const ground = this.terrainY(angle, radius);
+      const tangent = (feature.tangent ?? 0) + (step - 1) * 1.35 * route.sway;
+      if (step === 1) {
+        const point = this.point(angle, radius, ground + .72, tangent);
+        this.addMountainBoulder(`${prefix} bridge rock`, point,
+          { x: 2.8, y: 2.05, z: 2.55 }, material, { climbMaterial: feature.material });
+      } else {
+        this.addRadialRock(`${prefix} small ledge ${step + 1}`, angle, radius, ground + .48,
+          { x: 3.0 + step * .25, y: .72, z: 2.15 }, material, {
+            tangentOffset: tangent,
+            pitch: 1,
+            roll: (feature.roll ?? 0) * .7,
+            climbMaterial: feature.material
+          });
+      }
+    }
+  }
+
+  buildBrokenPassage(route, feature, prefix, angle) {
+    const material = this.materialForClimb(feature.material);
+    const halfGap = feature.gap / 2;
+    for (const side of [-1, 1]) {
+      for (let chunk = 0; chunk < 3; chunk += 1) {
+        const radius = feature.radius - chunk * 4.6;
+        const ground = this.terrainY(angle, radius);
+        const height = 4.0 + ((chunk + (side > 0 ? 1 : 0)) % 3) * .85;
+        this.addRadialRock(`${prefix} ${side < 0 ? 'west' : 'east'} broken wall ${chunk + 1}`,
+          angle, radius, ground + height * .31,
+          { x: 3.0 + (chunk % 2) * .5, y: height, z: 3.6 + (chunk % 2) * .55 }, material, {
+            tangentOffset: side * (halfGap + 1.4 + chunk * .18),
+            pitch: side * (chunk % 2 ? 5 : 2),
+            roll: side * (chunk % 2 ? -7 : -3),
+            climbMaterial: feature.material
+          });
+      }
+    }
+    for (let step = 0; step < 5; step += 1) {
+      const radius = feature.radius - step * 3.2;
+      const ground = this.terrainY(angle, radius);
+      const tangent = ((step % 3) - 1) * 1.0;
+      const point = this.point(angle, radius, ground + .6 + (step % 2) * .18, tangent);
+      this.addMountainBoulder(`${prefix} floor stone ${step + 1}`, point,
+        { x: 2.8 + (step % 2) * .35, y: 1.8 + (step % 3) * .3, z: 2.65 },
+        material, { climbMaterial: feature.material });
+    }
+  }
+
+  buildRouteFeature(route, feature, index) {
+    const angle = route.angle + (feature.angleOffset ?? 0);
+    const prefix = `${route.label} ${index + 1}`;
+    if (feature.kind === 'climb') {
+      this.buildEscarpmentScramble(route, feature, prefix, angle, false);
+      return;
+    }
+    if (feature.kind === 'chimney-gate') {
+      this.buildEscarpmentScramble(route, feature, prefix, angle, true);
+      return;
+    }
+    if (feature.kind === 'slab' || feature.kind === 'ridge' || feature.kind === 'approach') {
+      this.buildParkourRun(route, feature, prefix, angle);
+      return;
+    }
+    if (feature.kind === 'ledge') {
+      this.buildLedgeChain(route, feature, prefix, angle);
+      return;
+    }
+    if (feature.kind === 'boulder-run') {
+      const count = feature.count ?? 5;
+      for (let boulder = 0; boulder < count; boulder += 1) {
+        const radialShift = boulder * (feature.spread ?? 3.15);
+        const radius = feature.radius - radialShift;
+        const tangent = (feature.tangent ?? 0) + ((boulder % 3) - 1) * (feature.large ? 3.1 : 2.35);
+        const baseY = this.terrainY(angle, radius);
+        const height = (feature.large ? 3.15 : 2.3) + (boulder % 3) * .62;
+        const point = this.point(angle, radius, baseY + height * .31, tangent);
+        this.addMountainBoulder(`${prefix} stable boulder ${boulder + 1}`, point,
+          {
+            x: (feature.large ? 4.2 : 3.05) + (boulder % 2) * .9,
+            y: height,
+            z: (feature.large ? 3.9 : 2.95) + ((boulder + 1) % 3) * .55
+          }, this.materialForClimb(feature.material), { climbMaterial: feature.material });
+      }
+      return;
+    }
+    if (feature.kind === 'boulder-branches') {
+      [-1, 1].forEach((side) => {
+        for (let boulder = 0; boulder < 4; boulder += 1) {
+          const radius = feature.radius - boulder * 4.4;
+          const baseY = this.terrainY(angle, radius);
+          const height = 2.55 + ((boulder + (side > 0 ? 1 : 0)) % 3) * .7;
+          const point = this.point(angle, radius, baseY + height * .31,
+            side * (4.8 + boulder * .65));
+          this.addMountainBoulder(`${prefix} ${side < 0 ? 'west' : 'east'} branch boulder ${boulder + 1}`,
+            point, { x: 3.45 + (boulder % 2) * .8, y: height, z: 3.25 + ((boulder + 1) % 2) * .9 },
+            this.materialForClimb(feature.material), { climbMaterial: feature.material });
+        }
+      });
+      return;
+    }
+    if (feature.kind === 'tilted-slab') {
+      const ground = this.terrainY(angle, feature.radius);
+      this.addRadialRock('Giant Tilted Slab landmark', angle, feature.radius, ground + 3.2,
+        { x: 11.5, y: 5.8, z: 9.2 }, this.materialForClimb('ungrippable'), {
+          tangentOffset: feature.tangent ?? 0,
+          pitch: 27,
+          roll: -19,
+          yawOffset: 8
+        });
+      this.buildParkourRun(route, { ...feature, kind: 'ridge', length: 12, material: feature.material }, prefix, angle);
+      return;
+    }
+    if (feature.kind === 'ravine' || feature.kind === 'cleft' || feature.kind === 'chimney') {
+      this.buildBrokenPassage(route, feature, prefix, angle);
+    }
+  }
+
+  buildRouteConnectors() {
+    // Same-band route switching now uses broken ledge chains too. These stay shallow
+    // radially, so they cannot become unintended extra ways through an escarpment.
+    const connectors = [
+      { name: 'Lower east traverse', angle: 73, radius: 126, length: 14, type: 'normal', sway: 1 },
+      { name: 'Lower west traverse', angle: 250, radius: 125, length: 15, type: 'rough', sway: -1 },
+      { name: 'Middle ravine traverse', angle: 171, radius: 88, length: 13, type: 'rough', sway: 1 },
+      { name: 'Middle wind traverse', angle: 318, radius: 88, length: 14, type: 'normal', sway: -1 },
+      { name: 'Alpine north saddle', angle: 73, radius: 52, length: 12, type: 'rough', sway: 1 },
+      { name: 'Alpine south saddle', angle: 238, radius: 52, length: 12, type: 'normal', sway: -1 }
+    ];
+    connectors.forEach((connector) => {
+      const pieces = 4;
+      for (let piece = 0; piece < pieces; piece += 1) {
+        const tangent = (piece - (pieces - 1) / 2) * (connector.length / pieces) * .82;
+        const radius = connector.radius + connector.sway * ((piece % 2) ? .65 : -.45);
+        const y = this.terrainY(connector.angle, radius);
+        if (piece === 1 || piece === 3) {
+          this.addRadialRock(`${connector.name} ledge ${piece + 1}`, connector.angle, radius, y + .46,
+            { x: 3.1, y: .72, z: 2.3 }, this.materialForClimb(connector.type), {
+              tangentOffset: tangent,
+              pitch: 1,
+              roll: connector.sway * (piece % 2 ? -5 : 5),
+              climbMaterial: connector.type
+            });
+        } else {
+          const point = this.point(connector.angle, radius, y + .68, tangent);
+          this.addMountainBoulder(`${connector.name} rock ${piece + 1}`, point,
+            { x: 2.9, y: 1.9 + piece * .12, z: 2.6 }, this.materialForClimb(connector.type), {
+              climbMaterial: connector.type
+            });
+        }
+      }
+    });
+  }
+
+  buildLandmarks() {
+    // Split Boulder: two intersecting natural forms, intentionally grounded at the Ridge route.
+    const splitY = this.terrainY(35, 119);
+    this.addRadialRock('Split Boulder west tooth', 35, 119, splitY + 3.2,
+      { x: 5.5, y: 7.2, z: 4.6 }, this.materials.deepRock, {
+        tangentOffset: -4.2, pitch: -9, roll: -10, climbMaterial: 'rough'
+      });
+    this.addRadialRock('Split Boulder east tooth', 35, 119, splitY + 3.5,
+      { x: 5.1, y: 8.1, z: 4.8 }, this.materials.rockLight, {
+        tangentOffset: 4.1, pitch: 8, roll: 12, climbMaterial: 'normal'
+      });
+
+    // Sample the actual ravine at a short cadence and join those samples. Each non-solid
+    // sheet overlaps its neighbors and touches the terrain at both ends, so the cascade
+    // follows the mountain instead of reading as one suspended vertical wall.
+    const waterfallPoint = (radius, tangentOffset, clearance) => {
+      const angle = fallglassAngleAt(radius);
+      // Tangentially offset ribbon vertices sit over slightly different parts of the
+      // irregular mountain. Sample the terrain at each vertex's real polar position.
+      const sampleRadius = Math.hypot(radius, tangentOffset);
+      const sampleAngle = angle + Math.atan2(tangentOffset, radius) * 180 / Math.PI;
+      const seed = this.point(angle, radius, 0, tangentOffset);
+      const authoredGround = this.authoredGroundAtWorldXZ(seed.x, seed.z, { minimumNormalY: .02 });
+      return { ...seed, y: (authoredGround?.y ?? this.terrainY(sampleAngle, sampleRadius)) + clearance };
+    };
+    const waterfallPath = FALLGLASS_WATERFALL_RADII.map((radius) => (
+      waterfallPoint(radius, fallglassTangentAt(radius), .4)
+    ));
+    const cascadeGeometry = new pc.Geometry();
+    cascadeGeometry.positions = [];
+    cascadeGeometry.indices = [];
+    waterfallPath.forEach((_, index) => {
+      const radius = FALLGLASS_WATERFALL_RADII[index];
+      const width = radius <= 116
+        ? lerp(3.8, 4.65, (radius - 96) / 20)
+        : lerp(2.85, 1.9, Math.min(1, (radius - 116) / 106))
+          + Math.sin(fallglassPhaseAt(radius) * 1.7) * .12;
+      const centerTangent = fallglassTangentAt(radius);
+      for (const side of [-1, 1]) {
+        const edgePoint = waterfallPoint(radius, centerTangent + width * .5 * side, .44);
+        cascadeGeometry.positions.push(
+          edgePoint.x,
+          edgePoint.y,
+          edgePoint.z
+        );
+      }
+      if (index < waterfallPath.length - 1) {
+        const base = index * 2;
+        cascadeGeometry.indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+      }
+    });
+    cascadeGeometry.calculateNormals();
+    const cascadeMesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, cascadeGeometry);
+    const cascade = new pc.Entity('Fallglass continuous terrain-following cascade');
+    cascade.addComponent('render');
+    cascade.render.meshInstances = [new pc.MeshInstance(cascadeMesh, this.materials.waterfall, cascade)];
+    cascade.render.castShadows = false;
+    this.buildTarget.addChild(cascade);
+
+    // Soft, irregular joins at the source, plunge pool, and lower runout remove the old
+    // hard rectangular sheet ends without adding collision around the fishing bank.
+    for (const [foamIndex, label] of [
+      [0, 'source lip'],
+      [FALLGLASS_WATERFALL_RADII.indexOf(116), 'plunge pool'],
+      [FALLGLASS_WATERFALL_RADII.length - 1, 'lower runout']
+    ]) {
+      const foamPoint = waterfallPath[foamIndex];
+      for (let puff = 0; puff < 5; puff += 1) {
+        const side = (puff - 2) * .72;
+        const angle = degreesToRadians(273);
+        this.createPrimitive(`Fallglass ${label} foam ${puff + 1}`, 'sphere', {
+          x: foamPoint.x + Math.cos(angle) * side,
+          y: foamPoint.y + .11 + (puff % 2) * .035,
+          z: foamPoint.z + Math.sin(angle) * side
+        }, { x: .74 + (puff % 2) * .22, y: .09, z: .48 + (puff % 3) * .12 },
+        this.materials.shallowWater, {}, { castShadows: false });
+      }
+    }
+
+    // Narrow ravine mouth and chimney crack get silhouette pieces beyond the route walls.
+    const ravineY = this.terrainY(183, 171);
+    this.addRadialRock('Narrow Ravine west tooth', 183, 171, ravineY + 4.3,
+      { x: 5, y: 9.2, z: 10 }, this.materials.deepRock, { tangentOffset: -7.2, roll: -10, climbMaterial: 'normal' });
+    this.addRadialRock('Narrow Ravine east tooth', 183, 171, ravineY + 4.1,
+      { x: 5.4, y: 8.7, z: 9.5 }, this.materials.rockLight, { tangentOffset: 7.1, roll: 9, climbMaterial: 'rough' });
+
+    const chimneyY = this.terrainY(125, 91);
+    this.addRadialRock('Chimney Crack west fin', 125, 91, chimneyY + 6.2,
+      { x: 3.6, y: 13.5, z: 9.8 }, this.materials.deepRock, { tangentOffset: -4.8, roll: -5, climbMaterial: 'rough' });
+    this.addRadialRock('Chimney Crack east fin', 125, 91, chimneyY + 6.1,
+      { x: 3.4, y: 13.2, z: 9.5 }, this.materials.rockLight, { tangentOffset: 4.7, roll: 6, climbMaterial: 'normal' });
+
+    // Sparse large navigation forms only; detailed vegetation/rock dressing is intentionally postponed.
+    const forestAngles = [91, 100, 119, 128, 137];
+    forestAngles.forEach((angle, index) => {
+      const radius = 169 - (index % 2) * 6;
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .62 });
+      if (point) this.addMountainTree(point.x, point.z, point.y, .8 + index * .08, `Forest inlet pine ${index + 1}`);
+    });
+
+    // Alpine shards mark the transition toward the crown without becoming a decorative rock field.
+    for (let index = 0; index < 7; index += 1) {
+      const angle = 242 + index * 12;
+      const radius = 43 + (index % 2) * 4;
+      const y = this.terrainY(angle, radius);
+      this.addRadialRock(`Alpine ridge shard ${index + 1}`, angle, radius, y + 1.6,
+        { x: 2.2 + (index % 2) * .7, y: 3.8 + (index % 3), z: 2.4 },
+        index % 3 === 0 ? this.materials.ice : this.materials.snow, {
+          pitch: index % 2 ? 9 : -7,
+          roll: index % 2 ? -10 : 8,
+          climbMaterial: index % 3 === 0 ? 'ice' : 'normal'
+        });
+    }
+  }
+
+  isEnvironmentPlacementOpen(angle, radius, clearance = 2.4) {
+    if (this.isRockInProtectedWaterApproach(angle, radius)) return false;
+    const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+    if (!point) return false;
+    const cabinCenter = this.point(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius, this.homeCabinFloorY);
+    if (Math.hypot(point.x - cabinCenter.x, point.z - cabinCenter.z) < 12.5) return false;
+    const aquariumCenter = this.point(PUBLIC_AQUARIUM_CONFIG.angle, PUBLIC_AQUARIUM_CONFIG.radius, this.publicAquariumFloorY);
+    if (Math.hypot(point.x - aquariumCenter.x, point.z - aquariumCenter.z) < PUBLIC_AQUARIUM_CONFIG.width * .58) return false;
+    return !this.rockPlacements.some((rock) => (
+      Math.abs(rock.position.y - point.y) < 5
+      && Math.hypot(rock.position.x - point.x, rock.position.z - point.z)
+        < clearance + Math.max(rock.size.x, rock.size.z) * .42
+    ));
+  }
+
+  addEnvironmentTree(angle, radius, size, name, solidTrunk = false, style = 'conifer') {
+    const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .62 });
+    if (!point) return null;
+    const baseY = point.y;
+    const trunkHeight = style === 'scrub-tree' ? 1.65 : style === 'broadleaf' ? 2.75 : 3.55;
+    const trunkWidth = style === 'scrub-tree' ? .5 : style === 'broadleaf' ? .7 : .58;
+    const trunk = this.addCylinder(`${name} climbable trunk`,
+      { x: point.x, y: baseY + trunkHeight * size * .5, z: point.z },
+      { x: trunkWidth * size, y: trunkHeight * size, z: trunkWidth * size },
+      this.materials.wood, {}, solidTrunk);
+    if (solidTrunk) {
+      this.registerClimbSurface(trunk, trunk.physicsCollider, 'rough', `${name} trunk`);
+      // Two low, solid branch stubs make the larger pines useful short climb objects
+      // instead of featureless poles. Their cones remain visual-only and snag-free.
+      if (style !== 'scrub-tree') for (const side of [-1, 1]) {
+        const branchY = style === 'broadleaf' ? 2.05 : 2.55;
+        const branchPoint = this.point(angle, radius, baseY + branchY * size, side * .58 * size);
+        const branch = this.addCylinder(`${name} ${side < 0 ? 'left' : 'right'} climbable branch`, branchPoint,
+          { x: .32 * size, y: 1.4 * size, z: .32 * size }, this.materials.wood,
+          { x: 0, y: inwardYaw(angle), z: side * 58 }, true);
+        this.registerClimbSurface(branch, branch.physicsCollider, 'rough');
+      }
+    }
+    const crownMaterial = stableNameHash(name) % 3 ? this.materials.foliage : this.materials.foliageLight;
+    if (style === 'scrub-tree') {
+      for (const [lobe, offset] of [[0, -1], [1, 0], [2, 1], [3, .35]]) {
+        const lobePoint = this.point(angle, radius, baseY + (1.62 + (lobe % 2) * .2) * size,
+          offset * 1.05 * size);
+        this.createPrimitive(`${name} umbrella lobe ${lobe + 1}`, 'sphere', lobePoint,
+          { x: 1.8 * size, y: .72 * size, z: 1.45 * size },
+          lobe % 2 ? this.materials.shrubLight : crownMaterial,
+          { z: offset * 5 }, { castShadows: size >= .72 });
+      }
+    } else if (style === 'broadleaf') {
+      for (const [lobe, offset] of [[0, 0], [1, -1], [2, 1]]) {
+        const tangent = offset * .72 * size;
+        const lobePoint = this.point(angle, radius, baseY + (2.95 + (lobe % 2) * .42) * size, tangent);
+        this.createPrimitive(`${name} broad crown ${lobe + 1}`, 'sphere', lobePoint,
+          { x: (1.65 - lobe * .12) * size, y: (1.35 + (lobe % 2) * .18) * size, z: 1.45 * size },
+          lobe === 1 ? this.materials.shrubLight : crownMaterial,
+          { x: 0, y: (stableNameHash(name) + lobe * 47) % 180, z: offset * 5 }, { castShadows: size >= .72 });
+      }
+    } else {
+      const windOffset = style === 'wind-pine' ? .58 * size : 0;
+      const lowerPoint = this.point(angle, radius, baseY + 3.55 * size, windOffset);
+      const upperPoint = this.point(angle, radius, baseY + 5.05 * size, windOffset * 1.55);
+      this.createPrimitive(`${name} lower crown`, 'cone', lowerPoint,
+        { x: (style === 'wind-pine' ? 2.1 : 2.45) * size, y: 3.4 * size, z: 2.45 * size }, crownMaterial,
+        { x: 0, y: stableNameHash(name) % 180, z: style === 'wind-pine' ? 8 : 0 }, { castShadows: size >= .72 });
+      this.createPrimitive(`${name} upper crown`, 'cone', upperPoint,
+        { x: (style === 'wind-pine' ? 1.45 : 1.75) * size, y: 2.85 * size, z: 1.75 * size }, crownMaterial,
+        { x: 0, y: (stableNameHash(name) + 61) % 180, z: style === 'wind-pine' ? 11 : 0 }, { castShadows: size >= .72 });
+    }
+  }
+
+  addEnvironmentBush(angle, radius, size, name, material = this.materials.shrubDark) {
+    const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+    if (!point) return null;
+    const baseY = point.y;
+    this.createPrimitive(name, 'sphere', { x: point.x, y: baseY + .34 * size, z: point.z },
+      { x: .95 * size, y: .62 * size, z: .8 * size }, material,
+      { x: 0, y: stableNameHash(name) % 180, z: (stableNameHash(name) % 11) - 5 }, { castShadows: false });
+  }
+
+  buildEnvironmentAesthetics() {
+    // A denser deterministic lowland canopy gives the coast a forested silhouette. The
+    // largest nearby trees have exact solid trunks and branches registered as rough grips.
+    let solidTrees = 0;
+    let plantedTrees = 0;
+    const plantedByBiome = { sunwash: 0, blackstone: 0, fernwood: 0 };
+    for (let index = 0; index < LOWLAND_TREE_CONFIG.candidateCount; index += 1) {
+      let angle;
+      let radius;
+      let open = false;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        angle = (21 + index * 5.13 + Math.sin(index * 1.31) * 3.6 + attempt * 2.35 + 360) % 360;
+        const biome = climateThemeAt(angle);
+        const biomeDensity = MOUNTAIN_BIOME_SECTORS.find((sector) => sector.id === biome)?.forestDensity ?? .5;
+        if (stableUnit(`tree-density:${index}:${attempt}`) > biomeDensity) continue;
+        radius = LOWLAND_TREE_CONFIG.minimumRadius
+          + ((index * 11 + attempt * 7) % LOWLAND_TREE_CONFIG.radiusSpan);
+        const attemptSize = .52 + (index % 7) * .072 + (biome === 'fernwood' ? .16 : biome === 'blackstone' ? .08 : 0);
+        if (this.isEnvironmentPlacementOpen(angle, radius, 2.5 + attemptSize)) {
+          open = true;
+          break;
+        }
+      }
+      const biome = climateThemeAt(angle);
+      const size = .52 + (index % 7) * .072 + (biome === 'fernwood' ? .16 : biome === 'blackstone' ? .08 : 0);
+      if (!open) continue;
+      const solid = size >= .68 && solidTrees < LOWLAND_TREE_CONFIG.maximumClimbableTrees;
+      const style = biome === 'fernwood' ? 'broadleaf'
+        : biome === 'blackstone' ? 'conifer' : 'scrub-tree';
+      this.addEnvironmentTree(angle, radius, size, `${biome} ${style} ${index + 1}`, solid, style);
+      plantedTrees += 1;
+      plantedByBiome[biome] += 1;
+      if (solid) solidTrees += 1;
+    }
+    this.lowlandTreeAudit = { planted: plantedTrees, climbable: solidTrees, byBiome: plantedByBiome };
+
+    // Secondary plants echo the dominant silhouette instead of homogenizing the sectors:
+    // dry scrub in Sunwash, needle-dark saplings in Blackstone, and fern fans in Fernwood.
+    for (let index = 0; index < 336; index += 1) {
+      const angle = (index * 13.73 + 7 + Math.sin(index * .71) * 3 + 360) % 360;
+      const radius = 150 + ((index * 17) % 34);
+      if (!this.isEnvironmentPlacementOpen(angle, radius, .78)) continue;
+      const biome = climateThemeAt(angle);
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
+      if (biome === 'blackstone') {
+        this.createPrimitive(`Blackstone pine sapling ${index + 1}`, 'cone',
+          { x: point.x, y: baseY + .72, z: point.z }, { x: .48, y: 1.45, z: .48 },
+          this.materials.shrubDark, {}, { castShadows: false });
+      } else if (biome === 'fernwood') {
+        for (const side of [-1, 1]) this.createPrimitive(`Fernwood fern fan ${index + 1}:${side}`, 'cone',
+          { x: point.x + side * .22, y: baseY + .24, z: point.z }, { x: .34, y: .55, z: .12 },
+          this.materials.shrubLight, { z: side * 58 }, { castShadows: false });
+      } else {
+        this.createPrimitive(`Sunwash dry scrub ${index + 1}`, 'sphere',
+          { x: point.x, y: baseY + .22, z: point.z }, { x: .72, y: .38, z: .58 },
+          index % 3 ? this.materials.dryGrass : this.materials.shrubLight, {}, { castShadows: false });
+      }
+    }
+
+    // Bushes taper from the lower slopes into hardy alpine scrub. They are deliberately
+    // offset from authored rocks and water approaches so grips and shore casting stay clear.
+    for (let index = 0; index < 96; index += 1) {
+      const angle = (17 + index * 14.9 + Math.sin(index * .87) * 4.2 + 360) % 360;
+      const radius = 118 + ((index * 11) % 36);
+      if (!this.isEnvironmentPlacementOpen(angle, radius, 1.55)) continue;
+      this.addEnvironmentBush(angle, radius, .58 + (index % 4) * .12,
+        `Lower mountain bush ${index + 1}`, index % 3 ? this.materials.shrubDark : this.materials.shrubLight);
+    }
+    for (let index = 0; index < 11; index += 1) {
+      const angle = (44 + index * 31.3) % 360;
+      const radius = 78 + ((index * 9) % 31);
+      if (!this.isEnvironmentPlacementOpen(angle, radius, 1.35)) continue;
+      this.addEnvironmentBush(angle, radius, .38 + (index % 3) * .1,
+        `Hardy alpine scrub ${index + 1}`, index % 2 ? this.materials.shrubDark : this.materials.dryGrass);
+    }
+
+    for (let index = 0; index < 176; index += 1) {
+      const angle = (8 + index * 8.15 + Math.sin(index * 1.7) * 2.1 + 360) % 360;
+      const radius = 164 + ((index * 5) % 17);
+      if (!this.isEnvironmentPlacementOpen(angle, radius, .65)) continue;
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
+      this.createPrimitive(`Coastal grass cluster ${index + 1}`, 'cone',
+        { x: point.x, y: baseY + .24, z: point.z },
+        { x: .24 + (index % 3) * .06, y: .5 + (index % 4) * .08, z: .18 },
+        index % 4 ? this.materials.shrubLight : this.materials.dryGrass,
+        { x: 0, y: index * 47, z: index % 2 ? 8 : -8 }, { castShadows: false });
+    }
+    for (let index = 0; index < 64; index += 1) {
+      const angle = (64 + index * 17.2) % 360;
+      const radius = 166 + ((index * 7) % 13);
+      if (!this.isEnvironmentPlacementOpen(angle, radius, .55)) continue;
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
+      this.createPrimitive(`Coastal flower ${index + 1}`, 'sphere',
+        { x: point.x, y: baseY + .2, z: point.z }, { x: .16, y: .2, z: .16 },
+        index % 2 ? this.materials.flowers : this.materials.flowerPink, {}, { castShadows: false });
+    }
+
+    // Fill the previously bare beach-to-first-incline apron (184–202 m) with low detail.
+    // Large clearances plus the protected water/start checks keep several open travel lanes.
+    for (let index = 0; index < 144; index += 1) {
+      const angle = (11 + index * 17.37 + Math.sin(index * .73) * 4.5 + 360) % 360;
+      const radius = 184 + ((index * 13) % 19);
+      if (!this.isEnvironmentPlacementOpen(angle, radius, 1.35)) continue;
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
+      const kind = index % 8;
+      if (kind === 0) {
+        this.addCylinder(`Foothill driftwood ${index + 1}`, { x: point.x, y: baseY + .16, z: point.z },
+          { x: .22, y: 2.3 + index % 3 * .45, z: .22 }, this.materials.wood,
+          { x: 90, y: inwardYaw(angle) + index * 19, z: index % 2 ? 5 : -5 }, false);
+      } else if (kind <= 2) {
+        this.createPrimitive(`Foothill low rock ${index + 1}`, 'sphere',
+          { x: point.x, y: baseY + .18, z: point.z },
+          { x: .55 + index % 3 * .18, y: .32 + index % 2 * .1, z: .48 + index % 4 * .12 },
+          index % 2 ? this.materials.coast : this.materials.wetRock,
+          { x: index * 7, y: index * 29, z: index % 2 ? 5 : -4 }, { castShadows: false });
+      } else if (kind === 3) {
+        this.createPrimitive(`Foothill flower patch ${index + 1}`, 'sphere',
+          { x: point.x, y: baseY + .18, z: point.z }, { x: .2, y: .2, z: .2 },
+          index % 2 ? this.materials.flowers : this.materials.flowerPink, {}, { castShadows: false });
+      } else {
+        this.createPrimitive(`Foothill grass and shrub ${index + 1}`, kind === 7 ? 'sphere' : 'cone',
+          { x: point.x, y: baseY + .24, z: point.z },
+          kind === 7 ? { x: .72, y: .42, z: .62 } : { x: .26, y: .56 + index % 3 * .1, z: .18 },
+          index % 3 ? this.materials.shrubLight : this.materials.dryGrass,
+          { y: index * 41, z: index % 2 ? 9 : -8 }, { castShadows: false });
+      }
+    }
+
+    // Small edge accents make the core rest shelves recognizable from neighboring
+    // lines without hiding their mantle lips or adding collision.
+    const restAccents = [
+      { id: '500ft', ...MOUNTAIN_REST_LEDGE_CONFIG.fiveHundred },
+      { id: '550ft-alpine', ...MOUNTAIN_REST_LEDGE_CONFIG.fiveFifty },
+      { id: '600ft', ...MOUNTAIN_REST_LEDGE_CONFIG.sixHundred }
+    ];
+    for (const rest of restAccents) {
+      for (const side of [-1, 1]) {
+        const point = this.proceduralGroundAt(rest.angle, rest.radius, {
+          tangentOffset: side * (rest.width * .56), minimumNormalY: .5
+        });
+        if (!point) continue;
+        this.createPrimitive(`${rest.id} wind-bent landmark shrub ${side < 0 ? 'left' : 'right'}`,
+          'sphere', { x: point.x, y: point.y + .32, z: point.z }, { x: .42, y: .3, z: .5 }, this.materials.dryGrass,
+          { x: 0, y: inwardYaw(rest.angle), z: side * 18 }, { castShadows: false });
+      }
+    }
+  }
+
+  buildSummitCrown() {
+    // A subdivided shell lets the same proven aperture filter cut a localized Crown cave
+    // mouth. The old two-triangle-tall wedges would have removed an entire face from base
+    // to summit for one opening.
+    const segments = 72;
+    const sideRings = 13;
+    const vertices = [];
+    const sideRingStarts = [];
+    for (let ring = 0; ring < sideRings; ring += 1) {
+      const t = ring / (sideRings - 1);
+      sideRingStarts.push(vertices.length);
+      for (let index = 0; index < segments; index += 1) {
+        const angle = index * 360 / segments;
+        const radians = degreesToRadians(angle);
+        const baseRadius = CROWN_BASE_RADIUS * (1 + Math.sin(degreesToRadians(angle * 3 + 17)) * .035);
+        const summitRadius = CROWN_TOP_RADIUS * (1 + Math.sin(degreesToRadians(angle * 4 - 11)) * .035);
+        const radius = lerp(baseRadius, summitRadius, t);
+        const bottomY = this.terrainY(angle, baseRadius) - 2.2;
+        vertices.push([
+          Math.cos(radians) * radius,
+          lerp(bottomY, SUMMIT_HEIGHT, t),
+          Math.sin(radians) * radius
+        ]);
+      }
+    }
+    const topStart = sideRingStarts.at(-1);
+    const summitWater = MOUNTAIN_FISHING_LOCATIONS.find((location) => location.summit);
+    const summitSurfaceY = summitWater?.y ?? SUMMIT_HEIGHT - .12;
+    const summitWaterRadii = summitWater?.radii ?? [3.7, 3.1];
+    const surfaceRingStarts = [];
+    for (const normalizedDistance of [.24, .5, .76, 1, 1.5]) {
+      surfaceRingStarts.push(vertices.length);
+      for (let index = 0; index < segments; index += 1) {
+        const angle = index * 360 / segments;
+        const radians = degreesToRadians(angle);
+        const waterBoundaryRadius = 1 / Math.hypot(
+          Math.cos(radians) / summitWaterRadii[0],
+          Math.sin(radians) / summitWaterRadii[1]
+        );
+        const radius = waterBoundaryRadius * normalizedDistance;
+        vertices.push([
+          Math.cos(radians) * radius,
+          summitBasinHeight(normalizedDistance, SUMMIT_HEIGHT, summitSurfaceY),
+          Math.sin(radians) * radius
+        ]);
+      }
+    }
+    const topCenter = vertices.length;
+    vertices.push([0, summitBasinHeight(0, SUMMIT_HEIGHT, summitSurfaceY), 0]);
+    const sideTriangles = [];
+    for (let ring = 0; ring < sideRingStarts.length - 1; ring += 1) {
+      for (let index = 0; index < segments; index += 1) {
+        const next = (index + 1) % segments;
+        const lower = sideRingStarts[ring] + index;
+        const lowerNext = sideRingStarts[ring] + next;
+        const upper = sideRingStarts[ring + 1] + index;
+        const upperNext = sideRingStarts[ring + 1] + next;
+        sideTriangles.push([lower, upper, upperNext], [lower, upperNext, lowerNext]);
+      }
+    }
+    const visibleSideTriangles = sideTriangles.filter((triangle) => (
+      !triangleIntersectsCaveEntrance(
+        vertices[triangle[0]], vertices[triangle[1]], vertices[triangle[2]]
+      )
+      && !terrainTriangleIsCut(vertices[triangle[0]], vertices[triangle[1]], vertices[triangle[2]], MOUNTAIN_CENTER, MAP_EDITOR_PATCH)
+    ));
+    const topTriangles = [];
+    for (let index = 0; index < segments; index += 1) {
+      const next = (index + 1) % segments;
+      const top = topStart + index;
+      const topNext = topStart + next;
+      topTriangles.push([topCenter, surfaceRingStarts[0] + next, surfaceRingStarts[0] + index]);
+      for (let ring = 0; ring < surfaceRingStarts.length - 1; ring += 1) {
+        const inner = surfaceRingStarts[ring];
+        const outer = surfaceRingStarts[ring + 1];
+        topTriangles.push(
+          [inner + index, outer + next, outer + index],
+          [inner + index, inner + next, outer + next]
+        );
+      }
+      const lastSurfaceRing = surfaceRingStarts.at(-1);
+      topTriangles.push(
+        [lastSurfaceRing + index, topNext, top],
+        [lastSurfaceRing + index, lastSurfaceRing + next, topNext]
+      );
+    }
+    const triangles = [...visibleSideTriangles, ...topTriangles];
+
+    // Rock grounding ray-tests the same filtered, faceted shell the player sees.
+    this.crownSideTriangles = visibleSideTriangles.map((triangle) => (
+      triangle.map((vertexIndex) => vertices[vertexIndex])
+    ));
+
+    const geometry = new pc.Geometry();
+    geometry.positions = [];
+    geometry.indices = [];
+    for (const triangle of triangles) {
+      for (const vertexIndex of triangle) {
+        geometry.positions.push(...vertices[vertexIndex]);
+        geometry.indices.push(geometry.indices.length);
+      }
+    }
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity('Stoneveil Peak summit crown - sheer ungrippable shell');
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.alpine, entity)];
+    entity.render.castShadows = false;
+    entity.setPosition(MOUNTAIN_CENTER.x, 0, MOUNTAIN_CENTER.z);
+    this.buildTarget.addChild(entity);
+
+    const colliderDesc = this.RAPIER.ColliderDesc.trimesh(
+      new Float32Array(vertices.flat()),
+      new Uint32Array(triangles.flat())
+    )
+      .setTranslation(MOUNTAIN_CENTER.x, 0, MOUNTAIN_CENTER.z)
+      .setFriction(.92)
+      .setRestitution(0);
+    entity.physicsCollider = this.physicsWorld.createCollider(colliderDesc);
+    // Deliberately NOT registered as climbable. The crown shell is a sheer barrier; only
+    // the surrounding V2.6 crown climb web below exposes Grip surfaces.
+  }
+
+  buildSummitBench() {
+    // Matching benches occupy opposite solid sides of the tarn. Both face inward and
+    // expose explicit seat/exit points to the click-to-toggle interaction controller.
+    for (const [index, config] of SUMMIT_BENCH_CONFIGS.entries()) {
+      const angle = config.angle;
+      const radius = config.radius;
+      const yaw = inwardYaw(angle);
+      const name = ['Summit west rest bench', 'Summit east rest bench', 'Summit north rest bench', 'Summit south rest bench'][index];
+      const seat = this.point(angle, radius, SUMMIT_HEIGHT + .56);
+      const parts = [this.addBox(`${name} seat`, seat,
+        { x: 2.35, y: .18, z: .72 }, this.materials.wood, { y: yaw })];
+      const back = this.point(angle, radius + .34, SUMMIT_HEIGHT + 1.08);
+      parts.push(this.addBox(`${name} back`, back,
+        { x: 2.35, y: .86, z: .16 }, this.materials.wood, { x: -7, y: yaw }));
+      for (const side of [-1, 1]) {
+        const tangent = side * .88;
+        parts.push(this.addBox(`${name} ${side < 0 ? 'left' : 'right'} leg`,
+          this.point(angle, radius, SUMMIT_HEIGHT + .24, tangent),
+          { x: .18, y: .48, z: .46 }, this.materials.wood, { y: yaw }));
+      }
+      const seatSurface = this.point(angle, radius, SUMMIT_HEIGHT + config.seatHeight);
+      const exitSurface = this.point(angle, radius, SUMMIT_HEIGHT + PLAYER_FOOT_OFFSET + .16, 1.72);
+      const interaction = {
+        id: config.id,
+        label: 'CLICK TO SIT & FISH AT THE TARN',
+        action: 'bench',
+        enabled: false,
+        position: seatSurface,
+        seatPosition: { ...seatSurface, y: seatSurface.y + PLAYER_FOOT_OFFSET + .03 },
+        exitPosition: exitSurface,
+        facingYaw: yaw,
+        fishingFacing: config.fishingFacing,
+        range: config.interactionDistance
+      };
+      this.homeInteractions.push(interaction);
+      this.scalableBenches.set(config.id, { index, parts, interaction });
+    }
+  }
+
+  setBenchPopulation(count = 1, occupiedIds = [], playerPositions = []) {
+    this.benchPopulation = Math.max(1, Math.min(4, Math.floor(Number(count) || 1)));
+    const occupied = new Set(occupiedIds);
+    for (const [id, bench] of this.scalableBenches) {
+      const wanted = bench.index < this.benchPopulation || occupied.has(id);
+      const nearPlayer = playerPositions.some((point) => point
+        && Math.hypot(point.x - bench.interaction.position.x, point.z - bench.interaction.position.z) < 1.4
+        && Math.abs(point.y - bench.interaction.position.y) < 2.5);
+      const enabled = wanted && (bench.interaction.enabled !== false || occupied.has(id) || !nearPlayer);
+      bench.interaction.enabled = enabled;
+      for (const part of bench.parts) {
+        part.enabled = enabled;
+        part.physicsCollider?.setEnabled?.(enabled);
+      }
+    }
+  }
+
+  crownRadiusAtHeight(y) {
+    const t = clamp((y - MAP_EDITOR_CROWN_BASE_HEIGHT) / (SUMMIT_HEIGHT - MAP_EDITOR_CROWN_BASE_HEIGHT), 0, 1);
+    return lerp(CROWN_BASE_RADIUS, CROWN_TOP_RADIUS, t);
+  }
+
+  buildCrownRoutes() {
+    // The 1,000-ft crown is much taller, so it uses more vertical stages rather than
+    // stretching the old rocks apart. Lines still zigzag and converge, but upper rocks
+    // shrink with circumference to avoid coplanar overlap / texture flicker near the cap.
+    CROWN_ROUTES.forEach((route, routeIndex) => {
+      const stageCount = CROWN_DENSITY_CONFIG.routeStages;
+      const baseDifficulty = climbDifficultyAt(route.angle, 3);
+      const side = route.sway;
+      let lastAngle = route.angle;
+      let lastTangent = 0;
+
+      for (let stage = 0; stage < stageCount; stage += 1) {
+        const t = (stage + .55) / stageCount;
+        const centerY = lerp(MAP_EDITOR_CROWN_BASE_HEIGHT + 1.2, SUMMIT_HEIGHT - 2.15, t);
+        const extraDifficulty = .07 + t * .16;
+        const zigzag = Math.sin(t * Math.PI * 4 + routeIndex * .37) * (1.25 + baseDifficulty * .7);
+        const secondary = Math.sin(t * Math.PI * 9 + routeIndex * .71) * .32;
+        const angle = route.angle + (zigzag + secondary) * side;
+        lastAngle = angle;
+
+        const materialType = chooseClimbMaterial(3, angle, stage, routeIndex, extraDifficulty);
+        const difficulty = clamp(baseDifficulty + extraDifficulty, 0, 1);
+        const tall = ((stage + routeIndex) % 5 === 1) || stage === 8 || stage === 15;
+        const formKinds = ['spire', 'needle', 'blade', 'wedge', 'crooked', 'lean', 'shelfblade', 'hook', 'shard', 'knuckle'];
+        const formKind = tall
+          ? (((stage + routeIndex) % 2) ? 'needle' : 'crooked')
+          : formKinds[(stage + routeIndex) % formKinds.length];
+        const height = tall ? 5.8 + difficulty * 1.5 : 2.45 + (stage % 4) * .32;
+        const taper = 1 - t * .34;
+        const width = ((tall ? 2.15 : 2.7) - difficulty * .32) * taper;
+        const depth = ((tall ? 1.65 : 1.95) - difficulty * .12) * (1 - t * .18);
+        const tangent = side * (
+          Math.sin(t * Math.PI * 5 + routeIndex * .43) * (2.7 + baseDifficulty * .6)
+          + Math.sin(t * Math.PI * 11 + routeIndex) * .55
+        );
+        lastTangent = tangent;
+
+        // Local depth is ~half the supplied z scale. Offset by only ~28% of depth so
+        // every route rock visibly intersects the crown shell instead of hovering on it.
+        const shellRadius = this.crownRadiusAtHeight(centerY);
+        const radius = shellRadius + depth * .28;
+        if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
+        this.addRadialRock(`${route.label} crown rock ${stage + 1}`, angle, radius, centerY,
+          { x: Math.max(1.28, width), y: height, z: Math.max(1.25, depth) },
+          this.materialForClimb(materialType), {
+            tangentOffset: tangent,
+            pitch: tall ? -(11 + t * 3) : -(5 + t * 3),
+            roll: side * ((stage % 3) - 1) * 6,
+            climbMaterial: materialType,
+            formKind
+          });
+
+        // Traverse branches stop before the cramped top quarter. This keeps lateral
+        // choices lower down without layering nearly coplanar meshes around the cap.
+        if (CROWN_DENSITY_CONFIG.branchStages.includes(stage) && t < .9) {
+          const branchSide = (routeIndex + stage) % 2 ? 1 : -1;
+          for (let branchStep = 0; branchStep < 2; branchStep += 1) {
+            const branchAngle = angle + branchSide * (.45 + branchStep * .35);
+            if (this.isRockInProtectedWaterApproach(branchAngle, radius - .08)) continue;
+            const branchType = chooseClimbMaterial(3, branchAngle, stage,
+              routeIndex + 73 + branchStep, extraDifficulty + .04);
+            this.addRadialRock(`${route.label} crown traverse ${stage + 1}-${branchStep + 1}`,
+              branchAngle, radius - .08, centerY + .05 + branchStep * .16,
+              { x: Math.max(1.25, 1.95 * taper), y: 2.2 + branchStep * .28, z: 1.36 },
+              this.materialForClimb(branchType), {
+                tangentOffset: tangent + branchSide * (1.85 + branchStep * 1.5),
+                pitch: -(7 + t * 3),
+                roll: branchSide * 9,
+                climbMaterial: branchType,
+                formKind: branchStep ? 'shelfblade' : 'wedge'
+              });
+          }
+        }
+
+        const addRest = (stage === 8 && routeIndex % 5 === 0)
+          || (stage === 17 && routeIndex % 6 === 2 && difficulty < .9);
+        if (addRest) {
+          const ledgeType = difficulty > .72 ? 'normal' : 'rough';
+          this.addRadialRock(`${route.label} rare crown rest`, angle, radius - .12, centerY - .22,
+            { x: 2.35 * taper, y: .56, z: 1.7 }, this.materialForClimb(ledgeType), {
+              tangentOffset: tangent - side * .4,
+              pitch: 2,
+              roll: side * -4,
+              climbMaterial: ledgeType,
+              formKind: 'chunk'
+            });
+        }
+
+        if (difficulty > .8 && stage === 13 && routeIndex % 3 === 1) {
+          this.addRadialRock(`${route.label} blank crown face`, angle, radius - .06, centerY + .25,
+            { x: 2.15 * taper, y: 5.4, z: 1.3 }, this.materialForClimb('ungrippable'), {
+              tangentOffset: tangent - side * 3.3,
+              pitch: -11,
+              roll: side * -10,
+              climbMaterial: 'ungrippable',
+              formKind: 'blade'
+            });
+        }
+      }
+
+      // Tiny individual exit lips fit around the new 8 m summit without overlapping
+      // each other enough to flicker. The centered pond still leaves ~4.3 m of rim.
+      this.addRadialRock(`${route.label} summit lip`, lastAngle, CROWN_TOP_RADIUS + .34,
+        SUMMIT_HEIGHT - 1.18, { x: 1.45, y: .72, z: 1.45 }, this.materialForClimb('normal'), {
+          tangentOffset: lastTangent * .26,
+          pitch: 4,
+          climbMaterial: 'normal',
+          formKind: 'wedge'
+        });
+      // A low threshold intersects the plateau itself, eliminating the last sub-mantle
+      // void without increasing jump height or making the crown shell universally grippable.
+      this.addRadialRock(`${route.label} summit threshold`, lastAngle,
+        SUMMIT_ROUTE_CONNECTOR.thresholdRadius, SUMMIT_HEIGHT - .2,
+        { x: 1.28, y: .42, z: 1.35 }, this.materialForClimb('normal'), {
+          tangentOffset: lastTangent * .14,
+          pitch: 1,
+          climbMaterial: 'normal',
+          formKind: 'chunk'
+        });
+    });
+  }
+
+  buildHighAltitudeInfill() {
+    // V2.8 fills the sparse upper silhouette without reverting to vertical rock rows.
+    // Shoulder belts are staggered laterally and crown belts sit between the 26 authored
+    // climb-web lines. Everything still goes through exact core-contact grounding.
+    const shoulderBelts = [
+      { radius: 79, count: 52, phase: 1.7 },
+      { radius: 66, count: 48, phase: 5.2 },
+      { radius: 55, count: 42, phase: 2.8 },
+      { radius: 45.5, count: 36, phase: 7.1 }
+    ];
+    shoulderBelts.forEach((belt, beltIndex) => {
+      for (let index = 0; index < belt.count; index += 1) {
+        const spacing = 360 / belt.count;
+        const angle = (belt.phase + index * spacing
+          + Math.sin((index + 1) * 1.73 + beltIndex) * spacing * .22 + 360) % 360;
+        const difficulty = climbDifficultyAt(angle, 2);
+        const radialJitter = Math.sin((index + 3) * 2.19 + beltIndex * .8) * 1.15;
+        const radius = belt.radius + radialJitter;
+        if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
+        const ground = this.terrainY(angle, radius);
+        const tall = (index + beltIndex) % 6 === 2;
+        const type = chooseClimbMaterial(2, angle, index, 420 + beltIndex, .05 + beltIndex * .018);
+        const forms = tall ? ['needle', 'crooked', 'column', 'shard', 'hook']
+          : ['wedge', 'blade', 'lean', 'spire', 'shelfblade', 'knuckle'];
+        const formKind = forms[(index + beltIndex * 2) % forms.length];
+        const height = tall ? 5.0 + difficulty * 1.6 : 2.0 + (index % 4) * .36;
+        this.addRadialRock(`upper infill ${beltIndex + 1}-${index + 1}`, angle, radius - .15,
+          ground + height * (tall ? .31 : .27),
+          { x: tall ? 2.0 : 2.45, y: height, z: tall ? 1.55 : 1.9 },
+          this.materialForClimb(type), {
+            tangentOffset: Math.sin((index + 2) * 1.31) * (2.0 + beltIndex * .35),
+            pitch: tall ? -(20 + difficulty * 5) : -(7 + difficulty * 4),
+            roll: ((index % 3) - 1) * 6,
+            climbMaterial: type,
+            formKind
+          });
+      }
+    });
+
+    const crownBelts = [
+      { t: .11, count: CROWN_DENSITY_CONFIG.beltCounts[0], phase: 4.4 },
+      { t: .27, count: CROWN_DENSITY_CONFIG.beltCounts[1], phase: 1.6 },
+      { t: .43, count: CROWN_DENSITY_CONFIG.beltCounts[2], phase: 6.8 },
+      { t: .59, count: CROWN_DENSITY_CONFIG.beltCounts[3], phase: 2.7 },
+      { t: .74, count: CROWN_DENSITY_CONFIG.beltCounts[4], phase: 8.1 },
+      { t: .87, count: CROWN_DENSITY_CONFIG.beltCounts[5], phase: 3.9 }
+    ];
+    crownBelts.forEach((belt, beltIndex) => {
+      const centerY = lerp(MAP_EDITOR_CROWN_BASE_HEIGHT + 1.3, SUMMIT_HEIGHT - 4.0, belt.t);
+      const shellRadius = this.crownRadiusAtHeight(centerY);
+      for (let index = 0; index < belt.count; index += 1) {
+        const spacing = 360 / belt.count;
+        const angle = (belt.phase + index * spacing
+          + Math.sin(index * 1.89 + beltIndex * .73) * spacing * .19 + 360) % 360;
+        const difficulty = climbDifficultyAt(angle, 3);
+        const type = chooseClimbMaterial(3, angle, index, 610 + beltIndex, .1 + belt.t * .08);
+        const tall = (index + beltIndex * 2) % 7 === 3;
+        const depth = tall ? 1.45 : 1.7;
+        if (this.isRockInProtectedWaterApproach(angle, shellRadius + depth * .22)) continue;
+        const height = tall ? 4.6 + difficulty * 1.5 : 2.0 + (index % 3) * .4;
+        const forms = tall ? ['needle', 'crooked', 'shard', 'hook']
+          : ['blade', 'wedge', 'lean', 'spire', 'shelfblade', 'knuckle'];
+        this.addRadialRock(`crown infill ${beltIndex + 1}-${index + 1}`, angle, shellRadius + depth * .22,
+          centerY + Math.sin(index * 2.4) * .32,
+          { x: tall ? 1.65 : 2.0, y: height, z: depth }, this.materialForClimb(type), {
+            tangentOffset: Math.sin(index * 1.57 + beltIndex) * (1.5 + (1 - belt.t) * .8),
+            pitch: tall ? -(14 + belt.t * 7) : -(6 + belt.t * 5),
+            roll: ((index + beltIndex) % 3 - 1) * 7,
+            climbMaterial: type,
+            formKind: forms[(index + beltIndex) % forms.length]
+          });
+      }
+    });
+  }
+
+  spiralStepHeightAt(targetHeight) {
+    const feet = targetHeight / .3048;
+    if (feet >= 680 && feet <= 700) return MID_MOUNTAIN_SPIRAL_CONFIG.priority680To700StepHeight;
+    if (feet >= 660 && feet < 680) return MID_MOUNTAIN_SPIRAL_CONFIG.priority660To700StepHeight;
+    if (feet >= 600 && feet <= 650) return MID_MOUNTAIN_SPIRAL_CONFIG.priority600To650StepHeight;
+    if (feet >= 550 && feet < 600) return MID_MOUNTAIN_SPIRAL_CONFIG.priority550To600StepHeight;
+    if (feet >= 500 && feet < 550) return MID_MOUNTAIN_SPIRAL_CONFIG.priority500To550StepHeight;
+    if (feet >= 450 && feet < 500) return MID_MOUNTAIN_SPIRAL_CONFIG.priority450To550StepHeight;
+    return MID_MOUNTAIN_SPIRAL_CONFIG.generalStepHeight;
+  }
+
+  spiralRouteSample(routeIndex, targetHeight) {
+    const config = MID_MOUNTAIN_SPIRAL_CONFIG;
+    const t = clamp((targetHeight - config.minimumHeight) / (config.maximumHeight - config.minimumHeight), 0, 1);
+    const direction = routeIndex % 2 === 0 ? 1 : -1;
+    const phase = routeIndex * 360 / config.routeCount + Math.sin(routeIndex * 2.17) * 5.5;
+    const turns = config.turns + ((routeIndex % 4) - 1.5) * .075;
+    const angle = (phase + direction * turns * 360 * t
+      + Math.sin(t * Math.PI * 5.2 + routeIndex * .81) * 2.6 + 720) % 360;
+    const routeRadius = this.findRouteRadiusForHeight(angle, 145, 38, targetHeight);
+    const radialJitter = Math.sin(t * 21.7 + routeIndex * 1.41) * .72;
+    return { angle, radius: routeRadius + radialJitter, direction, t };
+  }
+
+  buildThreeToSevenHundredRockField() {
+    // v9: these are actual continuous climb paths, NOT horizontal altitude bands.
+    // Each route winds around Mountain as elevation rises. Vertical sample spacing is
+    // intentionally tighter through 500–650 ft so adding more
+    // rocks makes the next move reachable rather than merely decorating the same elevation.
+    const config = MID_MOUNTAIN_SPIRAL_CONFIG;
+    const forms = [
+      'crooked', 'wedge', 'spire', 'knuckle', 'blade', 'hook', 'tooth', 'lean',
+      'shelfblade', 'shard', 'crouch', 'prow', 'slab', 'fin'
+    ];
+    let added = 0;
+    let requested = 0;
+    let priority500To650Requested = 0;
+    const routeAudits = [];
+
+    for (let routeIndex = 0; routeIndex < config.routeCount; routeIndex += 1) {
+      let targetHeight = config.minimumHeight + (routeIndex % 3) * .34;
+      let stepIndex = 0;
+      let routeAdded = 0;
+
+      while (targetHeight <= config.maximumHeight + .01) {
+        requested += 1;
+        const feet = targetHeight / .3048;
+        if (feet >= 500 && feet <= 650) priority500To650Requested += 1;
+        const sample = this.spiralRouteSample(routeIndex, targetHeight);
+        const { angle, direction } = sample;
+        let radius = sample.radius;
+        if (this.isRockInProtectedWaterApproach(angle, radius)) {
+          // Keep the route continuous around water by slipping a little inward/outward,
+          // rather than deleting a whole height step and creating an accidental dead end.
+          const alternatives = [2.2, -2.2, 4.0, -4.0];
+          const alternative = alternatives.find((offset) => !this.isRockInProtectedWaterApproach(angle, radius + offset));
+          if (alternative === undefined) {
+            targetHeight += this.spiralStepHeightAt(targetHeight);
+            stepIndex += 1;
+            continue;
+          }
+          radius += alternative;
+        }
+
+        const ground = this.terrainY(angle, radius);
+        const materialType = chooseClimbMaterial(
+          feet >= 620 ? 2 : feet >= 450 ? 1 : 0,
+          angle, stepIndex, 910 + routeIndex, feet >= 500 && feet <= 650 ? -.035 : .015
+        );
+        const formKind = forms[(stepIndex * 3 + routeIndex * 5) % forms.length];
+        const priorityMid = feet >= 500 && feet <= 700;
+        const denseHighGap = feet >= 600 && feet <= 700;
+        const rockHeight = denseHighGap
+          ? 2.65 + (stepIndex % 3) * .28
+          : priorityMid ? 2.45 + (stepIndex % 4) * .3 : 2.2 + (stepIndex % 4) * .34;
+        const rockWidth = denseHighGap ? 2.0 + (stepIndex % 3) * .24 : 1.8 + (stepIndex % 4) * .27;
+        const tangent = Math.sin(stepIndex * 1.31 + routeIndex * .73) * (denseHighGap ? .82 : 1.15);
+        const primary = this.addRadialRock(
+          `spiral ${routeIndex + 1} step ${stepIndex + 1}`,
+          angle, radius, ground + rockHeight * .28,
+          { x: rockWidth, y: rockHeight, z: 1.45 + (stepIndex % 3) * .22 },
+          this.materialForClimb(materialType), {
+            tangentOffset: tangent,
+            pitch: -8 - (stepIndex % 4) * 3 - (denseHighGap ? 3 : 0),
+            roll: direction * (((stepIndex + routeIndex) % 3) - 1) * 6,
+            climbMaterial: materialType,
+            formKind
+          }
+        );
+        if (primary) { added += 1; routeAdded += 1; }
+
+        // Frequent side options overlap adjacent spiral steps vertically. These are branches
+        // off the same ascent path—not another ring—and make passing/rest choices possible.
+        if (stepIndex % config.branchEvery === (routeIndex % config.branchEvery)
+          || priorityMid && stepIndex % (feet >= 680 ? 1 : feet >= 660 ? 2 : 3) === 0) {
+          const side = ((stepIndex + routeIndex) % 2 ? 1 : -1) * direction;
+          const branchAngle = angle + side * (1.2 + (stepIndex % 3) * .42);
+          const branchRadius = radius + side * (1.25 + (stepIndex % 4) * .26);
+          if (!this.isRockInProtectedWaterApproach(branchAngle, branchRadius)) {
+            const branchGround = this.terrainY(branchAngle, branchRadius);
+            const branchHeight = denseHighGap ? 2.35 : 1.95 + (stepIndex % 3) * .3;
+            const branchType = materialType === 'ice' ? 'normal' : (stepIndex % 5 === 2 ? 'normal' : 'rough');
+            const branch = this.addRadialRock(
+              `spiral ${routeIndex + 1} branch ${stepIndex + 1}`,
+              branchAngle, branchRadius, branchGround + branchHeight * .27,
+              { x: 1.75 + (stepIndex % 3) * .22, y: branchHeight, z: 1.4 + (stepIndex % 2) * .25 },
+              this.materialForClimb(branchType), {
+                tangentOffset: side * (1.05 + (stepIndex % 3) * .3),
+                pitch: -9 - (stepIndex % 3) * 4,
+                roll: side * (5 + (stepIndex % 4) * 2),
+                climbMaterial: branchType,
+                formKind: forms[(stepIndex * 5 + routeIndex * 2 + 4) % forms.length]
+              }
+            );
+            if (branch) { added += 1; routeAdded += 1; }
+          }
+        }
+
+        targetHeight += this.spiralStepHeightAt(targetHeight);
+        stepIndex += 1;
+      }
+      routeAudits.push({ routeId: routeIndex + 1, requestedSteps: stepIndex, added: routeAdded });
+    }
+
+    this.midMountainRockFieldAudit = {
+      layout: 'continuous-spirals',
+      routeCount: config.routeCount,
+      requestedSteps: requested,
+      priority500To650Requested,
+      priority660To700StepHeight: config.priority660To700StepHeight,
+      priority680To700StepHeight: config.priority680To700StepHeight,
+      added,
+      routeAudits
+    };
+  }
+
+  buildMidHighTraversalAnchors() {
+    // A few larger transfer/rest formations are tied to specific points ON the spirals.
+    // They are deliberately not repeated around an elevation ring.
+    const anchors = [
+      { id: '500ft-transfer', route: 2, height: 152.4, width: 4.8, depth: 3.4 },
+      { id: '550ft-transfer', route: 7, height: 167.64, width: 4.5, depth: 3.2 },
+      { id: '600ft-transfer', route: 4, height: 182.88, width: 4.35, depth: 3.0 },
+      { id: '642ft-transfer', route: 9, height: 195.68, width: 4.0, depth: 2.9 },
+      { id: '655ft-transfer', route: 1, height: 199.64, width: 3.9, depth: 2.8 },
+      { id: '690ft-transfer', route: 10, height: 210.31, width: 3.8, depth: 2.7 }
+    ];
+    for (const [index, anchor] of anchors.entries()) {
+      const sample = this.spiralRouteSample(anchor.route % MID_MOUNTAIN_SPIRAL_CONFIG.routeCount, anchor.height);
+      const angle = sample.angle;
+      const radius = sample.radius;
+      if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
+      const ground = this.terrainY(angle, radius);
+      const side = sample.direction * (index % 2 ? 1 : -1);
+      const type = index % 3 === 1 ? 'normal' : 'rough';
+      this.addRadialRock(anchor.id, angle, radius - .15, ground + .62,
+        { x: anchor.width, y: 1.2, z: anchor.depth }, this.materialForClimb(type), {
+          tangentOffset: side * .85,
+          pitch: 1 + index % 2,
+          roll: side * 2,
+          climbMaterial: type,
+          formKind: 'chunk'
+        });
+      for (let option = 0; option < 2; option += 1) {
+        const optionSide = option ? -side : side;
+        const optionAngle = angle + optionSide * (1.0 + option * .35);
+        const optionRadius = radius + optionSide * (1.5 + option * .45);
+        if (this.isRockInProtectedWaterApproach(optionAngle, optionRadius)) continue;
+        const optionGround = this.terrainY(optionAngle, optionRadius);
+        this.addRadialRock(`${anchor.id} option ${option + 1}`, optionAngle, optionRadius,
+          optionGround + .58, { x: 2.1, y: 2.25 + option * .25, z: 1.65 },
+          this.materialForClimb('rough'), {
+            tangentOffset: optionSide * 1.4,
+            pitch: -8 - option * 4,
+            roll: optionSide * 7,
+            climbMaterial: 'rough',
+            formKind: option ? 'wedge' : 'crooked'
+          });
+      }
+    }
+  }
+
+  isRockInProtectedWaterApproach(angle, radius) {
+    const point = localPolarPoint(angle, radius);
+    return EDITOR_FISHING_LAYOUT.some((water) => {
+      if (water.summit) return false;
+      const center = localPolarPoint(water.angle, water.radius);
+      const dx = point.x - center.x;
+      const dz = point.z - center.z;
+      if (Math.hypot(dx, dz) < Math.max(water.radii[0], water.radii[1]) + 3.2) return true;
+      if (!water.cave) return false;
+      const radians = degreesToRadians(water.angle);
+      const outward = dx * Math.cos(radians) + dz * Math.sin(radians);
+      const lateral = Math.abs(-dx * Math.sin(radians) + dz * Math.cos(radians));
+      const caveDepth = caveDepthAt(water);
+      return outward > -2 && outward < caveDepth + 5
+        && lateral < water.radii[1] * .72 + 3.4;
+    });
+  }
+
+  buildSparseRegionInfill() {
+    const bands = [
+      { id: 'lower', minimumRadius: 145, maximumRadius: 181 },
+      { id: 'middle', minimumRadius: 105, maximumRadius: 145 },
+      { id: 'upper', minimumRadius: 68, maximumRadius: 105 },
+      { id: 'alpine', minimumRadius: 41, maximumRadius: 68 }
+    ];
+    const substantial = this.rockPlacements.filter((rock) => (
+      Math.max(rock.size.x, rock.size.y, rock.size.z) >= 1.25 && !rock.crown
+    ));
+    const sparse = auditRockDensity(substantial, bands, 18)
+      .sort((a, b) => (b.median - b.count) - (a.median - a.count));
+    const findOpenPlacement = (region, slot = 0) => {
+      const spacing = 360 / region.sectorCount;
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const angleUnit = (stableUnit(`sparse-angle:${region.id}:${region.sector}:${slot}`)
+          + attempt * .173 + slot * .271) % 1;
+        const radiusUnit = (stableUnit(`sparse-radius:${region.id}:${region.sector}:${slot}`)
+          + attempt * .307 + slot * .193) % 1;
+        const angle = region.sector * spacing + spacing * (.12 + angleUnit * .76);
+        const radius = lerp(region.minimumRadius, region.maximumRadius, .2 + radiusUnit * .6);
+        if (!this.isRockInProtectedWaterApproach(angle, radius)) return { angle, radius };
+      }
+      return null;
+    };
+    let added = 0;
+    for (const region of sparse) {
+      const targetCount = region.targetCount ?? (region.median >= 2 ? Math.max(1, region.median - 1) : region.median);
+      const bandBonus = region.id === 'alpine' ? 8 : region.id === 'upper' ? 7 : region.id === 'middle' ? 4 : 2;
+      const severityBonus = region.count === 0 && region.median >= 3 ? 2 : 0;
+      const needed = Math.max(1, targetCount - region.count + severityBonus + bandBonus);
+      for (let slot = 0; slot < needed && added < 500; slot += 1) {
+        const placement = findOpenPlacement(region, slot);
+        if (!placement) continue;
+        const { angle, radius } = placement;
+        const ground = this.terrainY(angle, radius);
+        const sizeUnit = stableUnit(`sparse-size:${region.id}:${region.sector}:${slot}`);
+        const height = 1.75 + sizeUnit * 1.55 + (slot % 4 === 3 ? 1.15 : 0);
+        const entity = this.addRadialRock(`density-balanced secondary ${region.id}-${region.sector + 1}-${slot + 1}`,
+          angle, radius, ground + height * .22,
+          { x: 1.85 + sizeUnit * .95, y: height, z: 1.55 + (1 - sizeUnit) * .72 },
+          ground < 3 ? this.materials.wetRock : ground > 95 ? this.materials.alpine : this.materials.rock, {
+            tangentOffset: (stableUnit(`sparse-tangent:${region.id}:${region.sector}:${slot}`) - .5) * 3.2,
+            pitch: -6 - sizeUnit * 8,
+            roll: (sizeUnit - .5) * 12,
+            climbMaterial: 'rough',
+            formKind: sizeUnit > .52 ? 'wedge' : 'chunk',
+            // These secondary infill rocks are the high-count snag source. A slightly
+            // inset rounded proxy preserves their broad climb shape while eliminating
+            // tiny decorative hull corners from character collision.
+            collisionProxy: 'rounded-box'
+          });
+        if (entity) added += 1;
+      }
+    }
+    const updatedSubstantial = this.rockPlacements.filter((rock) => (
+      Math.max(rock.size.x, rock.size.y, rock.size.z) >= 1.25 && !rock.crown
+    ));
+    const remaining = auditRockDensity(updatedSubstantial, bands, 18);
+    const actionable = remaining.filter((region) => findOpenPlacement(region));
+    this.rockDensityAudit = {
+      sampledRocks: substantial.length,
+      sparseRegions: sparse.length,
+      added,
+      remainingSparseRegions: actionable.length,
+      protectedSparseRegions: remaining.length - actionable.length
+    };
+  }
+
+  auditSolidRockSupport() {
+    const unsupported = this.rockPlacements.filter((rock) => !rock.supported);
+    return {
+      total: this.rockPlacements.length,
+      crown: this.rockPlacements.filter((rock) => rock.crown).length,
+      rejected: this.rejectedRocks.length,
+      unsupported: unsupported.map((rock) => rock.name)
+    };
+  }
+
+  buildFishingLocations() {
+    MOUNTAIN_FISHING_LOCATIONS.forEach((location, index) => this.addFishingLocation(location, index));
+    this.addFrosthookColdOceanFishingLocation();
+    this.addBluewaterReachFishingLocation();
+    this.addOceanFishingLocation();
+  }
+
+  addFrosthookColdOceanFishingLocation() {
+    const descriptor = FROSTHOOK_COLD_OCEAN_DESCRIPTOR;
+    const zone = new FishingZone({
+      id: descriptor.id,
+      label: descriptor.label,
+      center: descriptor.center,
+      shape: 'annulus',
+      innerRadius: descriptor.innerRadius,
+      renderedInnerRadius: descriptor.innerRadius,
+      outerRadius: descriptor.outerRadius,
+      surfaceY: OCEAN_SURFACE_Y,
+      fishIds: descriptor.fish,
+      depth: 'deep',
+      modifiers: {
+        biteRate: 1.02,
+        size: 1.08,
+        rarityBias: .12,
+        trophyChance: 1.12,
+        maximumSpeciesProbability: ECOLOGY_TARGETS.maximumSpeciesShare
+      }
+    });
+    zone.tier = descriptor.tier;
+    zone.waterType = descriptor.waterType;
+    zone.theme = descriptor.theme;
+    zone.ecologyThemes = [...descriptor.ecologyThemes];
+    zone.uniformProbabilities = descriptor.uniformProbabilities;
+    zone.probabilityGroup = descriptor.probabilityGroup;
+    zone.physicalZone = descriptor.physicalZone;
+    this.fishingZones.push(attachZoneEcology(zone));
+  }
+
+  addBluewaterReachFishingLocation() {
+    const descriptor = BLUEWATER_REACH_DESCRIPTOR;
+    const zone = new FishingZone({
+      id: descriptor.id,
+      label: descriptor.label,
+      center: descriptor.center,
+      shape: 'annulus',
+      innerRadius: descriptor.innerRadius,
+      renderedInnerRadius: descriptor.innerRadius,
+      outerRadius: descriptor.outerRadius,
+      surfaceY: OCEAN_SURFACE_Y,
+      fishIds: descriptor.fish,
+      depth: 'deep',
+      modifiers: {
+        biteRate: 1,
+        size: 1,
+        specimenSizeBias: descriptor.specimenSizeBias,
+        largeSpeciesWeightBias: descriptor.largeSpeciesWeightBias,
+        trophyChance: 1.08,
+        maximumSpeciesProbability: ECOLOGY_TARGETS.maximumSpeciesShare
+      }
+    });
+    zone.tier = descriptor.tier;
+    zone.waterType = descriptor.waterType;
+    zone.theme = descriptor.theme;
+    zone.ecologyThemes = [...descriptor.ecologyThemes];
+    zone.habitatAliasIds = [...descriptor.habitatAliasIds];
+    zone.uniformProbabilities = descriptor.uniformProbabilities;
+    zone.probabilityGroup = descriptor.probabilityGroup;
+    zone.physicalZone = descriptor.physicalZone;
+    this.fishingZones.push(attachZoneEcology(zone));
+  }
+
+  addOceanFishingLocation() {
+    const descriptor = OCEAN_FISHING_DESCRIPTOR;
+    const zone = new FishingZone({
+      id: descriptor.id,
+      label: descriptor.label,
+      center: descriptor.center,
+      shape: 'annulus',
+      innerRadius: descriptor.innerRadius,
+      outerRadius: descriptor.outerRadius,
+      containsRenderedWater: (point, margin = 0) => Math.hypot(
+        point.x - descriptor.center.x, point.z - descriptor.center.z
+      ) >= descriptor.innerRadius + margin
+        && !isFrosthookColdOceanPoint(point, margin)
+        && !isBluewaterReachPoint(point, margin)
+        && !SMALL_ISLAND_LOCATIONS.some((location) => {
+        const dx = (point.x - location.worldPosition.x) / Math.max(.1, location.radii.x * 1.08 + margin);
+        const dz = (point.z - location.worldPosition.z) / Math.max(.1, location.radii.z * 1.08 + margin);
+        return Math.hypot(dx, dz) <= 1;
+      }),
+      distanceToRenderedWater: (point) => {
+        if (isFrosthookColdOceanPoint(point)) return FROSTHOOK_COLD_OCEAN_DESCRIPTOR.outerRadius;
+        if (isBluewaterReachPoint(point)) return BLUEWATER_REACH_DESCRIPTOR.outerRadius;
+        const radial = Math.hypot(point.x - descriptor.center.x, point.z - descriptor.center.z);
+        if (radial < descriptor.innerRadius) return descriptor.innerRadius - radial;
+        const island = SMALL_ISLAND_LOCATIONS.find((location) => {
+          const dx = (point.x - location.worldPosition.x) / (location.radii.x * 1.08);
+          const dz = (point.z - location.worldPosition.z) / (location.radii.z * 1.08);
+          return Math.hypot(dx, dz) <= 1;
+        });
+        if (!island) return Math.max(0, radial - descriptor.outerRadius);
+        const normalized = Math.hypot(
+          (point.x - island.worldPosition.x) / (island.radii.x * 1.08),
+          (point.z - island.worldPosition.z) / (island.radii.z * 1.08)
+        );
+        return Math.max(0, 1 - normalized) * Math.min(island.radii.x, island.radii.z) * 1.08;
+      },
+      surfaceY: OCEAN_SURFACE_Y,
+      fishIds: descriptor.fish,
+      depth: 'deep',
+      modifiers: {
+        biteRate: .98,
+        size: 1.04,
+        rarityBias: .07,
+        trophyChance: 1.08,
+        maximumSpeciesProbability: ECOLOGY_TARGETS.maximumSpeciesShare
+      }
+    });
+    zone.tier = descriptor.tier;
+    zone.waterType = descriptor.waterType;
+    zone.theme = descriptor.theme;
+    zone.ecologyThemes = [...descriptor.ecologyThemes];
+    zone.uniformProbabilities = descriptor.uniformProbabilities;
+    zone.probabilityGroup = descriptor.probabilityGroup;
+    zone.physicalZone = descriptor.physicalZone ?? 'Ocean';
+    this.fishingZones.push(attachZoneEcology(zone));
+  }
+
+  buildCaveInteriorShell(location) {
+    const caveDepth = caveDepthAt(location);
+    const entranceRadius = location.radius + caveDepth;
+    const island = location.offshore
+      ? SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === location.offshore)
+      : null;
+
+    // Cave geometry in this repair is triangle-mesh only. The old cuboid tunnel/chamber
+    // construction is deleted, not disabled or pushed deeper into the mountain.
+    const addCaveMesh = (name, vertices, triangles, material, friction = .92) => {
+      if (!vertices.length || !triangles.length) return null;
+      const geometry = new pc.Geometry();
+      geometry.positions = [];
+      geometry.indices = [];
+      for (const triangle of triangles) {
+        for (const vertexIndex of triangle) {
+          geometry.positions.push(...vertices[vertexIndex]);
+          geometry.indices.push(geometry.indices.length);
+        }
+      }
+      geometry.calculateNormals();
+      const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+      const entity = new pc.Entity(name);
+      entity.addComponent('render');
+      entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+      this.buildTarget.addChild(entity);
+      entity.physicsCollider = this.physicsWorld.createCollider(
+        this.RAPIER.ColliderDesc.trimesh(
+          new Float32Array(vertices.flat()),
+          new Uint32Array(triangles.flat())
+        ).setFriction(friction).setRestitution(0)
+      );
+      return entity;
+    };
+
+    const addRibbon = ({
+      name,
+      rows,
+      columns = 7,
+      pointAt,
+      material,
+      friction = .94
+    }) => {
+      const vertices = [];
+      const triangles = [];
+      for (let row = 0; row < rows; row += 1) {
+        const t = row / Math.max(1, rows - 1);
+        for (let column = 0; column < columns; column += 1) {
+          const side = lerp(-1, 1, column / Math.max(1, columns - 1));
+          const point = pointAt(t, side);
+          vertices.push([point.x, point.y, point.z]);
+        }
+      }
+      for (let row = 0; row < rows - 1; row += 1) {
+        for (let column = 0; column < columns - 1; column += 1) {
+          const a = row * columns + column;
+          const b = a + 1;
+          const c = (row + 1) * columns + column;
+          const d = c + 1;
+          triangles.push([a, c, b], [b, c, d]);
+        }
+      }
+      return addCaveMesh(name, vertices, triangles, material, friction);
+    };
+
+    const addOrganicShell = ({
+      name,
+      stations,
+      sides = 12,
+      stationAt,
+      material,
+      capBack = true
+    }) => {
+      const vertices = [];
+      const triangles = [];
+      const capBelowHostSurface = (point, profile) => {
+        let ceilingY = Number.isFinite(profile.ceilingY) ? profile.ceilingY : null;
+        if (profile.surfaceCap) {
+          const dx = point.x - MOUNTAIN_CENTER.x;
+          const dz = point.z - MOUNTAIN_CENTER.z;
+          let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+          if (localAngle < 0) localAngle += 360;
+          const localRadius = Math.hypot(dx, dz);
+          ceilingY = terrainHeightAt(localAngle, localRadius) - CAVE_TOPOLOGY_CONFIG.roofClearance;
+        }
+        if (Number.isFinite(ceilingY)) point.y = Math.min(point.y, ceilingY);
+        return point;
+      };
+      for (let station = 0; station < stations; station += 1) {
+        const t = station / Math.max(1, stations - 1);
+        const profile = stationAt(t);
+        for (let side = 0; side <= sides; side += 1) {
+          const phase = side / sides * Math.PI;
+          const lateral = Math.cos(phase) * profile.halfWidth;
+          const point = this.point(location.angle, profile.radius, profile.floorY, lateral);
+          const shoulder = Math.pow(Math.sin(phase), .82);
+          point.y = profile.floorY + shoulder * profile.height;
+          capBelowHostSurface(point, profile);
+          vertices.push([point.x, point.y, point.z]);
+        }
+      }
+      for (let station = 0; station < stations - 1; station += 1) {
+        for (let side = 0; side < sides; side += 1) {
+          const a = station * (sides + 1) + side;
+          const b = a + 1;
+          const c = (station + 1) * (sides + 1) + side;
+          const d = c + 1;
+          triangles.push([a, c, b], [b, c, d]);
+        }
+      }
+      if (capBack) {
+        const last = stationAt(1);
+        const center = this.point(location.angle, last.radius - .18, last.floorY + last.height * .38, 0);
+        capBelowHostSurface(center, last);
+        const centerIndex = vertices.length;
+        vertices.push([center.x, center.y, center.z]);
+        const start = (stations - 1) * (sides + 1);
+        for (let side = 0; side < sides; side += 1) {
+          triangles.push([start + side, centerIndex, start + side + 1]);
+        }
+      }
+      return addCaveMesh(name, vertices, triangles, material, .92);
+    };
+
+    if (island) {
+      // The shallow offshore island needs an open, lined descent before its roof begins.
+      // Every ceiling vertex stays below the lowest surrounding top ring, so the lining can
+      // never become an exterior hood even though this island has little overburden.
+      const outerRadius = entranceRadius - .15;
+      const backRadius = location.radius - location.radii[0] - 2.4;
+      const floorOuter = island.elevation - .02;
+      const floorRear = location.y - 1.3;
+      const islandCeilingY = island.elevation + .02;
+      const shellStartT = .34;
+      const chamberHalfWidth = Math.max(location.radii[1] + 1.15, 4.4);
+      const islandSurfaceYAt = (point) => {
+        const dx = point.x - island.worldPosition.x;
+        const dz = point.z - island.worldPosition.z;
+        let parameterAngle = Math.atan2(dz / island.radii.z, dx / island.radii.x) * 180 / Math.PI;
+        if (parameterAngle < 0) parameterAngle += 360;
+        const outlineScale = islandFootprintScale(island.id, parameterAngle);
+        const normalizedRadius = Math.hypot(dx / island.radii.x, dz / island.radii.z)
+          / Math.max(.001, outlineScale);
+        if (normalizedRadius >= 1) return lerp(OCEAN_SURFACE_Y - .08, OCEAN_SURFACE_Y - 1.6,
+          smoothstep(1, 1.2, normalizedRadius));
+        if (normalizedRadius >= .68) return lerp(island.elevation + .06, OCEAN_SURFACE_Y - .08,
+          smoothstep(.68, 1, normalizedRadius));
+        if (normalizedRadius >= .2) return lerp(island.elevation + .16, island.elevation + .06,
+          smoothstep(.2, .68, normalizedRadius));
+        return island.elevation + .18;
+      };
+      const widthAt = (t) => {
+        const chamber = smoothstep(.32, .58, t) * (1 - smoothstep(.82, 1, t));
+        return lerp(location.radii[1] * .72 + 1.05, chamberHalfWidth, chamber)
+          * lerp(1, .12, smoothstep(.88, 1, t));
+      };
+      const floorAt = (t) => lerp(floorOuter, floorRear,
+        t < .34 ? smoothstep(0, .34, t) : 1);
+
+      // The island terrain omits two complete shoreline/top-ring strips to form its mouth.
+      // Reconstruct only their lower walking surface as a recessed apron; the volume above
+      // stays open, while players can no longer fall through the unlined outer half of the cut.
+      const centerRadians = degreesToRadians(location.angle);
+      const localShoreRadius = Math.hypot(
+        Math.cos(centerRadians) * island.radii.x,
+        Math.sin(centerRadians) * island.radii.z
+      ) * islandFootprintScale(island.id, location.angle);
+      const shoreRadius = location.radius + localShoreRadius;
+      addRibbon({
+        name: `${location.label} natural island entrance apron`,
+        rows: 14,
+        columns: 9,
+        pointAt: (t, side) => {
+          const radius = lerp(shoreRadius - .12, outerRadius, t);
+          const outerHalfWidth = Math.tan(degreesToRadians(13.5)) * shoreRadius;
+          const halfWidth = lerp(outerHalfWidth, widthAt(0), smoothstep(0, 1, t));
+          const point = this.point(location.angle, radius, 0, side * halfWidth);
+          const hostY = islandSurfaceYAt(point) - .08;
+          const centerDip = (1 - Math.abs(side)) * lerp(.03, .12, t);
+          point.y = Math.min(hostY,
+            lerp(hostY, floorOuter - centerDip, smoothstep(.72, 1, t)));
+          return point;
+        },
+        material: this.materials.islandRock,
+        friction: .96
+      });
+
+      addRibbon({
+        name: `${location.label} faceted cave floor`,
+        rows: 18,
+        pointAt: (t, side) => {
+          const radius = lerp(outerRadius + 1.6, backRadius, t);
+          const width = widthAt(t);
+          const bowl = (1 - Math.abs(side)) * .12;
+          return this.point(location.angle, radius, floorAt(t) - bowl, side * width);
+        },
+        material: this.materials.cave
+      });
+
+      for (const wallSide of [-1, 1]) addRibbon({
+        name: `${location.label} recessed entrance ${wallSide < 0 ? 'left' : 'right'} wall`,
+        rows: 9,
+        columns: 2,
+        pointAt: (t, verticalSide) => {
+          const pathT = lerp(0, shellStartT, t);
+          const radius = lerp(shoreRadius + .8, backRadius, pathT);
+          const point = this.point(location.angle, radius, 0,
+            wallSide * (widthAt(pathT) + lerp(1.8, .22, t)));
+          point.y = lerp(floorAt(pathT), islandCeilingY, (verticalSide + 1) * .5);
+          return point;
+        },
+        material: this.materials.caveWall
+      });
+
+      addOrganicShell({
+        name: `${location.label} recessed tunnel lining`,
+        stations: 20,
+        sides: 14,
+        stationAt: (localT) => {
+          const t = lerp(shellStartT, 1, localT);
+          return {
+            radius: lerp(outerRadius, backRadius, t),
+            floorY: floorAt(t),
+            halfWidth: widthAt(t) + .22,
+            height: lerp(3.3, 5.25, smoothstep(.15, .62, t))
+              * lerp(1, .18, smoothstep(.88, 1, t)),
+            ceilingY: islandCeilingY
+          };
+        },
+        material: this.materials.caveWall
+      });
+      return;
+    }
+
+    // MOUNTAIN CAVES — no-box topology + fall-gap repair.
+    // The doorway remains a literal missing-face aperture in the gray mountain core. A
+    // visible natural-gray concave apron sits beneath the full deleted-triangle footprint,
+    // then transitions into an irregular cave floor and a rounded faceted interior shell.
+    const mouthHalfWidth = caveMouthHalfWidthAt(location);
+    const outerCutRadius = entranceRadius + CAVE_TOPOLOGY_CONFIG.entranceOuterPad;
+    const innerCutRadius = entranceRadius - CAVE_TOPOLOGY_CONFIG.entranceCutDepth;
+    const apronInnerRadius = innerCutRadius - CAVE_TOPOLOGY_CONFIG.hiddenRadialOverlap;
+
+    addRibbon({
+      name: `${location.label} natural entrance catch apron`,
+      rows: 9,
+      columns: 9,
+      pointAt: (t, side) => {
+        const radius = lerp(outerCutRadius + CAVE_TOPOLOGY_CONFIG.hiddenRadialOverlap, apronInnerRadius, t);
+        const depthT = clamp((outerCutRadius - radius)
+          / Math.max(.001, outerCutRadius - innerCutRadius), 0, 1);
+        const profile = caveApertureProfileAtDepth(location, depthT);
+        // The safety margin is larger than a complete local terrain grid cell, so every
+        // whole triangle deleted by the aperture filter has a solid visible surface below.
+        const halfWidth = profile.halfWidth + lerp(
+          CAVE_TOPOLOGY_CONFIG.hiddenSideOverlap + .8,
+          CAVE_TOPOLOGY_CONFIG.hiddenSideOverlap,
+          t
+        );
+        const lateral = profile.centerShift + side * halfWidth;
+        const p = this.point(location.angle, radius, 0, lateral);
+        const dx = p.x - MOUNTAIN_CENTER.x;
+        const dz = p.z - MOUNTAIN_CENTER.z;
+        let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+        if (localAngle < 0) localAngle += 360;
+        const localRadius = Math.hypot(dx, dz);
+        const naturalY = terrainHeightAt(localAngle, localRadius);
+        const centerDip = (1 - Math.abs(side)) * lerp(.05, .32, t);
+        const inset = lerp(.06, .78, smoothstep(0, 1, t)) + centerDip;
+        p.y = naturalY - inset;
+        return p;
+      },
+      material: this.materials.alpine,
+      friction: .96
+    });
+
+    const backRadius = location.radius - location.radii[0] - 3.0;
+    const runDepth = Math.max(1, apronInnerRadius - backRadius);
+    const rearFloor = location.y - 1.08;
+    const apronInnerFloor = terrainHeightAt(location.angle, apronInnerRadius) - .82;
+    const chamberHalfWidth = Math.max(mouthHalfWidth + 1.0, location.radii[1] + 1.15);
+    const floorAt = (t) => {
+      if (t < .34) return lerp(apronInnerFloor, rearFloor, smoothstep(0, .34, t));
+      return rearFloor + smoothstep(.84, 1, t) * .16;
+    };
+    const widthAt = (t) => {
+      const tunnelWidth = mouthHalfWidth + .62;
+      const chamberBlend = smoothstep(.28, .54, t) * (1 - smoothstep(.82, 1, t));
+      const width = lerp(tunnelWidth, chamberHalfWidth, chamberBlend);
+      return width * lerp(1, .09, smoothstep(.9, 1, t));
+    };
+
+    addRibbon({
+      name: `${location.label} irregular cave floor`,
+      rows: 24,
+      columns: 9,
+      pointAt: (t, side) => {
+        const radius = lerp(apronInnerRadius + CAVE_TOPOLOGY_CONFIG.hiddenFloorOverlap, backRadius, t);
+        const wobble = Math.sin(t * 10.7 + stableUnit(`cave-floor:${location.id}`) * 5.4) * .08;
+        const width = Math.max(.28, widthAt(t) * (1 + wobble));
+        const bowl = (1 - Math.abs(side)) * .14;
+        return this.point(location.angle, radius, floorAt(t) - bowl, side * width);
+      },
+      material: this.materials.cave,
+      friction: .95
+    });
+
+    // The dark interior does not begin at the exterior shell. It starts only where a real
+    // arch fits under the original terrain; from there it widens around the pool and then
+    // closes by tapering to a rounded end instead of terminating in a flat rectangular wall.
+    let shellStartT = .04;
+    for (let candidate = .04; candidate <= .36; candidate += .02) {
+      const radius = lerp(apronInnerRadius, backRadius, candidate);
+      const headroom = terrainHeightAt(location.angle, radius) - floorAt(candidate);
+      shellStartT = candidate;
+      if (headroom >= 3.35) break;
+    }
+    shellStartT = Math.max(shellStartT,
+      CAVE_TOPOLOGY_CONFIG.archMinimumInset / Math.max(.001, runDepth));
+
+    // Two open-topped wall ribbons attach to the exact omitted-terrain footprint and descend
+    // until there is enough overburden for a full arch. Their top vertices are sampled from
+    // the host mountain and inset, making protrusion outside the gray core impossible.
+    const wallOuterRadius = outerCutRadius + CAVE_TOPOLOGY_CONFIG.hiddenSideOverlap;
+    const wallInnerRadius = lerp(apronInnerRadius, backRadius, shellStartT);
+    const innerMouthProfile = caveApertureProfileAtDepth(location, 1);
+    for (const wallSide of [-1, 1]) addRibbon({
+      name: `${location.label} recessed entrance ${wallSide < 0 ? 'left' : 'right'} wall`,
+      rows: 15,
+      columns: 2,
+      pointAt: (t, verticalSide) => {
+        const radius = lerp(wallOuterRadius, wallInnerRadius, t);
+        const depthT = clamp((outerCutRadius - radius)
+          / Math.max(.001, outerCutRadius - innerCutRadius), 0, 1);
+        const apertureProfile = caveApertureProfileAtDepth(location, depthT);
+        const tunnelT = clamp((apronInnerRadius - radius) / Math.max(.001, runDepth), 0, 1);
+        const belowCutT = clamp((innerCutRadius - radius)
+          / Math.max(.001, innerCutRadius - apronInnerRadius), 0, 1);
+        const halfWidth = radius >= innerCutRadius
+          ? apertureProfile.halfWidth + lerp(
+            CAVE_TOPOLOGY_CONFIG.hiddenSideOverlap,
+            .35,
+            depthT
+          )
+          : lerp(innerMouthProfile.halfWidth + .1, widthAt(tunnelT) + .26,
+            smoothstep(0, 1, belowCutT));
+        const centerShift = radius >= innerCutRadius
+          ? apertureProfile.centerShift
+          : lerp(innerMouthProfile.centerShift, 0, smoothstep(0, 1, belowCutT));
+        const point = this.point(location.angle, radius, 0,
+          centerShift + wallSide * halfWidth);
+        const dx = point.x - MOUNTAIN_CENTER.x;
+        const dz = point.z - MOUNTAIN_CENTER.z;
+        let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+        if (localAngle < 0) localAngle += 360;
+        const localRadius = Math.hypot(dx, dz);
+        const hostSurfaceY = terrainHeightAt(localAngle, localRadius);
+        const apronT = clamp((outerCutRadius - radius)
+          / Math.max(.001, outerCutRadius - apronInnerRadius), 0, 1);
+        const bottomY = radius >= apronInnerRadius
+          ? hostSurfaceY - lerp(.16, .82, smoothstep(0, 1, apronT))
+          : floorAt(tunnelT);
+        point.y = lerp(bottomY, hostSurfaceY - .16, (verticalSide + 1) * .5);
+        return point;
+      },
+      material: this.materials.caveWall
+    });
+
+    // A broad hidden ceiling liner sits entirely below the host surface and overlaps the
+    // aperture on every side. It is not an exterior facade: normal outside views see only
+    // the real mountain opening, with this concave surface filling what used to be black void.
+    addRibbon({
+      name: `${location.label} hidden aperture ceiling overlap`,
+      rows: 18,
+      columns: 9,
+      pointAt: (t, side) => {
+        const radius = lerp(
+          outerCutRadius + CAVE_TOPOLOGY_CONFIG.hiddenSideOverlap,
+          wallInnerRadius + .45,
+          t
+        );
+        const depthT = clamp((outerCutRadius - radius)
+          / Math.max(.001, outerCutRadius - innerCutRadius), 0, 1);
+        const profile = caveApertureProfileAtDepth(location, depthT);
+        const tunnelT = clamp((apronInnerRadius - radius) / Math.max(.001, runDepth), 0, 1);
+        const halfWidth = radius >= innerCutRadius
+          ? profile.halfWidth + lerp(CAVE_TOPOLOGY_CONFIG.hiddenSideOverlap, .55, depthT)
+          : widthAt(tunnelT) + .55;
+        const point = this.point(location.angle, radius, 0, profile.centerShift + side * halfWidth);
+        const dx = point.x - MOUNTAIN_CENTER.x;
+        const dz = point.z - MOUNTAIN_CENTER.z;
+        let localAngle = Math.atan2(dz, dx) * 180 / Math.PI;
+        if (localAngle < 0) localAngle += 360;
+        const hostY = terrainHeightAt(localAngle, Math.hypot(dx, dz));
+        point.y = hostY - .18 - (1 - Math.abs(side)) * .08;
+        return point;
+      },
+      material: this.materials.caveWall,
+      friction: .92
+    });
+
+    addOrganicShell({
+      name: `${location.label} recessed tunnel and pool lining`,
+      stations: 26,
+      sides: 14,
+      stationAt: (localT) => {
+        const t = lerp(shellStartT, 1, localT);
+        const chamberBlend = smoothstep(.3, .58, t) * (1 - smoothstep(.82, 1, t));
+        const taper = lerp(1, .12, smoothstep(.9, 1, t));
+        const desiredHeight = lerp(3.0, 5.35, chamberBlend) * taper;
+        return {
+          radius: lerp(apronInnerRadius, backRadius, t),
+          floorY: floorAt(t),
+          halfWidth: Math.max(.22, widthAt(t) + .26),
+          height: Math.max(.42, desiredHeight),
+          surfaceCap: true
+        };
+      },
+      material: this.materials.caveWall
+    });
+  }
+
+  addFishingWaterSurface(name, center, radii, material) {
+    const { vertices, triangles } = createEllipseSurfaceMeshData(center, radii);
+    const geometry = new pc.Geometry();
+    geometry.positions = vertices.flat();
+    geometry.indices = triangles.flat();
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity(name);
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+    entity.render.castShadows = false;
+    this.buildTarget.addChild(entity);
+    return entity;
+  }
+
+  addFishingLocation(location, index) {
+    const center = location.localOffset
+      ? this.point(location.angle, location.radius + location.localOffset.z, location.y, -location.localOffset.x)
+      : this.point(location.angle, location.radius, location.y);
+    const tierBiteRate = location.biteRate
+      ?? ({ lower: .94, middle: 1.03, upper: 1.11, summit: 1.18, waterfall: 1.06 })[location.tier]
+      ?? 1;
+    const visibleWaterScale = location.summit ? 1 : .96;
+    const visibleRadii = { x: location.radii[0] * visibleWaterScale, z: location.radii[1] * visibleWaterScale };
+    const fishingRadiiScale = Number.isFinite(location.fishingRadiiScale) ? location.fishingRadiiScale : 1;
+    const fishingRadii = { x: visibleRadii.x * fishingRadiiScale, z: visibleRadii.z * fishingRadiiScale };
+    const waterfallPath = location.waterfall ? FALLGLASS_WATERFALL_RADII.map((radius) => {
+      const angle = fallglassAngleAt(radius);
+      return this.point(angle, radius,
+        radius >= OCEAN_WATER_INNER_RADIUS ? OCEAN_SURFACE_Y + .04 : this.terrainY(angle, radius) + .4,
+        fallglassTangentAt(radius));
+    }) : [];
+    const zone = new FishingZone({
+      id: location.id,
+      label: location.label,
+      center: { x: center.x, z: center.z },
+      radii: fishingRadii,
+      shape: location.waterfall ? 'path' : 'ellipse',
+      pathPoints: waterfallPath,
+      pathWidth: location.waterfall ? 1.35 : 0,
+      surfaceY: location.y,
+      floorY: location.y - Math.max(.35, location.basinDepth ?? 1),
+      fishIds: location.fish,
+      depth: location.depth,
+      modifiers: {
+        biteRate: tierBiteRate,
+        size: location.size,
+        rarityBias: location.rarityBias,
+        trophyChance: location.trophyChance,
+        maximumSpeciesProbability: location.maximumSpeciesProbability ?? ECOLOGY_TARGETS.maximumSpeciesShare
+      }
+    });
+    // Dynamic metadata is backwards-compatible with the existing FishingZone class and
+    // gives the 256-creature population pass clean habitat axes without changing
+    // the constructor API in this mountain-only pass.
+    zone.tier = location.tier;
+    zone.waterType = location.waterType;
+    zone.theme = location.theme;
+    if (location.ecologyThemes) zone.ecologyThemes = [...location.ecologyThemes];
+    zone.uniformProbabilities = Boolean(location.uniformProbabilities);
+    zone.probabilityGroup = location.probabilityGroup ?? location.id;
+    zone.cave = Boolean(location.cave);
+    zone.waterfall = Boolean(location.waterfall);
+    zone.physicalZone = location.physicalZone ?? location.label;
+    if (location.tutorialWater) zone.allowedFishIds = [...location.fish];
+    if (location.allowedRarities) zone.allowedRarities = [...location.allowedRarities];
+    zone.tutorialWater = Boolean(location.tutorialWater);
+    this.fishingZones.push(attachZoneEcology(zone));
+    if (location.waterfall) return;
+    const waterThickness = .08;
+    const waterCenter = { x: center.x, y: location.y - waterThickness * .5, z: center.z };
+    const waterMaterial = location.offshore === 'normal-fishing-island'
+      ? this.materials.mangroveWater
+      : location.depth === 'deep' ? this.materials.deepWater : this.materials.shallowWater;
+    // Cave pools must not use the primitive cylinder used by open-air ponds. A cylinder
+    // includes a double-sided wall and underside; seen through an entrance, that extra shell
+    // becomes a large dark rectangular slab. The top-only ellipse preserves the exact water
+    // footprint and fishing surface without generating any surrounding cave-mouth geometry.
+    const water = location.cave
+      ? this.addFishingWaterSurface(`${location.label} water`, {
+        x: center.x, y: location.y, z: center.z
+      }, visibleRadii, waterMaterial)
+      : this.addCylinder(`${location.label} water`, waterCenter,
+        { x: visibleRadii.x * 2, y: waterThickness, z: visibleRadii.z * 2 },
+        waterMaterial, {}, false);
+    water.render.castShadows = false;
+    this.mountainWaters.push({
+      entity: water,
+      base: { x: visibleRadii.x * 2, y: waterThickness, z: visibleRadii.z * 2 },
+      rate: .31 + index * .035
+    });
+
+    if (location.summit) return;
+    if (location.cave) {
+      // The frozen Stoneveil core already owns every main-mountain cave surface.
+      // Offshore Basalt Grotto is outside that authored mesh and keeps its island shell.
+      if (shouldBuildLegacyCaveShell(location, this.authoredStoneveilCoreActive)) {
+        this.buildCaveInteriorShell(location);
+      }
+      return;
+    }
+    // Main-mountain ponds can use polar route coordinates. Offshore water cannot: a 4.6°
+    // offset at a 1,500 m island radius throws a prop more than 100 m into open ocean.
+    // Satellite islands already own correctly anchored decoration in decorateOceanIsland().
+    if (!location.offshore) {
+      for (let stone = 0; stone < 4; stone += 1) {
+        const stoneAngle = location.angle + (stone - 1.5) * 4.6;
+        const stoneRadius = location.radius + Math.max(location.radii[0], location.radii[1]) + 1.1;
+        const y = this.terrainY(stoneAngle, stoneRadius);
+        const point = this.point(stoneAngle, stoneRadius, y + .45);
+        this.addMountainBoulder(`${location.label} shore stone ${stone + 1}`, point,
+          { x: 1.25 + (stone % 2) * .45, y: .9 + (stone % 3) * .22, z: 1.35 },
+          ['upper', 'summit'].includes(location.tier) ? this.materials.alpine : this.materials.waterEdge);
+      }
+    }
+    if (location.offshore) return;
+    // Shore dressing varies by climate and water scale instead of stamping the same ring
+    // around every pond. All pieces remain outside the cast footprint and visual-only.
+    const shoreRadius = Math.max(location.radii[0], location.radii[1]) + 1.25;
+    const accentCount = location.waterType === 'lake' ? 10 : 6;
+    for (let accent = 0; accent < accentCount; accent += 1) {
+      const angle = location.angle + (accent - (accentCount - 1) * .5) * (location.waterType === 'lake' ? 3.8 : 5.2);
+      const radius = location.radius + shoreRadius + (accent % 3) * .45;
+      const seed = this.point(angle, radius, 0);
+      const authoredGround = this.authoredGroundAtWorldXZ(seed.x, seed.z, { minimumNormalY: .45, minimumY: OCEAN_SURFACE_Y - .08 });
+      if (this.authoredTerrainGroundQuery && !authoredGround) continue;
+      const point = authoredGround ?? { ...seed, y: this.terrainY(angle, radius) };
+      const baseY = point.y;
+      if (location.tier === 'upper' || location.theme === 'blackstone') {
+        this.createPrimitive(`${location.label} cold shore accent ${accent + 1}`,
+          accent % 3 ? 'sphere' : 'cone', { x: point.x, y: baseY + .22, z: point.z },
+          { x: .48 + accent % 3 * .14, y: accent % 3 ? .3 : .72, z: .44 },
+          location.tier === 'upper' ? (accent % 2 ? this.materials.snow : this.materials.ice) : this.materials.deepRock,
+          { x: accent * 9, y: accent * 37, z: accent % 2 ? 7 : -6 }, { castShadows: false });
+      } else if (location.theme === 'fernwood') {
+        for (const side of [-1, 1]) this.createPrimitive(`${location.label} fern ${accent + 1}-${side}`,
+          'cone', { x: point.x + side * .19, y: baseY + .25, z: point.z },
+          { x: .32, y: .57 + accent % 3 * .1, z: .1 },
+          accent % 2 ? this.materials.shrubLight : this.materials.shrubDark,
+          { y: accent * 31, z: side * 58 }, { castShadows: false });
+      } else {
+        this.createPrimitive(`${location.label} grass flower ${accent + 1}`,
+          accent % 3 === 0 ? 'sphere' : 'cone', { x: point.x, y: baseY + .22, z: point.z },
+          accent % 3 === 0 ? { x: .18, y: .2, z: .18 } : { x: .25, y: .5, z: .17 },
+          accent % 3 === 0 ? this.materials.flowerPink : this.materials.dryGrass,
+          { y: accent * 43, z: accent % 2 ? 8 : -8 }, { castShadows: false });
+      }
+    }
+    if (location.waterType === 'lake') {
+      const logAngle = location.angle + 5.5;
+      const logRadius = location.radius + shoreRadius + .8;
+      const seed = this.point(logAngle, logRadius, 0);
+      const ground = this.authoredGroundAtWorldXZ(seed.x, seed.z, { minimumNormalY: .45, minimumY: OCEAN_SURFACE_Y - .08 });
+      if (this.authoredTerrainGroundQuery && !ground) return;
+      const logY = ground?.y ?? this.terrainY(logAngle, logRadius);
+      const logPoint = { x: seed.x, y: logY + .22, z: seed.z };
+      this.addCylinder(`${location.label} weathered shoreline log`, logPoint,
+        { x: .28, y: 3.2, z: .28 }, this.materials.wood,
+        { x: 90, y: inwardYaw(logAngle), z: 7 }, false);
+    }
+  }
+
+  addMountainTree(x, z, baseY, size, name) {
+    const trunk = this.addCylinder(`${name} climbable trunk`, { x, y: baseY + 1.25 * size, z },
+      { x: .68 * size, y: 2.5 * size, z: .68 * size }, this.materials.wood);
+    this.registerClimbSurface(trunk, trunk.physicsCollider, 'rough', `${name} trunk`);
+    this.createPrimitive(`${name} crown`, 'cone', { x, y: baseY + 4.1 * size, z },
+      { x: 2.7 * size, y: 4.3 * size, z: 2.7 * size }, this.materials.foliage,
+      { x: 0, y: (x * 19 + z * 7) % 180, z: 0 });
+  }
+
+  chooseStart(previousId = null, rng = Math.random) {
+    const choices = previousId ? START_LOCATIONS.filter((start) => start.id !== previousId) : START_LOCATIONS;
+    return choices[Math.floor(rng() * choices.length)];
+  }
+
+  setDeveloperCourseVisible(visible) {
+    this.courseRoot.enabled = visible;
+  }
+
+  getSector(point) {
+    let angle = Math.atan2(point.z - MOUNTAIN_CENTER.z, point.x - MOUNTAIN_CENTER.x) * 180 / Math.PI;
+    if (angle < 0) angle += 360;
+    const anchor = NAMED_CLIMB_ANCHORS.reduce((best, candidate) => {
+      const distance = angularDistance(angle, candidate.angle);
+      return !best || distance < best.distance ? { anchor: candidate, distance } : best;
+    }, null);
+    // Named areas are navigation flavor only; they no longer correspond to exclusive
+    // climb corridors. Keep the names locally around their landmark sectors.
+    if (anchor && anchor.distance <= 8 && Math.hypot(point.x - MOUNTAIN_CENTER.x, point.z - MOUNTAIN_CENTER.z) < 174) {
+      return anchor.anchor.label;
+    }
+    return SECTORS[Math.floor((angle + 30) / 60) % 6];
+  }
+
+  getElevationBand(y) {
+    if (y < 24) return 'Coast / foothills';
+    if (y < 62) return 'Lower mountain';
+    if (y < 105) return 'Middle mountain';
+    if (y < MAP_EDITOR_CROWN_BASE_HEIGHT) return 'Upper / alpine';
+    if (y < SUMMIT_HEIGHT - 1) return 'Summit crown';
+    return 'Summit';
+  }
+
+  inferGroundMaterial(point, climbMaterial = null) {
+    if (climbMaterial) return climbMaterial;
+    if (point.y >= MAP_EDITOR_CROWN_BASE_HEIGHT) return 'crown climb web / sheer summit rock';
+    if (point.y >= 105) return 'alpine rock / snow';
+    const sector = this.getSector(point);
+    if (sector.includes('Waterfall')) return 'smooth rock';
+    if (sector.includes('Chimney')) return 'rough / normal rock';
+    if (sector === 'Sandy Beach' || sector === 'Sheltered Cove') return 'sand / rough rock';
+    if (sector === 'Forest Inlet') return 'forest floor / rough rock';
+    return 'normal / rough rock';
+  }
+
+  getWorldInfo(point, climbMaterial = null) {
+    const elevation = Math.max(0, point.y - PLAYER_FOOT_OFFSET);
+    const course = this.isInDeveloperCourse(point);
+    return {
+      sector: course ? 'Developer Course' : this.getSector(point),
+      elevation,
+      band: course ? 'Mechanics test' : this.getElevationBand(elevation),
+      material: this.inferGroundMaterial(point, climbMaterial),
+      rockSupport: this.rockSupportAudit,
+      rockDensity: this.rockDensityAudit
+    };
+  }
+
+  getMapData() {
+    return createMountainMapData();
+  }
+
+  isInDeveloperCourse(point) {
+    return Math.abs(point.x) < 34 && Math.abs(point.z) < 34;
+  }
+
+  isFatalPosition(point) {
+    return point.y < OUT_OF_WORLD_FALL_Y;
+  }
+
+  isAtSummit(point) {
+    return point.y >= SUMMIT_HEIGHT - .7
+      && Math.hypot(point.x - MOUNTAIN_CENTER.x, point.z - MOUNTAIN_CENTER.z) <= this.summitRadius;
+  }
+
+  getDebugTarget(code) {
+    if (/^Digit[1-6]$/.test(code)) return START_LOCATIONS[Number(code.at(-1)) - 1];
+    const targets = {
+      Digit7: { label: 'Lower climb web sample', position: this.point(20, escarpmentRadiusAt(ESCARPMENTS[0], 20) + ESCARPMENTS[0].width + 3, this.terrainY(20, escarpmentRadiusAt(ESCARPMENTS[0], 20) + ESCARPMENTS[0].width + 3) + 1.25), facingYaw: inwardYaw(20) },
+      Digit8: { label: 'Middle climb web sample', position: this.point(183, escarpmentRadiusAt(ESCARPMENTS[1], 183) + ESCARPMENTS[1].width + 3, this.terrainY(183, escarpmentRadiusAt(ESCARPMENTS[1], 183) + ESCARPMENTS[1].width + 3) + 1.25, 1.5), facingYaw: inwardYaw(183) },
+      Digit9: { label: 'Alpine climb web sample', position: this.point(265, escarpmentRadiusAt(ESCARPMENTS[2], 265) + ESCARPMENTS[2].width + 3, this.terrainY(265, escarpmentRadiusAt(ESCARPMENTS[2], 265) + ESCARPMENTS[2].width + 3) + 1.25), facingYaw: inwardYaw(265) },
+      Digit0: { label: 'Crown climb web sample', position: this.point(125, CROWN_BASE_RADIUS + 3, MAP_EDITOR_CROWN_BASE_HEIGHT + 1.25), facingYaw: inwardYaw(125) },
+      KeyT: { label: 'Mechanics course', position: { x: -14, y: 2.1, z: 12 }, facingYaw: 0 },
+      KeyV: { label: 'Grip test wall', position: { x: -14, y: 2.8, z: 8.45 }, facingYaw: 0 },
+      KeyY: { label: 'Upper climb web traverse', position: this.point(147, 74, this.terrainY(147, 74) + 1.25), facingYaw: inwardYaw(147) },
+      KeyO: { label: 'Sunwash fishing shore', position: this.point(348, 197, 1.25), facingYaw: inwardYaw(348) },
+      KeyU: { label: 'Out-of-world fall test', position: this.point(0, OCEAN_FLOOR_OUTER_RADIUS + 2, .2), facingYaw: 270 },
+      F8: { label: 'Temporary summit rim', position: this.point(270, 6.1, SUMMIT_HEIGHT + PLAYER_FOOT_OFFSET + .16), facingYaw: inwardYaw(270) }
+    };
+    return targets[code] ?? null;
+  }
+
+  update(dt) {
+    super.update(dt);
+    this.updateAquariumSwimming();
+    // Water footprints are intentionally static. Scaling transparent discs every frame
+    // made their edges cross the terrain carve and produced intermittent clipping/z-fighting.
+  }
+}

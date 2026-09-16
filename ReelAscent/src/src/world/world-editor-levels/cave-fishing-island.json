@@ -1,0 +1,50 @@
+{
+  "schema": 2,
+  "kind": "reel-ascent-world-level",
+  "worldId": "cave-fishing-island",
+  "displayName": "Cave Fishing Island / Basalt Grotto",
+  "runtimeLocationId": "cave-fishing-island",
+  "updatedAt": null,
+  "sourcePolicy": {
+    "terrain": "procedural-reference",
+    "architecture": "procedural-reference",
+    "waters": "hybrid",
+    "objects": "authored",
+    "movingPlatforms": "authored",
+    "prefabs": "authored"
+  },
+  "terrain": {
+    "mode": "procedural-reference",
+    "generator": "buildOceanIsland + buildCaveInteriorShell"
+  },
+  "waters": [
+    {
+      "id": "basalt-grotto",
+      "name": "Basalt Grotto",
+      "identity": "basalt-grotto",
+      "position": {
+        "x": 0,
+        "y": 0.22,
+        "z": 0
+      },
+      "radii": {
+        "x": 4.608,
+        "z": 3.744
+      },
+      "depthMeters": 1.15,
+      "color": "#269eb8",
+      "fishingZoneScale": 1.0
+    }
+  ],
+  "objects": [],
+  "movingPlatforms": [],
+  "prefabs": {
+    "definitions": [],
+    "instances": []
+  },
+  "rooms": [],
+  "metadata": {
+    "coordinateSpace": "cave-island-local",
+    "migrationNote": "Terrain is intentionally still a procedural reference in milestone 1; authored objects/water are independent and the format is ready for a later exact geometry bake."
+  }
+}

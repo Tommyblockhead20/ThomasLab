@@ -1,0 +1,23 @@
+{
+  "schema": 2,
+  "kind": "reel-ascent-world-level",
+  "worldId": "pirate-island",
+  "displayName": "Pirate Island",
+  "runtimeLocationId": "pirate-island",
+  "updatedAt": null,
+  "sourcePolicy": {
+    "terrain": "authored-future",
+    "architecture": "authored-future",
+    "waters": "authored-future",
+    "objects": "authored",
+    "movingPlatforms": "authored",
+    "prefabs": "authored"
+  },
+  "terrain": null,
+  "waters": [],
+  "objects": [],
+  "movingPlatforms": [],
+  "prefabs": { "definitions": [], "instances": [] },
+  "rooms": [],
+  "metadata": { "coordinateSpace": "pirate-island-local", "status": "placeholder-scene" }
+}

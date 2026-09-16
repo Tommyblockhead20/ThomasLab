@@ -1,0 +1,27 @@
+{
+  "schema": 2,
+  "kind": "reel-ascent-world-level",
+  "worldId": "skyscraper",
+  "displayName": "Skyscraper / ESB",
+  "runtimeLocationId": "skyreach-foundation",
+  "updatedAt": null,
+  "sourcePolicy": {
+    "terrain": "procedural",
+    "architecture": "runtime-reference",
+    "waters": "procedural",
+    "objects": "authored",
+    "movingPlatforms": "authored",
+    "prefabs": "authored"
+  },
+  "terrain": null,
+  "waters": [],
+  "objects": [],
+  "movingPlatforms": [],
+  "prefabs": { "definitions": [], "instances": [] },
+  "rooms": [],
+  "metadata": {
+    "visualAsset": "/assets/models/empire-state-building.glb",
+    "attribution": "Empire State Building model by SonnySee — CC BY 3.0",
+    "coordinateSpace": "skyreach-structure-local"
+  }
+}
