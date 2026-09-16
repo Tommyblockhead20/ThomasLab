@@ -9,7 +9,7 @@ import { FISH_SPECIES } from './fishing/fish-data.js';
 import { SaveSystem } from './persistence/save-system.js';
 import { ProgressionSystem } from './progression/progression.js';
 import { Player } from './player/player.js';
-import { loadKeyBindings } from './player/movement.js';
+import { loadGamepadBindings, loadKeyBindings } from './player/movement.js';
 import { stabilizeMobileContext } from './player/mobile-actions.js';
 import { FishJournal } from './ui/fish-journal.js';
 import { EcologyGuidePanel } from './ui/ecology-guide.js';
@@ -382,6 +382,7 @@ export class Game {
     window.__reelAscent = Object.freeze({
       getState: () => this.getState(),
       getFishingPerformance: () => this.fishing.getFishingPerformanceState(),
+      getStoneveilTerrainAuthority: () => this.world.stoneveilTerrainAuthority,
       getProgression: () => this.progression.getSnapshot(),
       purchase: (itemId) => this.progression.purchase(itemId),
       equip: (itemId) => this.progression.equip(itemId),
@@ -1060,6 +1061,8 @@ export class Game {
         contextAvailable: Boolean(this.mobileContextState.current)
       },
       keyBindings: loadKeyBindings(),
+      gamepadBindings: loadGamepadBindings(),
+      inputDevice: this.player.input.activeInputDevice,
       pause: {
         active: this.localPause.active,
         multiplayerContinues: true

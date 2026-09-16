@@ -115,6 +115,7 @@ const LEGENDARY_OVERRIDES = Object.freeze({
   goblin_shark: ['Goblin Shark Visor', 'eyewear', 'visor'],
   american_alligator: ['Alligator Scale Mantle', 'backAccessory', 'cape'],
   giant_panda: ['Panda Ear Hood', 'headwear', 'hood'],
+  green_sea_turtle: ['Sea Turtle Shell Pack', 'backAccessory', 'shell'],
   'green-sea-turtle': ['Sea Turtle Shell Pack', 'backAccessory', 'shell']
 });
 
@@ -154,6 +155,17 @@ const legendaryCosmetics = legendarySpecies.map((species, index) => {
   return item(`catch-${speciesId}`, label, slot,
     { type: 'catch', speciesId, speciesName: species.name, hint: `Catch: ${species.name}` }, visual);
 });
+
+// These records/unlocks stay canonical, but their current generated model is still one of
+// the shared fallback Crest/Lens/Charm/Mantle recipes. The wardrobe labels them honestly
+// and prevents new selection until each earns an authored silhouette.
+export const PENDING_COSMETIC_VISUAL_REDESIGN_IDS = Object.freeze(legendarySpecies
+  .filter((species) => !LEGENDARY_OVERRIDES[species.canonicalId ?? species.id])
+  .map((species) => `catch-${species.canonicalId ?? species.id}`));
+const PENDING_COSMETIC_VISUAL_REDESIGN_SET = new Set(PENDING_COSMETIC_VISUAL_REDESIGN_IDS);
+export function cosmeticVisualRedesignPending(id) {
+  return PENDING_COSMETIC_VISUAL_REDESIGN_SET.has(id);
+}
 
 export const CASINO_EXCLUSIVE_COSMETICS = Object.freeze([
   item('casino-golden-top-hat', 'Golden Top Hat', 'headwear', { type: 'casino', hint: 'Casino Exclusive' }, 'top-hat'),

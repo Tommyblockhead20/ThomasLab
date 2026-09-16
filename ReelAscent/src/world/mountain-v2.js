@@ -1,4 +1,7 @@
 import * as pc from 'playcanvas';
+import SKYREACH_WORLD_EDITOR_LEVEL from './world-editor-levels/skyscraper.json' with { type: 'json' };
+import CAVE_FISHING_WORLD_EDITOR_LEVEL from './world-editor-levels/cave-fishing-island.json' with { type: 'json' };
+import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from './world-editor-v2-runtime.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
 import {
@@ -1349,11 +1352,44 @@ export class MountainWorld extends TestWorld {
     markStartup('world:active-location');
     applyWorldObjectPatch(this, MAP_EDITOR_PATCH, MOUNTAIN_CENTER);
     markStartup('world:map-editor-overrides');
+    this.stoneveilTerrainAuthority = this.auditStoneveilTerrainAuthority();
+    if (this.authoredStoneveilCoreActive) {
+      const audit = this.stoneveilTerrainAuthority;
+      console.info(`Stoneveil terrain authority: baked render ${audit.bakedRenders}, baked collider ${audit.bakedColliders}, legacy main ${audit.legacyMainColliders}, legacy crown ${audit.legacyCrownColliders}.`);
+    }
     installMapEditorBridge(this, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
   }
 
   point(angle, radius, y, tangentOffset = 0) {
     return radialPoint(angle, radius, y, tangentOffset);
+  }
+
+  auditStoneveilTerrainAuthority() {
+    const entities = [];
+    const stack = [this.buildTarget ?? this.root];
+    while (stack.length) {
+      const entity = stack.pop();
+      if (!entity) continue;
+      entities.push(entity);
+      stack.push(...(entity.children ?? []));
+    }
+    const baked = entities.filter((entity) => entity.name === 'Map Editor baked 3D mountain core' && entity.enabled !== false);
+    const legacyMain = entities.filter((entity) => entity.name === 'Continuous irregular mountain body' && entity.enabled !== false);
+    const legacyCrown = entities.filter((entity) => entity.name === 'Stoneveil Peak summit crown - sheer ungrippable shell' && entity.enabled !== false);
+    const crownNamed = entities.filter((entity) => /crown|summit/i.test(entity.name ?? ''))
+      .filter((entity) => entity.render || entity.physicsCollider)
+      .map((entity) => Object.freeze({ name: entity.name, render: Boolean(entity.render), collider: Boolean(entity.physicsCollider) }));
+    return Object.freeze({
+      bakedRenders: baked.filter((entity) => entity.render).length,
+      bakedColliders: baked.filter((entity) => entity.physicsCollider).length,
+      legacyMainRenders: legacyMain.filter((entity) => entity.render).length,
+      legacyMainColliders: legacyMain.filter((entity) => entity.physicsCollider).length,
+      legacyCrownRenders: legacyCrown.filter((entity) => entity.render).length,
+      legacyCrownColliders: legacyCrown.filter((entity) => entity.physicsCollider).length,
+      crownNamed: Object.freeze(crownNamed),
+      valid: !this.authoredStoneveilCoreActive || (baked.length === 1
+        && baked[0].render && baked[0].physicsCollider && !legacyMain.length && !legacyCrown.length)
+    });
   }
 
   terrainY(angle, radius) {
@@ -1481,6 +1517,18 @@ export class MountainWorld extends TestWorld {
     group.locationId = location.id;
     this.buildTarget.addChild(group);
     this.locationLoadGroups.set(location.id, group);
+    if (location.id === 'cave-fishing-island') {
+      // World Editor V2 authored objects use a stable island-local coordinate frame while the
+      // legacy island mesh itself is still generated in world coordinates. This bridge lets
+      // Basalt accumulate authored props/platforms now without claiming the approximate editor
+      // reference mesh is production-authoritative terrain.
+      const authoredRoot = new pc.Entity('Basalt Hollow World Editor V2 authored root');
+      authoredRoot.setLocalPosition(location.worldPosition.x, 0, location.worldPosition.z);
+      group.addChild(authoredRoot);
+      this.caveFishingWorldEditorState = attachWorldEditorLevelToStructure(
+        this, authoredRoot, CAVE_FISHING_WORLD_EDITOR_LEVEL
+      );
+    }
     if (location.type === 'open-water-boat') {
       this.buildBluewaterBoat(location, group);
       return;
@@ -2008,6 +2056,10 @@ export class MountainWorld extends TestWorld {
       collision.render.enabled = false;
       collision.tags.add('non-climbable');
     }
+    // World Editor V2 parkour content is authored in the same local frame as this
+    // structure root. The visual ESB remains the supplied SonnySee model; only authored
+    // traversal pieces are added here. Empty milestone data is a no-op.
+    this.skyreachWorldEditorState = attachWorldEditorLevelToStructure(this, root, SKYREACH_WORLD_EDITOR_LEVEL);
   }
   loadSkyreachVisualShell(root) {
     this.app.assets.loadFromUrl(SKYREACH_TOWER_CONFIG.visualAssetUrl, 'container', (error, asset) => {
@@ -2067,8 +2119,9 @@ export class MountainWorld extends TestWorld {
     });
   }
 
-  updateKinematics() {
+  updateKinematics(dt = 1 / 60) {
     this.movingSurfaceMotion.clear();
+    updateWorldEditorKinematics(this, dt);
   }
 
   getSurfaceMotion(collider) {
@@ -4941,6 +4994,14 @@ export class MountainWorld extends TestWorld {
   }
 
   buildSummitCrown() {
+    // terrain.bakedMesh already contains the complete authored summit/cave topology. The
+    // former procedural crown was a second visible trimesh and a second physics collider
+    // over just the upper mountain, which is why lower authored caves worked while Crown
+    // entrances remained sealed. It is legacy fallback geometry only.
+    if (this.authoredStoneveilCoreActive) {
+      this.crownSideTriangles = [];
+      return;
+    }
     // A subdivided shell lets the same proven aperture filter cut a localized Crown cave
     // mouth. The old two-triangle-tall wedges would have removed an entire face from base
     // to summit for one opening.

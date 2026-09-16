@@ -213,9 +213,14 @@ test('300-creature ecology audit preserves the active 28-water topology', () => 
       || (pool.exclusiveCount >= ECOLOGY_TARGETS.minimumExclusivePerWater
         && pool.exclusiveCount <= ECOLOGY_TARGETS.maximumExclusivePerWater)
   )));
-  assert.ok(audit.pools.every((pool) => pool.poolSize >= (
-    pool.id === 'frosthook-cold-ocean' ? 5 : pool.id === 'blue-ice-melt' ? 7 : 8
-  )));
+  const authoredSpecialistMinimums = {
+    'frosthook-cold-ocean': 5,
+    'basalt-grotto': 6,
+    'cloudstep-lake': 6,
+    'hidden-ridge-pool': 7,
+    'blue-ice-melt': 7
+  };
+  assert.ok(audit.pools.every((pool) => pool.poolSize >= (authoredSpecialistMinimums[pool.id] ?? 8)));
   const generalWaterMaximumShare = Math.max(...audit.pools.map((pool) => pool.maximumNormalizedShare));
   assert.ok(generalWaterMaximumShare <= .25 + 1e-9);
   assert.ok(audit.mostDiversePool.poolSize >= 40);

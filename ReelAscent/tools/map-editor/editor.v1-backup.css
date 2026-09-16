@@ -60,29 +60,3 @@ dd { margin: 0; color: var(--text); }
   #editor-shell { grid-template-columns: 220px 1fr 280px; }
   .brand span { display: none; }
 }
-
-
-/* World Editor V2 additions */
-.brand { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-#world-selector {
-  min-width: 230px; max-width: 340px; padding: 7px 9px; border-radius: 7px;
-  background:#101813; color:#eef6ef; border:1px solid #405047; font-weight:700;
-}
-.outliner { display:flex; flex-direction:column; gap:4px; max-height:260px; overflow:auto; }
-.outliner-group { margin-top:5px; color:#91a59a; font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
-.outliner button {
-  text-align:left; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  background:#111a15; border:1px solid #26332c; color:#d9e4dd; border-radius:6px; padding:5px 7px;
-}
-.outliner button.selected { border-color:#d8a83d; color:#ffd978; }
-.validation-list { display:flex; flex-direction:column; gap:5px; }
-.validation-item { border-left:3px solid #8d9d94; padding-left:7px; }
-.validation-item.warning { border-left-color:#e0a937; color:#f3d89e; }
-.validation-item.info { border-left-color:#5fa4d9; color:#bdddf4; }
-.slope-legend { display:grid; grid-template-columns:auto 1fr; gap:4px 8px; margin-top:8px; font-size:11px; }
-.slope-chip { font-weight:800; }
-.slope-chip.walkable { color:#55dd77; }
-.slope-chip.awkward { color:#ffc252; }
-.slope-chip.slide { color:#ff6a42; }
-.slope-chip.extreme { color:#c77cff; }
-#generic-palette-section[hidden], [hidden] { display:none !important; }

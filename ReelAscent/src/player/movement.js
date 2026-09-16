@@ -2,6 +2,7 @@ import { STAMINA_CONFIG } from '../config.js';
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 
 export const KEY_BINDINGS_STORAGE_KEY = 'reel-ascent-key-bindings-v1';
+export const GAMEPAD_BINDINGS_STORAGE_KEY = 'reel-ascent-gamepad-bindings-v1';
 
 export const KEY_BINDING_DEFINITIONS = Object.freeze({
   forward: Object.freeze({ label: 'Move Forward / Rhythm Up', defaultCode: 'KeyW', fixedCodes: Object.freeze(['ArrowUp']) }),
@@ -23,6 +24,16 @@ export const KEY_BINDING_DEFINITIONS = Object.freeze({
 export const DEFAULT_KEY_BINDINGS = Object.freeze(Object.fromEntries(
   Object.entries(KEY_BINDING_DEFINITIONS).map(([action, definition]) => [action, definition.defaultCode])
 ));
+
+export const GAMEPAD_BUTTON_LABELS = Object.freeze([
+  'A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu',
+  'Left Stick Click', 'Right Stick Click', 'D-Pad Up', 'D-Pad Down', 'D-Pad Left', 'D-Pad Right'
+]);
+export const DEFAULT_GAMEPAD_BINDINGS = Object.freeze({
+  forward: null, backward: null, left: null, right: null,
+  sprint: 5, jump: 0, slide: 6, grip: 4, fish: 3, interact: 2,
+  inventory: 8, journal: 10, emotes: 11, map: null
+});
 // Pause and hidden playtest/debug controls remain intentionally unavailable here.
 const RESERVED_BINDING_CODES = new Set([
   'Escape', 'Home', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10',
@@ -58,6 +69,54 @@ export function saveKeyBindings(bindings) {
 }
 
 export function resetKeyBindings() { return saveKeyBindings(DEFAULT_KEY_BINDINGS); }
+
+export function normalizeGamepadBindings(value = {}) {
+  const result = { ...DEFAULT_GAMEPAD_BINDINGS };
+  for (const action of Object.keys(KEY_BINDING_DEFINITIONS)) {
+    const index = value?.[action];
+    result[action] = Number.isInteger(index) && index >= 0 && index < GAMEPAD_BUTTON_LABELS.length
+      ? index : DEFAULT_GAMEPAD_BINDINGS[action];
+  }
+  return result;
+}
+
+export function loadGamepadBindings() {
+  try {
+    const raw = bindingStorage()?.getItem(GAMEPAD_BINDINGS_STORAGE_KEY);
+    return normalizeGamepadBindings(raw ? JSON.parse(raw) : {});
+  } catch { return { ...DEFAULT_GAMEPAD_BINDINGS }; }
+}
+
+export function saveGamepadBindings(bindings) {
+  const normalized = normalizeGamepadBindings(bindings);
+  try { bindingStorage()?.setItem(GAMEPAD_BINDINGS_STORAGE_KEY, JSON.stringify(normalized)); } catch {}
+  globalThis.window?.dispatchEvent?.(new CustomEvent('reel-ascent:gamepad-bindings-changed', { detail: normalized }));
+  return normalized;
+}
+
+export function resetGamepadBindings() { return saveGamepadBindings(DEFAULT_GAMEPAD_BINDINGS); }
+
+export function formatGamepadBinding(index) {
+  return Number.isInteger(index) ? (GAMEPAD_BUTTON_LABELS[index] ?? `Button ${index}`) : 'Unbound';
+}
+
+export function setGamepadBinding(action, index, bindings = loadGamepadBindings()) {
+  if (!KEY_BINDING_DEFINITIONS[action]) return { ok: false, reason: 'Unknown action', bindings };
+  if (['forward', 'backward', 'left', 'right'].includes(action)) {
+    return { ok: false, reason: 'Movement remains assigned to the left stick and D-Pad.', bindings };
+  }
+  if (!Number.isInteger(index) || index < 0 || index >= GAMEPAD_BUTTON_LABELS.length) {
+    return { ok: false, reason: 'That controller input is not supported.', bindings };
+  }
+  for (const [otherAction, otherIndex] of Object.entries(bindings)) {
+    if (otherAction !== action && otherIndex === index) return {
+      ok: false,
+      reason: `${formatGamepadBinding(index)} is already used by ${KEY_BINDING_DEFINITIONS[otherAction]?.label ?? otherAction}.`,
+      bindings
+    };
+  }
+  return { ok: true, bindings: saveGamepadBindings({ ...bindings, [action]: index }) };
+}
 
 export function setKeyBinding(action, code, bindings = loadKeyBindings()) {
   if (!KEY_BINDING_DEFINITIONS[action]) return { ok: false, reason: 'Unknown action', bindings };
@@ -177,6 +236,13 @@ export class PlayerInput {
   constructor(canvas) {
     this.canvas = canvas;
     this.bindings = loadKeyBindings();
+    this.activeInputDevice = 'keyboard';
+    this.lastMeaningfulInputAt = performance.now();
+    this.noteInputDevice = (device) => {
+      if (!['keyboard', 'gamepad', 'touch'].includes(device)) return;
+      this.activeInputDevice = device;
+      this.lastMeaningfulInputAt = performance.now();
+    };
     this.onBindingsChanged = (event) => {
       this.bindings = normalizeKeyBindings(event.detail ?? loadKeyBindings());
       this.held.clear();
@@ -222,6 +288,7 @@ export class PlayerInput {
 
     this.onKeyDown = (event) => {
       if (isEditableInputTarget(event.target)) return;
+      if (event.isTrusted !== false) this.noteInputDevice('keyboard');
       if (!this.forceMobile) this.setMobileMode(false);
       const wasHeld = this.held.has(event.code);
       const lane = rhythmLaneForCode(event.code, this.bindings);
@@ -274,6 +341,7 @@ export class PlayerInput {
 
     this.onMouseDown = (event) => {
       if (event.button !== 0) return;
+      if (event.isTrusted !== false) this.noteInputDevice('keyboard');
       if (!this.forceMobile) this.setMobileMode(false);
       // Mouse-primary remains an immediate Grip/fishing press, but it is not a world-UI
       // interaction. World interactions use X/G or the actual prompt button, preventing a
@@ -310,6 +378,9 @@ export class PlayerInput {
     };
 
     this.onMouseMove = (event) => {
+      if (event.isTrusted !== false && Math.abs(event.movementX) + Math.abs(event.movementY) > 2) {
+        this.noteInputDevice('keyboard');
+      }
       if (!this.mouseGesture) return;
       this.mouseGesture.moved += Math.abs(event.movementX) + Math.abs(event.movementY);
       if (!this.mouseGesture.becameGrip && this.mouseGesture.moved > 6) {
@@ -370,6 +441,7 @@ export class PlayerInput {
       event.preventDefault();
       event.stopPropagation();
       this.setMobileMode(true);
+      this.noteInputDevice('touch');
       const action = event.currentTarget.dataset.touchAction;
       const effectiveAction = action === 'context-action'
         ? this.mobileContextAction

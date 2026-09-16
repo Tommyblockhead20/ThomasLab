@@ -2647,11 +2647,17 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-spin-toggle { position: absolute; right: .55rem; bottom: .55rem; padding: .4rem .52rem; color: #153a36; background: rgb(239 217 139 / 92%); border: 0; border-radius: .36rem; font-size: .5rem; font-weight: 950; cursor: pointer; box-shadow: 0 4px 12px rgb(0 0 0 / 28%); }
 .appearance-speed-toggle { right: auto; left: .55rem; min-width: 2.5rem; }
 .appearance-content { min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; align-content: start; overflow-y: auto; padding-right: .18rem; }
-.appearance-content[data-section="head"] { grid-template-columns: repeat(2, minmax(13rem, 1fr)); }
+.appearance-content[data-section="face"],
+.appearance-content[data-section="neck"],
+.appearance-content[data-section="back"] { grid-template-columns: repeat(2, minmax(13rem, 1fr)); }
 .appearance-group { display: grid; min-width: 0; margin: 0; padding: .5rem; border: 1px solid rgb(255 255 255 / 12%); border-radius: .55rem; background: rgb(255 255 255 / 4%); }
 .appearance-group-avatarType .appearance-options { grid-template-columns: repeat(2, minmax(7rem, 1fr)); }
-.appearance-content[data-section="head"] .appearance-options { grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
-.appearance-content[data-section="head"] .appearance-options button { min-height: 2.55rem; padding: .48rem .55rem; }
+.appearance-content[data-section="face"] .appearance-options,
+.appearance-content[data-section="neck"] .appearance-options,
+.appearance-content[data-section="back"] .appearance-options { grid-template-columns: repeat(auto-fill, minmax(7.2rem, 1fr)); }
+.appearance-content[data-section="face"] .appearance-options button,
+.appearance-content[data-section="neck"] .appearance-options button,
+.appearance-content[data-section="back"] .appearance-options button { min-height: 2.35rem; padding: .42rem .5rem; }
 .appearance-group-compact { grid-column: 1 / -1; }
 .appearance-group-compact .appearance-options { display: flex; flex-wrap: wrap; }
 .appearance-group-compact .appearance-options button { min-width: 4.6rem; min-height: 1.8rem; padding: .28rem .4rem; }
@@ -2665,6 +2671,13 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-options button[aria-pressed="true"] { color: #143833; background: #efd98b; border-color: #fff0b8; box-shadow: 0 0 0 2px rgb(239 217 139 / 18%); }
 .appearance-options button.is-locked { color: rgb(220 236 227 / 62%); background: rgb(0 0 0 / 13%); border-style: dashed; }
 .appearance-options button.is-locked small { display: block; color: #d7c47d; font-size: .42rem; line-height: 1.2; }
+.appearance-options button.is-redesign-pending {
+  color: rgb(220 226 222 / 60%);
+  cursor: not-allowed;
+  background: repeating-linear-gradient(135deg, rgb(82 86 84 / 32%) 0 6px, rgb(35 42 40 / 42%) 6px 12px);
+  border-color: rgb(191 202 197 / 28%);
+}
+.appearance-options button.is-redesign-pending small { display: block; color: #c8bfa8; font-size: .42rem; line-height: 1.2; }
 .appearance-options input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: #efd98b; }
 .appearance-tone-strip { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); height: 1.1rem; overflow: hidden; border: 1px solid rgb(255 255 255 / 28%); border-radius: 999px; }
 .appearance-tone-strip span { min-width: 0; }
@@ -2820,12 +2833,20 @@ body.pause-open #game-shell::after {
 .pause-setting-list label > span { flex: 1; }
 .pause-setting-list select { padding: .38rem .48rem; color: #edf6e9; font: inherit; background: #153a36; border: 1px solid rgb(239 217 139 / 42%); border-radius: .38rem; }
 .keybind-list { display: grid; gap: .35rem; }
-.keybind-row { display: grid; grid-template-columns: minmax(9rem, 1fr) auto auto; gap: .65rem; align-items: center; padding: .55rem .62rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 9%); border-radius: .46rem; }
+.keybind-row { display: grid; grid-template-columns: minmax(9rem, 1fr) repeat(2, minmax(10rem, auto)); gap: .65rem; align-items: center; padding: .55rem .62rem; background: rgb(255 255 255 / 5%); border: 1px solid rgb(255 255 255 / 9%); border-radius: .46rem; }
 .keybind-row.is-waiting { background: rgb(239 217 139 / 12%); border-color: rgb(239 217 139 / 58%); }
 .keybind-row > div { display: grid; gap: .12rem; }
 .keybind-row strong { font-size: .68rem; }
 .keybind-row small { color: rgb(234 244 231 / 53%); font-size: .49rem; }
 .keybind-row kbd { min-width: 4.4rem; text-align: center; }
+.keybind-device { display: grid; grid-template-columns: auto auto; gap: .3rem; align-items: center; }
+.keybind-device > small { grid-column: 1 / -1; letter-spacing: .08em; }
+.keybind-device button:disabled { opacity: .42; cursor: not-allowed; }
+.pause-menu :is(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #fff0a8;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgb(22 73 68 / 85%);
+}
 .pause-secondary-action { margin-top: .55rem; }
 body[data-ui-scale="compact"] :is(.pause-menu, .progression-shop, .mountain-map, .appearance-menu, .multiplayer-menu, .emote-menu) { font-size: .9em; }
 body.large-ui .pause-menu,
@@ -2973,8 +2994,8 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
   .pause-header { align-items: stretch; }
   .pause-workspace { grid-template-columns: 7rem minmax(0, 1fr); }
   .pause-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .keybind-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .keybind-row button { grid-column: 1 / -1; }
+  .keybind-row { grid-template-columns: minmax(0, 1fr); }
+  .keybind-device { grid-template-columns: minmax(5rem, 1fr) auto; }
   .home-interaction-prompt { bottom: 10.8rem; max-width: calc(100vw - 1rem); }
 }
 

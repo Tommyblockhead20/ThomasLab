@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark" />
-  <title>Reel Ascent — World Editor V2</title>
+  <title>Reel Ascent — Stoneveil Map Editor</title>
   <link rel="stylesheet" href="./editor.css" />
   <style>
     #walkthrough-hud {
@@ -28,21 +28,19 @@
     <header id="topbar">
       <div class="brand">
         <strong>REEL ASCENT</strong>
-        <span>WORLD EDITOR V2</span>
-        <select id="world-selector" aria-label="World / scene"></select>
+        <span>STONEVEIL MAP EDITOR</span>
       </div>
       <div class="top-actions">
         <button id="undo" title="Ctrl+Z">Undo</button>
         <button id="redo" title="Ctrl+Y">Redo</button>
         <button id="checkpoint" title="Store a browser-local safety checkpoint before a risky edit">Checkpoint</button>
         <button id="restore-checkpoint" title="Restore your latest manual safety checkpoint">Restore Checkpoint</button>
-        <button id="reload-project-patch" title="Reload the current world data from the dev server">Reload Project Data</button>
-        <button id="open-patch">Open Level / Patch</button>
+        <button id="reload-project-patch" title="Reload src/world/map-editor-patch.json from the dev server">Reload Project Patch</button>
+        <button id="open-patch">Open Patch</button>
         <button id="import-snapshot">Import Runtime Snapshot</button>
         <button id="bake-snapshot" disabled>Bake Rocks Into Editor</button>
         <button id="freeze-core" title="Convert the current finished heightfield into a true editable 3D triangle mesh">Freeze Core to 3D Mesh</button>
-        <button id="export-world-v2" title="Export a schema-v2 World Editor level without replacing the Stoneveil production patch">Export World V2</button>
-        <button id="save-patch" class="primary">Save</button>
+        <button id="save-patch" class="primary">Save Patch</button>
         <input id="patch-file" type="file" accept="application/json,.json" hidden />
         <input id="snapshot-file" type="file" accept="application/json,.json" hidden />
       </div>
@@ -63,9 +61,6 @@
           <button data-tool="plant">Place Plant</button>
           <button data-tool="decor">Place Decor</button>
           <button data-tool="move-water">Move Water</button>
-          <button data-tool="object" data-world-tool="objects">Place Object</button>
-          <button data-tool="platform" data-world-tool="parkour">Place Platform</button>
-          <button data-tool="moving-platform" data-world-tool="moving-platforms">Moving Platform</button>
         </div>
       </section>
 
@@ -82,7 +77,7 @@
         <p class="hint">In 3D Mesh mode, use a small brush (about 3–6 m) and modest depth (about 0.5–2 m). Repeated clicks on the recessed back wall extend a cave naturally. To make a loop/donut cave, bring two tunnel dead ends close, choose <strong>Connect Cave Ends</strong>, click the first end, then the second. It performs a local topology stitch on the same terrain mesh; it does not create a legacy Punch Hole/collar/tunnel object.</p>
       </section>
 
-      <section id="rock-palette-section">
+      <section>
         <h2>Rock Palette</h2>
         <select id="rock-kind"></select>
         <div class="triple">
@@ -102,7 +97,7 @@
         </label>
       </section>
 
-      <section id="plant-palette-section">
+      <section>
         <h2>Plant Palette</h2>
         <select id="plant-kind">
           <option value="grass">Grass tuft</option>
@@ -120,7 +115,7 @@
         <label>Size <input id="plant-size" type="range" min="0.35" max="3" step="0.05" value="1" /><output id="plant-size-out">1.00×</output></label>
       </section>
 
-      <section id="decor-palette-section">
+      <section>
         <h2>Decor Palette</h2>
         <select id="decor-kind">
           <option value="bench">Bench</option>
@@ -129,28 +124,6 @@
           <option value="sign">Trail sign</option>
           <option value="lantern">Lantern post</option>
         </select>
-      </section>
-
-      <section id="generic-palette-section" hidden>
-        <h2>Parkour / Object</h2>
-        <div class="triple">
-          <label>Width <input id="platform-x" type="number" min="0.2" max="80" step="0.1" value="3.0" /></label>
-          <label>Height <input id="platform-y" type="number" min="0.1" max="20" step="0.1" value="0.35" /></label>
-          <label>Depth <input id="platform-z" type="number" min="0.2" max="80" step="0.1" value="2.0" /></label>
-        </div>
-        <label>Climb material
-          <select id="platform-climb-material">
-            <option value="normal" selected>Normal</option>
-            <option value="rough">Rough</option>
-            <option value="smooth">Smooth</option>
-            <option value="ungrippable">Ungrippable</option>
-          </select>
-        </label>
-        <div class="row-actions">
-          <button id="create-prefab-foundation" type="button">New Empty Prefab</button>
-          <button id="create-room-foundation" type="button">New Empty Room Module</button>
-        </div>
-        <p class="hint">Static and moving parkour use the same schema/runtime bridge. Moving platforms start with two path points; edit the waypoints numerically after placement. Prefab/room roots keep child coordinates local so the whole assembly can move together.</p>
       </section>
     </aside>
 
@@ -163,9 +136,7 @@
         <button data-view="west">West Side</button>
         <button id="walkthrough-toggle" title="First-person terrain playtest using the game's player capsule, gravity, jump and slope settings">Walkthrough</button>
         <label><input id="show-waters" type="checkbox" checked /> Waters</label>
-        <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
-        <label id="slope-toggle-wrap" title="Classify the actual authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
-        <label title="Editor-only view of the geometry used for collision"><input id="show-collision" type="checkbox" /> Collision</label>
+        <label title="Temporarily ghost the mountain core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
         <label class="walkthrough-persistent" title="Editor-only ambient light floor. Keeps dark cave geometry readable without changing the saved map or production lighting." style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
           Min brightness <output id="minimum-brightness-out">55%</output>
           <input id="minimum-brightness" type="range" min="35" max="85" step="5" value="55" style="width:100px;" />
@@ -189,7 +160,7 @@
     </section>
 
     <aside id="right-panel" class="panel">
-      <section id="mountain-profile-section">
+      <section>
         <h2>Mountain Profile</h2>
         <p class="hint">Maps current elevation → edited elevation while still in Heightfield mode. Once the core is frozen to a 3D mesh these controls are locked; the frozen mesh becomes the source of truth.</p>
         <canvas id="profile-chart" width="360" height="190"></canvas>
@@ -198,11 +169,6 @@
           <button id="preset-middle">Raise middle plateau +150 ft</button>
           <button id="reset-profile">Reset Profile</button>
         </div>
-      </section>
-
-      <section id="outliner-section">
-        <h2>Outliner</h2>
-        <div id="outliner" class="outliner"></div>
       </section>
 
       <section>
@@ -220,15 +186,9 @@
       </section>
 
       <section>
-        <h2 id="summary-heading">Scene Summary</h2>
+        <h2>Patch Summary</h2>
         <dl id="summary"></dl>
-        <button id="clear-local" class="danger subtle">Clear Current World Autosave</button>
-      </section>
-
-      <section id="validation-section">
-        <h2>Validation</h2>
-        <div id="validation-list" class="validation-list hint">No warnings.</div>
-        <div id="slope-legend" class="slope-legend" hidden></div>
+        <button id="clear-local" class="danger subtle">Clear Editor Patch</button>
       </section>
 
       <section>

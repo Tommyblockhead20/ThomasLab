@@ -1,4 +1,4 @@
-import { formatInputCode } from '../player/movement.js';
+import { formatGamepadBinding, formatInputCode, loadGamepadBindings } from '../player/movement.js';
 
 const MODAL_CLASSES = Object.freeze([
   'fish-gallery', 'journal-open', 'inventory-open', 'multiplayer-open',
@@ -81,8 +81,8 @@ export class HomeInteractionController {
       this.camera?.setYaw?.(interaction.facingYaw);
       this.pendingSeat = { expiresAt: performance.now() + 1800 };
       this.hud.showToast?.(rest
-        ? `Rested on the ${interaction.seatKind ?? 'seat'} • stamina restored • use X or the prompt to stand.`
-        : `Seated facing ${interaction.fishingLabel ?? 'the water'} • press F to fish • click the prompt to get up.`);
+        ? `Rested on the ${interaction.seatKind ?? 'seat'} • stamina restored • use ${this.actionLabel('interact')} or the prompt to stand.`
+        : `Seated facing ${interaction.fishingLabel ?? 'the water'} • ${this.actionLabel('fish')} to fish • use the prompt to get up.`);
       return true;
     };
     if (!shared) return enter();
@@ -146,8 +146,8 @@ export class HomeInteractionController {
     this.prompt.hidden = !this.current || !this.promptAllowed;
     if (this.button) {
       const caps = this.button.querySelectorAll('kbd');
-      if (caps[0]) caps[0].textContent = formatInputCode(this.player.input.getBinding?.('interact') ?? 'KeyX');
-      if (caps[1]) caps[1].textContent = formatInputCode(this.player.input.getBinding?.('grip') ?? 'KeyG');
+      if (caps[0]) caps[0].textContent = this.actionLabel('interact');
+      if (caps[1]) caps[1].textContent = this.actionLabel('grip');
     }
     if (this.current && this.label) {
       if (this.eyebrow) this.eyebrow.textContent = ({
@@ -157,6 +157,11 @@ export class HomeInteractionController {
         ? (this.player.fishing?.active ? 'STOP FISHING & GET UP' : 'CLICK TO GET UP')
         : (this.isInteractionLocked(this.current) ? this.current.lockedLabel : this.current.label);
     }
+  }
+
+  actionLabel(action) {
+    if (this.player.input.activeInputDevice === 'gamepad') return formatGamepadBinding(loadGamepadBindings()[action]);
+    return formatInputCode(this.player.input.getBinding?.(action) ?? ({ interact: 'KeyX', grip: 'KeyG', fish: 'KeyF' })[action] ?? action);
   }
 
   isInteractionLocked(interaction) {

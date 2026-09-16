@@ -1,4 +1,4 @@
-export const DEFAULT_FISHING_VERTICAL_TOLERANCE = 6;
+export const DEFAULT_FISHING_VERTICAL_TOLERANCE = 7;
 
 export class FishingZone {
   constructor({

@@ -364,7 +364,39 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
   // Deliberate, name/theme-authored distinctions for the most obvious shared recipes.
   // These details describe the earned item; they are not index-derived cones or blocks.
   const theme = `${cosmetic.id} ${cosmetic.label} ${cosmetic.source?.speciesName ?? ''}`.toLowerCase();
-  if (cosmetic.id === 'cowboy-hat') {
+  if (cosmetic.id === 'catch-mermaid') {
+    for (let index = 0; index < 7; index += 1) {
+      const theta = index / 7 * Math.PI * 2;
+      add(`mermaid pearl ${index + 1}`, 'sphere', { x: Math.cos(theta) * .34, y: headY + .2, z: Math.sin(theta) * .34 }, { x: .065, y: .065, z: .065 }, materials.silver);
+    }
+    add('mermaid shell fan', 'sphere', { x: 0, y: headY + .43, z: -.02 }, { x: .28, y: .22, z: .055 }, materials.accessory);
+  } else if (cosmetic.id === 'catch-goblin_shark') {
+    add('goblin shark long snout', 'cone', { x: 0, y: (blob ? .85 : .73) - .08, z: frontZ - .22 }, { x: .1, y: .42, z: .08 }, materials.accessory, { x: 90 });
+    for (const side of [-1, 1]) add(`goblin tooth ${side}`, 'cone', { x: side * .09, y: (blob ? .85 : .73) - .2, z: frontZ - .08 }, { x: .035, y: .12, z: .035 }, materials.silver);
+  } else if (cosmetic.id === 'catch-american_alligator') {
+    for (let index = 0; index < 5; index += 1) add(`alligator back scute ${index + 1}`, 'cone', { x: 0, y: (blob ? .05 : -.03) + .34 - index * .17, z: blob ? .57 : .43 }, { x: .08, y: .18, z: .08 }, materials.silver, { x: 90 });
+    add('alligator tail', 'capsule', { x: 0, y: (blob ? .05 : -.03) - .53, z: blob ? .55 : .4 }, { x: .1, y: .55, z: .1 }, materials.accessory, { x: 18 });
+  } else if (cosmetic.id === 'catch-giant_panda') {
+    for (const side of [-1, 1]) {
+      add(`panda ear ${side}`, 'sphere', { x: side * .31, y: headY + .34, z: .02 }, { x: .14, y: .14, z: .1 }, materials.dark);
+      add(`panda eye patch ${side}`, 'sphere', { x: side * .13, y: blob ? .84 : .72, z: frontZ - .025 }, { x: .1, y: .13, z: .035 }, materials.dark, { z: side * -16 });
+    }
+  } else if (cosmetic.id === 'catch-starfall_minnow') {
+    for (let index = 0; index < 5; index += 1) {
+      const theta = index / 5 * Math.PI * 2 - Math.PI / 2;
+      add(`starfall ray ${index + 1}`, 'box', { x: Math.cos(theta) * .1, y: (blob ? .44 : .45) - .16 + Math.sin(theta) * .1, z: frontZ - .01 }, { x: .035, y: .16, z: .025 }, materials.silver, { z: theta * 180 / Math.PI + 90 });
+    }
+  } else if (cosmetic.id === 'catch-whisper_eel') {
+    for (let index = 0; index < 6; index += 1) add(`whisper eel curve ${index + 1}`, 'sphere', { x: -.18 + index * .07, y: (blob ? .44 : .45) - .11 - Math.sin(index / 5 * Math.PI) * .11, z: frontZ - .01 }, { x: .055, y: .04, z: .025 }, index === 5 ? materials.silver : materials.accessory);
+  } else if (cosmetic.id === 'catch-peaklight_koi') {
+    add('peaklight koi body', 'sphere', { x: 0, y: (blob ? .44 : .45) - .16, z: frontZ - .015 }, { x: .16, y: .075, z: .04 }, materials.silver);
+    for (const side of [-1, 1]) add(`peaklight koi fin ${side}`, 'cone', { x: side * .14, y: (blob ? .44 : .45) - .16, z: frontZ - .01 }, { x: .07, y: .12, z: .025 }, materials.accessory, { z: side * 90 });
+  } else if (cosmetic.id === 'catch-violet_crayfish') {
+    for (const side of [-1, 1]) add(`violet crayfish claw ${side}`, 'sphere', { x: side * .34, y: headY + .14, z: -.03 }, { x: .14, y: .09, z: .07 }, materials.accessory, { z: side * 20 });
+  } else if (cosmetic.id === 'catch-plungepool_crab') {
+    add('plungepool crab shell', 'sphere', { x: 0, y: blob ? .05 : -.03, z: blob ? .72 : .56 }, { x: .25, y: .19, z: .06 }, materials.silver);
+    for (const side of [-1, 1]) add(`plungepool crab pincer ${side}`, 'sphere', { x: side * .26, y: (blob ? .05 : -.03) + .08, z: blob ? .72 : .56 }, { x: .1, y: .075, z: .05 }, materials.accessory);
+  } else if (cosmetic.id === 'cowboy-hat') {
     add('creased cowboy crown', 'box', { x: 0, y: headY + .28, z: .02 }, { x: .3, y: .08, z: .32 }, materials.dark);
     add('cowboy hat band', 'cylinder', { x: 0, y: headY + .08, z: .02 }, { x: .45, y: .055, z: .45 }, materials.silver);
   } else if (cosmetic.id === 'badge-master-outfitter') {

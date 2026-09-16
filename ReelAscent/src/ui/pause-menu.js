@@ -1,8 +1,12 @@
 import {
   KEY_BINDING_DEFINITIONS,
+  formatGamepadBinding,
   formatInputCode,
+  loadGamepadBindings,
   loadKeyBindings,
+  resetGamepadBindings,
   resetKeyBindings,
+  setGamepadBinding,
   setKeyBinding
 } from '../player/movement.js';
 import { getAudioSettings, setAudioSettings } from '../audio/settings.js';
@@ -65,6 +69,7 @@ export class PauseMenu {
     this.onResumeClick = () => this.onResume();
     this.onKeyDown = (event) => {
       if (!this.isOpen || !this.awaitingBinding) return;
+      if (event.code !== 'Escape' && this.awaitingBinding.device !== 'keyboard') return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (event.code === 'Escape') {
@@ -73,9 +78,10 @@ export class PauseMenu {
         this.render();
         return;
       }
-      const result = setKeyBinding(this.awaitingBinding, event.code, loadKeyBindings());
+      const action = this.awaitingBinding.action;
+      const result = setKeyBinding(action, event.code, loadKeyBindings());
       this.status.textContent = result.ok
-        ? `${KEY_BINDING_DEFINITIONS[this.awaitingBinding].label} → ${formatInputCode(event.code)}`
+        ? `${KEY_BINDING_DEFINITIONS[action].label} → ${formatInputCode(event.code)}`
         : result.reason;
       if (result.ok) this.awaitingBinding = null;
       this.render();
@@ -196,13 +202,18 @@ export class PauseMenu {
     }
     const binding = event.target.closest('[data-rebind-action]');
     if (binding) {
-      this.awaitingBinding = binding.dataset.rebindAction;
-      this.status.textContent = `Press a key for ${KEY_BINDING_DEFINITIONS[this.awaitingBinding]?.label ?? this.awaitingBinding}. Escape cancels.`;
+      const action = binding.dataset.rebindAction;
+      const device = binding.dataset.rebindDevice === 'gamepad' ? 'gamepad' : 'keyboard';
+      this.awaitingBinding = { action, device };
+      this.status.textContent = device === 'gamepad'
+        ? `Press a controller button for ${KEY_BINDING_DEFINITIONS[action]?.label ?? action}. Escape cancels.`
+        : `Press a key for ${KEY_BINDING_DEFINITIONS[action]?.label ?? action}. Escape cancels.`;
       this.render();
       return;
     }
     if (event.target.closest('[data-reset-bindings]')) {
       resetKeyBindings();
+      resetGamepadBindings();
       this.awaitingBinding = null;
       this.status.textContent = 'Gameplay bindings reset to defaults.';
       this.render();
@@ -300,13 +311,30 @@ export class PauseMenu {
 
   renderKeybinds() {
     const bindings = loadKeyBindings();
+    const gamepadBindings = loadGamepadBindings();
     const rows = Object.entries(KEY_BINDING_DEFINITIONS).map(([action, definition]) => {
       const currentLabel = formatInputCode(bindings[action]);
+      const movementFixed = ['forward', 'backward', 'left', 'right'].includes(action);
+      const gamepadLabel = movementFixed ? 'Left Stick / D-Pad' : formatGamepadBinding(gamepadBindings[action]);
       const fixedLabels = [...new Set(definition.fixedCodes.map(formatInputCode))]
         .filter((label) => label !== currentLabel);
-      return `<article class="keybind-row ${this.awaitingBinding === action ? 'is-waiting' : ''}"><div><strong>${escapeHtml(definition.label)}</strong>${fixedLabels.length ? `<small>Always also: ${fixedLabels.join(', ')}</small>` : ''}</div><kbd>${escapeHtml(currentLabel)}</kbd><button data-rebind-action="${action}">${this.awaitingBinding === action ? 'PRESS A KEY…' : 'REBIND'}</button></article>`;
+      const waitingKeyboard = this.awaitingBinding?.action === action && this.awaitingBinding.device === 'keyboard';
+      const waitingGamepad = this.awaitingBinding?.action === action && this.awaitingBinding.device === 'gamepad';
+      return `<article class="keybind-row ${waitingKeyboard || waitingGamepad ? 'is-waiting' : ''}"><div><strong>${escapeHtml(definition.label)}</strong>${fixedLabels.length ? `<small>Always also: ${fixedLabels.join(', ')}</small>` : ''}</div><span class="keybind-device"><small>KEYBOARD</small><kbd>${escapeHtml(currentLabel)}</kbd><button data-rebind-action="${action}" data-rebind-device="keyboard">${waitingKeyboard ? 'PRESS A KEY…' : 'REBIND'}</button></span><span class="keybind-device"><small>CONTROLLER</small><kbd>${escapeHtml(gamepadLabel)}</kbd><button data-rebind-action="${action}" data-rebind-device="gamepad" ${movementFixed ? 'disabled title="Movement uses the left stick and D-Pad"' : ''}>${waitingGamepad ? 'PRESS BUTTON…' : 'REBIND'}</button></span></article>`;
     }).join('');
     return `<div class="keybind-list">${rows}</div><button class="pause-secondary-action" data-reset-bindings>RESET GAMEPLAY BINDINGS</button>`;
+  }
+
+  captureGamepadBinding(index) {
+    if (!this.isOpen || this.awaitingBinding?.device !== 'gamepad') return false;
+    const action = this.awaitingBinding.action;
+    const result = setGamepadBinding(action, index, loadGamepadBindings());
+    this.status.textContent = result.ok
+      ? `${KEY_BINDING_DEFINITIONS[action].label} → ${formatGamepadBinding(index)}`
+      : result.reason;
+    if (result.ok) this.awaitingBinding = null;
+    this.render();
+    return true;
   }
 
   handleSlotAction(action, slotId) {

@@ -19,19 +19,6 @@ import {
   PLAYER_FOOT_OFFSET,
   PLAYER_STANDING_HEIGHT
 } from '../../src/config.js';
-import { WORLD_EDITOR_WORLDS, getWorldEditorWorld, worldHasCapability } from './world-registry.js';
-import {
-  WORLD_EDITOR_LEVEL_KIND,
-  normalizeWorldEditorLevel,
-  nextStableId,
-  downloadWorldLevel,
-  wrapLegacyStoneveilPatch,
-  unwrapLegacyStoneveilPatch
-} from './world-level-format.js';
-import { GenericWorldScene } from './generic-scene.js';
-import { SlopeOverlay, slopeOverlayLegend } from './slope-overlay.js';
-import { validateWorldLevel } from './validation.js';
-import { movingPlatformPose } from '../../src/world/world-editor-v2-runtime.js';
 
 const STORAGE_KEY = 'reel-ascent-map-editor-v1';
 const CHECKPOINT_KEY = 'reel-ascent-map-editor-v1-manual-checkpoint';
@@ -40,10 +27,6 @@ const RECOVERY_STORE = 'autosaves';
 const RECOVERY_KEY = 'latest-patch';
 const CAMERA_VIEW_KEY = 'reel-ascent-map-editor-camera-view-v1';
 const MIN_BRIGHTNESS_KEY = 'reel-ascent-map-editor-min-brightness-v1';
-const WORLD_V2_ACTIVE_KEY = 'reel-ascent-world-editor-v2-active-world';
-const WORLD_V2_STORAGE_PREFIX = 'reel-ascent-world-editor-v2-level:';
-const WORLD_V2_CHECKPOINT_PREFIX = 'reel-ascent-world-editor-v2-checkpoint:';
-
 const TERRAIN_OUTER_RADIUS = 208;
 const CROWN_BASE_RADIUS = 41;
 const CROWN_TOP_RADIUS = 8;
@@ -65,9 +48,6 @@ const deg = (radians) => radians * 180 / Math.PI;
 const rad = (degrees) => degrees * Math.PI / 180;
 const clone = (value) => structuredClone(value);
 
-const hadStoneveilAutosaveAtBoot = (() => {
-  try { return localStorage.getItem(STORAGE_KEY) != null; } catch { return false; }
-})();
 let patch = loadLocalPatch();
 let runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
 let tool = 'select';
@@ -81,23 +61,6 @@ let suppressHistory = false;
 let activeBrushTransaction = false;
 let currentTerrainData = null;
 let caveConnectStart = null;
-let activeWorldId = (() => {
-  try {
-    const saved = localStorage.getItem(WORLD_V2_ACTIVE_KEY);
-    return WORLD_EDITOR_WORLDS.some((world) => world.id === saved) ? saved : 'stoneveil-peak';
-  } catch { return 'stoneveil-peak'; }
-})();
-const genericLevels = new Map();
-const genericHistories = new Map();
-const genericFutures = new Map();
-let genericScene = null;
-let slopeOverlay = null;
-
-function activeWorld() { return getWorldEditorWorld(activeWorldId); }
-function isStoneveilWorld() { return activeWorldId === 'stoneveil-peak'; }
-function activeGenericLevel() { return genericLevels.get(activeWorldId) ?? null; }
-function genericStorageKey(worldId = activeWorldId) { return `${WORLD_V2_STORAGE_PREFIX}${worldId}`; }
-function genericCheckpointKey(worldId = activeWorldId) { return `${WORLD_V2_CHECKPOINT_PREFIX}${worldId}`; }
 
 const walkthroughState = {
   active: false,
@@ -107,7 +70,6 @@ const walkthroughState = {
   rapierPromise: null,
   world: null,
   terrainCollider: null,
-  genericKinematics: [],
   body: null,
   collider: null,
   controller: null,
@@ -164,10 +126,8 @@ function applyMinimumBrightness(value = minimumBrightness) {
 applyMinimumBrightness();
 app.start();
 
-const sceneRoot = new pc.Entity('World Editor V2 Scene');
+const sceneRoot = new pc.Entity('Map Editor Scene');
 app.root.addChild(sceneRoot);
-const stoneveilRoot = new pc.Entity('Stoneveil Legacy Editor Scene');
-sceneRoot.addChild(stoneveilRoot);
 
 const terrainRoot = new pc.Entity('Terrain Root');
 const waterRoot = new pc.Entity('Water Root');
@@ -176,13 +136,13 @@ const placedRoot = new pc.Entity('Placed Root');
 const snapshotRoot = new pc.Entity('Snapshot Root');
 const helperRoot = new pc.Entity('Helper Root');
 const tunnelRoot = new pc.Entity('Tunnel Root');
-stoneveilRoot.addChild(terrainRoot);
-stoneveilRoot.addChild(waterRoot);
-stoneveilRoot.addChild(caveMarkerRoot);
-stoneveilRoot.addChild(placedRoot);
-stoneveilRoot.addChild(snapshotRoot);
-stoneveilRoot.addChild(tunnelRoot);
-stoneveilRoot.addChild(helperRoot);
+sceneRoot.addChild(terrainRoot);
+sceneRoot.addChild(waterRoot);
+sceneRoot.addChild(caveMarkerRoot);
+sceneRoot.addChild(placedRoot);
+sceneRoot.addChild(snapshotRoot);
+sceneRoot.addChild(tunnelRoot);
+sceneRoot.addChild(helperRoot);
 
 const cameraEntity = new pc.Entity('Editor Camera');
 cameraEntity.addComponent('camera', {
@@ -248,7 +208,7 @@ function queueCameraViewSave() {
 const materials = {
   terrain: makeMaterial([0.49, 0.54, 0.49], 0.08),
   terrainXray: makeMaterial([0.42, 0.52, 0.49], 0.04, 0.10),
-  terrainWire: makeMaterial([1.0, 0.12, 0.12], 0.02, 0.20),
+  terrainWire: makeMaterial([0.2, 0.27, 0.23], 0.02),
   water: makeMaterial([0.15, 0.62, 0.72], 0.78, 0.5),
   waterSelected: makeMaterial([0.96, 0.73, 0.23], 0.9, 0.35),
   caveWaterXray: makeMaterial([0.96, 0.20, 0.82], 0.9, 0.88),
@@ -267,12 +227,9 @@ const materials = {
   caveSelected: makeMaterial([0.78, 0.56, 0.18], 0.08),
   tunnelGuide: makeMaterial([0.88, 0.46, 0.18], 0.04, 0.32)
 };
-for (const material of [materials.terrain, materials.terrainXray, materials.terrainWire]) {
+for (const material of [materials.terrain, materials.terrainXray]) {
   try { material.cull = pc.CULLFACE_NONE; material.update(); } catch {}
 }
-
-genericScene = new GenericWorldScene(app, sceneRoot);
-slopeOverlay = new SlopeOverlay(app, stoneveilRoot, PLAYER_CONFIG);
 
 const waterMaterialCache = new Map();
 function normalizeHexColor(value, fallback = '#269eb8') {
@@ -401,7 +358,6 @@ function destroyWalkthroughPhysics() {
   walkthroughState.collider = null;
   walkthroughState.controller = null;
   walkthroughState.capsuleShape = null;
-  walkthroughState.genericKinematics = [];
 }
 
 function currentWalkthroughEye() {
@@ -441,48 +397,17 @@ function walkthroughCapsuleBlockedAt(position) {
 
 function buildWalkthroughPhysics(RAPIER, eyePosition) {
   destroyWalkthroughPhysics();
-  const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
-  let terrainCollider = null;
-  const genericKinematics = [];
-
-  if (isStoneveilWorld()) {
-    const data = currentTerrainData ?? terrainDataForRender();
-    if (!data?.positions?.length || !data?.indices?.length) {
-      throw new Error('No terrain mesh is available for walkthrough collision.');
-    }
-    const terrainDesc = RAPIER.ColliderDesc.trimesh(
-      Float32Array.from(data.positions),
-      Uint32Array.from(data.indices)
-    ).setFriction(1).setRestitution(0);
-    terrainCollider = world.createCollider(terrainDesc);
-  } else {
-    for (const box of genericScene.getWalkthroughBoxes()) {
-      const size = box.size ?? { x: 1, y: 1, z: 1 };
-      const rotation = box.rotation ?? { x: 0, y: 0, z: 0 };
-      const quat = new pc.Quat().setFromEulerAngles(rotation.x || 0, rotation.y || 0, rotation.z || 0);
-      if (box.moving) {
-        const body = world.createRigidBody(
-          RAPIER.RigidBodyDesc.kinematicPositionBased()
-            .setTranslation(box.center.x, box.center.y, box.center.z)
-            .setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w })
-        );
-        world.createCollider(
-          RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2).setFriction(.94).setRestitution(0),
-          body
-        );
-        genericKinematics.push({
-          id: box.id, definition: box.definition, body,
-          entity: genericScene.movingEntities.get(box.id) ?? null
-        });
-      } else {
-        const desc = RAPIER.ColliderDesc.cuboid(size.x / 2, size.y / 2, size.z / 2)
-          .setTranslation(box.center.x, box.center.y, box.center.z)
-          .setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w })
-          .setFriction(1).setRestitution(0);
-        world.createCollider(desc);
-      }
-    }
+  const data = currentTerrainData ?? terrainDataForRender();
+  if (!data?.positions?.length || !data?.indices?.length) {
+    throw new Error('No terrain mesh is available for walkthrough collision.');
   }
+
+  const world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+  const terrainDesc = RAPIER.ColliderDesc.trimesh(
+    Float32Array.from(data.positions),
+    Uint32Array.from(data.indices)
+  ).setFriction(1).setRestitution(0);
+  const terrainCollider = world.createCollider(terrainDesc);
 
   const center = {
     x: eyePosition.x,
@@ -511,7 +436,6 @@ function buildWalkthroughPhysics(RAPIER, eyePosition) {
 
   walkthroughState.world = world;
   walkthroughState.terrainCollider = terrainCollider;
-  walkthroughState.genericKinematics = genericKinematics;
   walkthroughState.body = body;
   walkthroughState.collider = collider;
   walkthroughState.controller = controller;
@@ -627,9 +551,9 @@ async function enterWalkthrough() {
     if (walkthroughCapsuleBlockedAt(center)) {
       state.fly = true;
       state.flyEye.copy(eye);
-      setWalkthroughMessage(`Walkthrough started in Fly mode because the gameplay capsule overlaps ${isStoneveilWorld() ? 'terrain' : 'scene collision'} here. Fly into open space, then press F for Walk.`);
+      setWalkthroughMessage('Walkthrough started in Fly mode because the gameplay capsule overlaps terrain here. Fly into open cave space, then press F for Walk.');
     } else {
-      setWalkthroughMessage(`Walkthrough: Walk mode active using the game capsule/slope settings${isStoneveilWorld() ? ' against the authored terrain mesh' : ' against scene/platform collision'}. F toggles Fly; Esc exits.`);
+      setWalkthroughMessage('Walkthrough: Walk mode active. Click viewport if mouse-look is not locked. F toggles Fly; Esc exits.');
     }
     updateWalkthroughCamera();
     syncWalkthroughHud();
@@ -668,27 +592,11 @@ function exitWalkthrough() {
   setStatus('Exited Walkthrough at the same cave location.');
 }
 
-function advanceGenericWalkthroughKinematics(dt) {
-  if (isStoneveilWorld() || !walkthroughState.genericKinematics.length) return false;
-  genericScene.elapsedSeconds += Math.max(0, dt);
-  for (const item of walkthroughState.genericKinematics) {
-    const point = movingPlatformPose(item.definition, genericScene.elapsedSeconds);
-    item.body.setNextKinematicTranslation({ x: point.x, y: point.y, z: point.z });
-    if (item.entity) item.entity.setLocalPosition(point.x, point.y, point.z);
-  }
-  return true;
-}
-
 function updateWalkthrough(dt) {
   const state = walkthroughState;
   if (!state.active) return;
   dt = Math.min(Math.max(Number(dt) || 0, 0), .05);
   if (!(dt > 0)) return;
-  const genericMoved = advanceGenericWalkthroughKinematics(dt);
-  if (genericMoved) {
-    state.world.timestep = dt;
-    state.world.step();
-  }
 
   if (state.fly) {
     const forward = walkthroughForward();
@@ -844,8 +752,7 @@ function brushTangentDistance(hit, x, y, z, radius) {
 }
 
 function applyTerrainDisplayMode() {
-  const collisionDebug = Boolean($('#show-collision')?.checked);
-  const material = collisionDebug ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
+  const material = xrayCoreEnabled() ? materials.terrainXray : materials.terrain;
   for (const entity of terrainRoot.children) {
     if (!entity.render?.meshInstances) continue;
     for (const instance of entity.render.meshInstances) instance.material = material;
@@ -1025,10 +932,8 @@ function rebuildTerrain() {
   const entity = new pc.Entity(isMeshMode() ? 'Frozen 3D Mountain Mesh' : 'Editable Mountain');
   entity._editorOwnedMeshes = [mesh];
   entity.addComponent('render');
-  const terrainMaterial = $('#show-collision')?.checked ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
-  entity.render.meshInstances = [new pc.MeshInstance(mesh, terrainMaterial, entity)];
+  entity.render.meshInstances = [new pc.MeshInstance(mesh, xrayCoreEnabled() ? materials.terrainXray : materials.terrain, entity)];
   terrainRoot.addChild(entity);
-  if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, data);
 
   rebuildWaterMeshes();
   rebuildTunnels();
@@ -1536,119 +1441,6 @@ function nextId(prefix) {
   return `${prefix}-${String(idCounter).padStart(6, '0')}`;
 }
 
-function loadGenericAutosave(worldId) {
-  try {
-    const raw = localStorage.getItem(genericStorageKey(worldId));
-    return raw ? normalizeWorldEditorLevel(JSON.parse(raw), {
-      worldId,
-      displayName: getWorldEditorWorld(worldId).label,
-      runtimeLocationId: getWorldEditorWorld(worldId).runtimeLocationId
-    }) : null;
-  } catch { return null; }
-}
-
-async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
-  if (preferAutosave) {
-    const autosave = loadGenericAutosave(world.id);
-    if (autosave) return autosave;
-  }
-  const response = await fetch(world.dataUrl, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Could not load ${world.label}: HTTP ${response.status}`);
-  return normalizeWorldEditorLevel(await response.json(), {
-    worldId: world.id, displayName: world.label, runtimeLocationId: world.runtimeLocationId
-  });
-}
-
-function persistGenericLevel(level = activeGenericLevel()) {
-  if (!level) return;
-  level.updatedAt = new Date().toISOString();
-  try { localStorage.setItem(genericStorageKey(level.worldId), JSON.stringify(level)); }
-  catch (error) { console.warn('World Editor V2 generic autosave failed.', error); }
-}
-
-function genericHistoryFor(worldId = activeWorldId) {
-  if (!genericHistories.has(worldId)) genericHistories.set(worldId, []);
-  return genericHistories.get(worldId);
-}
-function genericFutureFor(worldId = activeWorldId) {
-  if (!genericFutures.has(worldId)) genericFutures.set(worldId, []);
-  return genericFutures.get(worldId);
-}
-function saveGenericHistory() {
-  const level = activeGenericLevel();
-  if (!level) return;
-  const stack = genericHistoryFor();
-  stack.push(JSON.stringify(level));
-  if (stack.length > 120) stack.shift();
-  genericFutures.set(activeWorldId, []);
-}
-
-function commitGeneric(mutator, { rebuild = true, recordHistory = true } = {}) {
-  const level = activeGenericLevel();
-  if (!level) return;
-  if (recordHistory) saveGenericHistory();
-  mutator(level);
-  level.updatedAt = new Date().toISOString();
-  persistGenericLevel(level);
-  if (rebuild) genericScene.setWorld(activeWorld(), level);
-  genericScene.setSelected(selected?.id ?? null);
-  renderUi();
-}
-
-function replaceActiveGenericLevel(level, { persist = true } = {}) {
-  const normalized = normalizeWorldEditorLevel(level, {
-    worldId: activeWorldId,
-    displayName: activeWorld().label,
-    runtimeLocationId: activeWorld().runtimeLocationId
-  });
-  genericLevels.set(activeWorldId, normalized);
-  if (persist) persistGenericLevel(normalized);
-  genericScene.setWorld(activeWorld(), normalized);
-  selected = null;
-}
-
-function setWorldCameraDefaults(worldId) {
-  if (worldId === 'skyscraper') {
-    cameraState.target.set(0, 150, 0); cameraState.yaw = 38; cameraState.pitch = -10; cameraState.distance = 410;
-  } else if (worldId === 'cave-fishing-island') {
-    cameraState.target.set(0, 0, 0); cameraState.yaw = 42; cameraState.pitch = -22; cameraState.distance = 58;
-  } else if (worldId === 'pirate-island') {
-    cameraState.target.set(0, 0, 0); cameraState.yaw = 42; cameraState.pitch = -28; cameraState.distance = 82;
-  } else {
-    cameraState.target.set(MOUNTAIN_CENTER.x, 105, MOUNTAIN_CENTER.z); cameraState.yaw = 42; cameraState.pitch = -24; cameraState.distance = 430;
-  }
-  updateCamera();
-}
-
-async function switchWorld(worldId, { keepCamera = false } = {}) {
-  const world = getWorldEditorWorld(worldId);
-  if (walkthroughState.active) exitWalkthrough();
-  activeWorldId = world.id;
-  try { localStorage.setItem(WORLD_V2_ACTIVE_KEY, activeWorldId); } catch {}
-  selected = null;
-  tool = 'select';
-  caveConnectStart = null;
-  $$('#tool-grid button').forEach((button) => button.classList.toggle('active', button.dataset.tool === 'select'));
-  if (isStoneveilWorld()) {
-    stoneveilRoot.enabled = true;
-    genericScene.setEnabled(false);
-    if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, currentTerrainData ?? terrainDataForRender());
-  } else {
-    stoneveilRoot.enabled = false;
-    slopeOverlay.setEnabled(false);
-    if (!genericLevels.has(activeWorldId)) {
-      genericLevels.set(activeWorldId, await loadGenericProjectLevel(world, { preferAutosave: true }));
-    }
-    genericScene.setWorld(world, activeGenericLevel());
-    genericScene.setEnabled(true);
-    genericScene.setCollisionDebug(Boolean($('#show-collision')?.checked));
-  }
-  if (!keepCamera) setWorldCameraDefaults(activeWorldId);
-  syncWorldUi();
-  rebuildAll();
-  setStatus(`${world.label} loaded. ${isStoneveilWorld() ? 'Legacy authored Stoneveil patch remains the production-safe source.' : 'Edits autosave independently for this world.'}`);
-}
-
 function historyPayload(source = patch) {
   const copy = clone(source);
   // Existing-rock snapshots can dwarf terrain edits. They are not part of Undo/Redo;
@@ -1687,14 +1479,6 @@ function restoreHistoryPayload(serialized) {
 }
 
 function undo() {
-  if (!isStoneveilWorld()) {
-    const stack = genericHistoryFor();
-    if (!stack.length) return;
-    genericFutureFor().push(JSON.stringify(activeGenericLevel()));
-    replaceActiveGenericLevel(JSON.parse(stack.pop()), { persist: true });
-    rebuildAll();
-    return;
-  }
   if (!history.length) return;
   future.push(historyPayload());
   restoreHistoryPayload(history.pop());
@@ -1705,14 +1489,6 @@ function undo() {
 }
 
 function redo() {
-  if (!isStoneveilWorld()) {
-    const stack = genericFutureFor();
-    if (!stack.length) return;
-    genericHistoryFor().push(JSON.stringify(activeGenericLevel()));
-    replaceActiveGenericLevel(JSON.parse(stack.pop()), { persist: true });
-    rebuildAll();
-    return;
-  }
   if (!future.length) return;
   history.push(historyPayload());
   restoreHistoryPayload(future.pop());
@@ -1838,12 +1614,6 @@ function checkpointPayload(source = patch) {
 
 function saveManualCheckpoint() {
   try {
-    if (!isStoneveilWorld()) {
-      const record = { savedAt: new Date().toISOString(), level: clone(activeGenericLevel()) };
-      localStorage.setItem(genericCheckpointKey(), JSON.stringify(record));
-      setStatus(`World checkpoint saved at ${new Date(record.savedAt).toLocaleTimeString()}.`);
-      return;
-    }
     const record = { savedAt: new Date().toISOString(), patch: checkpointPayload() };
     localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(record));
     setStatus(`Checkpoint saved at ${new Date(record.savedAt).toLocaleTimeString()}.`);
@@ -1853,17 +1623,6 @@ function saveManualCheckpoint() {
 }
 
 function restoreManualCheckpoint() {
-  if (!isStoneveilWorld()) {
-    let record = null;
-    try { record = JSON.parse(localStorage.getItem(genericCheckpointKey()) || 'null'); } catch {}
-    if (!record?.level) { setStatus('No manual checkpoint is stored for this world yet.'); return; }
-    if (!confirm(`Restore the ${activeWorld().label} checkpoint from ${new Date(record.savedAt).toLocaleString()}?`)) return;
-    saveGenericHistory();
-    replaceActiveGenericLevel(record.level, { persist: true });
-    rebuildAll();
-    setStatus('World checkpoint restored.');
-    return;
-  }
   let record = null;
   try { record = JSON.parse(localStorage.getItem(CHECKPOINT_KEY) || 'null'); } catch {}
   if (!record?.patch) { setStatus('No manual checkpoint is stored yet.'); return; }
@@ -1881,18 +1640,6 @@ function restoreManualCheckpoint() {
 }
 
 async function reloadProjectPatch() {
-  if (!isStoneveilWorld()) {
-    if (!confirm(`Reload ${activeWorld().label} from its project JSON? Current autosaved edits remain available through Undo until this page is closed.`)) return;
-    try {
-      saveGenericHistory();
-      replaceActiveGenericLevel(await loadGenericProjectLevel(activeWorld(), { preferAutosave: false }), { persist: true });
-      rebuildAll();
-      setStatus(`Reloaded ${activeWorld().dataUrl}.`);
-    } catch (error) {
-      setStatus(`Could not reload project level: ${error?.message || error}`);
-    }
-    return;
-  }
   if (!confirm('Reload src/world/map-editor-patch.json from the project? This is useful if the file on disk still contains your pre-experiment terrain. Current editor state will remain available through Undo.')) return;
   try {
     const response = await fetch('../../src/world/map-editor-patch.json', { cache: 'no-store' });
@@ -1912,24 +1659,10 @@ async function reloadProjectPatch() {
 }
 
 function rebuildAll() {
-  if (!isStoneveilWorld()) {
-    const level = activeGenericLevel();
-    if (level) {
-      genericScene.setWorld(activeWorld(), level);
-      genericScene.setEnabled(true);
-      genericScene.setSelected(selected?.id ?? null);
-      genericScene.setCollisionDebug(Boolean($('#show-collision')?.checked));
-    }
-    renderUi();
-    return;
-  }
-  stoneveilRoot.enabled = true;
-  genericScene.setEnabled(false);
   rebuildTerrain();
   rebuildPlacedObjects();
   rebuildSnapshotObjects();
   rebuildTunnels();
-  if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, currentTerrainData ?? terrainDataForRender());
   renderUi();
 }
 
@@ -2665,86 +2398,7 @@ function raySphereDistance(origin, direction, center, radius) {
   return t >= 0 ? t : null;
 }
 
-function applyGenericToolAt(event) {
-  const level = activeGenericLevel();
-  if (!level) return;
-  const ray = pointerRay(event);
-  if (tool === 'select') {
-    const hit = genericScene.pick(ray);
-    selected = hit ? { kind: hit.kind, id: String(hit.id), record: hit.record } : null;
-    genericScene.setSelected(selected?.id ?? null);
-    renderUi();
-    return;
-  }
-  if (tool === 'move-water') {
-    if (selected?.kind !== 'water-v2') {
-      const hit = genericScene.pick(ray);
-      if (hit?.kind === 'water-v2') {
-        selected = { kind: hit.kind, id: String(hit.id), record: hit.record };
-        genericScene.setSelected(selected.id);
-        renderUi();
-      } else setStatus('Select a water first, then click Move Water.');
-      return;
-    }
-    const surface = genericScene.surfaceHit(ray);
-    if (!surface) return;
-    commitGeneric((draft) => {
-      const water = (draft.waters ?? []).find((item) => String(item.id || item.identity) === selected.id);
-      if (!water) return;
-      water.position ??= { x: 0, y: 0, z: 0 };
-      water.position.x = surface.x;
-      water.position.z = surface.z;
-    });
-    setStatus(`Moved ${selected.id} without changing its canonical water identity.`);
-    return;
-  }
-  if (!['object', 'platform', 'moving-platform'].includes(tool)) return;
-  const surface = genericScene.surfaceHit(ray);
-  if (!surface) { setStatus('No placement surface under the cursor.'); return; }
-  const size = {
-    x: Math.max(.2, Number($('#platform-x')?.value) || 3),
-    y: Math.max(.1, Number($('#platform-y')?.value) || .35),
-    z: Math.max(.2, Number($('#platform-z')?.value) || 2)
-  };
-  const position = { x: surface.x, y: surface.y + size.y / 2, z: surface.z };
-  const climbMaterial = $('#platform-climb-material')?.value || 'normal';
-  if (tool === 'object' || tool === 'platform') {
-    const prefix = tool === 'platform' ? 'PARKOUR' : 'OBJECT';
-    const category = tool === 'platform' ? 'parkour' : 'decor';
-    const id = nextStableId(level, prefix);
-    const item = {
-      id, name: `${tool === 'platform' ? 'Parkour Platform' : 'World Object'} ${id.split('-').at(-1)}`, type: 'box', category,
-      transform: { position, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
-      size, collision: true, climbMaterial, visible: true, metadata: {}
-    };
-    commitGeneric((draft) => draft.objects.push(item));
-    selected = { kind: 'world-object', id, record: item };
-    genericScene.setSelected(id);
-    renderUi();
-    setStatus(`Placed ${category === 'parkour' ? 'static parkour object' : 'authored world object'} ${id}.`);
-    return;
-  }
-  const id = nextStableId(level, 'MOVING-PLATFORM');
-  const second = { x: position.x, y: position.y + 4, z: position.z };
-  const item = {
-    id, name: `Moving Platform ${id.split('-').at(-1)}`, type: 'moving-platform', category: 'moving-platforms',
-    transform: { position: structuredClone(position), rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
-    size, collision: true, climbMaterial, visible: true,
-    path: { points: [structuredClone(position), second], speed: 2.5, pauseSeconds: .5, mode: 'ping-pong', phaseSeconds: 0 },
-    metadata: {}
-  };
-  commitGeneric((draft) => draft.movingPlatforms.push(item));
-  selected = { kind: 'moving-platform', id, record: item };
-  genericScene.setSelected(id);
-  renderUi();
-  setStatus(`Placed ${id}. Edit its two waypoints, speed, pause and path mode in Selected.`);
-}
-
 function applyToolAt(event, continuous = false) {
-  if (!isStoneveilWorld()) {
-    applyGenericToolAt(event);
-    return;
-  }
   if (tool === 'select') {
     selected = selectionFromClick(event);
     rebuildPlacedObjects();
@@ -2921,277 +2575,7 @@ function rebuildSelectionHelper() {
   if (tool !== 'raise' && tool !== 'lower' && tool !== 'smooth' && tool !== 'indent' && tool !== 'pull-core' && tool !== 'hole') return;
 }
 
-function syncWorldUi() {
-  const world = activeWorld();
-  const selector = $('#world-selector');
-  if (selector && selector.value !== world.id) selector.value = world.id;
-  const stoneveil = isStoneveilWorld();
-  for (const id of ['brush-section', 'mesh-mode-section', 'rock-palette-section', 'plant-palette-section', 'decor-palette-section', 'mountain-profile-section']) {
-    const element = $(`#${id}`);
-    if (element) element.hidden = !stoneveil;
-  }
-  $('#generic-palette-section').hidden = !(worldHasCapability(world.id, 'parkour') || worldHasCapability(world.id, 'objects'));
-  if ($('#create-prefab-foundation')) $('#create-prefab-foundation').hidden = !worldHasCapability(world.id, 'prefabs');
-  if ($('#create-room-foundation')) $('#create-room-foundation').hidden = !worldHasCapability(world.id, 'rooms');
-  $('#xray-core').closest('label').hidden = !stoneveil;
-  $('#slope-toggle-wrap').hidden = !stoneveil;
-  $('#show-snapshot-rocks').closest('label').hidden = !stoneveil;
-  $('#import-snapshot').hidden = !stoneveil;
-  $('#bake-snapshot').hidden = !stoneveil;
-  $('#freeze-core').hidden = !stoneveil;
-  $('#checkpoint').textContent = stoneveil ? 'Checkpoint' : 'Checkpoint World';
-  $('#restore-checkpoint').textContent = stoneveil ? 'Restore Checkpoint' : 'Restore World Checkpoint';
-  $('#save-patch').textContent = stoneveil ? 'Save Stoneveil Patch' : 'Save World Level';
-  $('#summary-heading').textContent = stoneveil ? 'Stoneveil Summary' : `${world.label} Summary`;
-  const capabilityByTool = {
-    raise: 'terrain', lower: 'terrain', smooth: 'terrain', indent: 'terrain', 'pull-core': 'terrain', 'connect-cave': 'terrain',
-    rock: 'rocks', plant: 'vegetation', decor: 'decor', 'move-water': 'water',
-    object: 'objects', platform: 'parkour', 'moving-platform': 'moving-platforms'
-  };
-  for (const button of $$('#tool-grid button')) {
-    const capability = capabilityByTool[button.dataset.tool];
-    button.hidden = Boolean(capability && !worldHasCapability(world.id, capability));
-  }
-}
-
-function renderGenericSelection() {
-  const empty = $('#selection-empty');
-  const editor = $('#selection-editor');
-  const record = selected ? genericScene.selectedRecord(selected.id) : null;
-  if (!selected || !record) {
-    selected = null;
-    empty.hidden = false;
-    editor.hidden = true;
-    return;
-  }
-  empty.hidden = true;
-  editor.hidden = false;
-  $('#selected-name').textContent = record.name || record.id || selected.id;
-  $('#selected-id').textContent = selected.id;
-  const fields = $('#selection-fields');
-  fields.innerHTML = '';
-  if (selected.kind === 'architecture-reference') {
-    const note = document.createElement('p');
-    note.className = 'hint';
-    note.innerHTML = `<strong>Runtime visual reference.</strong><br>Asset: ${record.asset}<br>Attribution: ${record.attribution}<br>Collision: ${record.collision}.<br>The supplied ESB visual remains authoritative; parkour is authored around it rather than replacing it.`;
-    fields.appendChild(note);
-    $('#duplicate-selected').disabled = true;
-    $('#hide-selected').disabled = true;
-    return;
-  }
-
-  const addNumberGrid = (defs, handler) => fields.appendChild(fieldGrid(defs, handler));
-  if (selected.kind === 'water-v2') {
-    record.position ??= { x: 0, y: 0, z: 0 };
-    record.radii ??= { x: 4, z: 4 };
-    addNumberGrid([
-      ['X', record.position.x, 'gpx'], ['Surface Y', record.position.y, 'gpy'], ['Z', record.position.z, 'gpz'],
-      ['X radius', record.radii.x, 'wrx'], ['Z radius', record.radii.z, 'wrz'],
-      ['Depth m', record.depthMeters ?? 1, 'wdepth'], ['Fishing scale', record.fishingZoneScale ?? 1, 'wfishing']
-    ], onGenericField);
-    const identity = document.createElement('p');
-    identity.className = 'hint';
-    identity.textContent = `Fishing identity: ${record.identity || record.id}. Moving/resizing this water does not change ecology identity.`;
-    fields.appendChild(identity);
-    $('#duplicate-selected').disabled = true;
-    $('#hide-selected').disabled = false;
-    return;
-  }
-
-  record.transform ??= { position: {x:0,y:0,z:0}, rotation:{x:0,y:0,z:0}, scale:{x:1,y:1,z:1} };
-  if (selected.kind === 'prefab-instance' || selected.kind === 'room') {
-    addNumberGrid([
-      ['X', record.transform.position.x, 'gpx'], ['Y', record.transform.position.y, 'gpy'], ['Z', record.transform.position.z, 'gpz'],
-      ['Rot X°', record.transform.rotation.x, 'grx'], ['Rot Y°', record.transform.rotation.y, 'gry'], ['Rot Z°', record.transform.rotation.z, 'grz'],
-      ['Scale X', record.transform.scale.x, 'gscalex'], ['Scale Y', record.transform.scale.y, 'gscaley'], ['Scale Z', record.transform.scale.z, 'gscalez']
-    ], onGenericField);
-    const note = document.createElement('p');
-    note.className = 'hint';
-    note.textContent = `${selected.kind === 'room' ? 'Room' : 'Prefab'} root → ${record.prefabId}. Child transforms stay local, so moving this root moves the whole assembly.`;
-    fields.appendChild(note);
-    $('#duplicate-selected').disabled = false;
-    $('#hide-selected').disabled = false;
-    return;
-  }
-  record.size ??= { x: 1, y: 1, z: 1 };
-  addNumberGrid([
-    ['X', record.transform.position.x, 'gpx'], ['Y', record.transform.position.y, 'gpy'], ['Z', record.transform.position.z, 'gpz'],
-    ['Rot X°', record.transform.rotation.x, 'grx'], ['Rot Y°', record.transform.rotation.y, 'gry'], ['Rot Z°', record.transform.rotation.z, 'grz'],
-    ['Size X', record.size.x, 'gsx'], ['Size Y', record.size.y, 'gsy'], ['Size Z', record.size.z, 'gsz']
-  ], onGenericField);
-
-  if (selected.kind === 'moving-platform') {
-    const path = record.path ??= { points: [], speed: 2.5, pauseSeconds: .5, mode: 'ping-pong', phaseSeconds: 0 };
-    path.points ??= [structuredClone(record.transform.position), { ...record.transform.position, y: record.transform.position.y + 4 }];
-    addNumberGrid([
-      ['Speed m/s', path.speed, 'mpspeed'], ['Pause s', path.pauseSeconds, 'mppause'], ['Phase s', path.phaseSeconds, 'mpphase']
-    ], onGenericField);
-    path.points.forEach((point, index) => {
-      const title = document.createElement('div');
-      title.className = 'hint';
-      title.textContent = `Waypoint ${index + 1}`;
-      fields.appendChild(title);
-      addNumberGrid([
-        ['X', point.x, `mp${index}x`], ['Y', point.y, `mp${index}y`], ['Z', point.z, `mp${index}z`]
-      ], onGenericField);
-    });
-    const mode = document.createElement('label');
-    mode.textContent = 'Path mode';
-    const select = document.createElement('select');
-    for (const value of ['ping-pong', 'loop', 'once']) select.append(new Option(value, value));
-    select.value = path.mode || 'ping-pong';
-    select.addEventListener('change', (event) => commitGeneric((draft) => {
-      const item = draft.movingPlatforms.find((candidate) => candidate.id === selected.id);
-      if (item) item.path.mode = event.target.value;
-    }));
-    mode.appendChild(select);
-    fields.appendChild(mode);
-    const addWaypoint = document.createElement('button');
-    addWaypoint.textContent = 'Add Waypoint';
-    addWaypoint.addEventListener('click', () => commitGeneric((draft) => {
-      const item = draft.movingPlatforms.find((candidate) => candidate.id === selected.id);
-      if (!item) return;
-      const last = item.path.points.at(-1) ?? item.transform.position;
-      item.path.points.push({ x: last.x, y: last.y + 2, z: last.z });
-    }));
-    fields.appendChild(addWaypoint);
-  }
-  $('#duplicate-selected').disabled = false;
-  $('#hide-selected').disabled = false;
-}
-
-function onGenericField(event) {
-  if (!selected || isStoneveilWorld()) return;
-  const key = event.currentTarget.dataset.key;
-  const value = Number(event.currentTarget.value);
-  if (!Number.isFinite(value)) return;
-  commitGeneric((draft) => {
-    const record = (draft.objects ?? []).find((item) => item.id === selected.id)
-      ?? (draft.movingPlatforms ?? []).find((item) => item.id === selected.id)
-      ?? (draft.waters ?? []).find((item) => String(item.id || item.identity) === selected.id)
-      ?? (draft.prefabs?.instances ?? []).find((item) => item.id === selected.id)
-      ?? (draft.rooms ?? []).find((item) => item.id === selected.id);
-    if (!record) return;
-    if (selected.kind === 'water-v2') {
-      record.position ??= { x: 0, y: 0, z: 0 };
-      record.radii ??= { x: 4, z: 4 };
-      if (key === 'gpx') record.position.x = value;
-      if (key === 'gpy') record.position.y = value;
-      if (key === 'gpz') record.position.z = value;
-      if (key === 'wrx') record.radii.x = Math.max(.1, value);
-      if (key === 'wrz') record.radii.z = Math.max(.1, value);
-      if (key === 'wdepth') record.depthMeters = Math.max(.05, value);
-      if (key === 'wfishing') record.fishingZoneScale = Math.max(.05, value);
-      return;
-    }
-    const t = record.transform;
-    if (key === 'gpx') t.position.x = value;
-    if (key === 'gpy') t.position.y = value;
-    if (key === 'gpz') t.position.z = value;
-    if (key === 'grx') t.rotation.x = value;
-    if (key === 'gry') t.rotation.y = value;
-    if (key === 'grz') t.rotation.z = value;
-    if (key === 'gscalex') t.scale.x = Math.max(.001, value);
-    if (key === 'gscaley') t.scale.y = Math.max(.001, value);
-    if (key === 'gscalez') t.scale.z = Math.max(.001, value);
-    if (key === 'gsx') record.size.x = Math.max(.05, value);
-    if (key === 'gsy') record.size.y = Math.max(.05, value);
-    if (key === 'gsz') record.size.z = Math.max(.05, value);
-    if (selected.kind === 'moving-platform') {
-      if (key === 'mpspeed') record.path.speed = Math.max(.05, value);
-      if (key === 'mppause') record.path.pauseSeconds = Math.max(0, value);
-      if (key === 'mpphase') record.path.phaseSeconds = value;
-      const match = /^mp(\d+)([xyz])$/.exec(key);
-      if (match) {
-        const point = record.path.points[Number(match[1])];
-        if (point) point[match[2]] = value;
-      }
-    }
-  });
-}
-
-function renderOutliner() {
-  const outliner = $('#outliner');
-  if (!outliner) return;
-  outliner.innerHTML = '';
-  const groups = [];
-  if (isStoneveilWorld()) {
-    groups.push(['Terrain', [{ id: 'terrain', name: `Frozen mesh · ${Math.round((patch.terrain.bakedMesh?.positions?.length || 0) / 3).toLocaleString()} verts`, kind: 'meta' }]]);
-    groups.push(['Waters', MOUNTAIN_FISHING_LOCATIONS.map((item) => ({ id: item.id, name: item.label, kind: 'water' }))]);
-    groups.push(['Authored objects', (patch.placedObjects ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'placed' }))]);
-  } else {
-    const level = activeGenericLevel();
-    if (activeWorldId === 'skyscraper') groups.push(['Architecture', [{ id: '__architecture__', name: 'Empire State Building · runtime reference', kind: 'architecture-reference' }]]);
-    groups.push(['Waters', (level?.waters ?? []).map((item) => ({ id: String(item.id || item.identity), name: item.name || item.id, kind: 'water-v2' }))]);
-    groups.push(['Objects', (level?.objects ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'world-object' }))]);
-    groups.push(['Moving Platforms', (level?.movingPlatforms ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'moving-platform' }))]);
-    groups.push(['Prefab Definitions', (level?.prefabs?.definitions ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'meta' }))]);
-    groups.push(['Prefab Instances', (level?.prefabs?.instances ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'prefab-instance' }))]);
-    groups.push(['Rooms', (level?.rooms ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'room' }))]);
-  }
-  for (const [name, items] of groups) {
-    const heading = document.createElement('div');
-    heading.className = 'outliner-group';
-    heading.textContent = `${name} (${items.length})`;
-    outliner.appendChild(heading);
-    for (const item of items) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = item.name;
-      button.title = item.id;
-      if (selected?.id === item.id) button.classList.add('selected');
-      if (item.kind !== 'meta') button.addEventListener('click', () => {
-        selected = { kind: item.kind, id: item.id };
-        if (!isStoneveilWorld()) genericScene.setSelected(item.id);
-        renderUi();
-      });
-      else button.disabled = true;
-      outliner.appendChild(button);
-    }
-  }
-}
-
-function renderValidation() {
-  const container = $('#validation-list');
-  if (!container) return;
-  const legend = $('#slope-legend');
-  if (legend) {
-    legend.hidden = !isStoneveilWorld();
-    if (isStoneveilWorld()) {
-      legend.innerHTML = slopeOverlayLegend(PLAYER_CONFIG)
-        .map(([label, range]) => `<span class="slope-chip ${label.startsWith('WALK') ? 'walkable' : label.startsWith('AWK') ? 'awkward' : label.startsWith('SLIDE') ? 'slide' : 'extreme'}">${label}</span><span>${range}</span>`)
-        .join('') + `<span class="hint">Slide exit</span><span>${PLAYER_CONFIG.slideExitSlopeDegrees}° hysteresis</span>`;
-    }
-  }
-  if (isStoneveilWorld()) {
-    const issues = [];
-    if (!patch.terrain?.bakedMesh?.positions?.length) issues.push({ severity:'warning', message:'Stoneveil has no frozen terrain mesh.' });
-    const seen = new Set();
-    for (const item of patch.placedObjects ?? []) {
-      if (!item.id) issues.push({ severity:'warning', message:'Authored Stoneveil object has no stable ID.' });
-      else if (seen.has(item.id)) issues.push({ severity:'warning', message:`Duplicate authored object ID: ${item.id}` });
-      else seen.add(item.id);
-    }
-    container.innerHTML = issues.length ? issues.map((issue) => `<div class="validation-item ${issue.severity}">${issue.message}</div>`).join('') : 'No structural warnings. Stoneveil render and terrain collision use the same frozen mesh.';
-    return;
-  }
-  const warnings = validateWorldLevel(activeGenericLevel());
-  container.innerHTML = warnings.length
-    ? warnings.map((warning) => `<div class="validation-item ${warning.severity}">${warning.message}</div>`).join('')
-    : 'No structural warnings.';
-}
-
 function renderUi() {
-  syncWorldUi();
-  if (!isStoneveilWorld()) {
-    $('#undo').disabled = genericHistoryFor().length === 0;
-    $('#redo').disabled = genericFutureFor().length === 0;
-    renderGenericSelection();
-    renderSummary();
-    renderOutliner();
-    renderValidation();
-    return;
-  }
   $('#undo').disabled = history.length === 0;
   $('#redo').disabled = future.length === 0;
   const meshMode = isMeshMode();
@@ -3214,8 +2598,6 @@ function renderUi() {
   renderProfileRows();
   renderSelection();
   renderSummary();
-  renderOutliner();
-  renderValidation();
 }
 
 function renderProfileRows() {
@@ -3360,7 +2742,6 @@ function fieldGrid(defs, handler) {
 }
 
 function currentSelectedRecord() {
-  if (!isStoneveilWorld()) return selected ? genericScene.selectedRecord(selected.id) : null;
   if (selected.kind === 'placed') return patch.placedObjects.find((item) => item.id === selected.id);
   if (selected.kind === 'tunnel') return (patch.tunnels ?? []).find((item) => item.id === selected.id);
   if (selected.kind === 'water') return waterRecords.get(selected.id) || waterState(MOUNTAIN_FISHING_LOCATIONS.find((item) => item.id === selected.id));
@@ -3481,23 +2862,6 @@ function onObjectField(event) {
 }
 
 function renderSummary() {
-  if (!isStoneveilWorld()) {
-    const level = activeGenericLevel();
-    const rows = [
-      ['Schema', level?.schema ?? '—'],
-      ['World ID', level?.worldId ?? activeWorldId],
-      ['Static objects', level?.objects?.length ?? 0],
-      ['Moving platforms', level?.movingPlatforms?.length ?? 0],
-      ['Waters', level?.waters?.length ?? 0],
-      ['Prefab definitions', level?.prefabs?.definitions?.length ?? 0],
-      ['Prefab instances', level?.prefabs?.instances?.length ?? 0],
-      ['Rooms', level?.rooms?.length ?? 0],
-      ['Terrain source', level?.sourcePolicy?.terrain ?? '—'],
-      ['Architecture source', level?.sourcePolicy?.architecture ?? '—']
-    ];
-    $('#summary').innerHTML = rows.map(([key, value]) => `<dt>${key}</dt><dd>${value}</dd>`).join('');
-    return;
-  }
   const rows = [
     ['Terrain strokes', patch.terrain.strokes.length],
     ['Core indents', patch.terrain.dents?.length || 0],
@@ -3517,35 +2881,6 @@ function renderSummary() {
 }
 
 function duplicateSelected() {
-  if (!isStoneveilWorld()) {
-    if (!selected || selected.kind === 'water-v2') return;
-    const level = activeGenericLevel();
-    const sourceList = selected.kind === 'moving-platform' ? level.movingPlatforms
-      : selected.kind === 'prefab-instance' ? level.prefabs.instances
-        : selected.kind === 'room' ? level.rooms : level.objects;
-    const source = sourceList.find((item) => item.id === selected.id);
-    if (!source) return;
-    const copy = clone(source);
-    const prefix = selected.kind === 'moving-platform' ? 'MOVING-PLATFORM'
-      : selected.kind === 'prefab-instance' ? 'PREFAB-INSTANCE'
-        : selected.kind === 'room' ? 'ROOM' : 'OBJECT';
-    copy.id = nextStableId(level, prefix);
-    copy.name = `${source.name || source.id} Copy`;
-    if (copy.transform?.position) { copy.transform.position.x += 1.5; copy.transform.position.z += 1.5; }
-    if (selected.kind === 'moving-platform' && copy.path?.points) {
-      for (const point of copy.path.points) { point.x += 1.5; point.z += 1.5; }
-    }
-    commitGeneric((draft) => {
-      const target = selected.kind === 'moving-platform' ? draft.movingPlatforms
-        : selected.kind === 'prefab-instance' ? draft.prefabs.instances
-          : selected.kind === 'room' ? draft.rooms : draft.objects;
-      target.push(copy);
-    });
-    selected = { kind: selected.kind, id: copy.id, record: copy };
-    genericScene.setSelected(copy.id);
-    renderUi();
-    return;
-  }
   if (selected?.kind !== 'placed') return;
   const source = patch.placedObjects.find((item) => item.id === selected.id);
   if (!source) return;
@@ -3560,20 +2895,6 @@ function duplicateSelected() {
 
 function hideSelected() {
   if (!selected) return;
-  if (!isStoneveilWorld()) {
-    const target = { ...selected };
-    commitGeneric((draft) => {
-      if (target.kind === 'world-object') draft.objects = draft.objects.filter((item) => item.id !== target.id);
-      else if (target.kind === 'moving-platform') draft.movingPlatforms = draft.movingPlatforms.filter((item) => item.id !== target.id);
-      else if (target.kind === 'water-v2') draft.waters = draft.waters.filter((item) => String(item.id || item.identity) !== target.id);
-      else if (target.kind === 'prefab-instance') draft.prefabs.instances = draft.prefabs.instances.filter((item) => item.id !== target.id);
-      else if (target.kind === 'room') draft.rooms = draft.rooms.filter((item) => item.id !== target.id);
-    });
-    selected = null;
-    genericScene.setSelected(null);
-    renderUi();
-    return;
-  }
   const target = selected;
   commit(() => {
     if (target.kind === 'placed') {
@@ -3665,67 +2986,31 @@ function returnToHeightfield() {
 }
 
 async function savePatch() {
-  const data = isStoneveilWorld() ? patch : activeGenericLevel();
-  if (!data) return;
-  data.updatedAt = new Date().toISOString();
-  if (!isStoneveilWorld()) persistGenericLevel(data);
-  const filename = isStoneveilWorld() ? 'map-editor-patch.json' : `${activeWorldId}.json`;
-  const text = JSON.stringify(data, null, 2);
+  patch.updatedAt = new Date().toISOString();
+  const text = JSON.stringify(patch, null, 2);
   if ('showSaveFilePicker' in window) {
     try {
       const handle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{ description: 'Reel Ascent world/editor JSON', accept: { 'application/json': ['.json'] } }]
+        suggestedName: 'map-editor-patch.json',
+        types: [{ description: 'Reel Ascent map patch', accept: { 'application/json': ['.json'] } }]
       });
       const writable = await handle.createWritable();
       await writable.write(text);
       await writable.close();
-      setStatus(`${activeWorld().label} saved.`);
+      setStatus('Patch saved.');
       return;
     } catch (error) {
       if (error?.name === 'AbortError') return;
     }
   }
-  if (isStoneveilWorld()) downloadJson(filename, patch);
-  else downloadWorldLevel(data, filename);
-  setStatus(`${activeWorld().label} downloaded.`);
-}
-
-function exportActiveWorldV2() {
-  const level = isStoneveilWorld() ? wrapLegacyStoneveilPatch(patch) : normalizeWorldEditorLevel(activeGenericLevel());
-  downloadWorldLevel(level, `${activeWorldId}-world-editor-v2.json`);
-  setStatus(isStoneveilWorld()
-    ? 'Exported a schema-v2 compatibility envelope containing the exact current Stoneveil patch. Production patch was not replaced.'
-    : 'Exported World Editor V2 level.');
+  downloadJson('map-editor-patch.json', patch);
+  setStatus('Patch downloaded.');
 }
 
 async function loadJsonFile(file, type) {
   const text = await file.text();
   const data = JSON.parse(text);
   if (type === 'patch') {
-    if (data?.kind === WORLD_EDITOR_LEVEL_KIND) {
-      if (data.worldId === 'stoneveil-peak') {
-        await switchWorld('stoneveil-peak');
-        const legacy = unwrapLegacyStoneveilPatch(data);
-        if (!legacy) throw new Error('Stoneveil V2 envelope does not contain its legacy compatibility patch.');
-        saveHistory();
-        patch = normalizePatch(legacy);
-        runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
-        selected = null;
-        persistPatch();
-        syncSnapshotUi();
-        rebuildAll();
-      } else {
-        if (!WORLD_EDITOR_WORLDS.some((world) => world.id === data.worldId)) throw new Error(`Unknown World Editor worldId: ${data.worldId}`);
-        await switchWorld(data.worldId);
-        saveGenericHistory();
-        replaceActiveGenericLevel(data, { persist: true });
-        rebuildAll();
-      }
-      setStatus(`Loaded World Editor V2 level: ${file.name}`);
-      return;
-    }
-    await switchWorld('stoneveil-peak');
     saveHistory();
     patch = normalizePatch(data);
     runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
@@ -3733,7 +3018,7 @@ async function loadJsonFile(file, type) {
     persistPatch();
     syncSnapshotUi();
     rebuildAll();
-    setStatus(`Loaded Stoneveil patch: ${file.name}`);
+    setStatus(`Loaded patch: ${file.name}`);
   } else {
     runtimeSnapshot = {
       ...data,
@@ -3779,33 +3064,23 @@ function setStatus(message) { $('#status').textContent = message; }
 
 function setView(view) {
   $$('#view-toolbar button[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
-  const center = isStoneveilWorld()
-    ? { x: MOUNTAIN_CENTER.x, y: view === 'top' ? 90 : 130, z: MOUNTAIN_CENTER.z }
-    : { x: 0, y: activeWorldId === 'skyscraper' ? (view === 'top' ? 170 : 145) : 0, z: 0 };
-  const distance = isStoneveilWorld() ? (view === 'perspective' ? 430 : 510) : (activeWorldId === 'skyscraper' ? 430 : 75);
   if (view === 'top') {
-    cameraState.target.set(center.x, center.y, center.z);
-    cameraState.yaw = 0; cameraState.pitch = -89; cameraState.distance = distance;
+    cameraState.target.set(MOUNTAIN_CENTER.x, 90, MOUNTAIN_CENTER.z);
+    cameraState.yaw = 0; cameraState.pitch = -89; cameraState.distance = 520;
   } else if (view === 'north') {
-    cameraState.target.set(center.x, center.y, center.z);
-    cameraState.yaw = 180; cameraState.pitch = 0; cameraState.distance = distance;
+    cameraState.target.set(MOUNTAIN_CENTER.x, 130, MOUNTAIN_CENTER.z);
+    cameraState.yaw = 180; cameraState.pitch = 0; cameraState.distance = 510;
   } else if (view === 'west') {
-    cameraState.target.set(center.x, center.y, center.z);
-    cameraState.yaw = -90; cameraState.pitch = 0; cameraState.distance = distance;
-  } else if (isStoneveilWorld()) {
+    cameraState.target.set(MOUNTAIN_CENTER.x, 130, MOUNTAIN_CENTER.z);
+    cameraState.yaw = -90; cameraState.pitch = 0; cameraState.distance = 510;
+  } else {
     cameraState.target.set(MOUNTAIN_CENTER.x, 105, MOUNTAIN_CENTER.z);
     cameraState.yaw = 42; cameraState.pitch = -24; cameraState.distance = 430;
-  } else {
-    setWorldCameraDefaults(activeWorldId);
-    return;
   }
   updateCamera();
 }
 
 // UI wiring
-for (const world of WORLD_EDITOR_WORLDS) $('#world-selector')?.append(new Option(world.label, world.id));
-if ($('#world-selector')) $('#world-selector').value = activeWorldId;
-$('#world-selector')?.addEventListener('change', (event) => switchWorld(event.target.value).catch((error) => setStatus(error.message)));
 ROCK_KINDS.forEach((kind) => $('#rock-kind').append(new Option(kind, kind)));
 $('#rock-kind').value = 'chunk';
 
@@ -3828,56 +3103,6 @@ $$('#tool-grid button').forEach((button) => button.addEventListener('click', () 
 $('#brush-radius').addEventListener('input', () => $('#brush-radius-out').textContent = `${$('#brush-radius').value} m`);
 $('#brush-strength').addEventListener('input', () => $('#brush-strength-out').textContent = `${$('#brush-strength').value}`);
 $('#plant-size').addEventListener('input', () => $('#plant-size-out').textContent = `${Number($('#plant-size').value).toFixed(2)}×`);
-$('#create-prefab-foundation')?.addEventListener('click', () => {
-  if (isStoneveilWorld() || !worldHasCapability(activeWorldId, 'prefabs')) return;
-  const level = activeGenericLevel();
-  const definitionId = nextStableId(level, 'PREFAB');
-  const instanceId = nextStableId(level, 'PREFAB-INSTANCE');
-  const definition = {
-    id: definitionId, name: `Prefab ${definitionId.split('-').at(-1)}`, kind: 'assembly', version: 1,
-    objects: [], movingPlatforms: [], waters: [], metadata: {}
-  };
-  const instance = {
-    id: instanceId, name: `Prefab Instance ${instanceId.split('-').at(-1)}`, prefabId: definitionId, linked: true,
-    transform: {
-      position: { x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z },
-      rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }
-    }, metadata: {}
-  };
-  commitGeneric((draft) => {
-    draft.prefabs.definitions.push(definition);
-    draft.prefabs.instances.push(instance);
-  });
-  selected = { kind: 'prefab-instance', id: instanceId };
-  genericScene.setSelected(instanceId);
-  renderUi();
-  setStatus(`Created linked prefab ${definitionId} with root instance ${instanceId}. Child-authoring UI is a later V2 pass; the schema/runtime root transform is active now.`);
-});
-$('#create-room-foundation')?.addEventListener('click', () => {
-  if (isStoneveilWorld() || !worldHasCapability(activeWorldId, 'rooms')) return;
-  const level = activeGenericLevel();
-  const definitionId = nextStableId(level, 'ROOM-PREFAB');
-  const roomId = nextStableId(level, 'ROOM');
-  const definition = {
-    id: definitionId, name: `Room Module ${definitionId.split('-').at(-1)}`, kind: 'room', version: 1,
-    objects: [], movingPlatforms: [], waters: [], metadata: { independentlyAuthored: true }
-  };
-  const room = {
-    id: roomId, name: `Room ${roomId.split('-').at(-1)}`, prefabId: definitionId, linked: true,
-    transform: {
-      position: { x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z },
-      rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }
-    }, metadata: {}
-  };
-  commitGeneric((draft) => {
-    draft.prefabs.definitions.push(definition);
-    draft.rooms.push(room);
-  });
-  selected = { kind: 'room', id: roomId };
-  genericScene.setSelected(roomId);
-  renderUi();
-  setStatus(`Created linked room module ${definitionId} and room root ${roomId}. Moving the room root moves all future child content.`);
-});
 $('#undo').addEventListener('click', undo);
 $('#redo').addEventListener('click', redo);
 $('#checkpoint').addEventListener('click', saveManualCheckpoint);
@@ -3887,7 +3112,6 @@ $('#freeze-core').addEventListener('click', freezeCoreToMesh);
 $('#return-heightfield').addEventListener('click', returnToHeightfield);
 $('#clear-legacy-caves').addEventListener('click', clearLegacyCaveExperiments);
 $('#save-patch').addEventListener('click', savePatch);
-$('#export-world-v2')?.addEventListener('click', exportActiveWorldV2);
 $('#open-patch').addEventListener('click', () => $('#patch-file').click());
 $('#import-snapshot').addEventListener('click', () => $('#snapshot-file').click());
 $('#bake-snapshot').addEventListener('click', bakeSnapshotIntoPatch);
@@ -3914,37 +3138,9 @@ $('#xray-core').addEventListener('change', () => {
     ? 'X-Ray Core on — mountain ghosted; cave waters are magenta with locator beacons.'
     : 'X-Ray Core off.');
 });
-$('#show-slope')?.addEventListener('change', (event) => {
-  if (!isStoneveilWorld()) return;
-  slopeOverlay.setEnabled(event.target.checked, currentTerrainData ?? terrainDataForRender());
-  if (event.target.checked) {
-    const legend = slopeOverlayLegend(PLAYER_CONFIG).map(([label, range]) => `${label} ${range}`).join(' · ');
-    setStatus(`Slope diagnostic: ${legend}. Slide exit hysteresis is ${PLAYER_CONFIG.slideExitSlopeDegrees}°.`);
-  } else setStatus('Slope diagnostic off.');
-});
-$('#show-collision')?.addEventListener('change', (event) => {
-  if (isStoneveilWorld()) {
-    applyTerrainDisplayMode();
-    setStatus(event.target.checked
-      ? 'Stoneveil collision view: the wire-dark mesh is the same frozen triangle geometry used by the terrain collider.'
-      : 'Collision view off.');
-  } else {
-    genericScene.setCollisionDebug(event.target.checked);
-    setStatus(event.target.checked ? 'Collision proxy view on.' : 'Collision proxy view off.');
-  }
-});
 $('#show-snapshot-rocks').addEventListener('change', rebuildSnapshotObjects);
-$('#clear-local').addEventListener('click', async () => {
-  if (!isStoneveilWorld()) {
-    if (!confirm(`Clear the browser autosave for ${activeWorld().label} and reload its project JSON?`)) return;
-    saveGenericHistory();
-    try { localStorage.removeItem(genericStorageKey()); } catch {}
-    replaceActiveGenericLevel(await loadGenericProjectLevel(activeWorld(), { preferAutosave: false }), { persist: false });
-    rebuildAll();
-    setStatus(`Cleared ${activeWorld().label} browser autosave.`);
-    return;
-  }
-  if (!confirm('Clear all Stoneveil browser editor changes? This does not change the project file, but it resets the current browser patch.')) return;
+$('#clear-local').addEventListener('click', () => {
+  if (!confirm('Clear all editor changes? This does not change the game files, only this editor patch.')) return;
   saveHistory();
   patch = makeEmptyPatch();
   runtimeSnapshot = { objects: [], rocks: [] };
@@ -3982,10 +3178,8 @@ canvas.addEventListener('pointerdown', (event) => {
 });
 canvas.addEventListener('pointermove', (event) => {
   if (walkthroughState.active) return;
-  const hit = isStoneveilWorld() ? rayTerrainHit(event) : genericScene.surfaceHit(pointerRay(event));
-  if (hit) $('#cursor-info').textContent = isStoneveilWorld()
-    ? `x ${hit.x.toFixed(1)} · z ${hit.z.toFixed(1)} · ${Math.round(hit.y * FEET_PER_METER)} ft`
-    : `x ${hit.x.toFixed(1)} · y ${hit.y.toFixed(1)} · z ${hit.z.toFixed(1)}`;
+  const hit = rayTerrainHit(event);
+  if (hit) $('#cursor-info').textContent = `x ${hit.x.toFixed(1)} · z ${hit.z.toFixed(1)} · ${Math.round(hit.y * FEET_PER_METER)} ft`;
   else $('#cursor-info').textContent = '';
   if (orbiting || panning) {
     const dx = event.clientX - previousPointer.x;
@@ -4077,16 +3271,6 @@ function typingInField() {
 
 function focusSelectedObject() {
   if (!selected) return false;
-  if (!isStoneveilWorld()) {
-    const record = genericScene.selectedRecord(selected.id);
-    const position = selected.kind === 'water-v2' || selected.kind === 'architecture-reference'
-      ? record?.position : record?.transform?.position;
-    if (!position) return false;
-    cameraState.target.set(Number(position.x) || 0, Number(position.y) || 0, Number(position.z) || 0);
-    cameraState.distance = clamp(cameraState.distance, 0.25, activeWorldId === 'skyscraper' ? 180 : 90);
-    updateCamera();
-    return true;
-  }
   let position = null;
   if (selected.kind === 'placed') {
     const item = patch.placedObjects.find((candidate) => candidate.id === selected.id);
@@ -4204,7 +3388,6 @@ app.on('update', (dt) => {
     updateWalkthrough(dt);
     return;
   }
-  if (!isStoneveilWorld()) genericScene.update(dt);
   if (!cameraKeys.size) return;
   const cameraPosition = cameraEntity.getPosition();
   // True fly-camera translation: W/S follows the direction the camera is actually looking,
@@ -4273,9 +3456,8 @@ canvas.addEventListener('webglcontextlost', () => {
   if (walkthroughState.active) exitWalkthrough();
   // A context loss should never cost level-design work. Persist immediately to both
   // available autosave paths; PlayCanvas/browser recovery can then restore rendering.
-  if (isStoneveilWorld()) persistPatch();
-  else persistGenericLevel();
-  console.warn('World Editor WebGL context lost; latest active-world data queued for recovery.');
+  persistPatch();
+  console.warn('Map Editor WebGL context lost; latest patch queued for recovery.');
 });
 canvas.addEventListener('webglcontextrestored', () => {
   rebuildAll();
@@ -4285,41 +3467,9 @@ canvas.addEventListener('webglcontextrestored', () => {
 
 window.addEventListener('resize', () => app.resizeCanvas());
 
-async function initializeWorldEditorV2() {
-  try {
-    // A fresh browser must start from the checked-in authored Stoneveil patch. The legacy
-    // editor historically defaulted to makeEmptyPatch() when localStorage was absent, which
-    // is unsafe now that the project patch contains irreplaceable frozen level-design work.
-    if (!hadStoneveilAutosaveAtBoot) {
-      const response = await fetch('../../src/world/map-editor-patch.json', { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Stoneveil project patch HTTP ${response.status}`);
-      patch = normalizePatch(await response.json());
-      // Check large IndexedDB recovery BEFORE queueing any write. Otherwise a fresh
-      // localStorage session could overwrite a newer sculpt recovery with the project copy.
-      const recovery = await readRecoverySnapshot();
-      if (recovery?.patch) {
-        const recovered = normalizePatch(recovery.patch);
-        if (patchTimestamp(recovered) > patchTimestamp(patch)) patch = recovered;
-      }
-      runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
-      persistPatch();
-    }
-    syncSnapshotUi();
-    await switchWorld(activeWorldId, { keepCamera: activeWorldId === 'stoneveil-peak' });
-    if (isStoneveilWorld()) {
-      setStatus(isMeshMode()
-        ? 'World Editor V2 ready. Current authored Stoneveil 3D mesh loaded intact; production patch remains compatibility-safe.'
-        : 'World Editor V2 ready in Stoneveil heightfield compatibility mode.');
-      // When localStorage already existed, it may still trail a large IndexedDB mesh save.
-      if (hadStoneveilAutosaveAtBoot) recoverNewerAutosaveIfNeeded();
-    }
-  } catch (error) {
-    console.error(error);
-    activeWorldId = 'stoneveil-peak';
-    stoneveilRoot.enabled = true;
-    genericScene.setEnabled(false);
-    rebuildAll();
-    setStatus(`World Editor V2 startup warning: ${error?.message || error}`);
-  }
-}
-initializeWorldEditorV2();
+rebuildAll();
+syncSnapshotUi();
+setStatus(isMeshMode() ? 'Ready in 3D Mesh mode. Indent Core can now create real overhangs by pushing the same terrain surface inward.' : (runtimeSnapshot.rocks?.length ? `Ready. Loaded ${runtimeSnapshot.rocks.length} baked existing rocks from the patch.` : 'Ready. Finish the large core shape, then Freeze Core to 3D Mesh for overhang/cave sculpting.'));
+// If the browser had to reload after a GPU/context problem, localStorage may contain an
+// older patch when the frozen mesh has outgrown its quota. Recover the newer IndexedDB copy.
+recoverNewerAutosaveIfNeeded();

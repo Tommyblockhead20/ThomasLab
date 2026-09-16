@@ -1,4 +1,10 @@
 import { CAMERA_CONFIG } from '../config.js';
+import {
+  KEY_BINDING_DEFINITIONS,
+  loadGamepadBindings,
+  loadKeyBindings,
+  normalizeGamepadBindings
+} from '../player/movement.js';
 
 // Standard Gamepad layout. A connected pad is opt-in by presence alone; keyboard and
 // touch retain their own independent input sources.
@@ -35,6 +41,9 @@ export class GamepadController {
     this.previous = [];
     this.navigationReadyAt = 0;
     this.lastDialog = null;
+    this.bindings = loadGamepadBindings();
+    this.onBindingsChanged = (event) => { this.bindings = normalizeGamepadBindings(event.detail ?? loadGamepadBindings()); };
+    globalThis.window?.addEventListener?.('reel-ascent:gamepad-bindings-changed', this.onBindingsChanged);
   }
 
   clear() {
@@ -74,6 +83,8 @@ export class GamepadController {
     const rising = (index) => down(index) && !this.previous[index];
     const falling = (index) => !down(index) && this.previous[index];
     const input = this.game.player.input;
+    const meaningfulAxis = (pad.axes ?? []).some((value) => Math.abs(Number(value) || 0) > .35);
+    if (meaningfulAxis || this.previous.some((wasDown, index) => !wasDown && down(index))) input.noteInputDevice?.('gamepad');
     const dialog = visibleDialog();
     const menuOpen = Boolean(dialog || this.game.localPause.active || this.game.isGameplayModalOpen());
     let stateChanged = false;
@@ -84,11 +95,21 @@ export class GamepadController {
       this.game.performFishingResultAction('recast', 'end', 'gamepad');
     }
 
-    if (rising(BUTTON.START)) {
+    const boundActionForButton = (index) => Object.entries(this.bindings)
+      .find(([action, button]) => button === index && !['forward', 'backward', 'left', 'right'].includes(action))?.[0] ?? null;
+    if (this.game.pauseMenu?.awaitingBinding?.device === 'gamepad') {
+      const bindingIndex = Array.from({ length: Math.min(16, pad.buttons.length) }, (_, index) => index).find(rising);
+      if (bindingIndex !== undefined) this.game.pauseMenu.captureGamepadBinding(bindingIndex);
+      this.releaseGameplay(input);
+      this.previous = Array.from({ length: 16 }, (_, index) => down(index));
+      return;
+    }
+
+    if (rising(BUTTON.START) && !boundActionForButton(BUTTON.START)) {
       if (this.game.localPause.active) { this.game.setLocalPause(false); stateChanged = true; }
       else if (!menuOpen && !this.game.fishing.active) { this.game.setLocalPause(true); stateChanged = true; }
     }
-    if (rising(BUTTON.B)) {
+    if (rising(BUTTON.B) && (menuOpen || !boundActionForButton(BUTTON.B))) {
       // Route cancellation through each owner's existing Escape handler so fishing,
       // benches, dialogs and Pause all retain their established cleanup path.
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
@@ -113,19 +134,28 @@ export class GamepadController {
       }
     } else {
       input.gamepadAxes = { x: gamepadAxis(pad.axes?.[0]), z: -gamepadAxis(pad.axes?.[1]) };
-      input.gamepadSprintHeld = down(BUTTON.RB);
-      input.gamepadSlideHeld = down(BUTTON.LT);
-      input.gamepadGripHeld = down(BUTTON.LB);
+      const actionDown = (action) => Number.isInteger(this.bindings[action]) && down(this.bindings[action]);
+      const actionRising = (action) => Number.isInteger(this.bindings[action]) && rising(this.bindings[action]);
+      input.gamepadSprintHeld = actionDown('sprint');
+      input.gamepadSlideHeld = actionDown('slide');
+      input.gamepadGripHeld = actionDown('grip');
       if (!input.gamepadGripHeld && !input.rawGripHeld) input.gripInteractionSuppressed = false;
       input.gamepadCastHeld = down(BUTTON.RT) && this.game.fishing.active && !input.rhythmCapture;
       if (input.gamepadCastHeld && rising(BUTTON.RT)) input.fishingCastPressed = true;
       if (falling(BUTTON.RT)) input.fishingCastReleased = true;
-      if (rising(BUTTON.A)) {
+      if (actionRising('jump')) {
         if (this.game.fishing.active && !input.rhythmCapture) input.fishingHookPressed = true;
         else if (!input.rhythmCapture) input.jumpQueued = true;
       }
-      if (rising(BUTTON.X) && !input.rhythmCapture) input.mobileInteractionQueued = true;
-      if (rising(BUTTON.Y) && !input.rhythmCapture) input.fishingToggleQueued = true;
+      if (actionRising('interact') && !input.rhythmCapture) input.mobileInteractionQueued = true;
+      if (actionRising('fish') && !input.rhythmCapture) input.fishingToggleQueued = true;
+      for (const action of ['inventory', 'journal', 'emotes', 'map']) {
+        if (!actionRising(action) || input.rhythmCapture) continue;
+        const code = loadKeyBindings()[action] ?? KEY_BINDING_DEFINITIONS[action]?.defaultCode;
+        if (!code) continue;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
+        window.dispatchEvent(new KeyboardEvent('keyup', { code, key: code, bubbles: true }));
+      }
       for (const [indexText, lane] of Object.entries(DIRECTION)) {
         const index = Number(indexText);
         if (rising(index)) input.rhythmLaneInput.press(`gamepad:${index}`, lane, performance.now() / 1000);
@@ -172,13 +202,24 @@ export class GamepadController {
     const vertical = gamepadAxis(pad.axes?.[1], .45);
     const horizontal = gamepadAxis(pad.axes?.[0], .45);
     const active = document.activeElement;
-    if ((rising(BUTTON.LEFT) || rising(BUTTON.RIGHT)) && active?.matches?.('input[type="range"]')) {
+    const horizontalAdjust = rising(BUTTON.RIGHT) || horizontal > .5 ? 1
+      : rising(BUTTON.LEFT) || horizontal < -.5 ? -1 : 0;
+    if (horizontalAdjust && now >= this.navigationReadyAt && active?.matches?.('input[type="range"]')) {
       const step = Number(active.step) || 1;
       const minimum = Number(active.min) || 0;
       const maximum = Number(active.max) || 100;
-      active.value = String(Math.max(minimum, Math.min(maximum, Number(active.value) + (rising(BUTTON.RIGHT) ? step : -step))));
+      active.value = String(Math.max(minimum, Math.min(maximum, Number(active.value) + horizontalAdjust * step)));
       active.dispatchEvent(new Event('input', { bubbles: true }));
       active.dispatchEvent(new Event('change', { bubbles: true }));
+      this.navigationReadyAt = now + 120;
+      return;
+    }
+    if (horizontalAdjust && now >= this.navigationReadyAt && active?.matches?.('select')) {
+      const options = [...active.options].filter((option) => !option.disabled);
+      const selected = Math.max(0, options.findIndex((option) => option.value === active.value));
+      active.value = options[(selected + horizontalAdjust + options.length) % options.length]?.value ?? active.value;
+      active.dispatchEvent(new Event('change', { bubbles: true }));
+      this.navigationReadyAt = now + 160;
       return;
     }
     const direction = rising(BUTTON.DOWN) || vertical > .5 ? 1
@@ -193,9 +234,17 @@ export class GamepadController {
     if (rising(BUTTON.A)) {
       const focused = items.includes(document.activeElement) ? document.activeElement : items[0];
       if (focused !== document.activeElement) focused.focus();
-      else if (focused.matches('button, [href], [role="button"], input[type="checkbox"], input[type="radio"]')) focused.click();
+      else if (focused.matches('select')) {
+        const options = [...focused.options].filter((option) => !option.disabled);
+        const selected = Math.max(0, options.findIndex((option) => option.value === focused.value));
+        focused.value = options[(selected + 1) % options.length]?.value ?? focused.value;
+        focused.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (focused.matches('button, [href], [role="button"], input[type="checkbox"], input[type="radio"]')) focused.click();
     }
   }
 
-  destroy() { this.clear(); }
+  destroy() {
+    globalThis.window?.removeEventListener?.('reel-ascent:gamepad-bindings-changed', this.onBindingsChanged);
+    this.clear();
+  }
 }

@@ -29,11 +29,11 @@ test('generic Legendary cosmetic names map to their real design family', () => {
   assert.equal(COSMETIC_BY_ID.get('casino-card-shark-cap').visual, 'cap');
 });
 
-test('fishing vertical allowance is six metres without changing horizontal distance', () => {
+test('fishing vertical allowance is seven metres without changing horizontal distance', () => {
   const zone = new FishingZone({ id: 'test', label: 'Test', center: { x: 0, z: 0 }, radii: { x: 2, z: 2 }, surfaceY: 0, fishIds: [] });
-  assert.equal(DEFAULT_FISHING_VERTICAL_TOLERANCE, 6);
-  assert.equal(zone.canCastFrom({ x: 3, y: 5.99, z: 0 }, 1.01), true);
-  assert.equal(zone.canCastFrom({ x: 3, y: 6.01, z: 0 }, 1.01), false);
+  assert.equal(DEFAULT_FISHING_VERTICAL_TOLERANCE, 7);
+  assert.equal(zone.canCastFrom({ x: 3, y: 6.99, z: 0 }, 1.01), true);
+  assert.equal(zone.canCastFrom({ x: 3, y: 7.01, z: 0 }, 1.01), false);
   assert.equal(zone.canCastFrom({ x: 3.02, y: 0, z: 0 }, 1.01), false);
 });
 
@@ -56,4 +56,4 @@ test('Basalt opening and Crown rock exclusions are explicit in active world sour
   assert.match(world, /buildCrownRoutes\(\)[\s\S]{0,3000}isRockInProtectedWaterApproach/);
 });
 
-test('v20.5 is the active build', () => assert.equal(GAME_VERSION, 'v20.5'));
+test('v20.7 is the active build', () => assert.equal(GAME_VERSION, 'v20.7'));

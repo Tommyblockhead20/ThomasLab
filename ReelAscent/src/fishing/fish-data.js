@@ -244,6 +244,10 @@ function resolvedHabitatFor(id, authoredHabitat) {
     ...habitat,
     tiers: Object.freeze([...new Set([...(habitat.tiers ?? []), 'summit'])]),
     waterTypes: Object.freeze([...new Set([...(habitat.waterTypes ?? []), 'summit-pond', 'cave-tarn'])]),
+    // Several authored species carry an explicit waterIds allow-list. Extending only the
+    // tier/type left those supposedly summit-compatible creatures at 0% in both real summit
+    // waters. Keep their existing homes and deliberately add the two Stoneveil summit waters.
+    waterIds: Object.freeze([...new Set([...(habitat.waterIds ?? []), 'crooked-peak-tarn', 'crown-vault'])]),
     themes: Object.freeze([...new Set(habitat.themes ?? ['sunwash', 'fernwood', 'blackstone'])]),
     exclusive: false
   });

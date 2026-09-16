@@ -1,6 +1,6 @@
 import { isCheatsEnabled } from '../debug/cheat-gate.js';
 import { MOBILE_FISHING_DIRECTION_ORDER } from '../fishing/result-actions.js';
-import { formatInputCode } from '../player/movement.js';
+import { formatGamepadBinding, formatInputCode } from '../player/movement.js';
 import { GAME_VERSION } from '../version.js';
 import { SongVoteStore, normalizeDownvoteReason, songDownvoteReasonForDigit, songVoteKey } from '../fishing/song-votes.js';
 
@@ -265,30 +265,36 @@ export class Hud {
     }
     const contextualAction = playerState.contextualAction?.kind ?? null;
     const bindings = playerState.keyBindings ?? {};
+    const controller = playerState.gamepadBindings ?? {};
+    const controllerActive = playerState.inputDevice === 'gamepad';
+    const actionLabel = (action, fallback) => controllerActive
+      ? formatGamepadBinding(controller[action])
+      : formatInputCode(bindings[action] ?? fallback);
     const gripKey = formatInputCode(bindings.grip ?? 'KeyG');
     const hintText = {
-      move: `${formatInputCode(bindings.forward ?? 'KeyW')}/${formatInputCode(bindings.left ?? 'KeyA')}/${formatInputCode(bindings.backward ?? 'KeyS')}/${formatInputCode(bindings.right ?? 'KeyD')} / Arrows`,
-      sprint: formatInputCode(bindings.sprint ?? 'ShiftLeft'),
-      jump: formatInputCode(bindings.jump ?? 'Space'),
-      slide: formatInputCode(bindings.slide ?? 'KeyC'),
-      grip: `Click / ${gripKey}`,
-      fish: formatInputCode(bindings.fish ?? 'KeyF'),
-      inventory: formatInputCode(bindings.inventory ?? 'KeyI'),
-      journal: formatInputCode(bindings.journal ?? 'KeyJ'),
-      settings: 'Esc',
-      emotes: formatInputCode(bindings.emotes ?? 'KeyE'),
-      map: formatInputCode(bindings.map ?? 'KeyV')
+      move: controllerActive ? 'Left Stick / D-Pad' : `${formatInputCode(bindings.forward ?? 'KeyW')}/${formatInputCode(bindings.left ?? 'KeyA')}/${formatInputCode(bindings.backward ?? 'KeyS')}/${formatInputCode(bindings.right ?? 'KeyD')} / Arrows`,
+      sprint: actionLabel('sprint', 'ShiftLeft'),
+      jump: actionLabel('jump', 'Space'),
+      slide: actionLabel('slide', 'KeyC'),
+      grip: controllerActive ? actionLabel('grip', 'KeyG') : `Click / ${gripKey}`,
+      fish: actionLabel('fish', 'KeyF'),
+      inventory: actionLabel('inventory', 'KeyI'),
+      journal: actionLabel('journal', 'KeyJ'),
+      settings: controllerActive ? 'Menu / B' : 'Esc',
+      emotes: actionLabel('emotes', 'KeyE'),
+      map: actionLabel('map', 'KeyV')
     };
     for (const [id, keycaps] of Object.entries(this.controlHints ?? {})) {
       for (const keycap of keycaps) keycap.textContent = hintText[id];
     }
     this.gripPrompt.hidden = contextualAction !== 'grip';
+    const gripLabel = controllerActive ? actionLabel('grip', 'KeyG') : `Click / ${gripKey}`;
     this.gripPrompt.innerHTML = playerState.movementState === 'climbing'
-      ? `${playerState.climbMaterial ?? 'Rock'} • Release <kbd>Click / ${gripKey}</kbd> — Drop`
-      : `Hold <kbd>Click / ${gripKey}</kbd> — Grip ${playerState.climbMaterial ?? ''}`;
-    const fishKey = formatInputCode(bindings.fish ?? 'KeyF');
+      ? `${playerState.climbMaterial ?? 'Rock'} • Release <kbd>${gripLabel}</kbd> — Drop`
+      : `Hold <kbd>${gripLabel}</kbd> — Grip ${playerState.climbMaterial ?? ''}`;
+    const fishKey = actionLabel('fish', 'KeyF');
     this.fishPrompt.hidden = contextualAction !== 'fish';
-    this.fishPrompt.innerHTML = `Press <kbd>${fishKey}</kbd> — Fish`;
+    this.fishPrompt.innerHTML = `<kbd>${fishKey}</kbd> — Fish`;
     this.fishingPanel.hidden = playerState.fishing.state === 'inactive'
       || playerState.fishing.state === 'rhythm'
       || playerState.fishing.state === 'caught';
