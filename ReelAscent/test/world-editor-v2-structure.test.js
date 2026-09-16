@@ -19,7 +19,8 @@ test('all first-milestone V2 levels use stable schema/world IDs', async () => {
   for (const [file, worldId] of [
     ['cave-fishing-island.json', 'cave-fishing-island'],
     ['skyscraper.json', 'skyscraper'],
-    ['pirate-island.json', 'pirate-island']
+    ['pirate-island.json', 'pirate-island'],
+    ['library-island.json', 'library-island']
   ]) {
     const data = JSON.parse(await text(`src/world/world-editor-levels/${file}`));
     assert.equal(data.schema, 2);
@@ -46,10 +47,10 @@ test('runtime bridges V2 data into Skyreach and Basalt without replacing their s
   assert.match(mountain, /updateWorldEditorKinematics\(this, dt\)/);
 });
 
-test('World Editor V2 shell exposes all four worlds and moving-platform tools', async () => {
+test('World Editor V2 shell exposes all five worlds and moving-platform tools', async () => {
   const registry = await text('tools/map-editor/world-registry.js');
   const html = await text('tools/map-editor/index.html');
-  for (const id of ['stoneveil-peak', 'cave-fishing-island', 'skyscraper', 'pirate-island']) {
+  for (const id of ['stoneveil-peak', 'cave-fishing-island', 'skyscraper', 'pirate-island', 'library-island']) {
     assert.match(registry, new RegExp(id));
   }
   assert.match(html, /id="world-selector"/);
@@ -62,19 +63,36 @@ test('World Editor V2 shell exposes all four worlds and moving-platform tools', 
 });
 
 
-test('V2.1 authoring workflow wires compact UI, room workspace, search and snapping', async () => {
+test('V2.2 authoring workflow wires compact UI, room workspace, search and snapping', async () => {
   const main = await text('tools/map-editor/main.js');
   const html = await text('tools/map-editor/index.html');
   const css = await text('tools/map-editor/editor.css');
   assert.match(main, /setupResizableRightPanel/);
   assert.match(main, /setupCollapsibleSections/);
   assert.match(main, /enterPrefabWorkspace/);
-  assert.match(main, /createTestRoom/);
+  assert.match(main, /placeCompleteLibraryRoom/);
+  assert.match(main, /placeLibraryComponent/);
   assert.match(main, /outlinerFilter/);
   assert.match(main, /gridSnapEnabled/);
   assert.match(main, /routeGroup/);
   assert.match(html, /id="edit-source-prefab"/);
-  assert.match(html, /id="create-test-room"/);
+  assert.match(html, /id="skyscraper-room-library-section"/);
+  assert.match(html, /id="place-complete-room"/);
+  assert.match(html, /id="place-room-component"/);
   assert.match(css, /--right-panel-width/);
   assert.match(css, /\.outliner-row/);
+});
+
+
+test('Skyscraper room library provides five authored interiors and modular components', async () => {
+  const library = await text('tools/map-editor/room-library.js');
+  const main = await text('tools/map-editor/main.js');
+  for (const room of ['Bathroom', 'Restaurant', 'Penthouse', 'Maintenance / Utility', 'Casino']) {
+    assert.match(library, new RegExp(room.replace(/[\/]/g, '\\$&')));
+  }
+  assert.match(library, /makeRoomLibraryDefinition/);
+  assert.match(library, /makeRoomComponentDefinition/);
+  assert.match(library, /componentName/);
+  assert.match(main, /roomLibraryId/);
+  assert.match(main, /suggestedAssemblyOffset/);
 });

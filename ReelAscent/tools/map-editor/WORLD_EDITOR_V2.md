@@ -1,8 +1,8 @@
-# REEL ASCENT WORLD EDITOR V2.1
+# REEL ASCENT WORLD EDITOR V2.2
 
 ## Safety / Stoneveil source of truth
 
-World Editor V2.1 keeps `src/world/map-editor-patch.json` as the production-safe Stoneveil source. It does **not** regenerate Stoneveil, simplify the mesh, or convert it back to the old height-profile architecture.
+World Editor V2.2 keeps `src/world/map-editor-patch.json` as the production-safe Stoneveil source. It does **not** regenerate Stoneveil, simplify the mesh, or convert it back to the old height-profile architecture.
 
 The safety copy remains:
 
@@ -21,6 +21,31 @@ npm run dev
 Open:
 
 `http://localhost:5173/tools/map-editor/`
+
+
+## V2.2 interior-library / fifth-world additions
+
+### Skyscraper Interior Library
+
+The Skyscraper now has a real authored **Interior Library** rather than another procedural platform-pattern button. Five starter interiors are available:
+
+- Bathroom
+- Restaurant
+- Penthouse
+- Maintenance / Utility
+- Casino
+
+Each interior can be placed as a **Complete Room** (a linked room prefab with all authored child geometry) or as one of roughly eight to nine **Major Components**. Components are independent linked prefab roots, so they can be positioned/rotated separately and reused. Complete-room source workspaces group their child objects by those same component names in the outliner.
+
+The current starter interiors are deliberately low-poly authored level geometry, not final decorative art. They include the functional spatial composition and representative fixtures/furniture needed to lay out the level. Actual lights, doors/NPC/interactions, high-detail asset meshes and final materials remain later content work.
+
+Room/component material intent is stored as metadata and previewed with differentiated editor materials. The runtime bridge maps those material roles onto existing world materials when an exported Skyscraper level JSON is installed.
+
+### Library Island / Veiled Athenaeum
+
+`Library Island / Veiled Athenaeum` is now a fifth World Editor scene. It has independent V2 state, autosave, generic objects/water/prefabs/rooms, walkthrough and collision inspection. The editor shows the current production island footprint and Athenaeum obscured foundation/silhouette/roofline as a **reference only**. Production is not switched to V2-authored terrain or architecture by this addition.
+
+This foundation exists so future Athenaeum terrain, modular reading/archive rooms, lighting and interaction authoring can use shared editor systems instead of becoming another hard-coded special case.
 
 ## V2.1 workflow changes
 
@@ -50,8 +75,6 @@ Skyscraper surface placement uses the actual editor representation of the ESB co
 ### Rooms / prefabs
 
 `New Room` and `New Prefab` create a source definition plus linked root instance. Select the instance and choose **Edit Source Prefab** to enter an isolated local-origin workspace. Objects, platforms and waters placed there are stored as children in local coordinates. **Return to World** restores the editor camera/selection.
-
-`Test Room` creates a small floor/walls/prop fixture that proves the workflow quickly.
 
 Existing linked instances read the same prefab definition, so source edits are reflected by all linked instances on rebuild. This is intentionally not a Blender-style per-instance override system yet.
 
@@ -106,6 +129,8 @@ Importing a candidate does **not** promote it to production. The remaining missi
 - Stoneveil capsule-clearance diagnostic
 - Stoneveil grounded-object spatial validation
 - substantial Pirate Island content
+- authored Library Island terrain/interior content beyond the current reference scene
+- final-art meshes, real light entities and gameplay interactions for the starter interior library
 
 ## Manual test order
 
@@ -113,7 +138,7 @@ Importing a candidate does **not** promote it to production. The remaining missi
 2. Resize/collapse the sidebars and reload.
 3. Search/select/focus/rename/hide authored objects in the outliner.
 4. Create/edit a room source, return to Skyscraper, move/rotate/duplicate the room root.
-5. Try Test Room.
+5. Place a complete Bathroom/Casino and one individual component; open Edit Source Prefab and inspect component groups.
 6. Place and duplicate ESB parkour pieces with Surface Snap; toggle grid/rotation snapping.
 7. Assign route groups and inspect the outliner.
 8. Edit/test a moving platform in Walkthrough and return to editing.

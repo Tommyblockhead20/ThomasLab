@@ -18,6 +18,11 @@ export const WORLD_EDITOR_WORLDS = Object.freeze([
     id: 'pirate-island', label: 'PIRATE ISLAND', runtimeLocationId: 'pirate-island',
     dataUrl: '../../src/world/world-editor-levels/pirate-island.json', kind: 'generic',
     capabilities: ['select', 'objects', 'water', 'prefabs', 'rooms', 'walkthrough', 'collision-debug']
+  }),
+  Object.freeze({
+    id: 'library-island', label: 'LIBRARY ISLAND / VEILED ATHENAEUM', runtimeLocationId: 'veiled-athenaeum',
+    dataUrl: '../../src/world/world-editor-levels/library-island.json', kind: 'generic',
+    capabilities: ['select', 'objects', 'water', 'prefabs', 'rooms', 'walkthrough', 'collision-debug']
   })
 ]);
 

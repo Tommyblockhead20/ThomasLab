@@ -31,6 +31,7 @@ import { GenericWorldScene } from './generic-scene.js';
 import { SlopeOverlay, slopeOverlayLegend } from './slope-overlay.js';
 import { validateWorldLevel } from './validation.js';
 import { movingPlatformPose } from '../../src/world/world-editor-v2-runtime.js';
+import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinition, makeRoomComponentDefinition } from './room-library.js';
 
 const STORAGE_KEY = 'reel-ascent-map-editor-v1';
 const CHECKPOINT_KEY = 'reel-ascent-map-editor-v1-manual-checkpoint';
@@ -1689,6 +1690,8 @@ function setWorldCameraDefaults(worldId) {
     cameraState.target.set(0, 0, 0); cameraState.yaw = 42; cameraState.pitch = -22; cameraState.distance = 58;
   } else if (worldId === 'pirate-island') {
     cameraState.target.set(0, 0, 0); cameraState.yaw = 42; cameraState.pitch = -28; cameraState.distance = 82;
+  } else if (worldId === 'library-island') {
+    cameraState.target.set(0, 2.2, 0); cameraState.yaw = 38; cameraState.pitch = -22; cameraState.distance = 88;
   } else {
     cameraState.target.set(MOUNTAIN_CENTER.x, 105, MOUNTAIN_CENTER.z); cameraState.yaw = 42; cameraState.pitch = -24; cameraState.distance = 430;
   }
@@ -3110,6 +3113,7 @@ function syncWorldUi() {
   }
   $('#generic-palette-section').hidden = !(worldHasCapability(world.id, 'parkour') || worldHasCapability(world.id, 'objects') || worldHasCapability(world.id, 'prefabs') || worldHasCapability(world.id, 'rooms'));
   if ($('#cave-migration-section')) $('#cave-migration-section').hidden = world.id !== 'cave-fishing-island';
+  if ($('#skyscraper-room-library-section')) $('#skyscraper-room-library-section').hidden = world.id !== 'skyscraper';
   if ($('#create-prefab-foundation')) $('#create-prefab-foundation').hidden = !worldHasCapability(world.id, 'prefabs');
   if ($('#create-room-foundation')) $('#create-room-foundation').hidden = !worldHasCapability(world.id, 'rooms');
   if (world.id === 'cave-fishing-island' && $('#basalt-freeze-status')) {
@@ -3449,12 +3453,21 @@ function renderOutliner() {
   } else if (prefabWorkspace.active) {
     const definition = activePrefabDefinition();
     groups.push(['Prefab / Room Root', [{ id: definition?.id || 'definition', name: definition?.name || 'Definition', kind:'meta', type:definition?.kind || 'prefab' }]]);
-    groups.push(['Children', (definition?.objects ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-child-object',type:item.type||'object',renameable:true,deletable:true,hideable:true }))]);
+    const prefabObjects = definition?.objects ?? [];
+    const componentNames = [...new Set(prefabObjects.map((item) => item.metadata?.componentName).filter(Boolean))];
+    if (componentNames.length) {
+      for (const componentName of componentNames) {
+        groups.push([componentName, prefabObjects.filter((item) => item.metadata?.componentName === componentName).map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-child-object',type:item.type||'object',renameable:true,deletable:true,hideable:true }))]);
+      }
+      const loose = prefabObjects.filter((item) => !item.metadata?.componentName);
+      if (loose.length) groups.push(['Other Children', loose.map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-child-object',type:item.type||'object',renameable:true,deletable:true,hideable:true }))]);
+    } else groups.push(['Children', prefabObjects.map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-child-object',type:item.type||'object',renameable:true,deletable:true,hideable:true }))]);
     groups.push(['Moving Platforms', (definition?.movingPlatforms ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-child-moving',type:'moving-platform',renameable:true,deletable:true,hideable:true }))]);
     groups.push(['Waters', (definition?.waters ?? []).map((item) => ({ id:String(item.id||item.identity),name:item.name||item.id,kind:'prefab-child-water',type:'water',renameable:true,deletable:true,hideable:true }))]);
   } else {
     const level = activeGenericLevel();
     if (activeWorldId === 'skyscraper') groups.push(['ESB Reference', [{ id:'__architecture__', name:'Empire State Building', kind:'architecture-reference', type:'reference' }]]);
+    else if (activeWorldId === 'library-island') groups.push(['Athenaeum Reference', [{ id:'__architecture__', name:'The Veiled Athenaeum', kind:'architecture-reference', type:'reference' }]]);
     groups.push(['Waters', (level?.waters ?? []).map((item) => ({ id:String(item.id||item.identity), name:item.name||item.id, kind:'water-v2', type:'water', renameable:true, deletable:true, hideable:true }))]);
     const objects = (level?.objects ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'world-object',type:item.type||item.category||'object',renameable:true,deletable:true,hideable:true, route:item.metadata?.routeGroup || 'Unassigned' }));
     if (activeWorldId === 'skyscraper') {
@@ -4286,6 +4299,90 @@ function setupSnapPreferences() {
   for (const id of ['grid-snap','grid-snap-step','rotation-snap','rotation-snap-step','surface-snap']) $(`#${id}`)?.addEventListener('change', save);
 }
 
+function populateRoomLibraryUi() {
+  const roomSelect = $('#room-library-template');
+  const componentSelect = $('#room-library-component');
+  if (!roomSelect || !componentSelect) return;
+  if (!roomSelect.options.length) {
+    for (const template of SKYSCRAPER_ROOM_LIBRARY) roomSelect.add(new Option(template.label, template.id));
+  }
+  const template = getRoomLibraryTemplate(roomSelect.value || SKYSCRAPER_ROOM_LIBRARY[0]?.id);
+  componentSelect.replaceChildren(...template.components.map((component) => new Option(component.label, component.id)));
+  const description = $('#room-library-description');
+  if (description) description.textContent = `${template.description} ${template.components.length} major modules. Complete room size ≈ ${template.dimensions.x} × ${template.dimensions.z} m.`;
+}
+
+function ensureLibraryDefinition(draft, definition) {
+  draft.prefabs ??= { definitions: [], instances: [] };
+  draft.prefabs.definitions ??= [];
+  const existing = draft.prefabs.definitions.find((item) => item.id === definition.id);
+  if (existing) return existing;
+  draft.prefabs.definitions.push(definition);
+  return definition;
+}
+
+function roomLibraryPlacement() {
+  return maybeSnapPosition({ x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z });
+}
+
+function placeCompleteLibraryRoom() {
+  if (activeWorldId !== 'skyscraper') return;
+  const level = activeGenericLevel();
+  const templateId = $('#room-library-template')?.value || SKYSCRAPER_ROOM_LIBRARY[0]?.id;
+  const template = getRoomLibraryTemplate(templateId);
+  const definition = makeRoomLibraryDefinition(templateId);
+  const id = nextStableId(level, 'ROOM');
+  const room = {
+    id,
+    name: `${template.label} ${id.split('-').at(-1)}`,
+    prefabId: definition.id,
+    linked: true,
+    transform: { position: roomLibraryPlacement(), rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+    metadata: { roomLibraryId: template.id, libraryAuthored: true, completeRoom: true }
+  };
+  commitGeneric((draft) => {
+    ensureLibraryDefinition(draft, definition);
+    draft.rooms.push(room);
+  });
+  selected = { kind: 'room', id };
+  genericScene.setSelected(id);
+  renderUi();
+  setStatus(`Placed complete ${template.label}. Edit Source Prefab exposes its ${template.components.length} named component groups.`);
+}
+
+function placeLibraryComponent() {
+  if (activeWorldId !== 'skyscraper') return;
+  const level = activeGenericLevel();
+  const templateId = $('#room-library-template')?.value || SKYSCRAPER_ROOM_LIBRARY[0]?.id;
+  const componentId = $('#room-library-component')?.value;
+  const template = getRoomLibraryTemplate(templateId);
+  const component = template.components.find((item) => item.id === componentId) ?? template.components[0];
+  const definition = makeRoomComponentDefinition(templateId, component.id);
+  if (!definition) return;
+  const id = nextStableId(level, 'PREFAB-INSTANCE');
+  const instance = {
+    id,
+    name: `${template.label} — ${component.label} ${id.split('-').at(-1)}`,
+    prefabId: definition.id,
+    linked: true,
+    transform: { position: roomLibraryPlacement(), rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+    metadata: {
+      roomLibraryId: template.id,
+      roomComponentId: component.id,
+      libraryAuthored: true,
+      suggestedAssemblyOffset: structuredClone(component.offset)
+    }
+  };
+  commitGeneric((draft) => {
+    ensureLibraryDefinition(draft, definition);
+    draft.prefabs.instances.push(instance);
+  });
+  selected = { kind: 'prefab-instance', id };
+  genericScene.setSelected(id);
+  renderUi();
+  setStatus(`Placed ${template.label} component: ${component.label}. It is an independent linked module with its own root transform.`);
+}
+
 function createTestRoom() {
   if (isStoneveilWorld() || !worldHasCapability(activeWorldId, 'rooms')) return;
   const level=activeGenericLevel();
@@ -4362,6 +4459,10 @@ function setupV21Ui() {
   $('#focus-selected')?.addEventListener('click', () => focusSelectedObject());
   $('#rename-selected')?.addEventListener('click', renameSelectedRecord);
   $('#edit-source-prefab')?.addEventListener('click', () => { const def=definitionForSelectedInstance(); if(def) enterPrefabWorkspace(def.id); });
+  $('#room-library-template')?.addEventListener('change', populateRoomLibraryUi);
+  $('#place-complete-room')?.addEventListener('click', placeCompleteLibraryRoom);
+  $('#place-room-component')?.addEventListener('click', placeLibraryComponent);
+  populateRoomLibraryUi();
   $('#create-test-room')?.addEventListener('click', createTestRoom);
   $('#save-prefab-workspace')?.addEventListener('click', () => { persistGenericLevel(); setStatus('Prefab/room definition saved to this world autosave. Use Save World Level to download the JSON.'); });
   $('#exit-prefab-workspace')?.addEventListener('click', () => exitPrefabWorkspace());

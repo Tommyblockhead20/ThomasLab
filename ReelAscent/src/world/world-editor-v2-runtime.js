@@ -272,9 +272,33 @@ export function movingPlatformPose(definition, elapsedSeconds = 0) {
 }
 
 function materialForObject(world, item) {
-  if (item.category === 'moving-platforms') return world.materials?.metal ?? world.materials?.cabinTrim ?? world.materials?.rock;
-  if (item.category === 'parkour') return world.materials?.decoStone ?? world.materials?.rock ?? world.materials?.alpine;
-  return world.materials?.wood ?? world.materials?.rock ?? world.materials?.alpine;
+  const key = String(item?.metadata?.materialKey || '').toLowerCase();
+  const materials = world.materials ?? {};
+  const authored = {
+    wall: materials.decoStone ?? materials.cabinWall ?? materials.rock,
+    ceiling: materials.cabinWall ?? materials.decoStone ?? materials.rock,
+    floor: materials.decoStone ?? materials.rock ?? materials.alpine,
+    stone: materials.decoStone ?? materials.rock ?? materials.alpine,
+    tile: materials.decoStone ?? materials.snow ?? materials.rock,
+    wood: materials.wood ?? materials.cabinWood ?? materials.rock,
+    metal: materials.metal ?? materials.cabinTrim ?? materials.rock,
+    glass: materials.glass ?? materials.ice ?? materials.cabinTrim ?? materials.rock,
+    fabric: materials.cabinRoof ?? materials.wood ?? materials.rock,
+    accent: materials.brass ?? materials.cabinTrim ?? materials.metal ?? materials.rock,
+    fixture: materials.snow ?? materials.decoStone ?? materials.rock,
+    dark: materials.cave ?? materials.cabinRoof ?? materials.rock,
+    plant: materials.leaf ?? materials.grass ?? materials.wood ?? materials.rock,
+    partition: materials.cabinWall ?? materials.decoStone ?? materials.rock,
+    light: materials.brass ?? materials.cabinTrim ?? materials.snow ?? materials.rock,
+    'casino-felt': materials.grass ?? materials.leaf ?? materials.decoStone ?? materials.rock,
+    'casino-red': materials.cabinRoof ?? materials.wood ?? materials.rock,
+    'casino-purple': materials.cave ?? materials.cabinRoof ?? materials.rock,
+    trim: materials.brass ?? materials.cabinTrim ?? materials.metal ?? materials.rock
+  };
+  if (authored[key]) return authored[key];
+  if (item.category === 'moving-platforms') return materials.metal ?? materials.cabinTrim ?? materials.rock;
+  if (item.category === 'parkour') return materials.decoStone ?? materials.rock ?? materials.alpine;
+  return materials.wood ?? materials.rock ?? materials.alpine;
 }
 
 function registerClimb(world, entity, climbMaterial, label) {

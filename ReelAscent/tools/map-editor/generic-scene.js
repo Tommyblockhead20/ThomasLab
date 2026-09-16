@@ -86,6 +86,7 @@ function rayAabbHit(origin, direction, center, half) {
 
 function createBox(parent, name, position, size, material, rotation = {}, solidRecord = null) {
   const entity = new pc.Entity(name);
+  entity._editorBaseMaterial = material;
   entity.addComponent('render', { type: 'box', material, castShadows: true, receiveShadows: true });
   parent.addChild(entity);
   entity.setLocalPosition(position.x, position.y, position.z);
@@ -172,7 +173,25 @@ export class GenericWorldScene {
       path: makeMaterial([1, .5, .08], .82, .18),
       collision: makeMaterial([1, .12, .12], .15, .12),
       pirate: makeMaterial([.27, .42, .28]),
-      workspaceGrid: makeMaterial([.34, .38, .31], .28)
+      library: makeMaterial([.30, .27, .38]),
+      workspaceGrid: makeMaterial([.34, .38, .31], .28),
+      roomWall: makeMaterial([.63, .66, .65]),
+      roomCeiling: makeMaterial([.72, .73, .69]),
+      roomFloor: makeMaterial([.25, .29, .28]),
+      roomWood: makeMaterial([.43, .28, .17]),
+      roomMetal: makeMaterial([.31, .36, .38]),
+      roomGlass: makeMaterial([.42, .68, .75], .48),
+      roomFabric: makeMaterial([.34, .22, .24]),
+      roomAccent: makeMaterial([.73, .56, .22], 1, .05),
+      roomFixture: makeMaterial([.82, .84, .79]),
+      roomDark: makeMaterial([.12, .14, .15]),
+      roomPlant: makeMaterial([.19, .42, .24]),
+      roomTile: makeMaterial([.47, .56, .55]),
+      roomPartition: makeMaterial([.54, .57, .56]),
+      roomLight: makeMaterial([.95, .88, .56], 1, .35),
+      casinoFelt: makeMaterial([.08, .36, .22]),
+      casinoRed: makeMaterial([.44, .08, .09]),
+      casinoPurple: makeMaterial([.31, .12, .45], 1, .08)
     };
     this.level = null;
     this.world = null;
@@ -244,6 +263,20 @@ export class GenericWorldScene {
     for (const [id, entity] of this.entities) entity.enabled = !this.editorHiddenIds.has(String(id));
   }
 
+  materialForRecord(record, fallback = this.materials.platform) {
+    const key = String(record?.metadata?.materialKey || '').toLowerCase();
+    const map = {
+      wall: this.materials.roomWall, ceiling: this.materials.roomCeiling, floor: this.materials.roomFloor,
+      wood: this.materials.roomWood, metal: this.materials.roomMetal, glass: this.materials.roomGlass,
+      fabric: this.materials.roomFabric, accent: this.materials.roomAccent, fixture: this.materials.roomFixture,
+      dark: this.materials.roomDark, plant: this.materials.roomPlant, tile: this.materials.roomTile,
+      partition: this.materials.roomPartition, light: this.materials.roomLight, stone: this.materials.roomFloor,
+      trim: this.materials.roomAccent, 'casino-felt': this.materials.casinoFelt,
+      'casino-red': this.materials.casinoRed, 'casino-purple': this.materials.casinoPurple
+    };
+    return map[key] || fallback;
+  }
+
   applySelectionMaterials() {
     for (const [id, entity] of this.entities) {
       const selected = id === this.selectedId;
@@ -252,11 +285,11 @@ export class GenericWorldScene {
         const node = stack.pop();
         stack.push(...(node.children ?? []));
         for (const mesh of node.render?.meshInstances ?? []) {
-          const base = entity.editorKind === 'water-v2'
-            ? this.materials.water
-            : entity.editorKind === 'waypoint' ? this.materials.path
-              : (node.editorKind === 'moving-platform' || entity.editorKind === 'moving-platform')
-                ? this.materials.moving : this.materials.platform;
+          const base = node._editorBaseMaterial
+            || (entity.editorKind === 'water-v2' ? this.materials.water
+              : entity.editorKind === 'waypoint' ? this.materials.path
+                : (node.editorKind === 'moving-platform' || entity.editorKind === 'moving-platform')
+                  ? this.materials.moving : this.materials.platform);
           mesh.material = selected ? this.materials.selected : base;
         }
       }
@@ -284,6 +317,7 @@ export class GenericWorldScene {
     if (this.world.id === 'skyscraper') this.buildSkyscraperReference();
     else if (this.world.id === 'cave-fishing-island') this.buildCaveReference();
     else if (this.world.id === 'pirate-island') this.buildPirateReference();
+    else if (this.world.id === 'library-island') this.buildLibraryReference();
     this.buildWaters();
     this.buildObjects();
     this.buildMovingPlatforms();
@@ -393,6 +427,28 @@ export class GenericWorldScene {
     this.referenceCollisionBoxes.push({ center: { x: 0, y: -.2, z: 0 }, size: { x: 44, y: .4, z: 36 }, kind: 'placeholder' });
   }
 
+  buildLibraryReference() {
+    const location = SMALL_ISLAND_LOCATIONS.find((item) => item.id === 'veiled-athenaeum');
+    if (!location) return;
+    this.referenceRecord = {
+      id: '__architecture__', name: 'The Veiled Athenaeum — production reference', type: 'architecture-reference',
+      position: { x: 0, y: location.elevation, z: 0 }, collision: 'current procedural island / silhouette reference'
+    };
+    createBox(this.referenceRoot, 'Athenaeum island work pad', { x: 0, y: location.elevation - .18, z: 0 },
+      { x: location.radii.x * 1.8, y: .36, z: location.radii.z * 1.8 }, this.materials.library);
+    createBox(this.referenceRoot, 'Athenaeum obscured foundation', { x: 0, y: location.elevation + .22, z: 0 },
+      { x: 12.8, y: .44, z: 10.2 }, this.materials.reference, { y: 8 });
+    createBox(this.referenceRoot, 'Athenaeum distant silhouette', { x: 0, y: location.elevation + 2.45, z: .3 },
+      { x: 9.2, y: 4.2, z: 6.9 }, this.materials.roomDark, { y: 8 });
+    createBox(this.referenceRoot, 'Athenaeum softened roofline', { x: 0, y: location.elevation + 4.82, z: .3 },
+      { x: 10.6, y: .48, z: 8.1 }, this.materials.roomWood, { x: 2, y: 8, z: -2 });
+    this.referenceCollisionBoxes.push(
+      { center: { x: 0, y: location.elevation - .18, z: 0 }, size: { x: location.radii.x * 1.8, y: .36, z: location.radii.z * 1.8 }, kind: 'island-reference', id: '__athenaeum-island' },
+      { center: { x: 0, y: location.elevation + .22, z: 0 }, size: { x: 12.8, y: .44, z: 10.2 }, kind: 'architecture-reference', id: '__athenaeum-foundation' },
+      { center: { x: 0, y: location.elevation + 2.45, z: .3 }, size: { x: 9.2, y: 4.2, z: 6.9 }, kind: 'architecture-reference', id: '__athenaeum-silhouette' }
+    );
+  }
+
   buildWaterRecord(water) {
     const radii = water.radii ?? { x: 4, z: 4 };
     const position = water.position ?? { x: 0, y: 0, z: 0 };
@@ -412,7 +468,7 @@ export class GenericWorldScene {
 
   buildObjectRecord(item, kind = 'world-object') {
     if (item.visible === false) return null;
-    const entity = createBox(this.objectRoot, item.name || item.id, item.transform.position, item.size, this.materials.platform, item.transform.rotation, {
+    const entity = createBox(this.objectRoot, item.name || item.id, item.transform.position, item.size, this.materialForRecord(item), item.transform.rotation, {
       editorKind: kind, editorRecord: item, editorId: item.id
     });
     this.entities.set(item.id, entity);
@@ -463,7 +519,7 @@ export class GenericWorldScene {
       this.objectRoot.addChild(root);
       this.entities.set(instance.id, root);
       for (const child of definition.objects ?? []) {
-        const entity = createBox(root, child.name || child.id, child.transform.position, child.size, this.materials.platform, child.transform.rotation);
+        const entity = createBox(root, child.name || child.id, child.transform.position, child.size, this.materialForRecord(child), child.transform.rotation);
         if (child.collision !== false && child.visible !== false) this.prefabCollisionEntries.push({ entity, record: child, instance });
       }
       for (const child of definition.movingPlatforms ?? []) {

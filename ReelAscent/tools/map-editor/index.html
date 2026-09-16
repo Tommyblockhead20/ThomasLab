@@ -29,7 +29,7 @@
     <header id="topbar">
       <div class="brand">
         <strong>REEL ASCENT</strong>
-        <span>WORLD EDITOR V2.1</span>
+        <span>WORLD EDITOR V2.2</span>
         <select id="world-selector" aria-label="World / scene"></select>
       </div>
       <div class="top-actions">
@@ -159,15 +159,32 @@
           <label><span><input id="surface-snap" type="checkbox" checked /> Surface snap</span><span class="mini-note">ESB / ground</span></label>
         </div>
         <div class="row-actions">
-          <button id="create-prefab-foundation" type="button">New Prefab</button>
-          <button id="create-room-foundation" type="button">New Room</button>
-          <button id="create-test-room" type="button">Test Room</button>
+          <button id="create-prefab-foundation" type="button">New Empty Prefab</button>
+          <button id="create-room-foundation" type="button">New Empty Room</button>
         </div>
         <div id="prefab-workspace-actions" class="row-actions" hidden>
           <button id="save-prefab-workspace" type="button" class="primary">Save Prefab</button>
           <button id="exit-prefab-workspace" type="button">Return to World</button>
         </div>
         <div class="compact-help">Linked room/prefab children use local coordinates. <button class="help-dot" type="button" data-tip="Open Edit Source Prefab from an instance to author it at local origin. Existing linked instances update from the same definition." aria-label="Prefab help">?</button></div>
+      </section>
+
+      <section id="skyscraper-room-library-section" hidden>
+        <h2>Skyscraper Interior Library <button class="help-dot" type="button" data-tip="Place a complete authored interior or one of its major modules. These are real linked prefab definitions, not procedural platform patterns." aria-label="Interior library help">?</button></h2>
+        <label>Interior
+          <select id="room-library-template"></select>
+        </label>
+        <div id="room-library-description" class="compact-status hint"></div>
+        <div class="row-actions">
+          <button id="place-complete-room" type="button" class="primary">Place Complete Room</button>
+        </div>
+        <label style="margin-top:7px;">Major component
+          <select id="room-library-component"></select>
+        </label>
+        <div class="row-actions">
+          <button id="place-room-component" type="button">Place Component</button>
+        </div>
+        <div class="compact-help">Bathroom, Restaurant, Penthouse, Maintenance/Utility, and Casino are included. Complete rooms can be opened with Edit Source Prefab; their outliner is grouped by the same major components.</div>
       </section>
     </aside>
 

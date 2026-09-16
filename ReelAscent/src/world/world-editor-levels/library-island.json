@@ -1,0 +1,30 @@
+{
+  "schema": 2,
+  "kind": "reel-ascent-world-level",
+  "worldId": "library-island",
+  "displayName": "Library Island / Veiled Athenaeum",
+  "runtimeLocationId": "veiled-athenaeum",
+  "updatedAt": null,
+  "sourcePolicy": {
+    "terrain": "procedural-reference",
+    "architecture": "runtime-reference",
+    "waters": "procedural",
+    "objects": "authored",
+    "movingPlatforms": "authored",
+    "prefabs": "authored"
+  },
+  "terrain": {
+    "mode": "procedural-reference",
+    "generator": "buildOceanIsland(veiled-athenaeum)"
+  },
+  "waters": [],
+  "objects": [],
+  "movingPlatforms": [],
+  "prefabs": { "definitions": [], "instances": [] },
+  "rooms": [],
+  "metadata": {
+    "editorStatus": "future-authoring-scene",
+    "referenceArchitecture": "current Veiled Athenaeum obscured foundation / silhouette / roofline",
+    "note": "Production terrain and Athenaeum massing remain references. This scene exists now so shared editor improvements do not hardcode the original four worlds."
+  }
+}
