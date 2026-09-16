@@ -28,8 +28,8 @@ const session = (id, name) => {
   return result;
 };
 
-test('v20.4 is the active displayed build version', () => {
-  assert.equal(GAME_VERSION, 'v20.4');
+test('v20.8 is the active displayed build version', () => {
+  assert.equal(GAME_VERSION, 'v20.8');
 });
 
 test('authored ground query uses upward baked surfaces and ignores downward ceilings', () => {

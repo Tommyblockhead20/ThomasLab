@@ -2674,7 +2674,8 @@ body.appearance-open #game-shell::after { position: absolute; z-index: 70; inset
 .appearance-options button.is-redesign-pending {
   color: rgb(220 226 222 / 60%);
   cursor: not-allowed;
-  background: repeating-linear-gradient(135deg, rgb(82 86 84 / 32%) 0 6px, rgb(35 42 40 / 42%) 6px 12px);
+  background: rgb(48 57 54 / 72%);
+  opacity: .64;
   border-color: rgb(191 202 197 / 28%);
 }
 .appearance-options button.is-redesign-pending small { display: block; color: #c8bfa8; font-size: .42rem; line-height: 1.2; }

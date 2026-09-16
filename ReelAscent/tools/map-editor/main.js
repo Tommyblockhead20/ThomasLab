@@ -7,7 +7,6 @@ import {
   FRACTURED_ROCK_FORM_KINDS
 } from '../../src/world/mountain-v2.js';
 import {
-  applyMidPlateauPreset,
   applyTerrainPatchHeight,
   downloadJson,
   FEET_PER_METER,
@@ -43,6 +42,10 @@ const MIN_BRIGHTNESS_KEY = 'reel-ascent-map-editor-min-brightness-v1';
 const WORLD_V2_ACTIVE_KEY = 'reel-ascent-world-editor-v2-active-world';
 const WORLD_V2_STORAGE_PREFIX = 'reel-ascent-world-editor-v2-level:';
 const WORLD_V2_CHECKPOINT_PREFIX = 'reel-ascent-world-editor-v2-checkpoint:';
+const RIGHT_PANEL_WIDTH_KEY = 'reel-ascent-world-editor-v2-right-panel-width';
+const COLLAPSE_PREFS_KEY = 'reel-ascent-world-editor-v2-collapsed-sections';
+const OUTLINER_GROUP_PREFS_KEY = 'reel-ascent-world-editor-v2-outliner-groups';
+const SNAP_PREFS_KEY = 'reel-ascent-world-editor-v2-snap-prefs';
 
 const TERRAIN_OUTER_RADIUS = 208;
 const CROWN_BASE_RADIUS = 41;
@@ -92,6 +95,62 @@ const genericHistories = new Map();
 const genericFutures = new Map();
 let genericScene = null;
 let slopeOverlay = null;
+let outlinerFilter = '';
+let validationIssues = [];
+let validationFilter = 'all';
+const editorHiddenStoneveilIds = new Set();
+let draggingWaypoint = null;
+const prefabWorkspace = { active: false, definitionId: null, returnCamera: null, returnSelection: null };
+
+function activePrefabDefinition(level = activeGenericLevel()) {
+  if (!prefabWorkspace.active || !level) return null;
+  return (level.prefabs?.definitions ?? []).find((item) => item.id === prefabWorkspace.definitionId) ?? null;
+}
+
+function currentCollisionMode() { return $('#collision-mode')?.value || 'normal'; }
+function collisionVisible() { return currentCollisionMode() !== 'normal'; }
+function snapNumber(value, step) {
+  const numeric = Number(value);
+  const increment = Math.max(.0001, Number(step) || 1);
+  return Math.round(numeric / increment) * increment;
+}
+function gridSnapEnabled() { return Boolean($('#grid-snap')?.checked); }
+function rotationSnapEnabled() { return Boolean($('#rotation-snap')?.checked); }
+function gridSnapStep() { return Math.max(.05, Number($('#grid-snap-step')?.value) || .5); }
+function rotationSnapStep() { return Math.max(1, Number($('#rotation-snap-step')?.value) || 15); }
+function maybeSnapPosition(position) {
+  if (!gridSnapEnabled()) return position;
+  const step = gridSnapStep();
+  return { x: snapNumber(position.x, step), y: snapNumber(position.y, step), z: snapNumber(position.z, step) };
+}
+function maybeSnapRotation(value) { return rotationSnapEnabled() ? snapNumber(value, rotationSnapStep()) : value; }
+
+function nextPrefabChildId(definition, prefix = 'CHILD') {
+  const ids = new Set([
+    ...(definition?.objects ?? []).map((item) => item.id),
+    ...(definition?.movingPlatforms ?? []).map((item) => item.id),
+    ...(definition?.waters ?? []).map((item) => item.id || item.identity)
+  ].filter(Boolean).map(String));
+  for (let sequence = 1; sequence < 100000; sequence += 1) {
+    const candidate = `${prefix}-${String(sequence).padStart(3, '0')}`;
+    if (!ids.has(candidate)) return candidate;
+  }
+  return `${prefix}-${Date.now()}`;
+}
+
+function refreshGenericScene({ preserveSelection = true } = {}) {
+  const level = activeGenericLevel();
+  if (!level || isStoneveilWorld()) return;
+  genericScene.setWorld(activeWorld(), level);
+  if (prefabWorkspace.active) {
+    const definition = activePrefabDefinition(level);
+    if (definition) genericScene.setPrefabWorkspace(definition);
+    else prefabWorkspace.active = false;
+  }
+  genericScene.setEnabled(true);
+  genericScene.setCollisionMode(currentCollisionMode());
+  if (preserveSelection) genericScene.setSelected(selected?.id ?? null);
+}
 
 function activeWorld() { return getWorldEditorWorld(activeWorldId); }
 function isStoneveilWorld() { return activeWorldId === 'stoneveil-peak'; }
@@ -125,7 +184,9 @@ const walkthroughState = {
   flyEye: new pc.Vec3(),
   entryEye: new pc.Vec3(),
   entryYaw: 0,
-  entryPitch: 0
+  entryPitch: 0,
+  editorCameraBeforeWalk: null,
+  selectionBeforeWalk: null
 };
 
 
@@ -608,6 +669,11 @@ async function enterWalkthrough() {
     const pitch = deg(Math.asin(clamp(forward.y, -1, 1)));
 
     buildWalkthroughPhysics(RAPIER, eye);
+    state.editorCameraBeforeWalk = {
+      target: { x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z },
+      yaw: cameraState.yaw, pitch: cameraState.pitch, distance: cameraState.distance
+    };
+    state.selectionBeforeWalk = selected ? { kind: selected.kind, id: selected.id } : null;
     state.entryEye.copy(eye);
     state.entryYaw = yaw;
     state.entryPitch = pitch;
@@ -648,8 +714,6 @@ async function enterWalkthrough() {
 function exitWalkthrough() {
   const state = walkthroughState;
   if (!state.active) return;
-  const eye = currentWalkthroughEye();
-  const forward = walkthroughForward();
   state.active = false;
   state.fly = false;
   state.keys.clear();
@@ -658,14 +722,24 @@ function exitWalkthrough() {
   document.body.classList.remove('walkthrough-active');
   if (document.pointerLockElement === canvas) document.exitPointerLock?.();
 
-  cameraState.yaw = state.yaw;
-  cameraState.pitch = clamp(state.pitch, -89, 75);
-  cameraState.distance = 4;
-  cameraState.target.copy(eye).add(forward.mulScalar(cameraState.distance));
+  const previous = state.editorCameraBeforeWalk;
+  if (previous) {
+    cameraState.target.set(previous.target.x, previous.target.y, previous.target.z);
+    cameraState.yaw = previous.yaw;
+    cameraState.pitch = previous.pitch;
+    cameraState.distance = previous.distance;
+  }
+  if (state.selectionBeforeWalk?.id) {
+    selected = { ...state.selectionBeforeWalk };
+    if (!isStoneveilWorld()) genericScene.setSelected(selected.id);
+  }
+  state.editorCameraBeforeWalk = null;
+  state.selectionBeforeWalk = null;
   destroyWalkthroughPhysics();
   syncWalkthroughHud();
   updateCamera();
-  setStatus('Exited Walkthrough at the same cave location.');
+  renderUi();
+  setStatus('Exited Walkthrough — restored the previous editor camera and selection.');
 }
 
 function advanceGenericWalkthroughKinematics(dt) {
@@ -844,7 +918,7 @@ function brushTangentDistance(hit, x, y, z, radius) {
 }
 
 function applyTerrainDisplayMode() {
-  const collisionDebug = Boolean($('#show-collision')?.checked);
+  const collisionDebug = collisionVisible();
   const material = collisionDebug ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
   for (const entity of terrainRoot.children) {
     if (!entity.render?.meshInstances) continue;
@@ -1025,7 +1099,7 @@ function rebuildTerrain() {
   const entity = new pc.Entity(isMeshMode() ? 'Frozen 3D Mountain Mesh' : 'Editable Mountain');
   entity._editorOwnedMeshes = [mesh];
   entity.addComponent('render');
-  const terrainMaterial = $('#show-collision')?.checked ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
+  const terrainMaterial = collisionVisible() ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
   entity.render.meshInstances = [new pc.MeshInstance(mesh, terrainMaterial, entity)];
   terrainRoot.addChild(entity);
   if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, data);
@@ -1391,6 +1465,7 @@ function rebuildPlacedObjects() {
   for (const item of patch.placedObjects) {
     const entity = createPlacedEntity(item, selected?.kind === 'placed' && selected.id === item.id);
     entity.editorRecord = item;
+    entity.enabled = !editorHiddenStoneveilIds.has(String(item.id));
     placedRoot.addChild(entity);
   }
 }
@@ -1590,8 +1665,8 @@ function commitGeneric(mutator, { rebuild = true, recordHistory = true } = {}) {
   mutator(level);
   level.updatedAt = new Date().toISOString();
   persistGenericLevel(level);
-  if (rebuild) genericScene.setWorld(activeWorld(), level);
-  genericScene.setSelected(selected?.id ?? null);
+  if (rebuild) refreshGenericScene();
+  else genericScene.setSelected(selected?.id ?? null);
   renderUi();
 }
 
@@ -1603,8 +1678,8 @@ function replaceActiveGenericLevel(level, { persist = true } = {}) {
   });
   genericLevels.set(activeWorldId, normalized);
   if (persist) persistGenericLevel(normalized);
-  genericScene.setWorld(activeWorld(), normalized);
   selected = null;
+  refreshGenericScene({ preserveSelection: false });
 }
 
 function setWorldCameraDefaults(worldId) {
@@ -1620,7 +1695,75 @@ function setWorldCameraDefaults(worldId) {
   updateCamera();
 }
 
+function enterPrefabWorkspace(definitionId, { returnSelection = selected } = {}) {
+  if (isStoneveilWorld()) return false;
+  const level = activeGenericLevel();
+  const definition = (level?.prefabs?.definitions ?? []).find((item) => item.id === definitionId);
+  if (!definition) { setStatus(`Prefab definition ${definitionId} was not found.`); return false; }
+  if (!prefabWorkspace.active) {
+    prefabWorkspace.returnCamera = {
+      target: { x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z },
+      yaw: cameraState.yaw, pitch: cameraState.pitch, distance: cameraState.distance
+    };
+    prefabWorkspace.returnSelection = returnSelection ? { kind: returnSelection.kind, id: returnSelection.id } : null;
+  }
+  prefabWorkspace.active = true;
+  prefabWorkspace.definitionId = definitionId;
+  selected = null;
+  genericScene.setPrefabWorkspace(definition);
+  genericScene.setEnabled(true);
+  genericScene.setCollisionMode(currentCollisionMode());
+  cameraState.target.set(0, 1.5, 0);
+  cameraState.yaw = 38;
+  cameraState.pitch = -22;
+  cameraState.distance = 28;
+  updateCamera();
+  document.body.classList.add('prefab-workspace-active');
+  const banner = $('#prefab-workspace-banner');
+  if (banner) banner.hidden = false;
+  if ($('#prefab-workspace-name')) $('#prefab-workspace-name').textContent = `${definition.kind === 'room' ? 'Room' : 'Prefab'}: ${definition.name}`;
+  if ($('#prefab-workspace-actions')) $('#prefab-workspace-actions').hidden = false;
+  renderUi();
+  setStatus(`Editing ${definition.name} at local origin. New objects are stored as local prefab children.`);
+  return true;
+}
+
+function exitPrefabWorkspace({ restore = true } = {}) {
+  if (!prefabWorkspace.active) return;
+  const returnCamera = prefabWorkspace.returnCamera;
+  const returnSelection = prefabWorkspace.returnSelection;
+  prefabWorkspace.active = false;
+  prefabWorkspace.definitionId = null;
+  prefabWorkspace.returnCamera = null;
+  prefabWorkspace.returnSelection = null;
+  document.body.classList.remove('prefab-workspace-active');
+  if ($('#prefab-workspace-banner')) $('#prefab-workspace-banner').hidden = true;
+  if ($('#prefab-workspace-actions')) $('#prefab-workspace-actions').hidden = true;
+  selected = restore && returnSelection ? returnSelection : null;
+  refreshGenericScene();
+  if (restore && returnCamera) {
+    cameraState.target.set(returnCamera.target.x, returnCamera.target.y, returnCamera.target.z);
+    cameraState.yaw = returnCamera.yaw;
+    cameraState.pitch = returnCamera.pitch;
+    cameraState.distance = returnCamera.distance;
+    updateCamera();
+  }
+  renderUi();
+  setStatus('Returned to world editing.');
+}
+
+function definitionForSelectedInstance() {
+  if (isStoneveilWorld() || !selected || !['prefab-instance', 'room'].includes(selected.kind)) return null;
+  const level = activeGenericLevel();
+  const instance = selected.kind === 'room'
+    ? (level.rooms ?? []).find((item) => item.id === selected.id)
+    : (level.prefabs?.instances ?? []).find((item) => item.id === selected.id);
+  if (!instance) return null;
+  return (level.prefabs?.definitions ?? []).find((item) => item.id === instance.prefabId) ?? null;
+}
+
 async function switchWorld(worldId, { keepCamera = false } = {}) {
+  if (prefabWorkspace.active) exitPrefabWorkspace({ restore: false });
   const world = getWorldEditorWorld(worldId);
   if (walkthroughState.active) exitWalkthrough();
   activeWorldId = world.id;
@@ -1641,7 +1784,7 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
     }
     genericScene.setWorld(world, activeGenericLevel());
     genericScene.setEnabled(true);
-    genericScene.setCollisionDebug(Boolean($('#show-collision')?.checked));
+    genericScene.setCollisionMode(currentCollisionMode());
   }
   if (!keepCamera) setWorldCameraDefaults(activeWorldId);
   syncWorldUi();
@@ -1915,10 +2058,7 @@ function rebuildAll() {
   if (!isStoneveilWorld()) {
     const level = activeGenericLevel();
     if (level) {
-      genericScene.setWorld(activeWorld(), level);
-      genericScene.setEnabled(true);
-      genericScene.setSelected(selected?.id ?? null);
-      genericScene.setCollisionDebug(Boolean($('#show-collision')?.checked));
+      refreshGenericScene();
     }
     renderUi();
     return;
@@ -2669,6 +2809,7 @@ function applyGenericToolAt(event) {
   const level = activeGenericLevel();
   if (!level) return;
   const ray = pointerRay(event);
+  const definition = activePrefabDefinition(level);
   if (tool === 'select') {
     const hit = genericScene.pick(ray);
     selected = hit ? { kind: hit.kind, id: String(hit.id), record: hit.record } : null;
@@ -2677,9 +2818,10 @@ function applyGenericToolAt(event) {
     return;
   }
   if (tool === 'move-water') {
-    if (selected?.kind !== 'water-v2') {
+    const expectedKinds = prefabWorkspace.active ? ['prefab-child-water'] : ['water-v2'];
+    if (!expectedKinds.includes(selected?.kind)) {
       const hit = genericScene.pick(ray);
-      if (hit?.kind === 'water-v2') {
+      if (hit && expectedKinds.includes(hit.kind)) {
         selected = { kind: hit.kind, id: String(hit.id), record: hit.record };
         genericScene.setSelected(selected.id);
         renderUi();
@@ -2689,55 +2831,91 @@ function applyGenericToolAt(event) {
     const surface = genericScene.surfaceHit(ray);
     if (!surface) return;
     commitGeneric((draft) => {
-      const water = (draft.waters ?? []).find((item) => String(item.id || item.identity) === selected.id);
+      const owner = prefabWorkspace.active
+        ? (draft.prefabs?.definitions ?? []).find((item) => item.id === prefabWorkspace.definitionId)
+        : draft;
+      const water = (owner?.waters ?? []).find((item) => String(item.id || item.identity) === selected.id);
       if (!water) return;
       water.position ??= { x: 0, y: 0, z: 0 };
-      water.position.x = surface.x;
-      water.position.z = surface.z;
+      const snapped = maybeSnapPosition({ x: surface.x, y: water.position.y, z: surface.z });
+      water.position.x = snapped.x;
+      water.position.z = snapped.z;
     });
     setStatus(`Moved ${selected.id} without changing its canonical water identity.`);
     return;
   }
   if (!['object', 'platform', 'moving-platform'].includes(tool)) return;
-  const surface = genericScene.surfaceHit(ray);
+  let surface = genericScene.surfaceHit(ray);
   if (!surface) { setStatus('No placement surface under the cursor.'); return; }
+  if (!$('#surface-snap')?.checked) {
+    if (Math.abs(ray.direction.y) < 1e-6) return;
+    const distance = -ray.origin.y / ray.direction.y;
+    if (distance < 0) return;
+    const point = ray.origin.clone().add(ray.direction.clone().mulScalar(distance));
+    surface = { x: point.x, y: 0, z: point.z, normal: { x: 0, y: 1, z: 0 }, kind: 'ground-plane' };
+  }
   const size = {
     x: Math.max(.2, Number($('#platform-x')?.value) || 3),
     y: Math.max(.1, Number($('#platform-y')?.value) || .35),
     z: Math.max(.2, Number($('#platform-z')?.value) || 2)
   };
-  const position = { x: surface.x, y: surface.y + size.y / 2, z: surface.z };
+  const normal = surface.normal ?? { x: 0, y: 1, z: 0 };
+  let position = { x: surface.x, y: surface.y, z: surface.z };
+  let yaw = 0;
+  if (Math.abs(normal.y) > .65) {
+    position.y += Math.sign(normal.y || 1) * size.y / 2;
+  } else {
+    // Wall/surface placement keeps ledges horizontal but offsets them out from the facade.
+    position.x += normal.x * Math.max(.08, size.z / 2);
+    position.z += normal.z * Math.max(.08, size.z / 2);
+    yaw = Math.abs(normal.x) > Math.abs(normal.z) ? 90 : 0;
+  }
+  position = maybeSnapPosition(position);
+  yaw = maybeSnapRotation(yaw);
   const climbMaterial = $('#platform-climb-material')?.value || 'normal';
+  const targetObjects = definition?.objects ?? level.objects;
+  const targetMoving = definition?.movingPlatforms ?? level.movingPlatforms;
   if (tool === 'object' || tool === 'platform') {
     const prefix = tool === 'platform' ? 'PARKOUR' : 'OBJECT';
     const category = tool === 'platform' ? 'parkour' : 'decor';
-    const id = nextStableId(level, prefix);
+    const id = definition ? nextPrefabChildId(definition, prefix) : nextStableId(level, prefix);
     const item = {
       id, name: `${tool === 'platform' ? 'Parkour Platform' : 'World Object'} ${id.split('-').at(-1)}`, type: 'box', category,
-      transform: { position, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
-      size, collision: true, climbMaterial, visible: true, metadata: {}
+      transform: { position, rotation: { x: 0, y: yaw, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      size, collision: true, climbMaterial, visible: true,
+      metadata: activeWorldId === 'skyscraper' && !prefabWorkspace.active ? { routeGroup: 'Unassigned' } : {}
     };
-    commitGeneric((draft) => draft.objects.push(item));
-    selected = { kind: 'world-object', id, record: item };
+    commitGeneric((draft) => {
+      const owner = prefabWorkspace.active
+        ? (draft.prefabs?.definitions ?? []).find((entry) => entry.id === prefabWorkspace.definitionId)
+        : draft;
+      owner?.objects?.push(item);
+    });
+    selected = { kind: definition ? 'prefab-child-object' : 'world-object', id, record: item };
     genericScene.setSelected(id);
     renderUi();
-    setStatus(`Placed ${category === 'parkour' ? 'static parkour object' : 'authored world object'} ${id}.`);
+    setStatus(`Placed ${definition ? 'prefab child' : category === 'parkour' ? 'static parkour object' : 'authored world object'} ${id}.`);
     return;
   }
-  const id = nextStableId(level, 'MOVING-PLATFORM');
+  const id = definition ? nextPrefabChildId(definition, 'MOVING') : nextStableId(level, 'MOVING-PLATFORM');
   const second = { x: position.x, y: position.y + 4, z: position.z };
   const item = {
     id, name: `Moving Platform ${id.split('-').at(-1)}`, type: 'moving-platform', category: 'moving-platforms',
-    transform: { position: structuredClone(position), rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+    transform: { position: structuredClone(position), rotation: { x: 0, y: yaw, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
     size, collision: true, climbMaterial, visible: true,
     path: { points: [structuredClone(position), second], speed: 2.5, pauseSeconds: .5, mode: 'ping-pong', phaseSeconds: 0 },
-    metadata: {}
+    metadata: activeWorldId === 'skyscraper' && !prefabWorkspace.active ? { routeGroup: 'Unassigned' } : {}
   };
-  commitGeneric((draft) => draft.movingPlatforms.push(item));
-  selected = { kind: 'moving-platform', id, record: item };
+  commitGeneric((draft) => {
+    const owner = prefabWorkspace.active
+      ? (draft.prefabs?.definitions ?? []).find((entry) => entry.id === prefabWorkspace.definitionId)
+      : draft;
+    owner?.movingPlatforms?.push(item);
+  });
+  selected = { kind: definition ? 'prefab-child-moving' : 'moving-platform', id, record: item };
   genericScene.setSelected(id);
   renderUi();
-  setStatus(`Placed ${id}. Edit its two waypoints, speed, pause and path mode in Selected.`);
+  setStatus(`Placed ${id}. Edit its waypoints, speed, pause and path mode in Selected.`);
 }
 
 function applyToolAt(event, continuous = false) {
@@ -2930,9 +3108,14 @@ function syncWorldUi() {
     const element = $(`#${id}`);
     if (element) element.hidden = !stoneveil;
   }
-  $('#generic-palette-section').hidden = !(worldHasCapability(world.id, 'parkour') || worldHasCapability(world.id, 'objects'));
+  $('#generic-palette-section').hidden = !(worldHasCapability(world.id, 'parkour') || worldHasCapability(world.id, 'objects') || worldHasCapability(world.id, 'prefabs') || worldHasCapability(world.id, 'rooms'));
+  if ($('#cave-migration-section')) $('#cave-migration-section').hidden = world.id !== 'cave-fishing-island';
   if ($('#create-prefab-foundation')) $('#create-prefab-foundation').hidden = !worldHasCapability(world.id, 'prefabs');
   if ($('#create-room-foundation')) $('#create-room-foundation').hidden = !worldHasCapability(world.id, 'rooms');
+  if (world.id === 'cave-fishing-island' && $('#basalt-freeze-status')) {
+    const candidate=activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate' ? activeGenericLevel().terrain : null;
+    $('#basalt-freeze-status').textContent=candidate ? `Candidate: ${Math.floor((candidate.positions?.length||0)/3).toLocaleString()} verts / ${Math.floor((candidate.indices?.length||0)/3).toLocaleString()} triangles · comparison only.` : 'No frozen candidate imported.';
+  }
   $('#xray-core').closest('label').hidden = !stoneveil;
   $('#slope-toggle-wrap').hidden = !stoneveil;
   $('#show-snapshot-rocks').closest('label').hidden = !stoneveil;
@@ -2966,22 +3149,56 @@ function renderGenericSelection() {
   }
   empty.hidden = true;
   editor.hidden = false;
-  $('#selected-name').textContent = record.name || record.id || selected.id;
+  $('#selected-name').textContent = record.name || record.label || record.id || selected.id;
   $('#selected-id').textContent = selected.id;
   const fields = $('#selection-fields');
   fields.innerHTML = '';
+
+  const meta = document.createElement('dl');
+  meta.className = 'inspector-meta';
+  const parentLabel = record.parentId || record.prefabInstanceId || (selected.kind === 'room' || selected.kind === 'prefab-instance' ? record.prefabId : null) || '—';
+  meta.innerHTML = `<dt>Type</dt><dd>${selected.kind}</dd><dt>Stable ID</dt><dd title="${selected.id}">${selected.id}</dd><dt>Parent / source</dt><dd title="${parentLabel}">${parentLabel}</dd>`;
+  fields.appendChild(meta);
+
+  if (!['architecture-reference', 'waypoint'].includes(selected.kind)) {
+    const nameWrap = document.createElement('label');
+    nameWrap.className = 'inspector-name';
+    nameWrap.textContent = 'Name';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = record.name || record.label || selected.id;
+    nameInput.maxLength = 80;
+    nameInput.addEventListener('change', () => renameGenericRecord(selected, nameInput.value));
+    nameWrap.appendChild(nameInput);
+    fields.appendChild(nameWrap);
+  }
+
   if (selected.kind === 'architecture-reference') {
     const note = document.createElement('p');
-    note.className = 'hint';
-    note.innerHTML = `<strong>Runtime visual reference.</strong><br>Asset: ${record.asset}<br>Attribution: ${record.attribution}<br>Collision: ${record.collision}.<br>The supplied ESB visual remains authoritative; parkour is authored around it rather than replacing it.`;
+    note.className = 'compact-help';
+    note.innerHTML = `<strong>Runtime visual reference.</strong> Asset: ${record.asset}. Attribution: ${record.attribution}. Collision: ${record.collision}.`;
     fields.appendChild(note);
     $('#duplicate-selected').disabled = true;
     $('#hide-selected').disabled = true;
+    $('#rename-selected').disabled = true;
+    $('#edit-source-prefab').hidden = true;
+    return;
+  }
+
+  if (selected.kind === 'waypoint') {
+    const note = document.createElement('p');
+    note.className = 'compact-help';
+    note.textContent = `Waypoint ${Number(record.index) + 1} for ${record.platformId}. Drag it in the viewport or edit the parent platform numerically.`;
+    fields.appendChild(note);
+    $('#duplicate-selected').disabled = true;
+    $('#hide-selected').disabled = false;
+    $('#rename-selected').disabled = true;
+    $('#edit-source-prefab').hidden = true;
     return;
   }
 
   const addNumberGrid = (defs, handler) => fields.appendChild(fieldGrid(defs, handler));
-  if (selected.kind === 'water-v2') {
+  if (selected.kind === 'water-v2' || selected.kind === 'prefab-child-water') {
     record.position ??= { x: 0, y: 0, z: 0 };
     record.radii ??= { x: 4, z: 4 };
     addNumberGrid([
@@ -2990,67 +3207,94 @@ function renderGenericSelection() {
       ['Depth m', record.depthMeters ?? 1, 'wdepth'], ['Fishing scale', record.fishingZoneScale ?? 1, 'wfishing']
     ], onGenericField);
     const identity = document.createElement('p');
-    identity.className = 'hint';
-    identity.textContent = `Fishing identity: ${record.identity || record.id}. Moving/resizing this water does not change ecology identity.`;
+    identity.className = 'compact-help';
+    identity.textContent = `Fishing identity: ${record.identity || record.id}. Geometry edits preserve this ecology ID.`;
     fields.appendChild(identity);
     $('#duplicate-selected').disabled = true;
     $('#hide-selected').disabled = false;
+    $('#rename-selected').disabled = false;
+    $('#edit-source-prefab').hidden = true;
     return;
   }
 
   record.transform ??= { position: {x:0,y:0,z:0}, rotation:{x:0,y:0,z:0}, scale:{x:1,y:1,z:1} };
-  if (selected.kind === 'prefab-instance' || selected.kind === 'room') {
+  const rootLike = ['prefab-instance', 'room'].includes(selected.kind);
+  if (rootLike) {
     addNumberGrid([
       ['X', record.transform.position.x, 'gpx'], ['Y', record.transform.position.y, 'gpy'], ['Z', record.transform.position.z, 'gpz'],
       ['Rot X°', record.transform.rotation.x, 'grx'], ['Rot Y°', record.transform.rotation.y, 'gry'], ['Rot Z°', record.transform.rotation.z, 'grz'],
       ['Scale X', record.transform.scale.x, 'gscalex'], ['Scale Y', record.transform.scale.y, 'gscaley'], ['Scale Z', record.transform.scale.z, 'gscalez']
     ], onGenericField);
     const note = document.createElement('p');
-    note.className = 'hint';
-    note.textContent = `${selected.kind === 'room' ? 'Room' : 'Prefab'} root → ${record.prefabId}. Child transforms stay local, so moving this root moves the whole assembly.`;
+    note.className = 'compact-help';
+    note.textContent = `${selected.kind === 'room' ? 'Room' : 'Prefab'} root → ${record.prefabId}. Children remain local when this root moves.`;
     fields.appendChild(note);
-    $('#duplicate-selected').disabled = false;
-    $('#hide-selected').disabled = false;
-    return;
+    $('#edit-source-prefab').hidden = false;
+  } else {
+    record.size ??= { x: 1, y: 1, z: 1 };
+    addNumberGrid([
+      ['X', record.transform.position.x, 'gpx'], ['Y', record.transform.position.y, 'gpy'], ['Z', record.transform.position.z, 'gpz'],
+      ['Rot X°', record.transform.rotation.x, 'grx'], ['Rot Y°', record.transform.rotation.y, 'gry'], ['Rot Z°', record.transform.rotation.z, 'grz'],
+      ['Size X', record.size.x, 'gsx'], ['Size Y', record.size.y, 'gsy'], ['Size Z', record.size.z, 'gsz']
+    ], onGenericField);
+    $('#edit-source-prefab').hidden = true;
   }
-  record.size ??= { x: 1, y: 1, z: 1 };
-  addNumberGrid([
-    ['X', record.transform.position.x, 'gpx'], ['Y', record.transform.position.y, 'gpy'], ['Z', record.transform.position.z, 'gpz'],
-    ['Rot X°', record.transform.rotation.x, 'grx'], ['Rot Y°', record.transform.rotation.y, 'gry'], ['Rot Z°', record.transform.rotation.z, 'grz'],
-    ['Size X', record.size.x, 'gsx'], ['Size Y', record.size.y, 'gsy'], ['Size Z', record.size.z, 'gsz']
-  ], onGenericField);
 
-  if (selected.kind === 'moving-platform') {
+  if (activeWorldId === 'skyscraper' && !prefabWorkspace.active && ['world-object', 'moving-platform'].includes(selected.kind)) {
+    const route = document.createElement('label');
+    route.textContent = 'Route group';
+    const routeSelect = document.createElement('select');
+    for (const value of ['Unassigned', 'Route A', 'Route B', 'Route C', 'Route D', 'Shared / Crossover']) routeSelect.append(new Option(value, value));
+    routeSelect.value = record.metadata?.routeGroup || 'Unassigned';
+    routeSelect.addEventListener('change', () => commitGeneric((draft) => {
+      const item = [...(draft.objects ?? []), ...(draft.movingPlatforms ?? [])].find((candidate) => candidate.id === selected.id);
+      if (!item) return;
+      item.metadata ??= {};
+      item.metadata.routeGroup = routeSelect.value;
+    }));
+    route.appendChild(routeSelect);
+    fields.appendChild(route);
+  }
+
+  if (selected.kind === 'moving-platform' || selected.kind === 'prefab-child-moving') {
     const path = record.path ??= { points: [], speed: 2.5, pauseSeconds: .5, mode: 'ping-pong', phaseSeconds: 0 };
     path.points ??= [structuredClone(record.transform.position), { ...record.transform.position, y: record.transform.position.y + 4 }];
     addNumberGrid([
       ['Speed m/s', path.speed, 'mpspeed'], ['Pause s', path.pauseSeconds, 'mppause'], ['Phase s', path.phaseSeconds, 'mpphase']
     ], onGenericField);
+    const count = document.createElement('div');
+    count.className = 'compact-help';
+    count.textContent = `${path.points.length} waypoints · click/drag orange waypoint handles in the viewport.`;
+    fields.appendChild(count);
     path.points.forEach((point, index) => {
       const title = document.createElement('div');
-      title.className = 'hint';
+      title.className = 'compact-help';
       title.textContent = `Waypoint ${index + 1}`;
       fields.appendChild(title);
       addNumberGrid([
         ['X', point.x, `mp${index}x`], ['Y', point.y, `mp${index}y`], ['Z', point.z, `mp${index}z`]
       ], onGenericField);
+      if (path.points.length > 2) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'subtle';
+        remove.textContent = `Delete waypoint ${index + 1}`;
+        remove.addEventListener('click', () => removeMovingPlatformWaypoint(index));
+        fields.appendChild(remove);
+      }
     });
     const mode = document.createElement('label');
     mode.textContent = 'Path mode';
     const select = document.createElement('select');
     for (const value of ['ping-pong', 'loop', 'once']) select.append(new Option(value, value));
     select.value = path.mode || 'ping-pong';
-    select.addEventListener('change', (event) => commitGeneric((draft) => {
-      const item = draft.movingPlatforms.find((candidate) => candidate.id === selected.id);
-      if (item) item.path.mode = event.target.value;
-    }));
+    select.addEventListener('change', (event) => mutateSelectedGenericRecord((item) => { item.path.mode = event.target.value; }));
     mode.appendChild(select);
     fields.appendChild(mode);
     const addWaypoint = document.createElement('button');
+    addWaypoint.type = 'button';
     addWaypoint.textContent = 'Add Waypoint';
-    addWaypoint.addEventListener('click', () => commitGeneric((draft) => {
-      const item = draft.movingPlatforms.find((candidate) => candidate.id === selected.id);
-      if (!item) return;
+    addWaypoint.addEventListener('click', () => mutateSelectedGenericRecord((item) => {
       const last = item.path.points.at(-1) ?? item.transform.position;
       item.path.points.push({ x: last.x, y: last.y + 2, z: last.z });
     }));
@@ -3058,21 +3302,38 @@ function renderGenericSelection() {
   }
   $('#duplicate-selected').disabled = false;
   $('#hide-selected').disabled = false;
+  $('#rename-selected').disabled = false;
+}
+
+function mutateSelectedGenericRecord(mutator, { rebuild = true } = {}) {
+  if (!selected || isStoneveilWorld()) return;
+  commitGeneric((draft) => {
+    let record = null;
+    if (prefabWorkspace.active) {
+      const definition = (draft.prefabs?.definitions ?? []).find((entry) => entry.id === prefabWorkspace.definitionId);
+      record = (definition?.objects ?? []).find((item) => item.id === selected.id)
+        ?? (definition?.movingPlatforms ?? []).find((item) => item.id === selected.id)
+        ?? (definition?.waters ?? []).find((item) => String(item.id || item.identity) === selected.id);
+    } else {
+      record = (draft.objects ?? []).find((item) => item.id === selected.id)
+        ?? (draft.movingPlatforms ?? []).find((item) => item.id === selected.id)
+        ?? (draft.waters ?? []).find((item) => String(item.id || item.identity) === selected.id)
+        ?? (draft.prefabs?.instances ?? []).find((item) => item.id === selected.id)
+        ?? (draft.rooms ?? []).find((item) => item.id === selected.id);
+    }
+    if (record) mutator(record, draft);
+  }, { rebuild });
 }
 
 function onGenericField(event) {
   if (!selected || isStoneveilWorld()) return;
   const key = event.currentTarget.dataset.key;
-  const value = Number(event.currentTarget.value);
+  let value = Number(event.currentTarget.value);
   if (!Number.isFinite(value)) return;
-  commitGeneric((draft) => {
-    const record = (draft.objects ?? []).find((item) => item.id === selected.id)
-      ?? (draft.movingPlatforms ?? []).find((item) => item.id === selected.id)
-      ?? (draft.waters ?? []).find((item) => String(item.id || item.identity) === selected.id)
-      ?? (draft.prefabs?.instances ?? []).find((item) => item.id === selected.id)
-      ?? (draft.rooms ?? []).find((item) => item.id === selected.id);
-    if (!record) return;
-    if (selected.kind === 'water-v2') {
+  if (['gpx','gpy','gpz'].includes(key) && gridSnapEnabled()) value = snapNumber(value, gridSnapStep());
+  if (['grx','gry','grz'].includes(key)) value = maybeSnapRotation(value);
+  mutateSelectedGenericRecord((record) => {
+    if (['water-v2','prefab-child-water'].includes(selected.kind)) {
       record.position ??= { x: 0, y: 0, z: 0 };
       record.radii ??= { x: 4, z: 4 };
       if (key === 'gpx') record.position.x = value;
@@ -3085,6 +3346,7 @@ function onGenericField(event) {
       return;
     }
     const t = record.transform;
+    if (!t) return;
     if (key === 'gpx') t.position.x = value;
     if (key === 'gpy') t.position.y = value;
     if (key === 'gpz') t.position.z = value;
@@ -3097,17 +3359,79 @@ function onGenericField(event) {
     if (key === 'gsx') record.size.x = Math.max(.05, value);
     if (key === 'gsy') record.size.y = Math.max(.05, value);
     if (key === 'gsz') record.size.z = Math.max(.05, value);
-    if (selected.kind === 'moving-platform') {
+    if (selected.kind === 'moving-platform' || selected.kind === 'prefab-child-moving') {
       if (key === 'mpspeed') record.path.speed = Math.max(.05, value);
       if (key === 'mppause') record.path.pauseSeconds = Math.max(0, value);
       if (key === 'mpphase') record.path.phaseSeconds = value;
       const match = /^mp(\d+)([xyz])$/.exec(key);
       if (match) {
         const point = record.path.points[Number(match[1])];
-        if (point) point[match[2]] = value;
+        if (point) point[match[2]] = gridSnapEnabled() ? snapNumber(value, gridSnapStep()) : value;
       }
     }
   });
+}
+
+function removeMovingPlatformWaypoint(index) {
+  if (!selected || !['moving-platform','prefab-child-moving'].includes(selected.kind)) return;
+  mutateSelectedGenericRecord((record) => {
+    if ((record.path?.points?.length ?? 0) <= 2) return;
+    record.path.points.splice(index, 1);
+  });
+}
+
+function renameGenericRecord(target, rawName) {
+  const value = String(rawName || '').trim().slice(0, 80);
+  if (!value || !target) return;
+  const previous = selected;
+  selected = target;
+  mutateSelectedGenericRecord((record) => { record.name = value; });
+  selected = previous;
+}
+
+function loadOutlinerGroupPrefs() {
+  try { return JSON.parse(localStorage.getItem(OUTLINER_GROUP_PREFS_KEY) || '{}') || {}; } catch { return {}; }
+}
+function saveOutlinerGroupPrefs(value) { try { localStorage.setItem(OUTLINER_GROUP_PREFS_KEY, JSON.stringify(value)); } catch {} }
+
+function genericItemHidden(item) { return genericScene?.isEditorHidden?.(item.id) ?? false; }
+function setEditorItemHidden(item, hidden) {
+  if (isStoneveilWorld()) {
+    if (hidden) editorHiddenStoneveilIds.add(String(item.id)); else editorHiddenStoneveilIds.delete(String(item.id));
+    rebuildPlacedObjects();
+    return;
+  }
+  genericScene.setEditorHidden(item.id, hidden);
+  renderOutliner();
+}
+
+function focusOutlinerItem(item) {
+  const previous = selected;
+  selected = { kind: item.kind, id: item.id };
+  if (!isStoneveilWorld()) genericScene.setSelected(item.id);
+  const ok = focusSelectedObject();
+  selected = { kind: item.kind, id: item.id };
+  if (!isStoneveilWorld()) genericScene.setSelected(item.id);
+  renderUi();
+  if (!ok) selected = previous;
+}
+
+function renameOutlinerItem(item) {
+  if (!item.renameable) return;
+  const value = prompt('Rename authored object', item.name || item.id);
+  if (!value?.trim()) return;
+  if (isStoneveilWorld()) {
+    const record = patch.placedObjects.find((entry) => entry.id === item.id);
+    if (record) commit(() => { record.name = value.trim().slice(0, 80); }, { placed: true });
+  } else {
+    renameGenericRecord({ kind: item.kind, id: item.id }, value);
+  }
+  renderUi();
+}
+
+function deleteOutlinerItem(item) {
+  selected = { kind: item.kind, id: item.id };
+  hideSelected();
 }
 
 function renderOutliner() {
@@ -3116,39 +3440,101 @@ function renderOutliner() {
   outliner.innerHTML = '';
   const groups = [];
   if (isStoneveilWorld()) {
-    groups.push(['Terrain', [{ id: 'terrain', name: `Frozen mesh · ${Math.round((patch.terrain.bakedMesh?.positions?.length || 0) / 3).toLocaleString()} verts`, kind: 'meta' }]]);
-    groups.push(['Waters', MOUNTAIN_FISHING_LOCATIONS.map((item) => ({ id: item.id, name: item.label, kind: 'water' }))]);
-    groups.push(['Authored objects', (patch.placedObjects ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'placed' }))]);
+    groups.push(['Terrain', [{ id: 'terrain', name: `Frozen mesh · ${Math.round((patch.terrain.bakedMesh?.positions?.length || 0) / 3).toLocaleString()} verts`, kind: 'meta', type: 'terrain' }]]);
+    groups.push(['Waters', MOUNTAIN_FISHING_LOCATIONS.map((item) => ({ id: item.id, name: item.label, kind: 'water', type: 'water', renameable: false, deletable: false }))]);
+    const byType = (type) => (patch.placedObjects ?? []).filter((item) => item.type === type).map((item) => ({ id:item.id, name:item.name||item.id, kind:'placed', type, renameable:true, deletable:true, hideable:true }));
+    groups.push(['Rocks', byType('rock')]);
+    groups.push(['Vegetation', byType('plant')]);
+    groups.push(['Decor', byType('decor')]);
+  } else if (prefabWorkspace.active) {
+    const definition = activePrefabDefinition();
+    groups.push(['Prefab / Room Root', [{ id: definition?.id || 'definition', name: definition?.name || 'Definition', kind:'meta', type:definition?.kind || 'prefab' }]]);
+    groups.push(['Children', (definition?.objects ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-child-object',type:item.type||'object',renameable:true,deletable:true,hideable:true }))]);
+    groups.push(['Moving Platforms', (definition?.movingPlatforms ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-child-moving',type:'moving-platform',renameable:true,deletable:true,hideable:true }))]);
+    groups.push(['Waters', (definition?.waters ?? []).map((item) => ({ id:String(item.id||item.identity),name:item.name||item.id,kind:'prefab-child-water',type:'water',renameable:true,deletable:true,hideable:true }))]);
   } else {
     const level = activeGenericLevel();
-    if (activeWorldId === 'skyscraper') groups.push(['Architecture', [{ id: '__architecture__', name: 'Empire State Building · runtime reference', kind: 'architecture-reference' }]]);
-    groups.push(['Waters', (level?.waters ?? []).map((item) => ({ id: String(item.id || item.identity), name: item.name || item.id, kind: 'water-v2' }))]);
-    groups.push(['Objects', (level?.objects ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'world-object' }))]);
-    groups.push(['Moving Platforms', (level?.movingPlatforms ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'moving-platform' }))]);
-    groups.push(['Prefab Definitions', (level?.prefabs?.definitions ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'meta' }))]);
-    groups.push(['Prefab Instances', (level?.prefabs?.instances ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'prefab-instance' }))]);
-    groups.push(['Rooms', (level?.rooms ?? []).map((item) => ({ id: item.id, name: item.name || item.id, kind: 'room' }))]);
+    if (activeWorldId === 'skyscraper') groups.push(['ESB Reference', [{ id:'__architecture__', name:'Empire State Building', kind:'architecture-reference', type:'reference' }]]);
+    groups.push(['Waters', (level?.waters ?? []).map((item) => ({ id:String(item.id||item.identity), name:item.name||item.id, kind:'water-v2', type:'water', renameable:true, deletable:true, hideable:true }))]);
+    const objects = (level?.objects ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'world-object',type:item.type||item.category||'object',renameable:true,deletable:true,hideable:true, route:item.metadata?.routeGroup || 'Unassigned' }));
+    if (activeWorldId === 'skyscraper') {
+      for (const route of ['Route A','Route B','Route C','Route D','Shared / Crossover','Unassigned']) {
+        const items = objects.filter((item) => item.route === route);
+        const movers = (level?.movingPlatforms ?? []).filter((item) => (item.metadata?.routeGroup || 'Unassigned') === route).map((item) => ({ id:item.id,name:item.name||item.id,kind:'moving-platform',type:'moving-platform',renameable:true,deletable:true,hideable:true,route }));
+        if (items.length || movers.length) groups.push([route, [...items, ...movers]]);
+      }
+    } else {
+      groups.push(['Objects', objects]);
+      groups.push(['Moving Platforms', (level?.movingPlatforms ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'moving-platform',type:'moving-platform',renameable:true,deletable:true,hideable:true }))]);
+    }
+    groups.push(['Prefab Instances', (level?.prefabs?.instances ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'prefab-instance',type:'prefab',renameable:true,deletable:true,hideable:true }))]);
+    groups.push(['Rooms', (level?.rooms ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'room',type:'room',renameable:true,deletable:true,hideable:true }))]);
   }
-  for (const [name, items] of groups) {
-    const heading = document.createElement('div');
-    heading.className = 'outliner-group';
-    heading.textContent = `${name} (${items.length})`;
-    outliner.appendChild(heading);
+
+  const prefs = loadOutlinerGroupPrefs();
+  const filter = outlinerFilter.trim().toLowerCase();
+  let shown = 0;
+  for (const [name, sourceItems] of groups) {
+    const items = sourceItems.filter((item) => !filter || `${item.name} ${item.id} ${item.type} ${item.route || ''}`.toLowerCase().includes(filter));
+    if (!items.length && filter) continue;
+    const groupKey = `${activeWorldId}:${prefabWorkspace.active ? prefabWorkspace.definitionId : 'world'}:${name}`;
+    const collapsed = Boolean(prefs[groupKey]);
+    const row = document.createElement('div');
+    row.className = `outliner-group-row${collapsed ? ' collapsed' : ''}`;
+    const toggle = document.createElement('button');
+    toggle.type = 'button'; toggle.className = 'outliner-group-toggle'; toggle.textContent = `${name} (${items.length})`;
+    toggle.addEventListener('click', () => { prefs[groupKey] = !collapsed; saveOutlinerGroupPrefs(prefs); renderOutliner(); });
+    row.appendChild(toggle); outliner.appendChild(row);
+    if (collapsed) continue;
     for (const item of items) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = item.name;
-      button.title = item.id;
-      if (selected?.id === item.id) button.classList.add('selected');
-      if (item.kind !== 'meta') button.addEventListener('click', () => {
-        selected = { kind: item.kind, id: item.id };
-        if (!isStoneveilWorld()) genericScene.setSelected(item.id);
-        renderUi();
-      });
-      else button.disabled = true;
-      outliner.appendChild(button);
+      shown += 1;
+      if (item.kind === 'meta') {
+        const meta = document.createElement('div'); meta.className='outliner-empty'; meta.textContent=item.name; meta.title=item.id; outliner.appendChild(meta); continue;
+      }
+      const itemRow = document.createElement('div');
+      itemRow.className = `outliner-row${genericItemHidden(item) || (isStoneveilWorld() && editorHiddenStoneveilIds.has(String(item.id))) ? ' hidden-record' : ''}`;
+      const main = document.createElement('button'); main.type='button'; main.className='outliner-main';
+      if (selected?.id === item.id) main.classList.add('selected');
+      main.title = `${item.id} · ${item.type}`;
+      main.innerHTML = `<span class="outliner-name">${item.name}</span><span class="outliner-type">${item.type}</span>`;
+      main.addEventListener('click', () => { selected={kind:item.kind,id:item.id}; if(!isStoneveilWorld()) genericScene.setSelected(item.id); renderUi(); });
+      itemRow.appendChild(main);
+      const actions = [
+        ['◎','Focus',()=>focusOutlinerItem(item),true],
+        [genericItemHidden(item) || (isStoneveilWorld() && editorHiddenStoneveilIds.has(String(item.id))) ? '○':'◉','Toggle editor visibility',()=>setEditorItemHidden(item, !(genericItemHidden(item) || (isStoneveilWorld() && editorHiddenStoneveilIds.has(String(item.id))))),Boolean(item.hideable)],
+        ['✎','Rename',()=>renameOutlinerItem(item),Boolean(item.renameable)],
+        ['×','Delete',()=>deleteOutlinerItem(item),Boolean(item.deletable)]
+      ];
+      for (const [label,title,handler,enabled] of actions) {
+        const b=document.createElement('button'); b.type='button'; b.className='outliner-icon'; b.textContent=label; b.title=title; b.disabled=!enabled; if(enabled) b.addEventListener('click',handler); itemRow.appendChild(b);
+      }
+      outliner.appendChild(itemRow);
     }
   }
+  if (!shown && filter) { const empty=document.createElement('div'); empty.className='outliner-empty'; empty.textContent='No matching objects.'; outliner.appendChild(empty); }
+}
+
+function renderSourcePolicy() {
+  const target = $('#source-policy-status');
+  if (!target) return;
+  let policy = null;
+  if (isStoneveilWorld()) policy = { terrain:'authored', waters:'authored', objects:(patch.placedObjects?.length ? 'hybrid':'procedural'), vegetation:'procedural', decor:(patch.placedObjects?.some((item)=>item.type==='decor') ? 'hybrid':'procedural') };
+  else policy = activeGenericLevel()?.sourcePolicy ?? {};
+  target.innerHTML = Object.entries(policy).map(([key,value]) => `<span class="source-chip ${String(value).toLowerCase().replaceAll(' ','-')}">${key}: ${value}</span>`).join('');
+}
+
+function selectValidationIssue(issue) {
+  if (!issue?.objectId) return;
+  const id = String(issue.objectId);
+  if (isStoneveilWorld()) {
+    if ((patch.placedObjects ?? []).some((item) => item.id === id)) selected={kind:'placed',id};
+    else if (MOUNTAIN_FISHING_LOCATIONS.some((item)=>item.id===id)) selected={kind:'water',id};
+  } else {
+    const level=activeGenericLevel();
+    const kind=(level.objects??[]).some((i)=>i.id===id)?'world-object':(level.movingPlatforms??[]).some((i)=>i.id===id)?'moving-platform':(level.rooms??[]).some((i)=>i.id===id)?'room':(level.prefabs?.instances??[]).some((i)=>i.id===id)?'prefab-instance':(level.waters??[]).some((i)=>String(i.id||i.identity)===id)?'water-v2':null;
+    if(kind){ selected={kind,id}; genericScene.setSelected(id); }
+  }
+  if (selected) { focusSelectedObject(); renderUi(); }
 }
 
 function renderValidation() {
@@ -3157,28 +3543,30 @@ function renderValidation() {
   const legend = $('#slope-legend');
   if (legend) {
     legend.hidden = !isStoneveilWorld();
-    if (isStoneveilWorld()) {
-      legend.innerHTML = slopeOverlayLegend(PLAYER_CONFIG)
-        .map(([label, range]) => `<span class="slope-chip ${label.startsWith('WALK') ? 'walkable' : label.startsWith('AWK') ? 'awkward' : label.startsWith('SLIDE') ? 'slide' : 'extreme'}">${label}</span><span>${range}</span>`)
-        .join('') + `<span class="hint">Slide exit</span><span>${PLAYER_CONFIG.slideExitSlopeDegrees}° hysteresis</span>`;
-    }
+    if (isStoneveilWorld()) legend.innerHTML = slopeOverlayLegend(PLAYER_CONFIG)
+      .map(([label, range]) => `<span class="slope-chip ${label.startsWith('WALK') ? 'walkable' : label.startsWith('AWK') ? 'awkward' : label.startsWith('SLIDE') ? 'slide' : 'extreme'}">${label}</span><span>${range}</span>`)
+      .join('') + `<span class="hint">Slide exit</span><span>${PLAYER_CONFIG.slideExitSlopeDegrees}° hysteresis</span>`;
   }
   if (isStoneveilWorld()) {
-    const issues = [];
-    if (!patch.terrain?.bakedMesh?.positions?.length) issues.push({ severity:'warning', message:'Stoneveil has no frozen terrain mesh.' });
+    validationIssues = [];
+    if (!patch.terrain?.bakedMesh?.positions?.length) validationIssues.push({ severity:'error', code:'terrain-missing', message:'Stoneveil has no frozen terrain mesh.' });
     const seen = new Set();
     for (const item of patch.placedObjects ?? []) {
-      if (!item.id) issues.push({ severity:'warning', message:'Authored Stoneveil object has no stable ID.' });
-      else if (seen.has(item.id)) issues.push({ severity:'warning', message:`Duplicate authored object ID: ${item.id}` });
+      if (!item.id) validationIssues.push({ severity:'error', code:'missing-id', message:'Authored Stoneveil object has no stable ID.' });
+      else if (seen.has(item.id)) validationIssues.push({ severity:'error', code:'duplicate-id', objectId:item.id, message:`Duplicate authored object ID: ${item.id}` });
       else seen.add(item.id);
+      if (item.position && !Object.values(item.position).every((v)=>Number.isFinite(Number(v)))) validationIssues.push({ severity:'error', code:'bad-position', objectId:item.id, message:`${item.name || item.id} has an invalid position.` });
     }
-    container.innerHTML = issues.length ? issues.map((issue) => `<div class="validation-item ${issue.severity}">${issue.message}</div>`).join('') : 'No structural warnings. Stoneveil render and terrain collision use the same frozen mesh.';
-    return;
+  } else validationIssues = validateWorldLevel(activeGenericLevel());
+  const issues = validationIssues.filter((issue) => validationFilter === 'all' || issue.severity === validationFilter);
+  container.innerHTML = '';
+  if (!issues.length) { container.textContent = validationIssues.length ? 'No issues in this severity filter.' : 'No structural warnings.'; return; }
+  for (const issue of issues) {
+    const node=document.createElement('div'); node.className=`validation-item ${issue.severity}${issue.objectId ? ' selectable':''}`;
+    node.innerHTML=`<strong>${String(issue.severity).toUpperCase()}</strong> · ${issue.message}`;
+    if(issue.objectId){ node.title=`Select ${issue.objectId}`; node.addEventListener('click',()=>selectValidationIssue(issue)); }
+    container.appendChild(node);
   }
-  const warnings = validateWorldLevel(activeGenericLevel());
-  container.innerHTML = warnings.length
-    ? warnings.map((warning) => `<div class="validation-item ${warning.severity}">${warning.message}</div>`).join('')
-    : 'No structural warnings.';
 }
 
 function renderUi() {
@@ -3190,6 +3578,7 @@ function renderUi() {
     renderSummary();
     renderOutliner();
     renderValidation();
+    renderSourcePolicy();
     return;
   }
   $('#undo').disabled = history.length === 0;
@@ -3201,14 +3590,13 @@ function renderUi() {
   if (returnButton) returnButton.disabled = !meshMode;
   const status = $('#mesh-mode-status');
   if (status) status.innerHTML = meshMode
-    ? `<strong>3D Mesh mode.</strong> The current core is explicit triangle geometry (${Math.round(patch.terrain.bakedMesh.positions.length / 3).toLocaleString()} vertices). <strong>Raise/Lower</strong> move the connected surface vertically, <strong>Smooth</strong> relaxes it, <strong>Indent/Pull</strong> sculpt caves/overhangs, and <strong>Connect Cave Ends</strong> can weld two nearby dead ends into a loop.`
-    : '<strong>Heightfield mode.</strong> Finish the large mountain shape, then use <strong>Freeze Core to 3D Mesh</strong>. After freezing, Indent Core pushes the actual surface inward along its 3D normal, so it can form roofs and overhangs.';
+    ? `<strong>3D Mesh</strong> · ${Math.round(patch.terrain.bakedMesh.positions.length / 3).toLocaleString()} vertices · cave/overhang sculpting enabled.`
+    : '<strong>Heightfield compatibility mode.</strong> Freeze when ready for arbitrary 3D sculpting.';
   for (const button of $$('[data-tool="raise"], [data-tool="lower"]')) button.disabled = false;
   const smoothButton = $('[data-tool="smooth"]');
   if (smoothButton) smoothButton.disabled = !meshMode;
   const connectButton = $('[data-tool="connect-cave"]');
   if (connectButton) connectButton.disabled = !meshMode;
-  $('#preset-middle').disabled = meshMode;
   $('#reset-profile').disabled = meshMode;
   drawProfileChart();
   renderProfileRows();
@@ -3216,6 +3604,7 @@ function renderUi() {
   renderSummary();
   renderOutliner();
   renderValidation();
+  renderSourcePolicy();
 }
 
 function renderProfileRows() {
@@ -3293,6 +3682,8 @@ function renderSelection() {
   if (!record) { selected = null; renderSelection(); return; }
   $('#selected-name').textContent = record.label || record.name || selected.id;
   $('#selected-id').textContent = selected.id;
+  $('#rename-selected').disabled = selected.kind !== 'placed';
+  $('#edit-source-prefab').hidden = true;
   const fields = $('#selection-fields');
   fields.innerHTML = '';
   if (selected.kind === 'water') {
@@ -3315,8 +3706,8 @@ function renderSelection() {
     const note = document.createElement('p');
     note.className = 'hint';
     note.textContent = isMeshMode()
-      ? 'Water surface Y controls the TOP of the water. Water depth controls the vertical distance from that surface to the basin floor by moving only submerged floor vertices; cave roofs/overhangs are left alone.'
-      : 'Water surface Y controls the top. Water depth becomes physical after Freeze Core to 3D Mesh. Color works in both modes.';
+      ? 'Surface Y moves the top; Depth moves submerged basin-floor vertices only.'
+      : 'Depth becomes physical after freezing to 3D mesh.';
     fields.appendChild(note);
     $('#duplicate-selected').disabled = true;
     $('#hide-selected').disabled = true;
@@ -3518,8 +3909,24 @@ function renderSummary() {
 
 function duplicateSelected() {
   if (!isStoneveilWorld()) {
-    if (!selected || selected.kind === 'water-v2') return;
+    if (!selected || ['water-v2','prefab-child-water','architecture-reference','waypoint'].includes(selected.kind)) return;
     const level = activeGenericLevel();
+    if (prefabWorkspace.active && ['prefab-child-object','prefab-child-moving'].includes(selected.kind)) {
+      const definition = activePrefabDefinition(level);
+      const sourceList = selected.kind === 'prefab-child-moving' ? definition?.movingPlatforms : definition?.objects;
+      const source = sourceList?.find((item) => item.id === selected.id);
+      if (!source) return;
+      const copy = clone(source);
+      copy.id = nextPrefabChildId(definition, selected.kind === 'prefab-child-moving' ? 'MOVING' : 'CHILD');
+      copy.name = `${source.name || source.id} Copy`;
+      if (copy.transform?.position) { copy.transform.position.x += 1.5; copy.transform.position.z += 1.5; }
+      if (selected.kind === 'prefab-child-moving' && copy.path?.points) for (const point of copy.path.points) { point.x += 1.5; point.z += 1.5; }
+      commitGeneric((draft) => {
+        const owner=(draft.prefabs?.definitions??[]).find((item)=>item.id===prefabWorkspace.definitionId);
+        (selected.kind === 'prefab-child-moving' ? owner?.movingPlatforms : owner?.objects)?.push(copy);
+      });
+      selected={kind:selected.kind,id:copy.id}; genericScene.setSelected(copy.id); renderUi(); return;
+    }
     const sourceList = selected.kind === 'moving-platform' ? level.movingPlatforms
       : selected.kind === 'prefab-instance' ? level.prefabs.instances
         : selected.kind === 'room' ? level.rooms : level.objects;
@@ -3532,9 +3939,7 @@ function duplicateSelected() {
     copy.id = nextStableId(level, prefix);
     copy.name = `${source.name || source.id} Copy`;
     if (copy.transform?.position) { copy.transform.position.x += 1.5; copy.transform.position.z += 1.5; }
-    if (selected.kind === 'moving-platform' && copy.path?.points) {
-      for (const point of copy.path.points) { point.x += 1.5; point.z += 1.5; }
-    }
+    if (selected.kind === 'moving-platform' && copy.path?.points) for (const point of copy.path.points) { point.x += 1.5; point.z += 1.5; }
     commitGeneric((draft) => {
       const target = selected.kind === 'moving-platform' ? draft.movingPlatforms
         : selected.kind === 'prefab-instance' ? draft.prefabs.instances
@@ -3562,8 +3967,22 @@ function hideSelected() {
   if (!selected) return;
   if (!isStoneveilWorld()) {
     const target = { ...selected };
+    if (target.kind === 'waypoint') {
+      const info=genericScene.selectedRecord(target.id);
+      if (info?.platformId) {
+        const parentKind=info.workspace?'prefab-child-moving':'moving-platform';
+        selected={kind:parentKind,id:info.platformId};
+        removeMovingPlatformWaypoint(info.index);
+      }
+      return;
+    }
     commitGeneric((draft) => {
-      if (target.kind === 'world-object') draft.objects = draft.objects.filter((item) => item.id !== target.id);
+      if (prefabWorkspace.active) {
+        const owner=(draft.prefabs?.definitions??[]).find((item)=>item.id===prefabWorkspace.definitionId);
+        if (target.kind === 'prefab-child-object') owner.objects = owner.objects.filter((item)=>item.id!==target.id);
+        else if (target.kind === 'prefab-child-moving') owner.movingPlatforms = owner.movingPlatforms.filter((item)=>item.id!==target.id);
+        else if (target.kind === 'prefab-child-water') owner.waters = owner.waters.filter((item)=>String(item.id||item.identity)!==target.id);
+      } else if (target.kind === 'world-object') draft.objects = draft.objects.filter((item) => item.id !== target.id);
       else if (target.kind === 'moving-platform') draft.movingPlatforms = draft.movingPlatforms.filter((item) => item.id !== target.id);
       else if (target.kind === 'water-v2') draft.waters = draft.waters.filter((item) => String(item.id || item.identity) !== target.id);
       else if (target.kind === 'prefab-instance') draft.prefabs.instances = draft.prefabs.instances.filter((item) => item.id !== target.id);
@@ -3576,13 +3995,9 @@ function hideSelected() {
   }
   const target = selected;
   commit(() => {
-    if (target.kind === 'placed') {
-      patch.placedObjects = patch.placedObjects.filter((item) => item.id !== target.id);
-    } else if (target.kind === 'tunnel') {
-      patch.tunnels = (patch.tunnels ?? []).filter((item) => item.id !== target.id);
-    } else if (target.kind === 'snapshot') {
-      if (!patch.hiddenObjectIds.includes(target.id)) patch.hiddenObjectIds.push(target.id);
-    }
+    if (target.kind === 'placed') patch.placedObjects = patch.placedObjects.filter((item) => item.id !== target.id);
+    else if (target.kind === 'tunnel') patch.tunnels = (patch.tunnels ?? []).filter((item) => item.id !== target.id);
+    else if (target.kind === 'snapshot') { if (!patch.hiddenObjectIds.includes(target.id)) patch.hiddenObjectIds.push(target.id); }
     selected = null;
   }, { terrain: target.kind === 'tunnel', placed: target.kind === 'placed', snapshot: target.kind === 'snapshot' });
 }
@@ -3802,6 +4217,174 @@ function setView(view) {
   updateCamera();
 }
 
+
+function loadJsonPreference(key, fallback = {}) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; }
+}
+function saveJsonPreference(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+
+function setupResizableRightPanel() {
+  const handle = $('#right-resize-handle');
+  if (!handle) return;
+  let width = clamp(Number(localStorage.getItem(RIGHT_PANEL_WIDTH_KEY)) || 390, 300, 620);
+  const apply = () => {
+    document.documentElement.style.setProperty('--right-panel-width', `${width}px`);
+    handle.style.right = `calc(${width}px - 3px)`;
+    app.resizeCanvas();
+  };
+  apply();
+  let startX = 0, startWidth = width;
+  handle.addEventListener('pointerdown', (event) => {
+    startX = event.clientX; startWidth = width;
+    handle.setPointerCapture(event.pointerId);
+    document.body.classList.add('resizing-right-panel');
+    event.preventDefault();
+  });
+  handle.addEventListener('pointermove', (event) => {
+    if (!handle.hasPointerCapture(event.pointerId)) return;
+    width = clamp(startWidth + (startX - event.clientX), 300, Math.min(620, window.innerWidth * .48));
+    apply();
+  });
+  const finish = (event) => {
+    if (handle.hasPointerCapture?.(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    document.body.classList.remove('resizing-right-panel');
+    try { localStorage.setItem(RIGHT_PANEL_WIDTH_KEY, String(Math.round(width))); } catch {}
+  };
+  handle.addEventListener('pointerup', finish);
+  handle.addEventListener('pointercancel', finish);
+}
+
+function setupCollapsibleSections() {
+  const prefs = loadJsonPreference(COLLAPSE_PREFS_KEY, {});
+  const sections = [...document.querySelectorAll('#left-panel > section, #right-panel > section')];
+  sections.forEach((section, index) => {
+    const heading = section.querySelector(':scope > h2');
+    if (!heading) return;
+    const key = section.id || `${section.closest('aside')?.id || 'panel'}:${index}:${heading.textContent.trim().split('?')[0].trim()}`;
+    section.classList.add('collapsible');
+    section.dataset.collapseKey = key;
+    if (prefs[key]) section.classList.add('collapsed');
+    heading.addEventListener('click', (event) => {
+      if (event.target.closest('button, input, select')) return;
+      section.classList.toggle('collapsed');
+      prefs[key] = section.classList.contains('collapsed');
+      saveJsonPreference(COLLAPSE_PREFS_KEY, prefs);
+    });
+  });
+}
+
+function setupSnapPreferences() {
+  const prefs = loadJsonPreference(SNAP_PREFS_KEY, {});
+  if ($('#grid-snap') && prefs.grid != null) $('#grid-snap').checked = Boolean(prefs.grid);
+  if ($('#grid-snap-step') && prefs.gridStep != null) $('#grid-snap-step').value = String(prefs.gridStep);
+  if ($('#rotation-snap') && prefs.rotation != null) $('#rotation-snap').checked = Boolean(prefs.rotation);
+  if ($('#rotation-snap-step') && prefs.rotationStep != null) $('#rotation-snap-step').value = String(prefs.rotationStep);
+  if ($('#surface-snap') && prefs.surface != null) $('#surface-snap').checked = Boolean(prefs.surface);
+  const save = () => saveJsonPreference(SNAP_PREFS_KEY, {
+    grid:gridSnapEnabled(), gridStep:gridSnapStep(), rotation:rotationSnapEnabled(), rotationStep:rotationSnapStep(), surface:Boolean($('#surface-snap')?.checked)
+  });
+  for (const id of ['grid-snap','grid-snap-step','rotation-snap','rotation-snap-step','surface-snap']) $(`#${id}`)?.addEventListener('change', save);
+}
+
+function createTestRoom() {
+  if (isStoneveilWorld() || !worldHasCapability(activeWorldId, 'rooms')) return;
+  const level=activeGenericLevel();
+  const definitionId=nextStableId(level,'ROOM-PREFAB');
+  const roomId=nextStableId(level,'ROOM');
+  const child=(name,position,size)=>({ id:'',name,type:'box',category:'room',transform:{position,rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1}},size,collision:true,climbMaterial:'normal',visible:true,metadata:{} });
+  const objects=[
+    child('Floor',{x:0,y:-.1,z:0},{x:8,y:.2,z:7}),
+    child('Back Wall',{x:0,y:1.5,z:3.4},{x:8,y:3,z:.2}),
+    child('Left Wall',{x:-3.9,y:1.5,z:0},{x:.2,y:3,z:7}),
+    child('Right Wall',{x:3.9,y:1.5,z:0},{x:.2,y:3,z:7}),
+    child('Interior Crate',{x:2.2,y:.45,z:1.5},{x:.9,y:.9,z:.9})
+  ];
+  objects.forEach((item,index)=>item.id=`ROOM-CHILD-${String(index+1).padStart(3,'0')}`);
+  const definition={id:definitionId,name:`Test Room ${definitionId.split('-').at(-1)}`,kind:'room',version:1,objects,movingPlatforms:[],waters:[],metadata:{independentlyAuthored:true,testFixture:true}};
+  const room={id:roomId,name:`Test Room Instance ${roomId.split('-').at(-1)}`,prefabId:definitionId,linked:true,transform:{position:{x:cameraState.target.x,y:cameraState.target.y,z:cameraState.target.z},rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1}},metadata:{}};
+  commitGeneric((draft)=>{ draft.prefabs.definitions.push(definition); draft.rooms.push(room); });
+  selected={kind:'room',id:roomId}; genericScene.setSelected(roomId); renderUi();
+  setStatus('Created a linked test-room prefab and instance. Edit Source Prefab opens its local-coordinate workspace.');
+}
+
+
+async function importBasaltFreezeFile(file) {
+  if (activeWorldId !== 'cave-fishing-island') return;
+  const raw=JSON.parse(await file.text());
+  const mesh=raw.terrain?.positions && raw.terrain?.indices ? raw.terrain : raw;
+  if (!Array.isArray(mesh.positions) || !Array.isArray(mesh.indices) || mesh.positions.length < 9 || mesh.indices.length < 3 || mesh.positions.length % 3 || mesh.indices.length % 3) {
+    throw new Error('Basalt freeze must contain triangle-mesh positions[] and indices[] arrays.');
+  }
+  if (!mesh.positions.every((v)=>Number.isFinite(Number(v))) || !mesh.indices.every((v)=>Number.isInteger(Number(v)) && Number(v)>=0)) {
+    throw new Error('Basalt freeze contains invalid/non-finite mesh values.');
+  }
+  const vertexCount=mesh.positions.length/3;
+  if (mesh.indices.some((index)=>index>=vertexCount)) throw new Error('Basalt freeze contains an out-of-range triangle index.');
+  let positions=mesh.positions.map(Number);
+  const coordinateSpace=String(mesh.coordinateSpace || raw.coordinateSpace || 'island-local');
+  const origin=mesh.origin || raw.origin || raw.worldOrigin || null;
+  if (coordinateSpace === 'world' && origin && Number.isFinite(Number(origin.x)) && Number.isFinite(Number(origin.z))) {
+    positions=positions.slice();
+    for(let i=0;i<positions.length;i+=3){ positions[i]-=Number(origin.x); positions[i+2]-=Number(origin.z); }
+  } else if (coordinateSpace === 'world') {
+    throw new Error('World-space Basalt freeze needs origin/worldOrigin so the editor can preserve the island-local authored frame.');
+  }
+  commitGeneric((draft)=>{
+    draft.terrain={ mode:'authored-mesh-candidate', format:mesh.format || 'triangle-mesh-v1', coordinateSpace:'island-local', positions, indices:mesh.indices.map(Number), source:'production-freeze-import', capturedAt:mesh.capturedAt || raw.capturedAt || new Date().toISOString(), metadata:{ ...(mesh.metadata||{}), originalCoordinateSpace:coordinateSpace } };
+    draft.sourcePolicy.terrain='authored-candidate';
+  });
+  genericScene.setBasaltReferenceMode($('#basalt-reference-mode')?.value || 'both');
+  const status=$('#basalt-freeze-status');
+  if(status) status.textContent=`Candidate imported: ${vertexCount.toLocaleString()} verts / ${(mesh.indices.length/3).toLocaleString()} triangles. Production still uses procedural terrain.`;
+  setStatus('Basalt production freeze imported as a comparison-only authored candidate. Nothing in production terrain was switched.');
+}
+
+function renameSelectedRecord() {
+  if (!selected) return;
+  const record=currentSelectedRecord();
+  if (!record || ['architecture-reference','waypoint','water'].includes(selected.kind)) return;
+  const current=record.name||record.label||selected.id;
+  const value=prompt('Rename authored object',current);
+  if (!value?.trim()) return;
+  if (isStoneveilWorld()) {
+    if (selected.kind === 'placed') commit(()=>{ record.name=value.trim().slice(0,80); },{placed:true});
+  } else renameGenericRecord(selected,value);
+  renderUi();
+}
+
+function setupV21Ui() {
+  setupResizableRightPanel();
+  setupCollapsibleSections();
+  setupSnapPreferences();
+  $('#outliner-search')?.addEventListener('input', (event) => { outlinerFilter=event.target.value||''; renderOutliner(); });
+  $('#validation-filter')?.addEventListener('change', (event) => { validationFilter=event.target.value||'all'; renderValidation(); });
+  $('#refresh-validation')?.addEventListener('click', renderValidation);
+  $('#focus-selected')?.addEventListener('click', () => focusSelectedObject());
+  $('#rename-selected')?.addEventListener('click', renameSelectedRecord);
+  $('#edit-source-prefab')?.addEventListener('click', () => { const def=definitionForSelectedInstance(); if(def) enterPrefabWorkspace(def.id); });
+  $('#create-test-room')?.addEventListener('click', createTestRoom);
+  $('#save-prefab-workspace')?.addEventListener('click', () => { persistGenericLevel(); setStatus('Prefab/room definition saved to this world autosave. Use Save World Level to download the JSON.'); });
+  $('#exit-prefab-workspace')?.addEventListener('click', () => exitPrefabWorkspace());
+  $('#prefab-workspace-return')?.addEventListener('click', () => exitPrefabWorkspace());
+  $('#collision-mode')?.addEventListener('change', (event) => {
+    const mode=event.target.value;
+    if (isStoneveilWorld()) {
+      applyTerrainDisplayMode();
+      setStatus(mode==='normal'?'Collision inspection off.':'Stoneveil uses the same frozen triangle mesh for render and terrain collision; collision inspection enabled.');
+    } else {
+      genericScene.setCollisionMode(mode);
+      setStatus(mode==='normal'?'Collision inspection off.':`Collision mode: ${event.target.selectedOptions[0]?.textContent || mode}.`);
+    }
+  });
+  $('#basalt-reference-mode')?.addEventListener('change', (event) => genericScene.setBasaltReferenceMode(event.target.value));
+  $('#import-basalt-freeze')?.addEventListener('click', () => $('#basalt-freeze-file')?.click());
+  $('#basalt-freeze-file')?.addEventListener('change', (event) => {
+    const file=event.target.files?.[0];
+    if(file) importBasaltFreezeFile(file).catch((error)=>setStatus(error.message));
+    event.target.value='';
+  });
+}
+
 // UI wiring
 for (const world of WORLD_EDITOR_WORLDS) $('#world-selector')?.append(new Option(world.label, world.id));
 if ($('#world-selector')) $('#world-selector').value = activeWorldId;
@@ -3851,7 +4434,7 @@ $('#create-prefab-foundation')?.addEventListener('click', () => {
   selected = { kind: 'prefab-instance', id: instanceId };
   genericScene.setSelected(instanceId);
   renderUi();
-  setStatus(`Created linked prefab ${definitionId} with root instance ${instanceId}. Child-authoring UI is a later V2 pass; the schema/runtime root transform is active now.`);
+  setStatus(`Created linked prefab ${definitionId}. Select Edit Source Prefab to author its local children.`);
 });
 $('#create-room-foundation')?.addEventListener('click', () => {
   if (isStoneveilWorld() || !worldHasCapability(activeWorldId, 'rooms')) return;
@@ -3876,7 +4459,7 @@ $('#create-room-foundation')?.addEventListener('click', () => {
   selected = { kind: 'room', id: roomId };
   genericScene.setSelected(roomId);
   renderUi();
-  setStatus(`Created linked room module ${definitionId} and room root ${roomId}. Moving the room root moves all future child content.`);
+  setStatus(`Created linked room ${definitionId}. Select Edit Source Prefab to build it at local origin.`);
 });
 $('#undo').addEventListener('click', undo);
 $('#redo').addEventListener('click', redo);
@@ -3893,7 +4476,6 @@ $('#import-snapshot').addEventListener('click', () => $('#snapshot-file').click(
 $('#bake-snapshot').addEventListener('click', bakeSnapshotIntoPatch);
 $('#patch-file').addEventListener('change', (event) => event.target.files[0] && loadJsonFile(event.target.files[0], 'patch').catch((e) => setStatus(e.message)));
 $('#snapshot-file').addEventListener('change', (event) => event.target.files[0] && loadJsonFile(event.target.files[0], 'snapshot').catch((e) => setStatus(e.message)));
-$('#preset-middle').addEventListener('click', () => commit(() => { patch = applyMidPlateauPreset(patch, 150); }, { terrain: true }));
 $('#reset-profile').addEventListener('click', () => commit(() => { patch.terrain.profile = makeEmptyPatch().terrain.profile; }, { terrain: true }));
 
 $('#manual-hole-tool')?.addEventListener('click', () => {
@@ -3921,17 +4503,6 @@ $('#show-slope')?.addEventListener('change', (event) => {
     const legend = slopeOverlayLegend(PLAYER_CONFIG).map(([label, range]) => `${label} ${range}`).join(' · ');
     setStatus(`Slope diagnostic: ${legend}. Slide exit hysteresis is ${PLAYER_CONFIG.slideExitSlopeDegrees}°.`);
   } else setStatus('Slope diagnostic off.');
-});
-$('#show-collision')?.addEventListener('change', (event) => {
-  if (isStoneveilWorld()) {
-    applyTerrainDisplayMode();
-    setStatus(event.target.checked
-      ? 'Stoneveil collision view: the wire-dark mesh is the same frozen triangle geometry used by the terrain collider.'
-      : 'Collision view off.');
-  } else {
-    genericScene.setCollisionDebug(event.target.checked);
-    setStatus(event.target.checked ? 'Collision proxy view on.' : 'Collision proxy view off.');
-  }
 });
 $('#show-snapshot-rocks').addEventListener('change', rebuildSnapshotObjects);
 $('#clear-local').addEventListener('click', async () => {
@@ -4079,8 +4650,10 @@ function focusSelectedObject() {
   if (!selected) return false;
   if (!isStoneveilWorld()) {
     const record = genericScene.selectedRecord(selected.id);
-    const position = selected.kind === 'water-v2' || selected.kind === 'architecture-reference'
-      ? record?.position : record?.transform?.position;
+    const position = ['water-v2','prefab-child-water','architecture-reference'].includes(selected.kind)
+      ? record?.position
+      : selected.kind === 'waypoint' ? record?.point
+        : record?.transform?.position;
     if (!position) return false;
     cameraState.target.set(Number(position.x) || 0, Number(position.y) || 0, Number(position.z) || 0);
     cameraState.distance = clamp(cameraState.distance, 0.25, activeWorldId === 'skyscraper' ? 180 : 90);
@@ -4158,6 +4731,7 @@ window.addEventListener('keydown', (event) => {
   const key = event.key.toLowerCase();
   if ((event.ctrlKey || event.metaKey) && key === 'z') { event.preventDefault(); undo(); return; }
   if ((event.ctrlKey || event.metaKey) && key === 'y') { event.preventDefault(); redo(); return; }
+  if ((event.ctrlKey || event.metaKey) && key === 'd') { event.preventDefault(); duplicateSelected(); return; }
   if (event.key === 'Delete' || event.key === 'Backspace') {
     if (typingInField()) return;
     hideSelected();
@@ -4284,6 +4858,8 @@ canvas.addEventListener('webglcontextrestored', () => {
 });
 
 window.addEventListener('resize', () => app.resizeCanvas());
+
+setupV21Ui();
 
 async function initializeWorldEditorV2() {
   try {

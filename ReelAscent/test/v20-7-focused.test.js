@@ -13,6 +13,7 @@ import {
 } from '../src/player/movement.js';
 import {
   COSMETIC_BY_ID,
+  GENERIC_COSMETIC_VISUAL_DUPLICATE_GROUPS,
   PENDING_COSMETIC_VISUAL_REDESIGN_IDS,
   cosmeticVisualRedesignPending
 } from '../src/progression/cosmetics.js';
@@ -23,9 +24,15 @@ const summitPool = (descriptor) => getEcologySelection({
   modifiers: {}
 });
 
-test('authored Stoneveil skips the duplicate legacy Crown render and collider', async () => {
-  const source = await readFile(new URL('../src/world/mountain-v2.js', import.meta.url), 'utf8');
-  assert.match(source, /buildSummitCrown\(\) \{[\s\S]{0,600}if \(this\.authoredStoneveilCoreActive\)/);
+test('authored Stoneveil keeps summit floor but excludes duplicate Crown sides', async () => {
+  const [source, runtime] = await Promise.all([
+    readFile(new URL('../src/world/mountain-v2.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/world/map-editor-runtime.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(source, /this\.authoredStoneveilCoreActive\s*\? topTriangles/);
+  assert.match(source, /authoredSummitInfill/);
+  assert.match(runtime, /summitIndices\.map\(\(index\) => index \+ summitVertexOffset\)/);
+  assert.match(runtime, /editorIncludesSummitInfill/);
   assert.match(source, /auditStoneveilTerrainAuthority\(\)/);
   assert.match(source, /bakedRenders:[\s\S]{0,900}legacyCrownColliders/);
 });
@@ -51,23 +58,30 @@ test('both real summit waters gained intended candidates without future-reserved
   }
 });
 
-test('appearance is five visible button tabs with no cosmetic dropdown', async () => {
+test('appearance is five visible button tabs, keeps skin slider, and has no cosmetic dropdown', async () => {
   const [markup, menu] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/appearance-menu.js', import.meta.url), 'utf8')
   ]);
   for (const tab of ['body', 'hair', 'face', 'neck', 'back']) assert.match(markup, new RegExp(`data-appearance-tab="${tab}"`));
-  assert.doesNotMatch(menu, /createElement\('select'\)|data\.appearanceSelect|appearance-skin-slider/);
+  assert.doesNotMatch(menu, /createElement\('select'\)|data\.appearanceSelect/);
+  assert.match(menu, /dataset\.appearanceSkinSlider/);
+  assert.match(menu, /const duplicateGroup = group\.cosmetic \? cosmeticVisualDuplicateGroup/);
+  assert.match(menu, /button\.disabled = Boolean\(redesignPending\)/);
   assert.match(menu, /Visual redesign pending/);
 });
 
 test('unresolved generic Legendary duplicates remain canonical but are marked pending', () => {
-  assert.ok(PENDING_COSMETIC_VISUAL_REDESIGN_IDS.length > 0);
+  assert.equal(PENDING_COSMETIC_VISUAL_REDESIGN_IDS.length, 48);
   for (const id of PENDING_COSMETIC_VISUAL_REDESIGN_IDS) {
     assert.ok(COSMETIC_BY_ID.has(id), id);
     assert.equal(cosmeticVisualRedesignPending(id), true);
   }
   assert.equal(COSMETIC_BY_ID.get('catch-green_sea_turtle').visual, 'shell');
+  for (const group of GENERIC_COSMETIC_VISUAL_DUPLICATE_GROUPS) {
+    assert.equal(cosmeticVisualRedesignPending(group[0]), false);
+    assert.ok(group.slice(1).every(cosmeticVisualRedesignPending));
+  }
 });
 
 test('controller bindings normalize, label and reject duplicates', () => {

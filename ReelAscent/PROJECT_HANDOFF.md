@@ -1,6 +1,21 @@
-# REEL ASCENT v20.7 — CROWN AUTHORITY, APPEARANCE, SUMMIT ECOLOGY & CONTROLLER POLISH
+# REEL ASCENT v20.8 — APPEARANCE AVAILABILITY + SUMMIT SUPPORT REPAIR
 
-Status (2026-09-16): v20.7 is implemented in the current tree. It deliberately preserves the concurrent World Editor V2 files/changes already present in the worktree. User visual/gameplay testing is still required.
+Status (2026-09-16): v20.8 is implemented in the current tree and the tracked frontend build is regenerated. This pass preserves the concurrent World Editor V2.1 work already present in the shared worktree.
+
+## v20.8 changes
+
+- **Appearance availability:** the redesign-pending state is now calculated only for actual cosmetic duplicate-model groups. Avatar Type, Skin Tone, Shirt Color, Pants Color, Blob Color, Hair Color, Hat Color, Accessory Color and Backpack Color are ordinary interactive controls and cannot be disabled by cosmetic deduplication. The old striped treatment was replaced with a restrained solid pending style so a genuinely deferred cosmetic is not visually confused with all ordinary choices.
+- **Duplicate cosmetics:** the remaining generic Legendary rewards form four real duplicate families by slot + shared visual recipe. One representative in each family stays usable—the currently equipped member when applicable, otherwise the first unlocked member, otherwise the stable first member—while only the other duplicates are gray-disabled as **Visual redesign pending**. This reduces the static pending set from 52 to 48 without deleting IDs, unlock history, save compatibility or multiplayer appearance values. Randomize may keep any unlocked result; once equipped, that item becomes the usable representative of its family.
+- **Skin tone:** the eight-step Skin Tone slider and visible tone strip are restored. Dragging updates the player and canonical preview live, writes the existing `skinTone` save field, and shows the current `1 / 8` style readout. The replacement v20.7 swatch-button grid is gone.
+- **Summit fall-through root cause:** the authored Stoneveil triangle mesh owns the Crown walls/caves but ends at the roughly eight-metre summit rim. v20.7 correctly removed the duplicate procedural side shell, but that also removed the separate basin/top triangles, leaving F8's 6.1 m summit-rim target—and a normal climbing top-out—over an open hole.
+- **Summit support repair:** authored mode now retains **only** the old proven summit basin/top triangles. They are converted to world coordinates and appended to the same `Map Editor baked 3D mountain core` render mesh and Rapier trimesh collider. The legacy Crown side triangles/render/collider remain absent, so authored cave openings stay open and the terrain-authority invariant remains one active Stoneveil render/collision owner. The tarn depression and surrounding walkable bank are physically supported again; no teleport-only platform or recovery hack was added.
+- **Files:** `src/progression/cosmetics.js`, `src/styles.css`, `src/ui/appearance-menu.js`, `src/version.js`, `src/world/{map-editor-runtime,mountain-v2}.js`, `test/{v20-3-focused,v20-5-focused,v20-7-focused}.test.js`, regenerated tracked `dist/`, and this handoff.
+- **Validation:** syntax checks pass for the edited modules; the scoped current world/cave/fishing/input/save/Atlas/appearance/controller regression selection passes **50/50**; `git diff --check` reports no whitespace errors; and `npm run build` succeeds with only the existing PlayCanvas worker-externalization and large-chunk warnings. The repository-wide historical suite still contains numerous stale milestone assertions and a current editor-backup mismatch, so it is not used as the v20.8 acceptance gate.
+- **Manual checks:** hard-refresh the published build; confirm all BODY colors/avatar controls are bright and clickable, Skin Tone is a working slider, each repeated reward family leaves one choice usable, F8 lands on the summit bank, a normal Crown climb can top out, the tarn bank supports walking/fishing, and Crown cave entrances remain unobstructed. This is frontend/world source only: publish the rebuilt frontend; no multiplayer protocol, database, or Render-server redeploy is required.
+
+# REEL ASCENT v20.7 — CROWN AUTHORITY, APPEARANCE, SUMMIT ECOLOGY & CONTROLLER POLISH (HISTORICAL)
+
+Historical status (2026-09-16): this pass is superseded by v20.8 above. Its complete removal of the Crown shell also removed the summit basin/top support, and its blanket generic-reward pending presentation is corrected in v20.8. The remaining ecology/controller/cave work is retained.
 
 ## v20.7 changes
 

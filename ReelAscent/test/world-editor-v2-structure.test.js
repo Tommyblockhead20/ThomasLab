@@ -55,5 +55,26 @@ test('World Editor V2 shell exposes all four worlds and moving-platform tools', 
   assert.match(html, /id="world-selector"/);
   assert.match(html, /data-tool="moving-platform"/);
   assert.match(html, /id="show-slope"/);
-  assert.match(html, /id="show-collision"/);
+  assert.match(html, /id="collision-mode"/);
+  assert.match(html, /id="right-resize-handle"/);
+  assert.match(html, /id="outliner-search"/);
+  assert.doesNotMatch(html, /Raise middle plateau \+150 ft/);
+});
+
+
+test('V2.1 authoring workflow wires compact UI, room workspace, search and snapping', async () => {
+  const main = await text('tools/map-editor/main.js');
+  const html = await text('tools/map-editor/index.html');
+  const css = await text('tools/map-editor/editor.css');
+  assert.match(main, /setupResizableRightPanel/);
+  assert.match(main, /setupCollapsibleSections/);
+  assert.match(main, /enterPrefabWorkspace/);
+  assert.match(main, /createTestRoom/);
+  assert.match(main, /outlinerFilter/);
+  assert.match(main, /gridSnapEnabled/);
+  assert.match(main, /routeGroup/);
+  assert.match(html, /id="edit-source-prefab"/);
+  assert.match(html, /id="create-test-room"/);
+  assert.match(css, /--right-panel-width/);
+  assert.match(css, /\.outliner-row/);
 });

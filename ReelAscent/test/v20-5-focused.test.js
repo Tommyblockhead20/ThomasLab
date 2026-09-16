@@ -56,4 +56,4 @@ test('Basalt opening and Crown rock exclusions are explicit in active world sour
   assert.match(world, /buildCrownRoutes\(\)[\s\S]{0,3000}isRockInProtectedWaterApproach/);
 });
 
-test('v20.7 is the active build', () => assert.equal(GAME_VERSION, 'v20.7'));
+test('v20.8 is the active build', () => assert.equal(GAME_VERSION, 'v20.8'));

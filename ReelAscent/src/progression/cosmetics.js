@@ -159,12 +159,27 @@ const legendaryCosmetics = legendarySpecies.map((species, index) => {
 // These records/unlocks stay canonical, but their current generated model is still one of
 // the shared fallback Crest/Lens/Charm/Mantle recipes. The wardrobe labels them honestly
 // and prevents new selection until each earns an authored silhouette.
-export const PENDING_COSMETIC_VISUAL_REDESIGN_IDS = Object.freeze(legendarySpecies
-  .filter((species) => !LEGENDARY_OVERRIDES[species.canonicalId ?? species.id])
-  .map((species) => `catch-${species.canonicalId ?? species.id}`));
+const genericLegendaryCosmetics = legendaryCosmetics
+  .filter((cosmetic) => !LEGENDARY_OVERRIDES[cosmetic.source.speciesId]);
+const genericVisualGroups = new Map();
+for (const cosmetic of genericLegendaryCosmetics) {
+  const key = `${cosmetic.slot}:${cosmetic.visual}`;
+  const group = genericVisualGroups.get(key) ?? [];
+  group.push(cosmetic.id);
+  genericVisualGroups.set(key, group);
+}
+export const GENERIC_COSMETIC_VISUAL_DUPLICATE_GROUPS = Object.freeze([...genericVisualGroups.values()]
+  .filter((group) => group.length > 1)
+  .map((group) => Object.freeze([...group])));
+export const PENDING_COSMETIC_VISUAL_REDESIGN_IDS = Object.freeze(
+  GENERIC_COSMETIC_VISUAL_DUPLICATE_GROUPS.flatMap((group) => group.slice(1))
+);
 const PENDING_COSMETIC_VISUAL_REDESIGN_SET = new Set(PENDING_COSMETIC_VISUAL_REDESIGN_IDS);
 export function cosmeticVisualRedesignPending(id) {
   return PENDING_COSMETIC_VISUAL_REDESIGN_SET.has(id);
+}
+export function cosmeticVisualDuplicateGroup(id) {
+  return GENERIC_COSMETIC_VISUAL_DUPLICATE_GROUPS.find((group) => group.includes(id)) ?? null;
 }
 
 export const CASINO_EXCLUSIVE_COSMETICS = Object.freeze([

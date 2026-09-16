@@ -4994,14 +4994,9 @@ export class MountainWorld extends TestWorld {
   }
 
   buildSummitCrown() {
-    // terrain.bakedMesh already contains the complete authored summit/cave topology. The
-    // former procedural crown was a second visible trimesh and a second physics collider
-    // over just the upper mountain, which is why lower authored caves worked while Crown
-    // entrances remained sealed. It is legacy fallback geometry only.
-    if (this.authoredStoneveilCoreActive) {
-      this.crownSideTriangles = [];
-      return;
-    }
+    // The authored bake owns the Crown's sides/caves but intentionally ends at the rim.
+    // Retain only the summit basin/top triangles and merge them into the baked entity later;
+    // the old side shell is the duplicate geometry that sealed authored Crown cave mouths.
     // A subdivided shell lets the same proven aperture filter cut a localized Crown cave
     // mouth. The old two-triangle-tall wedges would have removed an entire face from base
     // to summit for one opening.
@@ -5087,12 +5082,22 @@ export class MountainWorld extends TestWorld {
         [lastSurfaceRing + index, lastSurfaceRing + next, topNext]
       );
     }
-    const triangles = [...visibleSideTriangles, ...topTriangles];
+    const triangles = this.authoredStoneveilCoreActive
+      ? topTriangles
+      : [...visibleSideTriangles, ...topTriangles];
 
     // Rock grounding ray-tests the same filtered, faceted shell the player sees.
-    this.crownSideTriangles = visibleSideTriangles.map((triangle) => (
+    this.crownSideTriangles = (this.authoredStoneveilCoreActive ? [] : visibleSideTriangles).map((triangle) => (
       triangle.map((vertexIndex) => vertices[vertexIndex])
     ));
+
+    if (this.authoredStoneveilCoreActive) {
+      this.authoredSummitInfill = Object.freeze({
+        positions: Object.freeze(vertices.flatMap(([x, y, z]) => [x + MOUNTAIN_CENTER.x, y, z + MOUNTAIN_CENTER.z])),
+        indices: Object.freeze(triangles.flat())
+      });
+      return;
+    }
 
     const geometry = new pc.Geometry();
     geometry.positions = [];

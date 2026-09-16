@@ -799,8 +799,16 @@ function addBakedTerrainMesh(world, patch, center = centerFallback()) {
     original.enabled = false;
   }
 
-  const positions = baked.positions.map(Number);
-  const indices = baked.indices.map((value) => Math.trunc(Number(value)));
+  const bakedPositions = baked.positions.map(Number);
+  const bakedIndices = baked.indices.map((value) => Math.trunc(Number(value)));
+  const summitInfill = world.authoredSummitInfill;
+  const summitPositions = Array.isArray(summitInfill?.positions) ? summitInfill.positions.map(Number) : [];
+  const summitIndices = Array.isArray(summitInfill?.indices)
+    ? summitInfill.indices.map((value) => Math.trunc(Number(value)))
+    : [];
+  const summitVertexOffset = bakedPositions.length / 3;
+  const positions = [...bakedPositions, ...summitPositions];
+  const indices = [...bakedIndices, ...summitIndices.map((index) => index + summitVertexOffset)];
   const geometry = new pc.Geometry();
   geometry.positions = positions;
   geometry.indices = indices;
@@ -841,6 +849,7 @@ function addBakedTerrainMesh(world, patch, center = centerFallback()) {
   entity.physicsCollider = world.physicsWorld.createCollider(colliderDesc);
   entity.mapObjectId = 'EDITOR-BAKED-TERRAIN';
   entity.editorIncludesOceanFloorCollision = floorTriangles.length > 0;
+  entity.editorIncludesSummitInfill = summitIndices.length > 0;
 
   // Expose the baked mesh as the visible terrain source for diagnostics. Procedural rocks
   // were already created before this replacement; once their layout is curated, the rock

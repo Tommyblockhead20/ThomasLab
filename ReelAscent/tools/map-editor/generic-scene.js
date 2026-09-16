@@ -57,6 +57,33 @@ function rayAabbDistance(origin, direction, center, half) {
   return tmin >= 0 ? tmin : tmax;
 }
 
+function rayAabbHit(origin, direction, center, half) {
+  let tmin = -Infinity;
+  let tmax = Infinity;
+  let hitAxis = 'y';
+  let hitSign = 1;
+  for (const axis of ['x', 'y', 'z']) {
+    const o = origin[axis], d = direction[axis];
+    const min = center[axis] - half[axis], max = center[axis] + half[axis];
+    if (Math.abs(d) < 1e-8) {
+      if (o < min || o > max) return null;
+      continue;
+    }
+    let a = (min - o) / d;
+    let b = (max - o) / d;
+    let sign = -1;
+    if (a > b) { [a, b] = [b, a]; sign = 1; }
+    if (a > tmin) { tmin = a; hitAxis = axis; hitSign = sign; }
+    tmax = Math.min(tmax, b);
+    if (tmax < tmin) return null;
+  }
+  if (tmax < 0) return null;
+  const distance = tmin >= 0 ? tmin : tmax;
+  const normal = { x: 0, y: 0, z: 0 };
+  normal[hitAxis] = tmin >= 0 ? hitSign : -hitSign;
+  return { distance, normal };
+}
+
 function createBox(parent, name, position, size, material, rotation = {}, solidRecord = null) {
   const entity = new pc.Entity(name);
   entity.addComponent('render', { type: 'box', material, castShadows: true, receiveShadows: true });
@@ -133,7 +160,8 @@ export class GenericWorldScene {
     this.objectRoot = new pc.Entity('Authored Objects');
     this.pathRoot = new pc.Entity('Moving Platform Paths');
     this.collisionRoot = new pc.Entity('Collision Debug');
-    for (const child of [this.referenceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot]) this.root.addChild(child);
+    this.workspaceRoot = new pc.Entity('Prefab Workspace Reference');
+    for (const child of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot]) this.root.addChild(child);
     this.materials = {
       reference: makeMaterial([.45, .48, .47]),
       referenceGlass: makeMaterial([.46, .61, .7], .72),
@@ -143,7 +171,8 @@ export class GenericWorldScene {
       selected: makeMaterial([1, .7, .08], 1, .08),
       path: makeMaterial([1, .5, .08], .82, .18),
       collision: makeMaterial([1, .12, .12], .15, .12),
-      pirate: makeMaterial([.27, .42, .28])
+      pirate: makeMaterial([.27, .42, .28]),
+      workspaceGrid: makeMaterial([.34, .38, .31], .28)
     };
     this.level = null;
     this.world = null;
@@ -155,6 +184,11 @@ export class GenericWorldScene {
     this.prefabMovingEntries = [];
     this.selectedId = null;
     this.referenceRecord = null;
+    this.collisionMode = 'normal';
+    this.collisionEntries = [];
+    this.workspaceDefinition = null;
+    this.basaltReferenceMode = 'both';
+    this.editorHiddenIds = new Set();
     this.root.enabled = false;
   }
 
@@ -170,11 +204,44 @@ export class GenericWorldScene {
 
   setEnabled(enabled) { this.root.enabled = Boolean(enabled); }
 
-  setCollisionDebug(enabled) { this.collisionRoot.enabled = Boolean(enabled); }
+  setCollisionDebug(enabled) { this.setCollisionMode(enabled ? 'overlay' : 'normal'); }
+
+  setCollisionMode(mode = 'normal') {
+    this.collisionMode = ['normal', 'overlay', 'collision-only', 'selected'].includes(mode) ? mode : 'normal';
+    this.applyCollisionMode();
+  }
+
+  setBasaltReferenceMode(mode = 'both') {
+    this.basaltReferenceMode = ['procedural', 'authored', 'both'].includes(mode) ? mode : 'both';
+    if (this.world?.id === 'cave-fishing-island' && !this.workspaceDefinition) this.rebuild();
+  }
+
+  setPrefabWorkspace(definition = null) {
+    this.workspaceDefinition = definition || null;
+    this.selectedId = null;
+    this.rebuild();
+  }
+
+  clearPrefabWorkspace() { this.setPrefabWorkspace(null); }
 
   setSelected(id) {
     this.selectedId = id ? String(id) : null;
     this.applySelectionMaterials();
+    this.applyEditorVisibility();
+    this.applyCollisionMode();
+  }
+
+  setEditorHidden(id, hidden = true) {
+    const key = String(id);
+    if (hidden) this.editorHiddenIds.add(key); else this.editorHiddenIds.delete(key);
+    this.applyEditorVisibility();
+    this.applyCollisionMode();
+  }
+
+  isEditorHidden(id) { return this.editorHiddenIds.has(String(id)); }
+
+  applyEditorVisibility() {
+    for (const [id, entity] of this.entities) entity.enabled = !this.editorHiddenIds.has(String(id));
   }
 
   applySelectionMaterials() {
@@ -187,8 +254,9 @@ export class GenericWorldScene {
         for (const mesh of node.render?.meshInstances ?? []) {
           const base = entity.editorKind === 'water-v2'
             ? this.materials.water
-            : (node.editorKind === 'moving-platform' || entity.editorKind === 'moving-platform')
-              ? this.materials.moving : this.materials.platform;
+            : entity.editorKind === 'waypoint' ? this.materials.path
+              : (node.editorKind === 'moving-platform' || entity.editorKind === 'moving-platform')
+                ? this.materials.moving : this.materials.platform;
           mesh.material = selected ? this.materials.selected : base;
         }
       }
@@ -196,14 +264,23 @@ export class GenericWorldScene {
   }
 
   rebuild() {
-    for (const root of [this.referenceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot]) destroyChildren(root);
+    for (const root of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot]) destroyChildren(root);
     this.entities.clear();
     this.movingEntities.clear();
     this.prefabCollisionEntries = [];
     this.prefabMovingEntries = [];
     this.referenceCollisionBoxes = [];
+    this.collisionEntries = [];
     this.referenceRecord = null;
     if (!this.level || !this.world) return;
+    if (this.workspaceDefinition) {
+      this.buildPrefabWorkspace();
+      this.buildCollisionDebug();
+      this.applySelectionMaterials();
+      this.applyEditorVisibility();
+      this.applyCollisionMode();
+      return;
+    }
     if (this.world.id === 'skyscraper') this.buildSkyscraperReference();
     else if (this.world.id === 'cave-fishing-island') this.buildCaveReference();
     else if (this.world.id === 'pirate-island') this.buildPirateReference();
@@ -213,6 +290,8 @@ export class GenericWorldScene {
     this.buildPrefabInstances();
     this.buildCollisionDebug();
     this.applySelectionMaterials();
+    this.applyEditorVisibility();
+    this.applyCollisionMode();
   }
 
   buildSkyscraperReference() {
@@ -229,7 +308,7 @@ export class GenericWorldScene {
       this.referenceCollisionBoxes.push({
         center: { x: 0, y: (layer.bottom + layer.top) / 2, z: 0 },
         size: { x: layer.width, y: layer.top - layer.bottom, z: layer.depth },
-        kind: 'building'
+        kind: 'building', id: `__esb-collider-${this.referenceCollisionBoxes.length + 1}`
       });
     }
     this.app.assets.loadFromUrl('/assets/models/empire-state-building.glb', 'container', (error, asset) => {
@@ -269,23 +348,44 @@ export class GenericWorldScene {
   buildCaveReference() {
     const location = SMALL_ISLAND_LOCATIONS.find((item) => item.id === 'cave-fishing-island');
     if (!location) return;
-    const data = caveReferenceMesh(location);
-    const geometry = new pc.Geometry();
-    geometry.positions = data.positions;
-    geometry.indices = data.indices;
-    geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
-    const entity = new pc.Entity('Basalt Hollow current procedural reference');
-    entity._editorOwnedMeshes = [mesh];
-    entity.addComponent('render');
-    entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.reference, entity)];
-    this.referenceRoot.addChild(entity);
-    // A conservative collision/reference floor for editor walkthrough. It is not exported.
+    const candidate = this.level?.terrain?.mode === 'authored-mesh-candidate' ? this.level.terrain : null;
+    if (this.basaltReferenceMode !== 'authored') {
+      const data = caveReferenceMesh(location);
+      this.buildMeshEntity('Basalt Hollow procedural reference', data.positions, data.indices, this.materials.reference, this.referenceRoot);
+    }
+    if (candidate?.positions?.length && candidate?.indices?.length && this.basaltReferenceMode !== 'procedural') {
+      this.buildMeshEntity('Basalt Hollow frozen production candidate', candidate.positions, candidate.indices, this.materials.referenceGlass, this.referenceRoot);
+    }
+    // Until candidate promotion, walkthrough collision intentionally remains the conservative
+    // procedural reference. The candidate is visual comparison data, not a silent production switch.
     this.referenceCollisionBoxes.push({
       center: { x: 0, y: location.elevation - .05, z: 0 },
       size: { x: location.radii.x * 1.75, y: .3, z: location.radii.z * 1.75 },
-      kind: 'island-reference'
+      kind: 'island-reference', id: '__basalt-reference-floor'
     });
+  }
+
+  buildMeshEntity(name, positions, indices, material, parent) {
+    const geometry = new pc.Geometry();
+    geometry.positions = [...positions];
+    geometry.indices = [...indices];
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const entity = new pc.Entity(name);
+    entity._editorOwnedMeshes = [mesh];
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+    parent.addChild(entity);
+    return entity;
+  }
+
+  buildPrefabWorkspace() {
+    const definition = this.workspaceDefinition;
+    createBox(this.workspaceRoot, 'Prefab local origin floor', { x: 0, y: -.03, z: 0 }, { x: 24, y: .06, z: 24 }, this.materials.workspaceGrid);
+    this.referenceCollisionBoxes.push({ center: { x: 0, y: -.03, z: 0 }, size: { x: 24, y: .06, z: 24 }, kind: 'workspace-floor', id: '__workspace-floor' });
+    for (const water of definition.waters ?? []) this.buildWaterRecord(water);
+    for (const item of definition.objects ?? []) this.buildObjectRecord(item, 'prefab-child-object');
+    for (const item of definition.movingPlatforms ?? []) this.buildMovingPlatformRecord(item, 'prefab-child-moving');
   }
 
   buildPirateReference() {
@@ -293,48 +393,56 @@ export class GenericWorldScene {
     this.referenceCollisionBoxes.push({ center: { x: 0, y: -.2, z: 0 }, size: { x: 44, y: .4, z: 36 }, kind: 'placeholder' });
   }
 
-  buildWaters() {
-    for (const water of this.level.waters ?? []) {
-      const radii = water.radii ?? { x: 4, z: 4 };
-      const position = water.position ?? { x: 0, y: 0, z: 0 };
-      const entity = new pc.Entity(water.name || water.id || 'Water');
-      entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
-      entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
-      entity.setLocalScale(Math.max(.1, finite(radii.x, 4) * 2), .07, Math.max(.1, finite(radii.z, 4) * 2));
-      entity.editorKind = 'water-v2';
-      entity.editorRecord = water;
-      entity.editorId = String(water.id || water.identity || 'water');
-      this.waterRoot.addChild(entity);
-      this.entities.set(entity.editorId, entity);
-    }
+  buildWaterRecord(water) {
+    const radii = water.radii ?? { x: 4, z: 4 };
+    const position = water.position ?? { x: 0, y: 0, z: 0 };
+    const entity = new pc.Entity(water.name || water.id || 'Water');
+    entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
+    entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
+    entity.setLocalScale(Math.max(.1, finite(radii.x, 4) * 2), .07, Math.max(.1, finite(radii.z, 4) * 2));
+    entity.editorKind = this.workspaceDefinition ? 'prefab-child-water' : 'water-v2';
+    entity.editorRecord = water;
+    entity.editorId = String(water.id || water.identity || 'water');
+    this.waterRoot.addChild(entity);
+    this.entities.set(entity.editorId, entity);
+    return entity;
   }
 
-  buildObjects() {
-    for (const item of this.level.objects ?? []) {
-      if (item.visible === false) continue;
-      const entity = createBox(this.objectRoot, item.name || item.id, item.transform.position, item.size, this.materials.platform, item.transform.rotation, {
-        editorKind: 'world-object', editorRecord: item, editorId: item.id
-      });
-      this.entities.set(item.id, entity);
-    }
+  buildWaters() { for (const water of this.level.waters ?? []) this.buildWaterRecord(water); }
+
+  buildObjectRecord(item, kind = 'world-object') {
+    if (item.visible === false) return null;
+    const entity = createBox(this.objectRoot, item.name || item.id, item.transform.position, item.size, this.materials.platform, item.transform.rotation, {
+      editorKind: kind, editorRecord: item, editorId: item.id
+    });
+    this.entities.set(item.id, entity);
+    return entity;
   }
 
-  buildMovingPlatforms() {
-    for (const item of this.level.movingPlatforms ?? []) {
-      if (item.visible === false) continue;
-      const position = movingPlatformPose(item, this.elapsedSeconds);
-      const entity = createBox(this.objectRoot, item.name || item.id, position, item.size, this.materials.moving, item.transform.rotation, {
-        editorKind: 'moving-platform', editorRecord: item, editorId: item.id
-      });
-      this.entities.set(item.id, entity);
-      this.movingEntities.set(item.id, entity);
-      const points = item.path?.points ?? [];
-      for (let index = 0; index < points.length; index += 1) {
-        createSphere(this.pathRoot, `${item.id} waypoint ${index + 1}`, points[index], .22, this.materials.path);
-        if (index) createSegment(this.pathRoot, `${item.id} path ${index}`, points[index - 1], points[index], this.materials.path);
-      }
+  buildObjects() { for (const item of this.level.objects ?? []) this.buildObjectRecord(item); }
+
+  buildMovingPlatformRecord(item, kind = 'moving-platform') {
+    if (item.visible === false) return null;
+    const position = movingPlatformPose(item, this.elapsedSeconds);
+    const entity = createBox(this.objectRoot, item.name || item.id, position, item.size, this.materials.moving, item.transform.rotation, {
+      editorKind: kind, editorRecord: item, editorId: item.id
+    });
+    this.entities.set(item.id, entity);
+    this.movingEntities.set(item.id, entity);
+    const points = item.path?.points ?? [];
+    for (let index = 0; index < points.length; index += 1) {
+      const waypoint = createSphere(this.pathRoot, `${item.id} waypoint ${index + 1}`, points[index], .22, this.materials.path);
+      const waypointId = `__waypoint__:${item.id}:${index}`;
+      waypoint.editorKind = 'waypoint';
+      waypoint.editorRecord = { platformId: item.id, index, point: points[index], workspace: Boolean(this.workspaceDefinition) };
+      waypoint.editorId = waypointId;
+      this.entities.set(waypointId, waypoint);
+      if (index) createSegment(this.pathRoot, `${item.id} path ${index}`, points[index - 1], points[index], this.materials.path);
     }
+    return entity;
   }
+
+  buildMovingPlatforms() { for (const item of this.level.movingPlatforms ?? []) this.buildMovingPlatformRecord(item); }
 
   buildPrefabInstances() {
     const definitions = new Map((this.level.prefabs?.definitions ?? []).map((item) => [item.id, item]));
@@ -368,29 +476,52 @@ export class GenericWorldScene {
   }
 
   buildCollisionDebug() {
+    const addDebugBox = (id, name, center, size, rotation = {}) => {
+      const entity = createBox(this.collisionRoot, name, center, size, this.materials.collision, rotation);
+      entity.editorCollisionTargetId = id;
+      this.collisionEntries.push({ id: String(id), entity });
+      return entity;
+    };
     for (const [index, box] of this.referenceCollisionBoxes.entries()) {
-      createBox(this.collisionRoot, `Reference collider ${index + 1}`, box.center, box.size, this.materials.collision);
+      addDebugBox(this.referenceRecord?.id ?? box.id ?? `__reference-${index}`, `Reference collider ${index + 1}`, box.center, box.size);
     }
-    for (const item of [...(this.level.objects ?? []), ...(this.level.movingPlatforms ?? [])]) {
+    const sourceObjects = this.workspaceDefinition
+      ? [...(this.workspaceDefinition.objects ?? []), ...(this.workspaceDefinition.movingPlatforms ?? [])]
+      : [...(this.level.objects ?? []), ...(this.level.movingPlatforms ?? [])];
+    for (const item of sourceObjects) {
       if (item.collision === false || item.visible === false) continue;
-      const position = item.type === 'moving-platform' ? movingPlatformPose(item, this.elapsedSeconds) : item.transform.position;
-      createBox(this.collisionRoot, `${item.id} collider`, position, item.size, this.materials.collision, item.transform?.rotation ?? {});
+      const moving = item.type === 'moving-platform' || item.path?.points;
+      const position = moving ? movingPlatformPose(item, this.elapsedSeconds) : item.transform.position;
+      addDebugBox(item.id, `${item.id} collider`, position, item.size, item.transform?.rotation ?? {});
     }
-    for (const entry of this.prefabCollisionEntries) {
-      entry.entity.syncHierarchy();
-      const position = entry.entity.getPosition();
-      const scale = entry.entity.getScale();
-      const rotation = entry.entity.getEulerAngles();
-      createBox(
-        this.collisionRoot,
-        `${entry.instance.id}/${entry.record.id} collider`,
-        { x: position.x, y: position.y, z: position.z },
-        { x: Math.abs(scale.x), y: Math.abs(scale.y), z: Math.abs(scale.z) },
-        this.materials.collision,
-        { x: rotation.x, y: rotation.y, z: rotation.z }
-      );
+    if (!this.workspaceDefinition) {
+      for (const entry of this.prefabCollisionEntries) {
+        entry.entity.syncHierarchy();
+        const position = entry.entity.getPosition();
+        const scale = entry.entity.getScale();
+        const rotation = entry.entity.getEulerAngles();
+        addDebugBox(entry.instance.id, `${entry.instance.id}/${entry.record.id} collider`,
+          { x: position.x, y: position.y, z: position.z },
+          { x: Math.abs(scale.x), y: Math.abs(scale.y), z: Math.abs(scale.z) },
+          { x: rotation.x, y: rotation.y, z: rotation.z });
+      }
     }
-    this.collisionRoot.enabled = false;
+    this.applyCollisionMode();
+  }
+
+  applyCollisionMode() {
+    if (!this.collisionRoot) return;
+    const mode = this.collisionMode || 'normal';
+    this.collisionRoot.enabled = mode !== 'normal';
+    const hideVisuals = mode === 'collision-only';
+    this.referenceRoot.enabled = !hideVisuals;
+    this.workspaceRoot.enabled = !hideVisuals;
+    this.waterRoot.enabled = !hideVisuals;
+    this.objectRoot.enabled = !hideVisuals;
+    this.pathRoot.enabled = !hideVisuals;
+    for (const entry of this.collisionEntries) {
+      entry.entity.enabled = mode === 'selected' ? entry.id === String(this.selectedId) : mode !== 'normal';
+    }
   }
 
   update(dt) {
@@ -435,12 +566,12 @@ export class GenericWorldScene {
   surfaceHit(ray) {
     let best = null;
     for (const box of this.referenceCollisionBoxes) {
-      const distance = rayAabbDistance(ray.origin, ray.direction, box.center, {
+      const hit = rayAabbHit(ray.origin, ray.direction, box.center, {
         x: box.size.x / 2, y: box.size.y / 2, z: box.size.z / 2
       });
-      if (distance != null && (!best || distance < best.distance)) {
-        const point = ray.origin.clone().add(ray.direction.clone().mulScalar(distance));
-        best = { distance, x: point.x, y: point.y, z: point.z, kind: box.kind };
+      if (hit && (!best || hit.distance < best.distance)) {
+        const point = ray.origin.clone().add(ray.direction.clone().mulScalar(hit.distance));
+        best = { distance: hit.distance, x: point.x, y: point.y, z: point.z, kind: box.kind, normal: hit.normal, surfaceId: box.id ?? null };
       }
     }
     // A fallback editing plane keeps empty/minimal scenes placeable.
@@ -448,7 +579,7 @@ export class GenericWorldScene {
       const distance = -ray.origin.y / ray.direction.y;
       if (distance >= 0 && (!best || distance < best.distance)) {
         const point = ray.origin.clone().add(ray.direction.clone().mulScalar(distance));
-        best = { distance, x: point.x, y: 0, z: point.z, kind: 'ground-plane' };
+        best = { distance, x: point.x, y: 0, z: point.z, kind: 'ground-plane', normal: { x: 0, y: 1, z: 0 }, surfaceId: '__ground-plane' };
       }
     }
     return best;
@@ -482,6 +613,13 @@ export class GenericWorldScene {
 
   selectedRecord(id) {
     if (id === this.referenceRecord?.id) return this.referenceRecord;
+    if (String(id).startsWith('__waypoint__:')) return this.entities.get(String(id))?.editorRecord ?? null;
+    if (this.workspaceDefinition) {
+      return (this.workspaceDefinition.objects ?? []).find((item) => item.id === id)
+        ?? (this.workspaceDefinition.movingPlatforms ?? []).find((item) => item.id === id)
+        ?? (this.workspaceDefinition.waters ?? []).find((item) => String(item.id || item.identity) === String(id))
+        ?? null;
+    }
     return (this.level.objects ?? []).find((item) => item.id === id)
       ?? (this.level.movingPlatforms ?? []).find((item) => item.id === id)
       ?? (this.level.waters ?? []).find((item) => String(item.id || item.identity) === String(id))
