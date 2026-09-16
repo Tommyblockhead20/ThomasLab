@@ -498,6 +498,17 @@ export class ProgressionSystem {
 
   setAppearance(value) {
     const requested = { ...value };
+    if (requested.outfitColor === undefined && requested.shirtColor !== undefined) {
+      requested.outfitColor = requested.shirtColor;
+    }
+    if (requested.outfitTint === undefined && (requested.shirtTint !== undefined || requested.accessoryTint !== undefined)) {
+      requested.outfitTint = requested.shirtTint ?? requested.accessoryTint;
+    }
+    // Legacy fields are accepted above as migration inputs but never persist beside the
+    // canonical outfit pair.
+    delete requested.shirtColor;
+    delete requested.shirtTint;
+    delete requested.accessoryTint;
     const avatarType = requested.avatarType ?? this.state.appearance?.avatarType ?? 'human';
     for (const key of ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']) {
       if (!(key in requested) || requested[key] === 'none') continue;
@@ -548,16 +559,36 @@ export class ProgressionSystem {
     return validateProgressImport(input);
   }
 
-  importProgress(input) {
-    const result = validateProgressImport(input);
-    if (!this.saveSystem.replaceData(result.save)) {
-      throw new Error('Progress was valid, but this browser could not save it. Your current progress was kept.');
-    }
+  synchronizeActiveSave() {
     this.state = normalizeProgressionState(this.saveSystem.data.progression);
     this.saveSystem.data.progression = this.state;
     this.equipment.repairDefaults();
     this.initializeAquariumIncomeClock();
     this.revision += 1;
+    return this.state;
+  }
+
+  selectSaveSlot(slotId, options = {}) {
+    if (!this.saveSystem.selectSlot(slotId, options)) return false;
+    // SaveSystem changes its active payload immediately, before the browser reload begins.
+    // Replace this live cache at the same time so no frame, income tick, or unload handler can
+    // commit the previous slot's appearance/progression into the newly selected save.
+    this.synchronizeActiveSave();
+    return true;
+  }
+
+  resetSaveSlot(slotId) {
+    if (!this.saveSystem.resetSlot(slotId)) return false;
+    if (slotId === this.saveSystem.activeSlotId) this.synchronizeActiveSave();
+    return true;
+  }
+
+  importProgress(input) {
+    const result = validateProgressImport(input);
+    if (!this.saveSystem.replaceData(result.save)) {
+      throw new Error('Progress was valid, but this browser could not save it. Your current progress was kept.');
+    }
+    this.synchronizeActiveSave();
     return result.summary;
   }
 
@@ -566,6 +597,7 @@ export class ProgressionSystem {
     if (!this.saveSystem.replaceSlotData(slotId, result.save, result.saveMetadata)) {
       throw new Error('Progress was valid, but the destination slot could not be saved.');
     }
+    if (slotId === this.saveSystem.activeSlotId) this.synchronizeActiveSave();
     return result.summary;
   }
 }

@@ -114,6 +114,7 @@ export function createRemoteAvatar(app, playerId, colorIndex = 0, initialAppeara
     root.appearance = character.setAppearance(value);
     updateNameplate();
   };
+  root.getCosmeticDiagnostic = () => character.getCosmeticDiagnostic();
   root.setAppearance(root.appearance);
   root.setPosture = (value) => { root.posture = value === 'seated' ? 'seated' : 'standing'; };
 

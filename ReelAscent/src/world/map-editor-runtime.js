@@ -644,6 +644,82 @@ export function hasAuthoritativeBakedTerrain(patch) {
   return Boolean(validBakedTerrainMesh(patch));
 }
 
+// Build one immutable X/Z acceleration grid from the authored world-space triangles.
+// Procedural dressing is created before the PlayCanvas/Rapier baked entity, so it cannot
+// use a scene raycast here. This query is the shared source of truth for grounding that
+// dressing to the exact same vertex/index data later used by render and collision.
+export function createBakedTerrainGroundQuery(patch, { cellSize = 8 } = {}) {
+  const baked = validBakedTerrainMesh(patch);
+  if (!baked) return null;
+  const positions = baked.positions.map(Number);
+  const indices = baked.indices.map((value) => Math.trunc(Number(value)));
+  const size = Math.max(2, Number(cellSize) || 8);
+  const cells = new Map();
+  const triangles = [];
+  const cellKey = (x, z) => `${x}:${z}`;
+
+  for (let index = 0; index < indices.length; index += 3) {
+    const ai = indices[index] * 3;
+    const bi = indices[index + 1] * 3;
+    const ci = indices[index + 2] * 3;
+    const ax = positions[ai]; const ay = positions[ai + 1]; const az = positions[ai + 2];
+    const bx = positions[bi]; const by = positions[bi + 1]; const bz = positions[bi + 2];
+    const cx = positions[ci]; const cy = positions[ci + 1]; const cz = positions[ci + 2];
+    const abx = bx - ax; const aby = by - ay; const abz = bz - az;
+    const acx = cx - ax; const acy = cy - ay; const acz = cz - az;
+    const nx = aby * acz - abz * acy;
+    const ny = abz * acx - abx * acz;
+    const nz = abx * acy - aby * acx;
+    const length = Math.hypot(nx, ny, nz);
+    const denominator = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    if (!(length > 1e-8) || Math.abs(denominator) < 1e-10) continue;
+    const triangle = {
+      ax, ay, az, bx, by, bz, cx, cy, cz,
+      normal: Object.freeze({ x: nx / length, y: ny / length, z: nz / length }),
+      denominator
+    };
+    const triangleIndex = triangles.push(triangle) - 1;
+    const minimumCellX = Math.floor(Math.min(ax, bx, cx) / size);
+    const maximumCellX = Math.floor(Math.max(ax, bx, cx) / size);
+    const minimumCellZ = Math.floor(Math.min(az, bz, cz) / size);
+    const maximumCellZ = Math.floor(Math.max(az, bz, cz) / size);
+    for (let cellX = minimumCellX; cellX <= maximumCellX; cellX += 1) {
+      for (let cellZ = minimumCellZ; cellZ <= maximumCellZ; cellZ += 1) {
+        const key = cellKey(cellX, cellZ);
+        const bucket = cells.get(key);
+        if (bucket) bucket.push(triangleIndex); else cells.set(key, [triangleIndex]);
+      }
+    }
+  }
+
+  const query = (xValue, zValue, options = {}) => {
+    const x = Number(xValue); const z = Number(zValue);
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    const minimumNormalY = Number.isFinite(options.minimumNormalY) ? options.minimumNormalY : .08;
+    const minimumY = Number.isFinite(options.minimumY) ? options.minimumY : -Infinity;
+    const maximumY = Number.isFinite(options.maximumY) ? options.maximumY : Infinity;
+    let highest = null;
+    for (const triangleIndex of cells.get(cellKey(Math.floor(x / size), Math.floor(z / size))) ?? []) {
+      const triangle = triangles[triangleIndex];
+      // Preserve winding: downward-facing cave ceilings and undersides are not ground.
+      if (triangle.normal.y < minimumNormalY) continue;
+      const u = ((triangle.bz - triangle.cz) * (x - triangle.cx)
+        + (triangle.cx - triangle.bx) * (z - triangle.cz)) / triangle.denominator;
+      const v = ((triangle.cz - triangle.az) * (x - triangle.cx)
+        + (triangle.ax - triangle.cx) * (z - triangle.cz)) / triangle.denominator;
+      const w = 1 - u - v;
+      if (u < -1e-6 || v < -1e-6 || w < -1e-6) continue;
+      const y = u * triangle.ay + v * triangle.by + w * triangle.cy;
+      if (y < minimumY || y > maximumY || (highest && y <= highest.y)) continue;
+      highest = Object.freeze({ x, y, z, normal: triangle.normal, triangleIndex });
+    }
+    return highest;
+  };
+  query.triangleCount = triangles.length;
+  query.cellCount = cells.size;
+  return query;
+}
+
 // The frozen mesh stores world-space positions. Its outermost radial band is the
 // authoritative Stoneveil/beach join, even after later editor exports reshape it.
 // Resample that band onto the runtime shelf's regular angular grid so the first

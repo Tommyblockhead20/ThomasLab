@@ -816,6 +816,29 @@ body.song-feedback-dashboard-open #game-shell::after { position: absolute; z-ind
 .ecology-guide li span { display: grid; gap: .02rem; color: #edf6e9; font-size: .57rem; letter-spacing: 0; text-transform: none; }
 .ecology-guide li small { color: rgb(234 244 231 / 56%); font-size: .44rem; }
 .ecology-guide li strong { font-size: .58rem; }
+.ecology-guide[data-guide-mode="atlas"] {
+  top: 5.5rem;
+  width: min(48rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 6.5rem);
+  overflow: hidden;
+}
+.ecology-guide[data-guide-mode="atlas"] ol {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .22rem;
+}
+.ecology-guide[data-guide-mode="atlas"] li { min-width: 0; padding: .24rem .32rem; }
+.ecology-guide[data-guide-mode="atlas"] li span { min-width: 0; overflow: hidden; font-size: .54rem; text-overflow: ellipsis; white-space: nowrap; }
+.ecology-guide[data-guide-mode="atlas"] li small { font-size: .4rem; }
+.ecology-guide[data-guide-mode="atlas"] li strong { flex: 0 0 auto; font-size: .54rem; }
+
+@media (max-width: 760px) {
+  .ecology-guide[data-guide-mode="atlas"] {
+    top: max(.5rem, env(safe-area-inset-top));
+    max-height: calc(100vh - max(1rem, env(safe-area-inset-top)));
+    overflow: auto;
+  }
+  .ecology-guide[data-guide-mode="atlas"] ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .catch-banner .catch-quality {
   margin-top: .12rem;
@@ -1023,6 +1046,8 @@ body.journal-open #game-shell::after {
 .journal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(13.25rem, 1fr));
+  grid-auto-rows: max-content;
+  align-items: start;
   gap: .55rem;
   align-content: start;
   padding: .1rem .3rem .5rem .1rem;
@@ -1039,6 +1064,8 @@ body.journal-open #game-shell::after {
   display: grid;
   min-width: 0;
   min-height: 9.2rem;
+  height: auto;
+  overflow: visible;
   align-content: start;
   gap: .55rem;
   padding: .7rem;
@@ -1128,11 +1155,15 @@ body.journal-open #game-shell::after {
 .journal-card .journal-first-found { padding-top: .36rem; border-top: 1px solid rgb(255 255 255 / 14%); line-height: 1.35; overflow-wrap: anywhere; }
 
 .journal-species-detail {
+  min-height: max-content;
   margin: .12rem 0 0;
   padding-top: .48rem;
   color: #fff0b0;
   font-size: .59rem;
   line-height: 1.4;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
   border-top: 1px solid rgb(255 255 255 / 14%);
 }
 

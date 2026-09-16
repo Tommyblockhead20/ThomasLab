@@ -4,6 +4,7 @@ const EMOTE_IDS = new Set(['wave', 'point', 'cheer', 'clap', 'sit', 'dance']);
 const APPEARANCE_OPTIONS = Object.freeze({
   avatarType: new Set(['human', 'blob']),
   skinTone: new Set(['porcelain', 'light', 'warm', 'honey', 'golden', 'bronze', 'umber', 'deep']),
+  outfitColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose', 'sky', 'lavender', 'coral', 'spruce', 'snow', 'sunbeam']),
   shirtColor: new Set(['classic-orange', 'alpine', 'ember', 'moss', 'sunset', 'plum', 'cream', 'frost', 'midnight', 'rose', 'sky', 'lavender', 'coral', 'spruce', 'snow', 'sunbeam']),
   pantsColor: new Set(['classic-trail', 'pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand', 'navy', 'slate', 'mulberry', 'olive', 'cloud', 'black']),
   hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'long', 'bun', 'braids', 'bald']),
@@ -17,13 +18,15 @@ const APPEARANCE_OPTIONS = Object.freeze({
   blobColor: new Set(['classic-blue', 'aqua', 'lime', 'sunny', 'orange', 'coral', 'pink', 'violet', 'indigo', 'silver', 'charcoal', 'cream'])
 });
 const DEFAULT_APPEARANCE = Object.freeze({
-  avatarType: 'human', skinTone: 'warm', shirtColor: 'classic-orange', pantsColor: 'classic-trail',
+  avatarType: 'human', skinTone: 'warm', outfitColor: 'classic-orange', pantsColor: 'classic-trail',
   hairStyle: 'tousled', hairColor: 'espresso', accessory: 'beanie', headwear: 'beanie',
   eyewear: 'none', faceAccessory: 'none', backAccessory: 'backpack', backpackColor: 'classic-teal',
-  blobColor: 'classic-blue', shirtTint: null,
-  pantsTint: null, hairTint: null, accessoryTint: null, blobTint: null
+  blobColor: 'classic-blue', outfitTint: null,
+  pantsTint: null, hairTint: null, blobTint: null
 });
-const APPEARANCE_TINTS = new Set(['shirtTint', 'pantsTint', 'hairTint', 'accessoryTint', 'blobTint']);
+const APPEARANCE_TINTS = new Set(['outfitTint', 'pantsTint', 'hairTint', 'blobTint']);
+const COSMETIC_FIELDS = new Set(['headwear', 'eyewear', 'faceAccessory', 'backAccessory']);
+const SAFE_COSMETIC_ID = /^[a-z0-9][a-z0-9_-]{0,99}$/;
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 const finite = (value) => Number.isFinite(Number(value));
 const cleanString = (value, maximum) => typeof value === 'string' ? value.slice(0, maximum) : '';
@@ -53,7 +56,9 @@ export function sanitizeAppearance(value = {}) {
     key,
     APPEARANCE_TINTS.has(key)
       ? (typeof source[key] === 'string' && COLOR_PATTERN.test(source[key]) ? source[key].toLowerCase() : null)
-      : (APPEARANCE_OPTIONS[key].has(source[key]) ? source[key] : fallback)
+      : COSMETIC_FIELDS.has(key)
+        ? (typeof source[key] === 'string' && SAFE_COSMETIC_ID.test(source[key]) ? source[key] : fallback)
+        : (APPEARANCE_OPTIONS[key].has(source[key]) ? source[key] : fallback)
   ]));
   const legacy = APPEARANCE_OPTIONS.accessory.has(source.accessory) ? source.accessory : null;
   const categorized = ['headwear', 'eyewear', 'faceAccessory', 'backAccessory']
@@ -63,6 +68,14 @@ export function sanitizeAppearance(value = {}) {
     appearance.eyewear = APPEARANCE_OPTIONS.eyewear.has(legacy) ? legacy : 'none';
     appearance.faceAccessory = APPEARANCE_OPTIONS.faceAccessory.has(legacy) ? legacy : 'none';
   }
+  appearance.outfitColor = APPEARANCE_OPTIONS.outfitColor.has(source.outfitColor)
+    ? source.outfitColor
+    : APPEARANCE_OPTIONS.shirtColor.has(source.shirtColor) ? source.shirtColor : DEFAULT_APPEARANCE.outfitColor;
+  const rawOutfitTint = Object.prototype.hasOwnProperty.call(source, 'outfitTint')
+    ? source.outfitTint
+    : Object.prototype.hasOwnProperty.call(source, 'shirtTint') ? source.shirtTint : source.accessoryTint;
+  appearance.outfitTint = typeof rawOutfitTint === 'string' && COLOR_PATTERN.test(rawOutfitTint)
+    ? rawOutfitTint.toLowerCase() : null;
   return appearance;
 }
 

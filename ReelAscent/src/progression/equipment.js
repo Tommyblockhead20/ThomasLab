@@ -29,10 +29,10 @@ export const EQUIPMENT_CATALOG = Object.freeze([
 
   item('trail-bobber', 'bobber', 'Trail Bobber', 0, 'Responsive starter float.', {}, { bobberMode: 'standard' }),
   item('selective-drift-bobber', 'bobber', 'Selective Drift Bobber', 1800,
-    'A patient cedar float that ignores nervous taps and settles only for a confident pull.', {},
+    'Retains 6% of Common, 56% of Uncommon, 96% of Rare, and 100% of Legendary bites; waits about 30 seconds (±25%).', {},
     { bobberMode: 'selective' }),
   item('trophy-sentinel-bobber', 'bobber', 'Trophy Sentinel Bobber', 4500,
-    'A brass-eyed deepwater float that waits until a bite seems worth bothering you about.', {},
+    'Retains 0% of Common, 5% of Uncommon, 82% of Rare, and 100% of Legendary bites; waits about 120 seconds (±20%).', {},
     { bobberMode: 'trophy' }),
 
   item('common-field-notes', 'guide', 'Common Field Notes', 225, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),

@@ -622,6 +622,7 @@ export class RhythmSession {
   }
 
   handleInput(lane, inputTime) {
+    if (this.result) return this.result;
     let matching = null;
     let matchingDelta = Infinity;
     let timingTarget = null;
@@ -683,6 +684,7 @@ export class RhythmSession {
   }
 
   completeHold(note, completionTime = this.songTime) {
+    if (this.result) return false;
     if (note.status !== 'holding') return;
     note.status = 'hit';
     this.completedNotes += 1;
@@ -711,6 +713,7 @@ export class RhythmSession {
   }
 
   missNote(note, inputLane = note.lane, mistakeTime = this.songTime, reason = 'timeout') {
+    if (this.result) return false;
     if (note.status === 'missed' || note.status === 'hit') return;
     const wasHolding = note.status === 'holding';
     note.status = 'missed';
@@ -746,6 +749,7 @@ export class RhythmSession {
   }
 
   registerOffBeat(inputLane, mistakeTime = this.songTime, timingTarget = null, signedMs = null) {
+    if (this.result) return false;
     this.offBeatPresses += 1;
     this.streak = 0;
     const escapeContribution = this.applyMistakeLoss(.25, mistakeTime);
@@ -761,8 +765,16 @@ export class RhythmSession {
 
   failCleanPerformanceIfNecessary() {
     if (!this.requiresCleanPerformance || this.lossMeter <= 0) return false;
-    this.result = 'escaped';
+    this.finish('escaped');
     return true;
+  }
+
+  finish(result) {
+    if (!this.result) {
+      this.result = result;
+      this.pendingChordInput = null;
+    }
+    return this.result;
   }
 
   laneLabel(lane) {
@@ -801,21 +813,23 @@ export class RhythmSession {
   }
 
   resolveOutcome() {
+    if (this.result) return this.result;
     const remaining = this.pattern.notes.filter((note) => note.status === 'pending' || note.status === 'holding').length;
     const songJudged = remaining === 0;
     if (this.requiresCleanPerformance && this.lossMeter > 0) {
       // Shinies require a completely clean performance: no missed notes and no off-beat taps.
-      this.result = 'escaped';
+      this.finish('escaped');
     } else if (this.lossMeter >= 1 && this.spacedMistakeCount >= 2) {
-      this.result = 'escaped';
+      this.finish('escaped');
     } else if (this.successfulNotes * this.reelGainMultiplier + remaining < this.pattern.requiredHits && this.spacedMistakeCount >= 2) {
       // Clustered mistakes are given the same anti-burst grace before a line break.
-      this.result = 'escaped';
+      this.finish('escaped');
     } else if (songJudged) {
-      this.result = this.successfulNotes * this.reelGainMultiplier >= this.pattern.requiredHits ? 'caught' : 'escaped';
+      this.finish(this.successfulNotes * this.reelGainMultiplier >= this.pattern.requiredHits ? 'caught' : 'escaped');
     } else if (this.songTime >= this.pattern.duration) {
-      this.result = 'escaped';
+      this.finish('escaped');
     }
+    return this.result;
   }
 
   setJudgment(value, lane = null, correct = false, note = null) {

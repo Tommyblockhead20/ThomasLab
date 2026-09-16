@@ -41,6 +41,9 @@ export class RoomManager {
     if (!room) return { ok: false, code: 'room_not_found', message: 'That room does not exist.' };
     if (room.players.has(session.playerId)) return { ok: false, code: 'already_in_room', message: 'That player is already in this room.' };
     if (!room.hasSpace()) return { ok: false, code: 'room_full', message: 'That room is full.' };
+    if (room.hasDisplayName(session.displayName)) {
+      return { ok: false, code: 'display_name_in_use', message: 'That player name is already in use in this room.' };
+    }
     room.add(session);
     room.broadcastState();
     return { ok: true, room };

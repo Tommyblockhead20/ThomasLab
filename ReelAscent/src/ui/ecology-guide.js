@@ -2,6 +2,8 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[character]);
 
+export const formatGuideOdds = (probability) => `${(Math.max(0, Number(probability) || 0) * 100).toFixed(1)}%`;
+
 export class EcologyGuidePanel {
   constructor(fishing) {
     this.fishing = fishing;
@@ -19,10 +21,12 @@ export class EcologyGuidePanel {
     const signature = JSON.stringify(state);
     if (signature === this.signature) return;
     this.signature = signature;
+    this.root.dataset.guideMode = state.mode ?? 'rarity';
+    this.root.dataset.entryCount = String(state.entries.length);
     this.title.textContent = state.guide;
-    this.zone.textContent = state.zone;
+    this.zone.textContent = `${state.zone} • equipped tackle odds`;
     this.list.innerHTML = state.entries.length ? state.entries.map((entry) => (
-      `<li data-rarity="${entry.rarity.toLowerCase()}"><span>${escapeHtml(entry.name)}${entry.exclusive ? ' ◆' : ''}<small>${entry.rarity}</small></span><strong>${(entry.probability * 100).toFixed(2)}%</strong></li>`
+      `<li data-rarity="${entry.rarity.toLowerCase()}"><span>${escapeHtml(entry.name)}${entry.exclusive ? ' ◆' : ''}<small>${entry.rarity}</small></span><strong>${formatGuideOdds(entry.probability)}</strong></li>`
     )).join('') : '<li><span>No matching creatures</span><strong>—</strong></li>';
   }
 }

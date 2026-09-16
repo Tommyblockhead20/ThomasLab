@@ -17,8 +17,8 @@ import { createFishingRodModel } from './rod-model.js';
 import { createSpecimenModel, destroySpecimenModel, positionSpecimenModel } from './specimen-model.js';
 import { resolveCreaturePresentation } from './creature-presentation.js';
 import {
-  chooseStrongBobberRefusal, deriveBobberAcceptance, samplePotentialBiteDelay,
-  strongestBobberHasEligibleTarget
+  chooseStrongBobberRefusal, deriveAcceptedBobberProfile, deriveBobberAcceptance,
+  getSelectiveBobberSettings, sampleBobberBiteDelay, strongestBobberHasEligibleTarget
 } from './selective-bobbers.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -1958,11 +1958,25 @@ export class FishingController {
     const biteRate = (this.zone.modifiers.biteRate ?? 1)
       * (this.progression?.getModifier('biteRate') ?? 1);
     const biteDelayMultiplier = this.progression?.getModifier('biteDelayMultiplier') ?? 1;
-    this.biteTimer = samplePotentialBiteDelay(this.rng(), {
+    const ecology = getEcologySelection(this.zone, this.cast?.target ?? this.zone.center);
+    const selectionTable = getWeightedSpeciesTable(
+      ecology.fishIds,
+      this.getSelectionModifiers(ecology, true)
+    );
+    const potentialProfile = Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
+      rarity,
+      selectionTable.filter((entry) => entry.fish.rarity === rarity)
+        .reduce((sum, entry) => sum + entry.probability, 0)
+    ]));
+    const bobber = getSelectiveBobberSettings(
+      this.progression?.getEquippedItem?.('bobber')?.bobberMode
+    );
+    this.biteTimer = sampleBobberBiteDelay(bobber, this.rng(), {
       minimum: this.config.biteDelayMinimum,
       maximum: this.config.biteDelayMaximum,
       biteRate,
-      biteDelayMultiplier
+      biteDelayMultiplier,
+      profile: potentialProfile
     });
   }
 
@@ -2018,14 +2032,6 @@ export class FishingController {
     const candidateIds = forcedSpeciesId ? [forcedSpeciesId] : ecology.fishIds;
     const selectionModifiers = this.getSelectionModifiers(ecology, !forcedSpeciesId);
     const selectionTable = getWeightedSpeciesTable(candidateIds, selectionModifiers);
-    this.selectedFish = rollFish(
-      candidateIds,
-      selectionModifiers,
-      this.rng
-    );
-    const selectedEntry = selectionTable.find(
-      (entry) => (entry.fish.canonicalId ?? entry.fish.id) === this.selectedFish?.speciesId
-    );
     const potentialProfile = Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
       rarity,
       selectionTable.filter((entry) => entry.fish.rarity === rarity)
@@ -2033,25 +2039,70 @@ export class FishingController {
     ]));
     const bobberMode = this.progression?.getEquippedItem?.('bobber')?.bobberMode ?? 'standard';
     const bobberAcceptance = deriveBobberAcceptance(potentialProfile, bobberMode);
-    const acceptance = bobberAcceptance[this.selectedFish?.rarity] ?? 0;
-    if (!forcedSpeciesId && this.rng() >= acceptance) {
-      this.selectionDebug = {
-        habitat: ecology.habitat,
-        candidatePoolSize: selectionTable.length,
-        selectedWeight: 0,
-        selectedProbability: 0,
-        filteredRarity: this.selectedFish?.rarity ?? null,
-        bobberMode
-      };
-      this.selectedFish = null;
-      this.schedulePotentialBite();
-      return false;
+    let selectedEntry = null;
+    if (!forcedSpeciesId && bobberMode !== 'standard') {
+      const acceptedTotal = selectionTable.reduce((sum, entry) => (
+        sum + entry.probability * (bobberAcceptance[entry.fish.rarity] ?? 0)
+      ), 0);
+      if (acceptedTotal <= Number.EPSILON) {
+        this.selectionDebug = {
+          habitat: ecology.habitat,
+          candidatePoolSize: selectionTable.length,
+          selectedWeight: 0,
+          selectedProbability: 0,
+          filteredRarity: null,
+          bobberMode
+        };
+        this.selectedFish = null;
+        if (bobberMode === 'trophy') {
+          const message = chooseStrongBobberRefusal(this.rng(), this.lastStrongBobberRefusal);
+          this.lastStrongBobberRefusal = message;
+          this.lastFishingFailure = 'sentinel found no eligible retained bite';
+          this.cast = null;
+          this.charge = 0;
+          this.resultTimer = 1.8;
+          this.bobberRoot.enabled = false;
+          this.lineEntity.enabled = false;
+          this.setState('result', message);
+          this.audio.tone(150, .08, 0, 'muted');
+        } else {
+          this.schedulePotentialBite();
+        }
+        return false;
+      }
+      const acceptedProfile = deriveAcceptedBobberProfile(potentialProfile, bobberMode);
+      let roll = this.rng();
+      for (const entry of selectionTable) {
+        const potentialRarityShare = Math.max(Number.EPSILON, potentialProfile[entry.fish.rarity] ?? 0);
+        const acceptedWeight = acceptedProfile[entry.fish.rarity]
+          * entry.probability / potentialRarityShare;
+        roll -= acceptedWeight;
+        if (roll <= 0) {
+          selectedEntry = entry;
+          break;
+        }
+      }
+      // Floating-point residue may leave a roll infinitesimally above zero. Fall back only
+      // to a genuinely retained entry so Trophy can never leak a Common catch.
+      selectedEntry ??= selectionTable.filter(
+        (entry) => (bobberAcceptance[entry.fish.rarity] ?? 0) > 0
+      ).at(-1) ?? null;
+      this.selectedFish = selectedEntry
+        ? rollFish([selectedEntry.fish.id], selectionModifiers, this.rng)
+        : null;
+    } else {
+      this.selectedFish = rollFish(candidateIds, selectionModifiers, this.rng);
+      selectedEntry = selectionTable.find(
+        (entry) => (entry.fish.canonicalId ?? entry.fish.id) === this.selectedFish?.speciesId
+      );
     }
     this.selectionDebug = {
       habitat: ecology.habitat,
       candidatePoolSize: selectionTable.length,
       selectedWeight: selectedEntry?.selectionWeight ?? 0,
-      selectedProbability: selectedEntry?.probability ?? 0
+      selectedProbability: selectedEntry?.probability ?? 0,
+      bobberMode,
+      bobberAcceptance: bobberAcceptance[this.selectedFish?.rarity] ?? 0
     };
     if (!forcedSpeciesId && this.selectedFish?.speciesId) {
       this.recentHookSpecies.unshift(this.selectedFish.runtimeSpeciesId ?? this.selectedFish.speciesId);
@@ -2218,9 +2269,13 @@ export class FishingController {
     if (Math.sin(this.visualTime * (nearLoss ? 17 : 10)) > (nearLoss ? .82 : .96)) {
       this.triggerRipple(this.bobberPosition);
     }
-    if (result === 'caught') this.landCatch();
+    if (result === 'caught') {
+      this.landCatch();
+      return;
+    }
     if (result === 'escaped') {
       this.loseFish('The fish broke the rhythm and escaped', this.rhythm.getFailureReason());
+      return;
     }
   }
 
@@ -3231,7 +3286,24 @@ export class FishingController {
     const point = this.cast?.landingZone?.id === zone.id ? this.cast.target : zone.center;
     const ecology = getEcologySelection(zone, point);
     const table = getWeightedSpeciesTable(ecology.fishIds, this.getSelectionModifiers(ecology, true, zone));
-    const sorted = [...table].sort((a, b) => b.probability - a.probability);
+    const potentialProfile = Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
+      rarity, table.filter((entry) => entry.fish.rarity === rarity)
+        .reduce((sum, entry) => sum + entry.probability, 0)
+    ]));
+    const bobberMode = this.progression?.getEquippedItem?.('bobber')?.bobberMode ?? 'standard';
+    const bobberAcceptance = deriveBobberAcceptance(potentialProfile, bobberMode);
+    const acceptedTotal = table.reduce((sum, entry) => (
+      sum + entry.probability * (bobberAcceptance[entry.fish.rarity] ?? 0)
+    ), 0);
+    // Guides show the next player-facing bite after all currently equipped chance-changing
+    // gear. Rod/reel timing parts do not invent odds; lure and bobber filters do.
+    const effectiveTable = table.map((entry) => ({
+      ...entry,
+      probability: acceptedTotal > 0
+        ? entry.probability * (bobberAcceptance[entry.fish.rarity] ?? 0) / acceptedTotal
+        : 0
+    }));
+    const sorted = [...effectiveTable].sort((a, b) => b.probability - a.probability);
     let entries;
     if (guide.guideMode === 'rarity') {
       entries = sorted.filter((entry) => entry.fish.rarity === guide.guideRarity).slice(0, 5);
@@ -3245,7 +3317,9 @@ export class FishingController {
     }
     return {
       guide: guide.name,
+      mode: guide.guideMode,
       zone: zone.label,
+      bobberMode,
       entries: entries.map((entry) => ({
         id: entry.fish.id,
         name: entry.fish.name,

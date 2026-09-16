@@ -9,8 +9,8 @@ import {
   HAIR_COLORS,
   HAIR_STYLES,
   HEADWEAR,
+  OUTFIT_COLORS,
   PANTS_COLORS,
-  SHIRT_COLORS,
   SKIN_TONES,
   normalizeAppearance,
   randomizeAppearance,
@@ -26,7 +26,7 @@ const GROUPS = Object.freeze([
   Object.freeze({ key: 'avatarType', label: 'Avatar Type', options: AVATAR_TYPES, section: 'body' }),
   Object.freeze({ key: 'blobColor', label: 'Blob Color', options: BLOB_COLORS, blob: true, swatches: true, section: 'body' }),
   Object.freeze({ key: 'skinTone', label: 'Skin Tone', options: SKIN_TONES, human: true, slider: true, section: 'body' }),
-  Object.freeze({ key: 'shirtColor', label: 'Shirt / Top', options: SHIRT_COLORS, human: true, swatches: true, section: 'body' }),
+  Object.freeze({ key: 'outfitColor', label: 'Outfit Color', options: OUTFIT_COLORS, human: true, swatches: true, section: 'body' }),
   Object.freeze({ key: 'pantsColor', label: 'Pants / Bottom', options: PANTS_COLORS, human: true, swatches: true, section: 'body' }),
   Object.freeze({ key: 'hairStyle', label: 'Hair Style', options: HAIR_STYLES, human: true, section: 'body' }),
   Object.freeze({ key: 'hairColor', label: 'Hair Color', options: HAIR_COLORS, human: true, swatches: true, section: 'body' }),
@@ -42,7 +42,7 @@ const colorCss = (color) => color
   : '';
 
 const TINT_BY_OPTION = Object.freeze({
-  shirtColor: 'shirtTint',
+  outfitColor: 'outfitTint',
   pantsColor: 'pantsTint',
   hairColor: 'hairTint',
   blobColor: 'blobTint'

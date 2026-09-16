@@ -309,6 +309,9 @@ export class MultiplayerClient extends EventTarget {
     if (message.type === MESSAGE_TYPES.ROOM_STATE) {
       const previousSeed = this.room.runSeed;
       this.room.applyRoomState(message.payload, this.createRemoteRepresentation);
+      const authoritativeLocal = (Array.isArray(message.payload.players) ? message.payload.players : [])
+        .find((player) => player?.id === this.playerId);
+      if (authoritativeLocal?.displayName) this.displayName = normalizeDisplayName(authoritativeLocal.displayName);
       if (typeof message.payload.reconnectToken === 'string' && message.payload.reconnectToken) {
         this.reconnectToken = message.payload.reconnectToken;
       }
@@ -364,6 +367,15 @@ export class MultiplayerClient extends EventTarget {
         this.cancelReconnect();
         this.reconnectToken = '';
         this.room.clear();
+      }
+      if (code === 'display_name_in_use' && this.room.roomCode) {
+        const authoritativeLocal = this.room.roster.get(this.playerId);
+        if (authoritativeLocal?.displayName) this.displayName = normalizeDisplayName(authoritativeLocal.displayName);
+        this.error = text;
+        this.dispatchEvent(new CustomEvent('statechange', { detail: this.getState() }));
+        this.dispatchEvent(new CustomEvent('nameerror', { detail: { code, message: text } }));
+        this.dispatchEvent(new CustomEvent('message', { detail: message }));
+        return;
       }
       this.setState('error', text);
     }

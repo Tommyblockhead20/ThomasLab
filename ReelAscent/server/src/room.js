@@ -15,8 +15,15 @@ export class Room {
 
   hasSpace() { return this.players.size < this.capacity; }
 
+  hasDisplayName(displayName, exceptPlayerId = null) {
+    const normalized = String(displayName ?? '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('en-US');
+    if (!normalized) return false;
+    return [...this.players.values()].some((player) => player.playerId !== exceptPlayerId
+      && String(player.displayName ?? '').replace(/\s+/g, ' ').trim().toLocaleLowerCase('en-US') === normalized);
+  }
+
   add(session) {
-    if (this.players.has(session.playerId) || !this.hasSpace()) return false;
+    if (this.players.has(session.playerId) || !this.hasSpace() || this.hasDisplayName(session.displayName)) return false;
     this.players.set(session.playerId, session);
     session.room = this;
     if (!this.hostId) this.hostId = session.playerId;

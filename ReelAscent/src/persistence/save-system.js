@@ -381,6 +381,7 @@ export class SaveSystem {
     this.storage = arguments.length ? storage : getBrowserStorage();
     this.lastLoadError = null;
     this.revision = 0;
+    this.reloadTransitionActive = false;
     this.slotStore = this.loadSlotStore();
     if (!this.storage) this.lastLoadError = 'write-unavailable';
     this.activeSlotId = this.slotStore.activeSlotId;
@@ -443,11 +444,17 @@ export class SaveSystem {
   }
 
   writeSlotStore() {
+    if (this.reloadTransitionActive) return true;
     if (!this.storage) throw new Error('Storage unavailable');
     this.storage.setItem(SAVE_SLOTS_STORAGE_KEY, JSON.stringify(this.slotStore));
+    return true;
   }
 
   save() {
+    // "Play This Save" selects the destination before navigation begins. Once that durable
+    // selection is written, ignore every late frame/unload save from the old running game;
+    // otherwise a cached subsystem can replace the destination payload before reload completes.
+    if (this.reloadTransitionActive) return true;
     try {
       const slot = this.slotStore.slots.find((entry) => entry.id === this.activeSlotId);
       if (!slot) throw new Error('Active slot unavailable');
@@ -711,7 +718,7 @@ export class SaveSystem {
     }
   }
 
-  selectSlot(id) {
+  selectSlot(id, { freezeUntilReload = false } = {}) {
     const slot = this.slotStore.slots.find((entry) => entry.id === id && entry.data);
     if (!slot) return false;
     if (slot.id === this.activeSlotId) return true;
@@ -726,6 +733,7 @@ export class SaveSystem {
     try {
       this.writeSlotStore();
       this.revision += 1;
+      this.reloadTransitionActive = Boolean(freezeUntilReload);
       return true;
     } catch {
       this.activeSlotId = previous;

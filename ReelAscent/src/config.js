@@ -196,8 +196,8 @@ export const FISHING_CONFIG = Object.freeze({
   maximumCastDistance: 10.5,
   castSecondsPerMeter: 0.035,
   minimumCastSeconds: 0.5,
-  // Potential bites average ten seconds. Selective bobbers silently discard weak potential
-  // bites; they do not replace this clock with a rigid 30/120-second sleep.
+  // The standard float varies from 5–15 seconds. Selective/Trophy floats use their own
+  // bounded 30/120-second cadence; existing water/lure timing multipliers still apply once.
   biteDelayMinimum: 5,
   biteDelayMaximum: 15,
   rhythmStartupFallbackSeconds: 0.9,

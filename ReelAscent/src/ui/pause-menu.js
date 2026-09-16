@@ -329,13 +329,13 @@ export class PauseMenu {
     if (action === 'select') {
       if (!globalThis.confirm?.('Load this save slot? The page will reload and leave any current multiplayer room.')) return;
       this.onBeforeSaveSwitch();
-      if (saves.selectSlot(slotId)) globalThis.location?.reload();
+      if (this.progression.selectSaveSlot(slotId, { freezeUntilReload: true })) globalThis.location?.reload();
       return;
     }
     const summary = saves.getSlotSummaries().find((slot) => slot.id === slotId);
     if (!globalThis.confirm?.(`Reset ${summary?.label ?? 'this save slot'}? This permanently replaces only that slot with a new save.`)) return;
     if (summary?.active) this.onBeforeSaveSwitch();
-    const ok = saves.resetSlot(slotId);
+    const ok = this.progression.resetSaveSlot(slotId);
     if (!ok) return;
     if (summary?.active) globalThis.location?.reload(); else this.render();
   }

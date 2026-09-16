@@ -410,6 +410,12 @@ export class Game {
       getCurrentLocationId: () => this.currentLocationId,
       openAquarium: () => this.aquariumMenu.open(),
       getLocalSongVotes: () => this.hud.songVoteStore.exportSummary(),
+      getCosmeticDiagnostic: () => ({
+        local: this.player.characterModel?.getCosmeticDiagnostic?.() ?? null,
+        remotes: Object.fromEntries([...this.multiplayer.room.members].map(([playerId, remote]) => [
+          playerId, remote.representation?.getCosmeticDiagnostic?.() ?? null
+        ]))
+      }),
       getTransientSession: () => describeTransientSession(this)
     });
     this.devUiPreview = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('ui') : null;
@@ -894,6 +900,13 @@ export class Game {
   }
 
   handleMultiplayerMessage(message) {
+    if (message?.type === MESSAGE_TYPES.ERROR) {
+      if (message.payload?.code === 'display_name_in_use' && this.multiplayer.displayName) {
+        this.saveSystem.setPlayerDisplayName(this.multiplayer.displayName);
+      }
+      this.hud.showToast?.(message.payload?.message || 'Multiplayer service error.', 4);
+      return;
+    }
     if (message?.type === MESSAGE_TYPES.ROOM_STATE) {
       this.sendAquariumShowcase(true);
       this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot(), this.getAquariumSocialShowcases());

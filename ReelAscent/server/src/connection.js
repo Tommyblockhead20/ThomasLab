@@ -107,7 +107,10 @@ export class ClientConnection {
         return;
       }
       this.session = restored;
-      restored.displayName = safeDisplayName(payload.displayName) || restored.displayName;
+      const requestedName = safeDisplayName(payload.displayName);
+      if (requestedName && !restored.room?.hasDisplayName(requestedName, restored.playerId)) {
+        restored.displayName = requestedName;
+      }
       restored.room?.broadcastState();
       return;
     }
@@ -145,6 +148,10 @@ export class ClientConnection {
     if (!this.session.room || !this.rateLimit('player_name', 6, 10_000)) return;
     const name = safeDisplayName(payload.displayName);
     if (!name) return;
+    if (this.session.room.hasDisplayName(name, this.session.playerId)) {
+      sendError(this.socket, 'display_name_in_use', 'That player name is already in use in this room.');
+      return;
+    }
     this.session.displayName = name;
     this.session.room.broadcastState();
   }

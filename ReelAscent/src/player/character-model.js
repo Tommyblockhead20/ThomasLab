@@ -462,6 +462,18 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   primitive(blobRig, 'Classic Blue Blob facing marker', 'box', { x: 0, y: .35, z: -.43 }, { x: .16, y: .16, z: .48 }, materials.blobBlue);
 
   let appearance = normalizeAppearance();
+  let cosmeticDiagnostic = Object.freeze({ avatarType: 'human', equippedIds: [], instantiatedIds: [], missingModelIds: [] });
+  const instantiate = (target, id, rig, blob = false, back = false) => {
+    if (id === 'none' || target.has(id)) return;
+    const cosmetic = COSMETIC_BY_ID.get(id);
+    if (!cosmetic) return;
+    try {
+      const created = buildGeneratedCosmetic(rig, cosmetic, materials, blob);
+      target.set(id, back ? [created] : created);
+    } catch (error) {
+      console.warn(`Cosmetic model could not be instantiated: ${id}`, error);
+    }
+  };
   const setAppearance = (value) => {
     appearance = normalizeAppearance(value);
     const resolved = resolveAppearance(appearance);
@@ -480,34 +492,34 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     for (const part of hairTopParts.get(appearance.hairStyle) ?? []) part.enabled = hairVisibility.top;
     const worn = new Set([appearance.headwear, appearance.eyewear, appearance.faceAccessory]);
     if (appearance.avatarType === 'human') {
-      for (const id of worn) if (id !== 'none' && !accessories.has(id)) {
-        const cosmetic = COSMETIC_BY_ID.get(id);
-        if (cosmetic) accessories.set(id, buildGeneratedCosmetic(humanRig, cosmetic, materials));
-      }
-      if (appearance.backAccessory !== 'none' && !backAccessoryRoots.has(appearance.backAccessory)) {
-        const cosmetic = COSMETIC_BY_ID.get(appearance.backAccessory);
-        if (cosmetic) backAccessoryRoots.set(cosmetic.id, [buildGeneratedCosmetic(humanRig, cosmetic, materials)]);
-      }
+      for (const id of worn) instantiate(accessories, id, humanRig);
+      instantiate(backAccessoryRoots, appearance.backAccessory, humanRig, false, true);
     } else {
-      for (const id of worn) if (id !== 'none' && !blobAccessories.has(id)) {
-        const cosmetic = COSMETIC_BY_ID.get(id);
-        if (cosmetic) blobAccessories.set(id, buildGeneratedCosmetic(blobRig, cosmetic, materials, true));
-      }
-      if (appearance.backAccessory !== 'none' && !blobBackAccessoryRoots.has(appearance.backAccessory)) {
-        const cosmetic = COSMETIC_BY_ID.get(appearance.backAccessory);
-        if (cosmetic) blobBackAccessoryRoots.set(cosmetic.id, [buildGeneratedCosmetic(blobRig, cosmetic, materials, true)]);
-      }
+      for (const id of worn) instantiate(blobAccessories, id, blobRig, true);
+      instantiate(blobBackAccessoryRoots, appearance.backAccessory, blobRig, true, true);
     }
     for (const [id, root] of accessories) root.enabled = worn.has(id);
     for (const [id, roots] of backAccessoryRoots) for (const root of roots) root.enabled = id === appearance.backAccessory;
     for (const [id, root] of blobAccessories) root.enabled = worn.has(id);
     for (const [id, roots] of blobBackAccessoryRoots) for (const root of roots) root.enabled = id === appearance.backAccessory;
+    const equippedIds = [...worn, appearance.backAccessory].filter((id) => id !== 'none');
+    const activeAccessories = appearance.avatarType === 'human' ? accessories : blobAccessories;
+    const activeBack = appearance.avatarType === 'human' ? backAccessoryRoots : blobBackAccessoryRoots;
+    const instantiatedIds = equippedIds.filter((id) => activeAccessories.has(id) || activeBack.has(id));
+    cosmeticDiagnostic = Object.freeze({
+      avatarType: appearance.avatarType,
+      equippedIds: Object.freeze([...equippedIds]),
+      instantiatedIds: Object.freeze([...instantiatedIds]),
+      missingModelIds: Object.freeze(equippedIds.filter((id) => !instantiatedIds.includes(id)))
+    });
     return normalizeAppearance(appearance);
   };
 
   return {
     humanRig, blobRig, materials, hairStyles, hairTopParts, accessories, backAccessoryRoots,
     leftLimb, rightLimb, leftHandAnchor: leftLimb.handAnchor, rightHandAnchor: rightLimb.handAnchor,
-    setAppearance, getAppearance: () => normalizeAppearance(appearance)
+    setAppearance,
+    getAppearance: () => normalizeAppearance(appearance),
+    getCosmeticDiagnostic: () => cosmeticDiagnostic
   };
 }

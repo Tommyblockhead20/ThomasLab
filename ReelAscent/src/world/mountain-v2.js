@@ -6,6 +6,7 @@ import {
   applyMapEditorHeight,
   applyMapEditorProfileHeight,
   applyWorldObjectPatch,
+  createBakedTerrainGroundQuery,
   getBakedTerrainBoundarySamples,
   hasAuthoritativeBakedTerrain,
   installMapEditorBridge,
@@ -431,6 +432,22 @@ function outlineRadiusAt(location, angle) {
 export function islandFootprintScale(locationId, angle) {
   const location = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === locationId);
   return outlineRadiusAt(location, angle);
+}
+
+export function triangleSurfaceHeightAt(vertices, triangles, x, z, fallback = null) {
+  let highest = -Infinity;
+  for (const triangle of triangles ?? []) {
+    const [a, b, c] = triangle.map((index) => vertices?.[index]);
+    if (!a || !b || !c) continue;
+    const denominator = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+    if (Math.abs(denominator) < 1e-9) continue;
+    const u = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / denominator;
+    const v = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / denominator;
+    const w = 1 - u - v;
+    if (u < -1e-6 || v < -1e-6 || w < -1e-6) continue;
+    highest = Math.max(highest, u * a[1] + v * b[1] + w * c[1]);
+  }
+  return Number.isFinite(highest) ? highest : fallback;
 }
 
 export function createIslandOutline(location, samples = location?.outline?.length ?? 28) {
@@ -1228,8 +1245,15 @@ export class MountainWorld extends TestWorld {
     this.benchPopulation = 1;
     this.homeTrophies = [];
     this.islandEntities = new Map();
+    this.islandTerrainSurfaces = new Map();
     this.locationLoadGroups = new Map();
     this.activeLocationId = MAIN_WORLD_LOCATION.id;
+    this.authoredTerrainGroundQuery = createBakedTerrainGroundQuery(MAP_EDITOR_PATCH);
+    this.proceduralGroundingAudit = {
+      source: this.authoredTerrainGroundQuery ? 'terrain.bakedMesh' : 'legacy-heightfield',
+      grounded: 0,
+      rejected: 0
+    };
     this.movingSurfaceMotion = new Map();
     this.summitRadius = CROWN_TOP_RADIUS + 1.5;
     this.authoredStoneveilCoreActive = AUTHORED_STONEVEIL_CORE_ACTIVE;
@@ -1590,6 +1614,7 @@ export class MountainWorld extends TestWorld {
       ).setFriction(.94).setRestitution(0)
     );
     this.islandEntities.set(location.id, entity);
+    this.islandTerrainSurfaces.set(location.id, { vertices, triangles });
     const previousTarget = this.buildTarget;
     this.buildTarget = group;
     this.decorateOceanIsland(location);
@@ -1897,35 +1922,49 @@ export class MountainWorld extends TestWorld {
   }
 
   buildAuthoredIslandBench(location, { radial, tangent, towardCenter }) {
-    const groundY = location.elevation + .08;
     const angle = location.angle;
     const yaw = inwardYaw(angle) + (towardCenter ? 0 : 180);
-    const point = (height, radialDelta = 0) => this.point(angle,
-      location.radius + radial + radialDelta, groundY + height, tangent);
+    const horizontalPoint = (radialDelta = 0, tangentDelta = 0) => this.point(angle,
+      location.radius + radial + radialDelta, 0, tangent + tangentDelta);
+    const surface = this.islandTerrainSurfaces.get(location.id);
+    const groundAt = (point) => triangleSurfaceHeightAt(
+      surface?.vertices, surface?.triangles, point.x, point.z, location.elevation + .08
+    );
+    const rad = yaw * Math.PI / 180;
+    const legPoints = [-1, 1].map((side) => {
+      const point = horizontalPoint();
+      point.x += Math.cos(rad) * side * .88;
+      point.z -= Math.sin(rad) * side * .88;
+      return { ...point, groundY: groundAt(point), side };
+    });
+    const seatCenterY = Math.max(...legPoints.map((point) => point.groundY)) + .46;
+    const point = (height, radialDelta = 0, tangentDelta = 0) => ({
+      ...horizontalPoint(radialDelta, tangentDelta), y: seatCenterY + height
+    });
     const name = `${location.displayName} shore rest bench`;
     const mapDebugId = `BENCH-${location.id.toUpperCase()}-SHORE-BENCH`;
-    const seatPart = this.addBox(`${name} seat`, point(.46),
+    const seatPart = this.addBox(`${name} seat`, point(0),
       { x: 2.35, y: .18, z: .74 }, this.materials.woodLight, { y: yaw });
     seatPart.mapDebugId = mapDebugId;
-    const backPart = this.addBox(`${name} back`, point(.93, towardCenter ? .34 : -.34),
+    const backPart = this.addBox(`${name} back`, point(.47, towardCenter ? .34 : -.34),
       { x: 2.35, y: .78, z: .15 }, this.materials.wood, { x: -7, y: yaw });
     backPart.mapDebugId = mapDebugId;
-    for (const side of [-1, 1]) {
-      const leg = point(.22);
-      const rad = yaw * Math.PI / 180;
-      leg.x += Math.cos(rad) * side * .88;
-      leg.z -= Math.sin(rad) * side * .88;
-      const legPart = this.addBox(`${name} ${side < 0 ? 'left' : 'right'} leg`, leg,
-        { x: .18, y: .44, z: .42 }, this.materials.wood, { y: yaw });
+    for (const leg of legPoints) {
+      const topY = seatCenterY - .05;
+      const bottomY = leg.groundY - .04;
+      const legPart = this.addBox(`${name} ${leg.side < 0 ? 'left' : 'right'} leg`,
+        { x: leg.x, y: (topY + bottomY) * .5, z: leg.z },
+        { x: .18, y: topY - bottomY, z: .42 }, this.materials.wood, { y: yaw });
       legPart.mapDebugId = mapDebugId;
     }
-    const surface = point(.55);
+    const seatSurface = point(.09);
+    const exit = horizontalPoint(towardCenter ? .92 : -.92);
     this.homeInteractions.push({
       id: `${location.id}-shore-bench`, action: 'bench', label: 'SIT & FISH',
       seatKind: 'shore fishing bench', fishingLabel: towardCenter ? 'the pond' : 'the ocean',
-      position: surface,
-      seatPosition: { ...surface, y: surface.y + PLAYER_FOOT_OFFSET + .03 },
-      exitPosition: point(PLAYER_FOOT_OFFSET + .08, towardCenter ? .92 : -.92),
+      position: seatSurface,
+      seatPosition: { ...seatSurface, y: seatSurface.y + PLAYER_FOOT_OFFSET + .03 },
+      exitPosition: { ...exit, y: groundAt(exit) + PLAYER_FOOT_OFFSET + .08 },
       facingYaw: yaw, range: 2.4
     });
   }
@@ -2583,6 +2622,8 @@ export class MountainWorld extends TestWorld {
       { x: 2.2, y: .18, z: .72 }, this.materials.woodLight);
     this.addCabinBox('Hearthward pond bench back', { x: 7.8, y: 1.02, z: 4.08 },
       { x: 2.2, y: .82, z: .14 }, this.materials.cabinTrim, { x: 7 });
+    for (const x of [7.02, 8.58]) this.addCabinBox(`Hearthward pond bench leg ${x}`,
+      { x, y: .2, z: 4.55 }, { x: .2, y: .4, z: .42 }, this.materials.cabinTrim);
     for (let index = 0; index < 12; index += 1) {
       const angle = index * Math.PI * 2 / 12;
       const localX = 7.8 + Math.cos(angle) * (4.45 + (index % 2) * .25);
@@ -2680,6 +2721,10 @@ export class MountainWorld extends TestWorld {
       for (const z of [-2.35, 2.35]) {
         this.addAquariumBox(`Glasswater Aquarium visitor bench ${x}:${z}`, { x, y: .52, z },
           { x: 3.8, y: .22, z: .72 }, this.materials.woodLight);
+        for (const offset of [-1.35, 1.35]) this.addAquariumBox(
+          `Glasswater Aquarium visitor bench leg ${x + offset}:${z}`,
+          { x: x + offset, y: .27, z }, { x: .24, y: .32, z: .46 }, this.materials.wood
+        );
       }
       this.addAquariumBox(`Glasswater Aquarium information board ${x}`, { x, y: 1.55, z: 0 },
         { x: 3.1, y: 1.65, z: .16 }, this.materials.deepRock, {}, false);
@@ -3410,7 +3455,31 @@ export class MountainWorld extends TestWorld {
     return terrainHeightAt(angle, radius);
   }
 
+  authoredGroundAtWorldXZ(x, z, options = {}) {
+    if (!this.authoredTerrainGroundQuery) return null;
+    return this.authoredTerrainGroundQuery(x, z, options);
+  }
+
+  proceduralGroundAt(angle, radius, options = {}) {
+    const point = this.point(angle, radius, 0, options.tangentOffset ?? 0);
+    if (!this.authoredTerrainGroundQuery) {
+      return { x: point.x, y: this.terrainY(angle, radius), z: point.z, normal: { x: 0, y: 1, z: 0 } };
+    }
+    const ground = this.authoredGroundAtWorldXZ(point.x, point.z, {
+      minimumNormalY: options.minimumNormalY ?? .52,
+      minimumY: options.allowUnderwater ? -Infinity : OCEAN_SURFACE_Y - .08
+    });
+    if (!ground || (!options.allowProtectedWater && this.isRockInProtectedWaterApproach(angle, radius))) {
+      this.proceduralGroundingAudit.rejected += 1;
+      return null;
+    }
+    this.proceduralGroundingAudit.grounded += 1;
+    return ground;
+  }
+
   visibleTerrainYAtWorldXZ(x, z) {
+    const authored = this.authoredGroundAtWorldXZ(x, z, { minimumNormalY: .08 });
+    if (this.authoredTerrainGroundQuery) return authored?.y ?? Number.NaN;
     if (!this.terrainSurface) return this.terrainYAtWorldXZ(x, z);
     const localX = x - MOUNTAIN_CENTER.x;
     const localZ = z - MOUNTAIN_CENTER.z;
@@ -3500,10 +3569,20 @@ export class MountainWorld extends TestWorld {
   }
 
   ensureRockCoreContact(position, size, quaternion, form, options = {}) {
-    if (options.solid === false || options.ensureCoreContact === false) {
-      return { position: { ...position }, support: { supported: true, contactCount: 0 }, exposure: null };
-    }
     const grounded = { ...position };
+    const externalSupport = ['map-editor', 'satellite-island'].includes(options.supportKind);
+    if (this.authoredTerrainGroundQuery && !externalSupport) {
+      const authoredGround = this.authoredGroundAtWorldXZ(position.x, position.z, { minimumNormalY: .08 });
+      if (!authoredGround || authoredGround.y < OCEAN_SURFACE_Y - .08) {
+        return { position: grounded, support: { supported: false, contactCount: 0, adjustment: 0 }, exposure: null };
+      }
+      // Keep every deterministic X/Z seed and its intended height above the former ground,
+      // but rebase that offset onto the authored mesh before exact hull-support sampling.
+      grounded.y += authoredGround.y - this.terrainYAtWorldXZ(position.x, position.z);
+    }
+    if (options.solid === false || options.ensureCoreContact === false) {
+      return { position: grounded, support: { supported: true, contactCount: 0 }, exposure: null };
+    }
     const rotate = (x, y, z) => {
       const qx = quaternion.x; const qy = quaternion.y; const qz = quaternion.z; const qw = quaternion.w;
       const tx = 2 * (qy * z - qz * y);
@@ -3529,7 +3608,8 @@ export class MountainWorld extends TestWorld {
     const radialProjections = localVertices.map((vertex) => vertex.x * radialUnit.x + vertex.z * radialUnit.z);
     const radialSpan = Math.max(...radialProjections) - Math.min(...radialProjections);
 
-    const usingCrownShell = Boolean(this.crownSideTriangles?.length) && position.y >= MAP_EDITOR_CROWN_BASE_HEIGHT - 3;
+    const usingCrownShell = !this.authoredTerrainGroundQuery
+      && Boolean(this.crownSideTriangles?.length) && position.y >= MAP_EDITOR_CROWN_BASE_HEIGHT - 3;
     const desiredOverlap = usingCrownShell
       ? clamp(radialSpan * .28, .32, 2.6)
       : clamp(Math.min(size.x, size.y, size.z) * .14 + verticalSpan * .015, .2, .82);
@@ -3544,11 +3624,12 @@ export class MountainWorld extends TestWorld {
       const actualShellRadius = this.crownVisibleRadiusAt(angle, worldY);
       return [Math.hypot(worldX - MOUNTAIN_CENTER.x, worldZ - MOUNTAIN_CENTER.z) - actualShellRadius];
     });
-    const terrainClearancesAt = (candidate) => localVertices.map((vertex) => {
+    const terrainClearancesAt = (candidate) => localVertices.flatMap((vertex) => {
       const worldX = candidate.x + vertex.x;
       const worldY = candidate.y + vertex.y;
       const worldZ = candidate.z + vertex.z;
-      return worldY - this.visibleTerrainYAtWorldXZ(worldX, worldZ);
+      const terrainY = this.visibleTerrainYAtWorldXZ(worldX, worldZ);
+      return Number.isFinite(terrainY) ? [worldY - terrainY] : [];
     });
     const exposureFrom = (clearances) => ({
       maximum: Math.max(...clearances),
@@ -3569,7 +3650,11 @@ export class MountainWorld extends TestWorld {
       return { position: grounded, support, exposure: exposureFrom(crownGapsAt(grounded)) };
     }
 
-    let support = supportAdjustment(terrainClearancesAt(grounded), desiredOverlap, 3);
+    const initialClearances = terrainClearancesAt(grounded);
+    if (this.authoredTerrainGroundQuery && initialClearances.length < 3) {
+      return { position: grounded, support: { supported: false, contactCount: initialClearances.length, adjustment: 0 }, exposure: null };
+    }
+    let support = supportAdjustment(initialClearances, desiredOverlap, 3);
     for (let attempt = 0; attempt < 4 && !support.supported; attempt += 1) {
       grounded.y -= Math.max(support.adjustment, desiredOverlap * .22);
       support = supportAdjustment(terrainClearancesAt(grounded), desiredOverlap, 3);
@@ -3586,7 +3671,8 @@ export class MountainWorld extends TestWorld {
     const quaternion = new pc.Quat().setFromEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
     const placement = this.ensureRockCoreContact(position, size, quaternion, form, options);
     const groundedPosition = placement.position;
-    if (options.solid !== false && !placement.support.supported) {
+    if ((options.solid !== false || (this.authoredTerrainGroundQuery
+      && !['map-editor', 'satellite-island'].includes(options.supportKind))) && !placement.support.supported) {
       this.rejectedRocks.push(name);
       return null;
     }
@@ -4515,7 +4601,9 @@ export class MountainWorld extends TestWorld {
       // irregular mountain. Sample the terrain at each vertex's real polar position.
       const sampleRadius = Math.hypot(radius, tangentOffset);
       const sampleAngle = angle + Math.atan2(tangentOffset, radius) * 180 / Math.PI;
-      return this.point(angle, radius, this.terrainY(sampleAngle, sampleRadius) + clearance, tangentOffset);
+      const seed = this.point(angle, radius, 0, tangentOffset);
+      const authoredGround = this.authoredGroundAtWorldXZ(seed.x, seed.z, { minimumNormalY: .02 });
+      return { ...seed, y: (authoredGround?.y ?? this.terrainY(sampleAngle, sampleRadius)) + clearance };
     };
     const waterfallPath = FALLGLASS_WATERFALL_RADII.map((radius) => (
       waterfallPoint(radius, fallglassTangentAt(radius), .4)
@@ -4588,9 +4676,8 @@ export class MountainWorld extends TestWorld {
     const forestAngles = [91, 100, 119, 128, 137];
     forestAngles.forEach((angle, index) => {
       const radius = 169 - (index % 2) * 6;
-      const baseY = this.terrainY(angle, radius);
-      const point = this.point(angle, radius, baseY);
-      this.addMountainTree(point.x, point.z, baseY, .8 + index * .08, `Forest inlet pine ${index + 1}`);
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .62 });
+      if (point) this.addMountainTree(point.x, point.z, point.y, .8 + index * .08, `Forest inlet pine ${index + 1}`);
     });
 
     // Alpine shards mark the transition toward the crown without becoming a decorative rock field.
@@ -4610,7 +4697,8 @@ export class MountainWorld extends TestWorld {
 
   isEnvironmentPlacementOpen(angle, radius, clearance = 2.4) {
     if (this.isRockInProtectedWaterApproach(angle, radius)) return false;
-    const point = this.point(angle, radius, this.terrainY(angle, radius));
+    const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+    if (!point) return false;
     const cabinCenter = this.point(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius, this.homeCabinFloorY);
     if (Math.hypot(point.x - cabinCenter.x, point.z - cabinCenter.z) < 12.5) return false;
     const aquariumCenter = this.point(PUBLIC_AQUARIUM_CONFIG.angle, PUBLIC_AQUARIUM_CONFIG.radius, this.publicAquariumFloorY);
@@ -4623,8 +4711,9 @@ export class MountainWorld extends TestWorld {
   }
 
   addEnvironmentTree(angle, radius, size, name, solidTrunk = false, style = 'conifer') {
-    const baseY = this.terrainY(angle, radius);
-    const point = this.point(angle, radius, baseY);
+    const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .62 });
+    if (!point) return null;
+    const baseY = point.y;
     const trunkHeight = style === 'scrub-tree' ? 1.65 : style === 'broadleaf' ? 2.75 : 3.55;
     const trunkWidth = style === 'scrub-tree' ? .5 : style === 'broadleaf' ? .7 : .58;
     const trunk = this.addCylinder(`${name} climbable trunk`,
@@ -4677,8 +4766,9 @@ export class MountainWorld extends TestWorld {
   }
 
   addEnvironmentBush(angle, radius, size, name, material = this.materials.shrubDark) {
-    const baseY = this.terrainY(angle, radius);
-    const point = this.point(angle, radius, baseY);
+    const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+    if (!point) return null;
+    const baseY = point.y;
     this.createPrimitive(name, 'sphere', { x: point.x, y: baseY + .34 * size, z: point.z },
       { x: .95 * size, y: .62 * size, z: .8 * size }, material,
       { x: 0, y: stableNameHash(name) % 180, z: (stableNameHash(name) % 11) - 5 }, { castShadows: false });
@@ -4727,8 +4817,9 @@ export class MountainWorld extends TestWorld {
       const radius = 150 + ((index * 17) % 34);
       if (!this.isEnvironmentPlacementOpen(angle, radius, .78)) continue;
       const biome = climateThemeAt(angle);
-      const baseY = this.terrainY(angle, radius);
-      const point = this.point(angle, radius, baseY);
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
       if (biome === 'blackstone') {
         this.createPrimitive(`Blackstone pine sapling ${index + 1}`, 'cone',
           { x: point.x, y: baseY + .72, z: point.z }, { x: .48, y: 1.45, z: .48 },
@@ -4765,8 +4856,9 @@ export class MountainWorld extends TestWorld {
       const angle = (8 + index * 8.15 + Math.sin(index * 1.7) * 2.1 + 360) % 360;
       const radius = 164 + ((index * 5) % 17);
       if (!this.isEnvironmentPlacementOpen(angle, radius, .65)) continue;
-      const baseY = this.terrainY(angle, radius);
-      const point = this.point(angle, radius, baseY);
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
       this.createPrimitive(`Coastal grass cluster ${index + 1}`, 'cone',
         { x: point.x, y: baseY + .24, z: point.z },
         { x: .24 + (index % 3) * .06, y: .5 + (index % 4) * .08, z: .18 },
@@ -4777,8 +4869,9 @@ export class MountainWorld extends TestWorld {
       const angle = (64 + index * 17.2) % 360;
       const radius = 166 + ((index * 7) % 13);
       if (!this.isEnvironmentPlacementOpen(angle, radius, .55)) continue;
-      const baseY = this.terrainY(angle, radius);
-      const point = this.point(angle, radius, baseY);
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
       this.createPrimitive(`Coastal flower ${index + 1}`, 'sphere',
         { x: point.x, y: baseY + .2, z: point.z }, { x: .16, y: .2, z: .16 },
         index % 2 ? this.materials.flowers : this.materials.flowerPink, {}, { castShadows: false });
@@ -4790,8 +4883,9 @@ export class MountainWorld extends TestWorld {
       const angle = (11 + index * 17.37 + Math.sin(index * .73) * 4.5 + 360) % 360;
       const radius = 184 + ((index * 13) % 19);
       if (!this.isEnvironmentPlacementOpen(angle, radius, 1.35)) continue;
-      const baseY = this.terrainY(angle, radius);
-      const point = this.point(angle, radius, baseY);
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .56 });
+      if (!point) continue;
+      const baseY = point.y;
       const kind = index % 8;
       if (kind === 0) {
         this.addCylinder(`Foothill driftwood ${index + 1}`, { x: point.x, y: baseY + .16, z: point.z },
@@ -4825,9 +4919,12 @@ export class MountainWorld extends TestWorld {
     ];
     for (const rest of restAccents) {
       for (const side of [-1, 1]) {
-        const point = this.point(rest.angle, rest.radius, rest.targetHeight + .32, side * (rest.width * .56));
+        const point = this.proceduralGroundAt(rest.angle, rest.radius, {
+          tangentOffset: side * (rest.width * .56), minimumNormalY: .5
+        });
+        if (!point) continue;
         this.createPrimitive(`${rest.id} wind-bent landmark shrub ${side < 0 ? 'left' : 'right'}`,
-          'sphere', point, { x: .42, y: .3, z: .5 }, this.materials.dryGrass,
+          'sphere', { x: point.x, y: point.y + .32, z: point.z }, { x: .42, y: .3, z: .5 }, this.materials.dryGrass,
           { x: 0, y: inwardYaw(rest.angle), z: side * 18 }, { castShadows: false });
       }
     }
@@ -6159,8 +6256,11 @@ export class MountainWorld extends TestWorld {
     for (let accent = 0; accent < accentCount; accent += 1) {
       const angle = location.angle + (accent - (accentCount - 1) * .5) * (location.waterType === 'lake' ? 3.8 : 5.2);
       const radius = location.radius + shoreRadius + (accent % 3) * .45;
-      const baseY = this.terrainY(angle, radius);
-      const point = this.point(angle, radius, baseY);
+      const seed = this.point(angle, radius, 0);
+      const authoredGround = this.authoredGroundAtWorldXZ(seed.x, seed.z, { minimumNormalY: .45, minimumY: OCEAN_SURFACE_Y - .08 });
+      if (this.authoredTerrainGroundQuery && !authoredGround) continue;
+      const point = authoredGround ?? { ...seed, y: this.terrainY(angle, radius) };
+      const baseY = point.y;
       if (location.tier === 'upper' || location.theme === 'blackstone') {
         this.createPrimitive(`${location.label} cold shore accent ${accent + 1}`,
           accent % 3 ? 'sphere' : 'cone', { x: point.x, y: baseY + .22, z: point.z },
@@ -6184,8 +6284,11 @@ export class MountainWorld extends TestWorld {
     if (location.waterType === 'lake') {
       const logAngle = location.angle + 5.5;
       const logRadius = location.radius + shoreRadius + .8;
-      const logY = this.terrainY(logAngle, logRadius);
-      const logPoint = this.point(logAngle, logRadius, logY + .22);
+      const seed = this.point(logAngle, logRadius, 0);
+      const ground = this.authoredGroundAtWorldXZ(seed.x, seed.z, { minimumNormalY: .45, minimumY: OCEAN_SURFACE_Y - .08 });
+      if (this.authoredTerrainGroundQuery && !ground) return;
+      const logY = ground?.y ?? this.terrainY(logAngle, logRadius);
+      const logPoint = { x: seed.x, y: logY + .22, z: seed.z };
       this.addCylinder(`${location.label} weathered shoreline log`, logPoint,
         { x: .28, y: 3.2, z: .28 }, this.materials.wood,
         { x: 90, y: inwardYaw(logAngle), z: 7 }, false);
