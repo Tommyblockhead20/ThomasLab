@@ -1,3 +1,5 @@
+export const DEFAULT_FISHING_VERTICAL_TOLERANCE = 6;
+
 export class FishingZone {
   constructor({
     id, label, center, radii, surfaceY, fishIds, modifiers = {}, exclusions = [],
@@ -159,7 +161,7 @@ export class FishingZone {
     };
   }
 
-  canCastFrom(point, maximumCastDistance, verticalTolerance = 3.5) {
+  canCastFrom(point, maximumCastDistance, verticalTolerance = DEFAULT_FISHING_VERTICAL_TOLERANCE) {
     if (this.distanceToWater(point) > maximumCastDistance) return false;
     const target = this.clampToWater(point);
     return Math.abs(point.y - this.resolveSurfaceY(target)) <= verticalTolerance;

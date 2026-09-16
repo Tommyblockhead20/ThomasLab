@@ -128,20 +128,14 @@ export const LEGACY_CATCH_REWARD_BY_SPECIES = Object.freeze({
   plungepool_crab: 'catch-plungepool_crab'
 });
 const legacyCatchCosmetics = Object.freeze([
-  item('catch-starfall_minnow', 'Starfall Minnow Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'scarf'),
+  item('catch-starfall_minnow', 'Starfall Minnow Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'necklace'),
   item('catch-violet_crayfish', 'Violet Crayfish Crest', 'headwear', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'hood'),
   item('catch-whisper_eel', 'Whisper Eel Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'necklace'),
-  item('catch-peaklight_koi', 'Peaklight Koi Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'scarf'),
+  item('catch-peaklight_koi', 'Peaklight Koi Charm', 'faceAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'necklace'),
   item('catch-plungepool_crab', 'Plungepool Crab Mantle', 'backAccessory', { type: 'legacy', hint: 'Previously earned Legendary catch reward' }, 'flag')
 ]);
 
 const SLOT_ROTATION = Object.freeze(['headwear', 'eyewear', 'faceAccessory', 'backAccessory']);
-const VISUALS = Object.freeze({
-  headwear: ['crown', 'wizard', 'hood', 'horn', 'halo', 'bucket', 'crest'],
-  eyewear: ['visor', 'round', 'goggles', 'sun', 'electric', 'hammer'],
-  faceAccessory: ['scarf', 'collar', 'necklace', 'serpent', 'puff', 'whirlpool'],
-  backAccessory: ['cape', 'fin', 'wings', 'shell', 'emblem', 'tentacle', 'flag']
-});
 const SUFFIX = Object.freeze({ headwear: 'Crest', eyewear: 'Lens', faceAccessory: 'Charm', backAccessory: 'Mantle' });
 
 const legendarySpecies = FISH_SPECIES.filter((species) => String(species.rarity).toLowerCase() === 'legendary');
@@ -151,7 +145,11 @@ export const LEGENDARY_COSMETIC_REWARD_BY_SPECIES = Object.freeze(Object.fromEnt
 const legendaryCosmetics = legendarySpecies.map((species, index) => {
   const speciesId = species.canonicalId ?? species.id;
   const slot = LEGENDARY_OVERRIDES[speciesId]?.[1] ?? SLOT_ROTATION[index % SLOT_ROTATION.length];
-  const visual = LEGENDARY_OVERRIDES[speciesId]?.[2] ?? VISUALS[slot][index % VISUALS[slot].length];
+  // Generic reward names describe a Crest/Lens/Charm/Mantle. Match that concept instead
+  // of assigning an unrelated wizard hat, scarf, flag, etc. from a numeric rotation.
+  const visual = LEGENDARY_OVERRIDES[speciesId]?.[2] ?? ({
+    headwear: 'crest', eyewear: 'round', faceAccessory: 'necklace', backAccessory: 'cape'
+  })[slot];
   const label = LEGENDARY_OVERRIDES[speciesId]?.[0] ?? `${species.name} ${SUFFIX[slot]}`;
   return item(`catch-${speciesId}`, label, slot,
     { type: 'catch', speciesId, speciesName: species.name, hint: `Catch: ${species.name}` }, visual);

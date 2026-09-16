@@ -31,12 +31,16 @@ class MemoryStorage {
 }
 
 const customAppearance = Object.freeze({
-  avatarType: 'blob',
+  avatarType: 'human',
   skinTone: 'deep',
   shirtColor: 'plum',
+  hatColor: 'sunbeam',
+  accessoryColor: 'sunbeam',
   pantsColor: 'denim',
   hairStyle: 'mohawk',
   hairColor: 'teal',
+  beardStyle: 'none',
+  mustacheStyle: 'none',
   accessory: 'glasses',
   headwear: 'none',
   eyewear: 'glasses',
@@ -45,6 +49,7 @@ const customAppearance = Object.freeze({
   backpackColor: 'coral',
   blobColor: 'violet',
   shirtTint: '#123456',
+  hatTint: null,
   pantsTint: '#654321',
   hairTint: '#abcdef',
   accessoryTint: '#fedcba',
@@ -132,8 +137,8 @@ test('cabin initializes outside the climb web with solid structure and useful in
   assert.ok(HOME_CABIN_CONFIG.radius > MOUNTAIN_FOOT_RADIUS);
   assert.ok(HOME_CABIN_CONFIG.width >= 8 && HOME_CABIN_CONFIG.depth >= 6);
   assert.ok(HOME_CABIN_CONFIG.interactionDistance < 3);
-  assert.match(mountain, /buildStarts\(\);\s*this\.buildHomeCabin\(\);\s*this\.buildPublicAquarium\(\);\s*this\.buildContinuousClimbWeb\(\)/);
-  assert.match(mountain, /Trail cabin stable floor[\s\S]*Trail cabin back wall[\s\S]*Trail cabin doorway header/);
+  assert.match(mountain, /buildStarts\(\);[\s\S]*this\.buildHomeCabin\(\);[\s\S]*this\.buildPublicAquarium\(\);[\s\S]*this\.buildContinuousClimbWeb\(\)/);
+  assert.match(mountain, /Trail cabin stable floor[\s\S]*Trail cabin back wall[\s\S]*Trail cabin front wall above doorway/);
   assert.match(mountain, /action: 'appearance'[\s\S]*action: 'rest'[\s\S]*action: 'trophies'/);
   assert.match(mountain, /getNearestHomeInteraction/);
   assert.match(html, /id="appearance-menu"/);

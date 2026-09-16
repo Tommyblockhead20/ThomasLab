@@ -3,6 +3,7 @@ import {
   ACCESSORY_COLORS,
   BACK_ACCESSORIES,
   BACKPACK_COLORS,
+  BEARD_STYLES,
   BLOB_COLORS,
   DEFAULT_APPEARANCE,
   EYEWEAR,
@@ -11,6 +12,7 @@ import {
   HAIR_STYLES,
   HAT_COLORS,
   HEADWEAR,
+  MUSTACHE_STYLES,
   PANTS_COLORS,
   SHIRT_COLORS,
   SKIN_TONES,
@@ -25,20 +27,22 @@ const BLOCKING_CLASSES = Object.freeze([
 ]);
 
 const GROUPS = Object.freeze([
+  Object.freeze({ key: 'hairStyle', label: 'Hair Style', options: HAIR_STYLES, human: true, section: 'hair' }),
+  Object.freeze({ key: 'hairColor', label: 'Hair / Facial Hair Color', options: HAIR_COLORS, human: true, swatches: true, section: 'hair' }),
+  Object.freeze({ key: 'beardStyle', label: 'Beard', options: BEARD_STYLES, human: true, section: 'hair' }),
+  Object.freeze({ key: 'mustacheStyle', label: 'Mustache', options: MUSTACHE_STYLES, human: true, section: 'hair' }),
+  Object.freeze({ key: 'headwear', label: 'Hat', options: HEADWEAR, cosmetic: true, section: 'head' }),
+  Object.freeze({ key: 'hatColor', label: 'Hat Color', options: HAT_COLORS, swatches: true, section: 'head', compact: true }),
+  Object.freeze({ key: 'eyewear', label: 'Glasses', options: EYEWEAR, cosmetic: true, section: 'head' }),
+  Object.freeze({ key: 'faceAccessory', label: 'Face / Neck', options: FACE_ACCESSORIES, cosmetic: true, section: 'head' }),
+  Object.freeze({ key: 'accessoryColor', label: 'Accessory Color', options: ACCESSORY_COLORS, swatches: true, section: 'head', compact: true }),
   Object.freeze({ key: 'avatarType', label: 'Avatar Type', options: AVATAR_TYPES, section: 'body' }),
   Object.freeze({ key: 'blobColor', label: 'Blob Color', options: BLOB_COLORS, blob: true, swatches: true, section: 'body' }),
   Object.freeze({ key: 'skinTone', label: 'Skin Tone', options: SKIN_TONES, human: true, slider: true, section: 'body' }),
-  Object.freeze({ key: 'shirtColor', label: 'Shirt Color', options: SHIRT_COLORS, human: true, swatches: true, section: 'body' }),
+  Object.freeze({ key: 'shirtColor', label: 'Shirt Color', options: SHIRT_COLORS, human: true, swatches: true, section: 'body', compact: true }),
   Object.freeze({ key: 'pantsColor', label: 'Pants / Bottom', options: PANTS_COLORS, human: true, swatches: true, section: 'body' }),
-  Object.freeze({ key: 'hairStyle', label: 'Hair Style', options: HAIR_STYLES, human: true, section: 'body' }),
-  Object.freeze({ key: 'hairColor', label: 'Hair Color', options: HAIR_COLORS, human: true, swatches: true, section: 'body' }),
-  Object.freeze({ key: 'hatColor', label: 'Hat Color', options: HAT_COLORS, swatches: true, section: 'accessories' }),
-  Object.freeze({ key: 'accessoryColor', label: 'Accessory Color', options: ACCESSORY_COLORS, swatches: true, section: 'accessories' }),
-  Object.freeze({ key: 'headwear', label: 'Headwear / Hats', options: HEADWEAR, cosmetic: true, section: 'accessories' }),
-  Object.freeze({ key: 'eyewear', label: 'Eyewear', options: EYEWEAR, cosmetic: true, section: 'accessories' }),
-  Object.freeze({ key: 'faceAccessory', label: 'Face / Neck', options: FACE_ACCESSORIES, cosmetic: true, section: 'accessories' }),
-  Object.freeze({ key: 'backAccessory', label: 'Back', options: BACK_ACCESSORIES, cosmetic: true, section: 'accessories' }),
-  Object.freeze({ key: 'backpackColor', label: 'Backpack Color', options: BACKPACK_COLORS, human: true, swatches: true, section: 'accessories' })
+  Object.freeze({ key: 'backAccessory', label: 'Back / Gear', options: BACK_ACCESSORIES, cosmetic: true, section: 'body' }),
+  Object.freeze({ key: 'backpackColor', label: 'Backpack Color', options: BACKPACK_COLORS, human: true, swatches: true, section: 'body', compact: true })
 ]);
 
 const colorCss = (color) => color
@@ -69,7 +73,7 @@ export class AppearanceMenu {
     this.preview = new AppearancePreview(document.querySelector('#appearance-preview-canvas'), this.progression.getAppearance());
     this.preview.setVisible(false);
     this.isOpen = false;
-    this.activeTab = 'body';
+    this.activeTab = 'hair';
     this.previousFocus = null;
     this.renderedRevision = -1;
 
@@ -118,7 +122,7 @@ export class AppearanceMenu {
     this.onClick = (event) => {
       const tab = event.target.closest('[data-appearance-tab]');
       if (tab) {
-        this.activeTab = tab.dataset.appearanceTab === 'accessories' ? 'accessories' : 'body';
+        this.activeTab = ['hair', 'head', 'body'].includes(tab.dataset.appearanceTab) ? tab.dataset.appearanceTab : 'hair';
         this.render(true);
         this.screen.querySelector(`[data-appearance-tab="${this.activeTab}"]`)?.focus({ preventScroll: true });
         return;
@@ -150,6 +154,26 @@ export class AppearanceMenu {
       this.render(true);
     };
     this.onChange = (event) => {
+      const cosmeticSelect = event.target.closest?.('[data-appearance-select]');
+      if (cosmeticSelect) {
+        const key = cosmeticSelect.dataset.appearanceSelect;
+        const value = cosmeticSelect.value;
+        const group = GROUPS.find((entry) => entry.key === key && entry.cosmetic);
+        if (!group?.options.some((entry) => entry.id === value)) return;
+        const current = this.progression.getAppearance();
+        const access = this.progression.getCosmeticAccess(value, current.avatarType);
+        if (!access.unlocked) {
+          cosmeticSelect.value = current[key];
+          if (this.status) this.status.textContent = access.reason;
+          return;
+        }
+        const appearance = this.progression.setAppearance({ [key]: value });
+        this.player.applyAppearance(appearance);
+        this.preview.setAppearance(appearance);
+        if (this.status) this.status.textContent = 'Saved locally • multiplayer appearance updates live.';
+        this.render(true);
+        return;
+      }
       const skinSlider = event.target.closest?.('[data-appearance-skin-slider]');
       if (skinSlider) {
         const entry = SKIN_TONES[Math.max(0, Math.min(SKIN_TONES.length - 1, Number(skinSlider.value) || 0))];
@@ -215,11 +239,31 @@ export class AppearanceMenu {
     const groups = GROUPS.filter((group) => group.section === this.activeTab).map((group) => {
       const fieldset = document.createElement('fieldset');
       fieldset.className = `appearance-group appearance-group-${group.key}`;
+      fieldset.classList.toggle('appearance-group-compact', Boolean(group.compact));
       fieldset.hidden = Boolean((group.human && !human) || (group.blob && human));
       const legend = document.createElement('legend');
       legend.textContent = group.label;
       const options = document.createElement('div');
       options.className = 'appearance-options';
+      if (group.cosmetic) {
+        const select = document.createElement('select');
+        select.className = 'appearance-cosmetic-select';
+        select.dataset.appearanceSelect = group.key;
+        select.setAttribute('aria-label', group.label);
+        for (const entry of group.options) {
+          if (entry.supports && !entry.supports.includes(appearance.avatarType)) continue;
+          const access = this.progression.getCosmeticAccess(entry.id, appearance.avatarType);
+          const option = document.createElement('option');
+          option.value = entry.id;
+          option.selected = appearance[group.key] === entry.id;
+          option.disabled = !access.unlocked;
+          option.textContent = access.unlocked ? entry.label : `${entry.label} — ${access.reason}`;
+          select.appendChild(option);
+        }
+        options.appendChild(select);
+        fieldset.append(legend, options);
+        return fieldset;
+      }
       if (group.slider) {
         const selectedIndex = Math.max(0, group.options.findIndex((entry) => entry.id === appearance[group.key]));
         const slider = document.createElement('input');

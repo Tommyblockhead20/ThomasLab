@@ -11,6 +11,8 @@ const APPEARANCE_OPTIONS = Object.freeze({
   pantsColor: new Set(['classic-trail', 'pine', 'charcoal', 'denim', 'clay', 'sage', 'rust', 'sand', 'navy', 'slate', 'mulberry', 'olive', 'cloud', 'black']),
   hairStyle: new Set(['short', 'tousled', 'ponytail', 'mohawk', 'long', 'bun', 'braids', 'bald']),
   hairColor: new Set(['espresso', 'chestnut', 'gold', 'copper', 'silver', 'teal', 'black', 'violet', 'pink', 'ash', 'white', 'blue', 'green', 'rose-gold', 'auburn']),
+  beardStyle: new Set(['none', 'stubble', 'short', 'full', 'goatee']),
+  mustacheStyle: new Set(['none', 'neat', 'handlebar', 'full']),
   accessory: new Set(['none', 'beanie', 'glasses', 'trail-hat', 'fishing-cap', 'headlamp', 'scarf', 'bandana', 'neck-gaiter', 'necklace', 'flower-crown', 'goggles']),
   headwear: new Set(['none', 'beanie', 'trail-hat', 'fishing-cap', 'headlamp', 'flower-crown']),
   eyewear: new Set(['none', 'glasses', 'goggles', 'round-glasses', 'aviators', 'sport-shades', 'clear-spectacles', 'snow-glasses']),
@@ -21,8 +23,8 @@ const APPEARANCE_OPTIONS = Object.freeze({
 });
 const DEFAULT_APPEARANCE = Object.freeze({
   avatarType: 'human', skinTone: 'warm', shirtColor: 'classic-orange', hatColor: 'sunbeam', accessoryColor: 'sunbeam', pantsColor: 'classic-trail',
-  hairStyle: 'tousled', hairColor: 'espresso', accessory: 'beanie', headwear: 'beanie',
-  eyewear: 'none', faceAccessory: 'none', backAccessory: 'backpack', backpackColor: 'classic-teal',
+  hairStyle: 'tousled', hairColor: 'espresso', beardStyle: 'none', mustacheStyle: 'none',
+  accessory: 'none', headwear: 'none', eyewear: 'none', faceAccessory: 'none', backAccessory: 'none', backpackColor: 'classic-teal',
   blobColor: 'classic-blue', shirtTint: null, hatTint: null, accessoryTint: null,
   pantsTint: null, hairTint: null, blobTint: null
 });

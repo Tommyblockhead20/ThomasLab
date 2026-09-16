@@ -3,9 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { selectEcologyGuideEntries } from '../src/fishing/fishing.js';
 import { SaveSystem } from '../src/persistence/save-system.js';
-import { cosmeticVisualVariant } from '../src/player/character-model.js';
 import { normalizeAppearance } from '../src/player/appearance.js';
-import { COSMETIC_CATALOG } from '../src/progression/cosmetics.js';
 import { guideOddsShade } from '../src/ui/ecology-guide.js';
 
 class MemoryStorage {
@@ -87,18 +85,7 @@ test('appearance channels stay independent and old merged outfit saves migrate s
   assert.equal(older.accessoryTint, '#224466');
 });
 
-test('shared cosmetic recipes receive stable, distinct ID-specific variants', () => {
-  const duplicateGroups = new Map();
-  for (const cosmetic of COSMETIC_CATALOG) {
-    const key = `${cosmetic.slot}:${cosmetic.visual}`;
-    const group = duplicateGroups.get(key) ?? [];
-    group.push(cosmetic);
-    duplicateGroups.set(key, group);
-  }
-  const duplicates = [...duplicateGroups.values()].filter((group) => group.length > 1);
-  assert.ok(duplicates.length > 0);
-  for (const group of duplicates) {
-    const fingerprints = group.map((cosmetic) => cosmeticVisualVariant(cosmetic, COSMETIC_CATALOG).fingerprint);
-    assert.equal(new Set(fingerprints).size, group.length);
-  }
+test('cosmetics do not manufacture arbitrary index-based uniqueness geometry', async () => {
+  const source = await readFile(new URL('../src/player/character-model.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /distinctive side crest|distinctive temple wing|distinctive hanging charm|distinctive back crest/);
 });

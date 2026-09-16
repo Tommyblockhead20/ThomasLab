@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import { COLORS } from '../config.js';
-import { FishingZone } from '../fishing/fishing-zone.js';
+import { DEFAULT_FISHING_VERTICAL_TOLERANCE, FishingZone } from '../fishing/fishing-zone.js';
 import { getClimbMaterial } from '../player/climbing-materials.js';
 
 function color(values, alpha = 1) {
@@ -135,7 +135,7 @@ export class TestWorld {
     for (const zone of this.fishingZones) {
       const distance = zone.distanceToWater(point);
       const target = zone.clampToWater(point);
-      if (Math.abs(point.y - zone.resolveSurfaceY(target)) > 3.5) continue;
+      if (Math.abs(point.y - zone.resolveSurfaceY(target)) > DEFAULT_FISHING_VERTICAL_TOLERANCE) continue;
       if (distance <= nearestDistance) {
         nearest = zone;
         nearestDistance = distance;
@@ -176,13 +176,13 @@ export class TestWorld {
       const maximum = zone.maximumCastDistance;
       const facing = distance > .001 ? (targetX * dx + targetZ * dz) / distance : 1;
       if (distance < minimum || distance > maximum || facing < .42) continue;
-      if (Math.abs(point.y - zone.resolveSurfaceY(target)) > 3.5) continue;
+      if (Math.abs(point.y - zone.resolveSurfaceY(target)) > DEFAULT_FISHING_VERTICAL_TOLERANCE) continue;
       return zone;
     }
     for (let distance = minimumCastDistance; distance <= maximumCastDistance + .001; distance += .55) {
       const target = { x: point.x + dx * distance, y: point.y, z: point.z + dz * distance };
       const zone = this.findFishingZoneAt(target);
-      if (zone && Math.abs(point.y - zone.resolveSurfaceY(target)) <= 3.5) return zone;
+      if (zone && Math.abs(point.y - zone.resolveSurfaceY(target)) <= DEFAULT_FISHING_VERTICAL_TOLERANCE) return zone;
     }
     return null;
   }
@@ -196,6 +196,23 @@ export class TestWorld {
       && zone.containsWaterFootprint(point, .15)
       && point.y >= zone.floorY - .35
       && point.y <= zone.surfaceY + 1.35) ?? null;
+  }
+
+  getWaterSubmersion(point, standingHeight) {
+    const height = Math.max(.2, Number(standingHeight) || 1.88);
+    const capsuleBottom = point.y - height * .5;
+    let deepest = null;
+    for (const zone of this.fishingZones) {
+      // Open ocean keeps its existing fatal boundary behavior. This escape is only for
+      // bounded ponds, tarns, lagoons, cave pools, and similarly authored inland water.
+      if (['ocean', 'cold-ocean', 'bluewater-ocean'].includes(zone.waterType)) continue;
+      if (!zone.containsWaterFootprint(point, .05)) continue;
+      const surfaceY = zone.resolveSurfaceY(point);
+      if (capsuleBottom >= surfaceY || point.y > surfaceY + height) continue;
+      const fraction = Math.max(0, Math.min(1, (surfaceY - capsuleBottom) / height));
+      if (!deepest || fraction > deepest.fraction) deepest = { zone, fraction, surfaceY };
+    }
+    return deepest;
   }
 
   addBoulder(name, position, scale, material = this.materials.rock) {

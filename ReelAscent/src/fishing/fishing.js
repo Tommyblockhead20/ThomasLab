@@ -1633,7 +1633,7 @@ export class FishingController {
     // water rather than where the camera happens to be facing. A small grace margin avoids
     // flicker at the exact boundary, while a fall away from the bank cleanly exits fishing.
     const remainDistance = this.zone.maximumCastDistance ?? maximumCastDistance + 1.25;
-    return this.zone.canCastFrom(this.player.getPosition(), remainDistance, 5.5);
+    return this.zone.canCastFrom(this.player.getPosition(), remainDistance);
   }
 
   enter(zone) {

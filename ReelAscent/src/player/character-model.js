@@ -29,18 +29,6 @@ export function auditCosmeticModelCoverage(catalog = []) {
   });
 }
 
-export function cosmeticVisualVariant(cosmetic, catalog = [...COSMETIC_BY_ID.values()]) {
-  if (!cosmetic) return Object.freeze({ index: 0, count: 0, fingerprint: 'missing' });
-  const peers = catalog.filter((entry) => entry.slot === cosmetic.slot && entry.visual === cosmetic.visual)
-    .sort((a, b) => a.id.localeCompare(b.id));
-  const index = Math.max(0, peers.findIndex((entry) => entry.id === cosmetic.id));
-  return Object.freeze({
-    index,
-    count: peers.length,
-    fingerprint: `${cosmetic.slot}:${cosmetic.visual}:${index}`
-  });
-}
-
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
 // Full primitive scales and joint-local anchors. Each child reaches slightly through its
@@ -373,35 +361,39 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
       add('pack', 'box', { x: 0, y: backY, z: blob ? .5 : .35 }, { x: .58, y: .7, z: .3 }, cosmetic.id === 'backpack' ? materials.pack : materials.accessory, { x: -7 });
     }
   }
-  const variant = cosmeticVisualVariant(cosmetic);
-  if (variant.count > 1) {
-    // Shared visual recipes get a substantial ID-stable silhouette/detail signature. This
-    // keeps separately earned items recognizable without changing their stable save IDs.
-    const side = variant.index % 2 ? 1 : -1;
-    const shape = ['cone', 'box', 'sphere'][variant.index % 3];
-    const tier = Math.floor(variant.index / 2);
-    if (cosmetic.slot === 'headwear') {
-      add(`distinctive side crest ${variant.index + 1}`, shape,
-        { x: side * (.28 + (tier % 3) * .055), y: headY + .25 + (variant.index % 4) * .055, z: .02 },
-        { x: .12 + (variant.index % 3) * .025, y: .3 + (variant.index % 5) * .045, z: .11 },
-        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (18 + (variant.index % 4) * 8) });
-    } else if (cosmetic.slot === 'eyewear') {
-      add(`distinctive temple wing ${variant.index + 1}`, shape,
-        { x: side * (.42 + (tier % 2) * .045), y: (blob ? .85 : .73) + (variant.index % 3) * .045, z: frontZ },
-        { x: .2 + (variant.index % 3) * .04, y: .08 + (variant.index % 2) * .035, z: .055 },
-        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (12 + (variant.index % 5) * 7) });
-    } else if (cosmetic.slot === 'faceAccessory') {
-      add(`distinctive hanging charm ${variant.index + 1}`, shape,
-        { x: side * (.13 + (tier % 2) * .055), y: (blob ? .44 : .45) - .27 - (variant.index % 3) * .055, z: frontZ + .04 },
-        { x: .12 + (variant.index % 2) * .035, y: .24 + (variant.index % 4) * .05, z: .07 },
-        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (10 + (variant.index % 4) * 9) });
-    } else {
-      const backY = blob ? .05 : -.03;
-      add(`distinctive back crest ${variant.index + 1}`, shape,
-        { x: side * (.2 + (tier % 3) * .05), y: backY + .32 + (variant.index % 4) * .07, z: blob ? .66 : .51 },
-        { x: .2 + (variant.index % 3) * .055, y: .42 + (variant.index % 5) * .06, z: .09 },
-        variant.index % 2 ? materials.silver : materials.accessory, { z: side * (14 + (variant.index % 4) * 8) });
-    }
+  // Deliberate, name/theme-authored distinctions for the most obvious shared recipes.
+  // These details describe the earned item; they are not index-derived cones or blocks.
+  const theme = `${cosmetic.id} ${cosmetic.label} ${cosmetic.source?.speciesName ?? ''}`.toLowerCase();
+  if (cosmetic.id === 'cowboy-hat') {
+    add('creased cowboy crown', 'box', { x: 0, y: headY + .28, z: .02 }, { x: .3, y: .08, z: .32 }, materials.dark);
+    add('cowboy hat band', 'cylinder', { x: 0, y: headY + .08, z: .02 }, { x: .45, y: .055, z: .45 }, materials.silver);
+  } else if (cosmetic.id === 'badge-master-outfitter') {
+    for (const x of [-.18, 0, .18]) add(`outfitter cap crown point ${x}`, 'cone', { x, y: headY + .34, z: .02 }, { x: .075, y: .22, z: .075 }, materials.silver);
+  } else if (cosmetic.id === 'casino-card-shark-cap') {
+    for (const [index, yaw] of [-24, 0, 24].entries()) add(`card fan ${index + 1}`, 'box', { x: (index - 1) * .1, y: headY + .32, z: .03 }, { x: .15, y: .24, z: .018 }, index === 1 ? materials.silver : materials.accessory, { z: yaw });
+  } else if (cosmetic.id === 'badge-curator-3') {
+    for (const side of [-1, 1]) add(`curator bubble ${side}`, 'sphere', { x: side * .14, y: blob ? .85 : .73, z: frontZ - .015 }, { x: .2, y: .2, z: .055 }, materials.glass);
+  } else if (/ledger/.test(theme)) {
+    add('ledger plate', 'box', { x: 0, y: cosmetic.slot === 'eyewear' ? (blob ? .98 : .86) : .15, z: cosmetic.slot === 'eyewear' ? frontZ : (blob ? .72 : .56) }, { x: .22, y: .16, z: .035 }, materials.silver);
+  } else if (/shimmer|prismatic/.test(theme) && cosmetic.slot === 'eyewear') {
+    add('prismatic center lens', 'sphere', { x: 0, y: blob ? .85 : .73, z: frontZ - .025 }, { x: .11, y: .19, z: .05 }, materials.silver, { z: 45 });
+  } else if (cosmetic.label.toLowerCase().endsWith(' charm') && cosmetic.slot === 'faceAccessory') {
+    // Catch charms read as small creature medallions instead of scarves chosen by rotation.
+    add('creature charm body', 'sphere', { x: 0, y: (blob ? .44 : .45) - .16, z: frontZ - .015 }, { x: .13, y: .08, z: .04 }, materials.silver);
+    add('creature charm tail', 'cone', { x: -.14, y: (blob ? .44 : .45) - .16, z: frontZ - .01 }, { x: .07, y: .13, z: .025 }, materials.accessory, { z: 90 });
+  } else if (cosmetic.id === 'daypack') {
+    add('compact daypack front pocket', 'box', { x: 0, y: -.12, z: blob ? .69 : .54 }, { x: .4, y: .3, z: .11 }, materials.silver, { x: -7 });
+    add('compact daypack rolled blanket', 'cylinder', { x: 0, y: .39, z: blob ? .62 : .47 }, { x: .11, y: .48, z: .11 }, materials.accessory, { z: 90 });
+  } else if (cosmetic.id === 'badge-field-naturalist-3') {
+    for (const side of [-1, 1]) add(`research sample tube ${side}`, 'cylinder', { x: side * .34, y: -.02, z: blob ? .67 : .52 }, { x: .075, y: .38, z: .075 }, materials.silver);
+    add('research notebook', 'box', { x: 0, y: .18, z: blob ? .7 : .55 }, { x: .28, y: .34, z: .045 }, materials.pack);
+  } else if (cosmetic.id === 'badge-thousand-casts') {
+    add('angler landing net hoop', 'cylinder', { x: .22, y: .15, z: blob ? .7 : .55 }, { x: .28, y: .035, z: .28 }, materials.silver, { x: 90 });
+    add('angler rod tube', 'cylinder', { x: -.3, y: .13, z: blob ? .65 : .5 }, { x: .06, y: .78, z: .06 }, materials.accessory, { z: 8 });
+  } else if (/turtle|nautilus|shell/.test(theme) && cosmetic.slot === 'backAccessory' && visual !== 'shell') {
+    add('themed shell boss', 'sphere', { x: 0, y: (blob ? .05 : -.03), z: blob ? .7 : .55 }, { x: .34, y: .34, z: .08 }, materials.silver);
+  } else if (/marlin|sailfish|shark|ray/.test(theme) && cosmetic.slot === 'headwear' && !['horn', 'sun'].includes(visual)) {
+    add('marine fin crest', 'cone', { x: 0, y: headY + .34, z: .04 }, { x: .11, y: .48, z: .08 }, materials.silver, { x: -12 });
   }
   root.enabled = false;
   return root;
@@ -462,6 +454,30 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     primitive(hairStyles.get('braids'), `Braid ${side} end`, 'sphere', { x: side * .35, y: .33, z: .17 }, { x: .13, y: .17, z: .13 }, materials.hair);
   }
   const hairTopParts = new Map([['ponytail', [ponytailTop]], ['long', [longTop]], ['braids', [braidsTop]]]);
+
+  const beardStyles = new Map();
+  for (const [id, label] of [['none', 'No beard'], ['stubble', 'Stubble'], ['short', 'Short beard'], ['full', 'Full beard'], ['goatee', 'Goatee']]) {
+    beardStyles.set(id, group(humanRig, label));
+  }
+  primitive(beardStyles.get('stubble'), 'Stubble chin', 'sphere', { x: 0, y: .53, z: -.265 }, { x: .3, y: .16, z: .035 }, materials.hair);
+  primitive(beardStyles.get('short'), 'Short beard chin', 'sphere', { x: 0, y: .48, z: -.25 }, { x: .31, y: .27, z: .085 }, materials.hair);
+  for (const side of [-1, 1]) primitive(beardStyles.get('short'), `Short beard jaw ${side}`, 'sphere',
+    { x: side * .22, y: .54, z: -.205 }, { x: .12, y: .25, z: .07 }, materials.hair, { z: side * 16 });
+  primitive(beardStyles.get('full'), 'Full beard chin', 'sphere', { x: 0, y: .43, z: -.22 }, { x: .35, y: .39, z: .13 }, materials.hair);
+  for (const side of [-1, 1]) primitive(beardStyles.get('full'), `Full beard cheek ${side}`, 'sphere',
+    { x: side * .25, y: .57, z: -.19 }, { x: .15, y: .3, z: .09 }, materials.hair, { z: side * 12 });
+  primitive(beardStyles.get('goatee'), 'Goatee', 'sphere', { x: 0, y: .45, z: -.27 }, { x: .13, y: .3, z: .065 }, materials.hair);
+
+  const mustacheStyles = new Map();
+  for (const [id, label] of [['none', 'No mustache'], ['neat', 'Neat mustache'], ['handlebar', 'Handlebar mustache'], ['full', 'Full mustache']]) {
+    mustacheStyles.set(id, group(humanRig, label));
+  }
+  for (const side of [-1, 1]) {
+    primitive(mustacheStyles.get('neat'), `Neat mustache ${side}`, 'sphere', { x: side * .075, y: .585, z: -.305 }, { x: .11, y: .045, z: .035 }, materials.hair, { z: side * 8 });
+    primitive(mustacheStyles.get('handlebar'), `Handlebar mustache center ${side}`, 'sphere', { x: side * .09, y: .585, z: -.305 }, { x: .13, y: .05, z: .038 }, materials.hair, { z: side * 8 });
+    primitive(mustacheStyles.get('handlebar'), `Handlebar mustache curl ${side}`, 'cone', { x: side * .22, y: .61, z: -.285 }, { x: .055, y: .18, z: .045 }, materials.hair, { z: side * -58 });
+    primitive(mustacheStyles.get('full'), `Full mustache ${side}`, 'sphere', { x: side * .1, y: .57, z: -.31 }, { x: .15, y: .085, z: .045 }, materials.hair, { z: side * 10 });
+  }
 
   const accessories = buildEyewear(humanRig, materials);
   const makeAccessory = (id, label) => {
@@ -540,6 +556,8 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     const hairVisibility = hairVisibilityForHeadwear(appearance.hairStyle, appearance.headwear);
     for (const [id, root] of hairStyles) root.enabled = hairVisibility.root && id === appearance.hairStyle;
     for (const part of hairTopParts.get(appearance.hairStyle) ?? []) part.enabled = hairVisibility.top;
+    for (const [id, root] of beardStyles) root.enabled = id === appearance.beardStyle;
+    for (const [id, root] of mustacheStyles) root.enabled = id === appearance.mustacheStyle;
     const worn = new Set([appearance.headwear, appearance.eyewear, appearance.faceAccessory]);
     if (appearance.avatarType === 'human') {
       for (const id of worn) instantiate(accessories, id, humanRig);
@@ -576,7 +594,7 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   };
 
   return {
-    humanRig, blobRig, materials, hairStyles, hairTopParts, accessories, backAccessoryRoots,
+    humanRig, blobRig, materials, hairStyles, hairTopParts, beardStyles, mustacheStyles, accessories, backAccessoryRoots,
     leftLimb, rightLimb, leftHandAnchor: leftLimb.handAnchor, rightHandAnchor: rightLimb.handAnchor,
     setAppearance,
     getAppearance: () => normalizeAppearance(appearance),

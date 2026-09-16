@@ -78,6 +78,21 @@ export const HAIR_STYLES = Object.freeze([
   Object.freeze({ id: 'bald', label: 'Bald' })
 ]);
 
+export const BEARD_STYLES = Object.freeze([
+  Object.freeze({ id: 'none', label: 'None' }),
+  Object.freeze({ id: 'stubble', label: 'Stubble' }),
+  Object.freeze({ id: 'short', label: 'Short Beard' }),
+  Object.freeze({ id: 'full', label: 'Full Beard' }),
+  Object.freeze({ id: 'goatee', label: 'Goatee' })
+]);
+
+export const MUSTACHE_STYLES = Object.freeze([
+  Object.freeze({ id: 'none', label: 'None' }),
+  Object.freeze({ id: 'neat', label: 'Neat' }),
+  Object.freeze({ id: 'handlebar', label: 'Handlebar' }),
+  Object.freeze({ id: 'full', label: 'Full Mustache' })
+]);
+
 export const HAIR_COLORS = Object.freeze([
   Object.freeze({ id: 'espresso', label: 'Espresso', color: [0.1, 0.065, 0.045] }),
   Object.freeze({ id: 'chestnut', label: 'Chestnut', color: [0.29, 0.13, 0.065] }),
@@ -172,6 +187,8 @@ export const DEFAULT_APPEARANCE = Object.freeze({
   pantsColor: 'classic-trail',
   hairStyle: 'tousled',
   hairColor: 'espresso',
+  beardStyle: 'none',
+  mustacheStyle: 'none',
   accessory: 'none',
   headwear: 'none',
   eyewear: 'none',
@@ -197,6 +214,8 @@ const OPTION_SETS = Object.freeze({
   pantsColor: new Set(PANTS_COLORS.map((entry) => entry.id)),
   hairStyle: new Set(HAIR_STYLES.map((entry) => entry.id)),
   hairColor: new Set(HAIR_COLORS.map((entry) => entry.id)),
+  beardStyle: new Set(BEARD_STYLES.map((entry) => entry.id)),
+  mustacheStyle: new Set(MUSTACHE_STYLES.map((entry) => entry.id)),
   accessory: new Set(ACCESSORIES.map((entry) => entry.id)),
   headwear: new Set(HEADWEAR.map((entry) => entry.id)),
   eyewear: new Set(EYEWEAR.map((entry) => entry.id)),
@@ -320,6 +339,8 @@ export function randomizeAppearance(random = Math.random) {
     pantsColor: randomEntry(PANTS_COLORS, random).id,
     hairStyle: randomEntry(HAIR_STYLES, random).id,
     hairColor: randomEntry(HAIR_COLORS, random).id,
+    beardStyle: randomEntry(BEARD_STYLES, random).id,
+    mustacheStyle: randomEntry(MUSTACHE_STYLES, random).id,
     accessory: 'none',
     headwear: randomEntry(HEADWEAR, random).id,
     eyewear: randomEntry(EYEWEAR, random).id,

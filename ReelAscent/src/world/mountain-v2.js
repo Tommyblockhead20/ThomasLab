@@ -654,7 +654,7 @@ const FISHING_LAYOUT = Object.freeze([
 
   // CROWN / SUMMIT — one fixed-aperture cave plus the summit tarn
   Object.freeze({ id: 'crown-vault', label: 'Crown Vault', tier: 'summit', waterType: 'cave-tarn', theme: 'blackstone', cave: true, entranceDepth: 20, angle: 302, radius: 18.5, radii: [4.5, 3.45], depth: 'shallow', basinDepth: 1.7, fish: ['mountain-whitefish', 'cutthroat-trout', 'alpine-char', 'burbot'], size: 1.18, rarityBias: .92, trophyChance: 1.5 }),
-  Object.freeze({ id: 'crooked-peak-tarn', label: 'Stoneveil Tarn', tier: 'summit', waterType: 'summit-pond', theme: 'summit', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], angle: 0, radius: 0, radii: [3.7, 3.1], depth: 'shallow', basinDepth: 0, summit: true, fish: ['rainbow-trout', 'cutthroat-trout', 'alpine-char', 'channel-catfish'], size: 1.18, rarityBias: 1.0, trophyChance: 1.55, maximumSpeciesProbability: .05 }),
+  Object.freeze({ id: 'crooked-peak-tarn', label: 'Stoneveil Tarn', tier: 'summit', waterType: 'summit-pond', theme: 'summit', ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], angle: 0, radius: 0, radii: [3.7, 3.1], fishingRadiiScale: .82, depth: 'shallow', basinDepth: 0, summit: true, fish: ['rainbow-trout', 'cutthroat-trout', 'alpine-char', 'channel-catfish'], size: 1.18, rarityBias: 1.0, trophyChance: 1.55, maximumSpeciesProbability: .05 }),
 
   // WATERFALL — 1 dedicated fishable plunge pool
   Object.freeze({ id: 'fallglass-cascade', label: 'Fallglass Cascade', physicalZone: 'Waterfall', tier: 'waterfall', waterType: 'waterfall-pool', theme: 'fallglass', waterfall: true, uniformProbabilities: true, probabilityGroup: 'fallglass-cascade', angle: 183, radius: 156, radii: [5.7, 3.8], depth: 'shallow', basinDepth: 1.9, fish: ['creek-chub', 'longnose-dace', 'rainbow-trout', 'smallmouth-bass'], size: 1.08, rarityBias: 0.58, trophyChance: 1.18 })
@@ -1567,7 +1567,11 @@ export class MountainWorld extends TestWorld {
         const next = (segment + 1) % segments;
         const localAngle = segment * 360 / segments;
         const openingDelta = angularDistance(localAngle, location.id === 'cave-fishing-island' ? location.angle : -180);
-        if (location.id === 'cave-fishing-island' && ring >= 2 && ring <= 3 && openingDelta < 15) continue;
+        // Basalt Hollow's old omission stopped at the shoreline rings. The remaining top
+        // rings then rebuilt a solid lid across the cave approach, so the visible mouth led
+        // directly into collision. Keep the authored wedge open through the center; the
+        // recessed apron, floor, walls, and tapered rear shell below provide its geometry.
+        if (location.id === 'cave-fishing-island' && ring >= 2 && openingDelta < 15) continue;
         const outer = ring * segments + segment;
         const inner = (ring + 1) * segments + segment;
         const outerNext = ring * segments + next;
@@ -1586,6 +1590,9 @@ export class MountainWorld extends TestWorld {
     const finalRingStart = (ringFactors.length - 1) * segments;
     for (let segment = 0; segment < segments; segment += 1) {
       const next = (segment + 1) % segments;
+      const localAngle = segment * 360 / segments;
+      if (location.id === 'cave-fishing-island'
+        && angularDistance(localAngle, location.angle) < 15) continue;
       triangles.push([finalRingStart + segment, centerIndex, finalRingStart + next]);
     }
     const geometry = new pc.Geometry();
@@ -1773,6 +1780,8 @@ export class MountainWorld extends TestWorld {
     } else if (location.id === 'cave-fishing-island') {
       for (let index = 0; index < 11; index += 1) {
         const theta = (index * 31 + 40) * Math.PI / 180;
+        const decorationAngle = ((index * 31 + 40) % 360 + 360) % 360;
+        if (angularDistance(decorationAngle, location.angle) < 27) continue;
         this.addMountainBoulder(`Cave island natural rock ${index + 1}`,
           { x: x + Math.cos(theta) * (8 + index % 4 * 2), y: y + .55, z: z + Math.sin(theta) * (6 + index % 3 * 1.7) },
           { x: 1.5 + index % 3 * .5, y: 1.1 + index % 4 * .55, z: 1.6 }, this.materials.islandRock,
@@ -1913,7 +1922,8 @@ export class MountainWorld extends TestWorld {
     }
     const islandBench = {
       'shop-island': { radial: 7.6, tangent: 8.8, towardCenter: false },
-      'aquarium-island': { radial: 50, tangent: 35, towardCenter: false },
+      // Near the ocean-facing landscaped edge, clear of the 104 m Aquarium footprint.
+      'aquarium-island': { radial: 56, tangent: 24, towardCenter: false },
       'cave-fishing-island': { radial: 6.2, tangent: 8.3, towardCenter: false },
       'normal-fishing-island': { radial: -9.4, tangent: -1.4, towardCenter: false },
       'cold-island': { radial: 8.6, tangent: 1.8, towardCenter: true }
@@ -5155,6 +5165,7 @@ export class MountainWorld extends TestWorld {
         // every route rock visibly intersects the crown shell instead of hovering on it.
         const shellRadius = this.crownRadiusAtHeight(centerY);
         const radius = shellRadius + depth * .28;
+        if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
         this.addRadialRock(`${route.label} crown rock ${stage + 1}`, angle, radius, centerY,
           { x: Math.max(1.28, width), y: height, z: Math.max(1.25, depth) },
           this.materialForClimb(materialType), {
@@ -5171,6 +5182,7 @@ export class MountainWorld extends TestWorld {
           const branchSide = (routeIndex + stage) % 2 ? 1 : -1;
           for (let branchStep = 0; branchStep < 2; branchStep += 1) {
             const branchAngle = angle + branchSide * (.45 + branchStep * .35);
+            if (this.isRockInProtectedWaterApproach(branchAngle, radius - .08)) continue;
             const branchType = chooseClimbMaterial(3, branchAngle, stage,
               routeIndex + 73 + branchStep, extraDifficulty + .04);
             this.addRadialRock(`${route.label} crown traverse ${stage + 1}-${branchStep + 1}`,
@@ -5252,6 +5264,7 @@ export class MountainWorld extends TestWorld {
         const difficulty = climbDifficultyAt(angle, 2);
         const radialJitter = Math.sin((index + 3) * 2.19 + beltIndex * .8) * 1.15;
         const radius = belt.radius + radialJitter;
+        if (this.isRockInProtectedWaterApproach(angle, radius)) continue;
         const ground = this.terrainY(angle, radius);
         const tall = (index + beltIndex) % 6 === 2;
         const type = chooseClimbMaterial(2, angle, index, 420 + beltIndex, .05 + beltIndex * .018);
@@ -5291,6 +5304,7 @@ export class MountainWorld extends TestWorld {
         const type = chooseClimbMaterial(3, angle, index, 610 + beltIndex, .1 + belt.t * .08);
         const tall = (index + beltIndex * 2) % 7 === 3;
         const depth = tall ? 1.45 : 1.7;
+        if (this.isRockInProtectedWaterApproach(angle, shellRadius + depth * .22)) continue;
         const height = tall ? 4.6 + difficulty * 1.5 : 2.0 + (index % 3) * .4;
         const forms = tall ? ['needle', 'crooked', 'shard', 'hook']
           : ['blade', 'wedge', 'lean', 'spire', 'shelfblade', 'knuckle'];
@@ -6160,6 +6174,8 @@ export class MountainWorld extends TestWorld {
       ?? 1;
     const visibleWaterScale = location.summit ? 1 : .96;
     const visibleRadii = { x: location.radii[0] * visibleWaterScale, z: location.radii[1] * visibleWaterScale };
+    const fishingRadiiScale = Number.isFinite(location.fishingRadiiScale) ? location.fishingRadiiScale : 1;
+    const fishingRadii = { x: visibleRadii.x * fishingRadiiScale, z: visibleRadii.z * fishingRadiiScale };
     const waterfallPath = location.waterfall ? FALLGLASS_WATERFALL_RADII.map((radius) => {
       const angle = fallglassAngleAt(radius);
       return this.point(angle, radius,
@@ -6170,11 +6186,12 @@ export class MountainWorld extends TestWorld {
       id: location.id,
       label: location.label,
       center: { x: center.x, z: center.z },
-      radii: visibleRadii,
+      radii: fishingRadii,
       shape: location.waterfall ? 'path' : 'ellipse',
       pathPoints: waterfallPath,
       pathWidth: location.waterfall ? 1.35 : 0,
       surfaceY: location.y,
+      floorY: location.y - Math.max(.35, location.basinDepth ?? 1),
       fishIds: location.fish,
       depth: location.depth,
       modifiers: {

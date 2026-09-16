@@ -33,6 +33,15 @@ function setMaterialColor(material, values) {
   material.update();
 }
 
+export function underwaterEscapeJumpMultiplier(submergedFraction) {
+  const fraction = Math.max(0, Math.min(1, Number(submergedFraction) || 0));
+  if (fraction <= .5) return 1;
+  const t = Math.min(1, (fraction - .5) / .22);
+  const eased = t * t * (3 - 2 * t);
+  // sqrt(2) launch velocity produces approximately twice the ordinary jump height.
+  return 1 + (Math.SQRT2 - 1) * eased;
+}
+
 function shirtAccent(values) {
   return values.map((value) => clamp(value * .72 + .08, 0, 1));
 }
@@ -1253,6 +1262,11 @@ export class Player {
     this.input.consumeDebugFish();
     this.input.discardPrimaryEdges();
 
+    const waterSubmersion = this.surfaceRegistry.getWaterSubmersion?.(
+      this.body.translation(), PLAYER_STANDING_HEIGHT
+    ) ?? null;
+    const underwaterJumpMultiplier = underwaterEscapeJumpMultiplier(waterSubmersion?.fraction);
+    const canUnderwaterEscape = underwaterJumpMultiplier > 1.001;
     const swimmingZone = this.surfaceRegistry.getSwimmingZone?.(this.body.translation()) ?? null;
     if (swimmingZone) {
       // Rooftop pools use a real bounded water volume. Horizontal input swims in camera
@@ -1603,12 +1617,15 @@ export class Player {
       );
     }
 
-    if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0 && !onTooSteepSurface && !slidingDownSlope
-        && this.stamina.value >= PLAYER_CONFIG.jumpStaminaCost * this.normalStaminaCostMultiplier('jumpCostMultiplier')) {
-      this.stamina.spend(PLAYER_CONFIG.jumpStaminaCost * this.normalStaminaCostMultiplier('jumpCostMultiplier'));
+    const jumpCost = PLAYER_CONFIG.jumpStaminaCost * this.normalStaminaCostMultiplier('jumpCostMultiplier');
+    if (this.jumpBufferTimer > 0 && (this.coyoteTimer > 0 || canUnderwaterEscape)
+        && (!onTooSteepSurface || canUnderwaterEscape) && (!slidingDownSlope || canUnderwaterEscape)
+        && (canUnderwaterEscape || this.stamina.value >= jumpCost)) {
+      if (this.stamina.value > 0) this.stamina.spend(Math.min(this.stamina.value, jumpCost));
       this.verticalVelocity = PLAYER_CONFIG.jumpSpeed
         * (this.input.mobileMode ? MOBILE_CLIMBING_ASSIST.jumpVelocityMultiplier : 1)
-        * (this.progression?.getModifier('jumpImpulseMultiplier') ?? 1);
+        * (this.progression?.getModifier('jumpImpulseMultiplier') ?? 1)
+        * underwaterJumpMultiplier;
       this.jumpBufferTimer = 0;
       this.coyoteTimer = 0;
       this.grounded = false;

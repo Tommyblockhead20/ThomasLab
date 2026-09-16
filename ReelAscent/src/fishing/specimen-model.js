@@ -216,33 +216,69 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
           { x: .17, y: .08, z: .12 }, base);
       }
     }
-  } else if (['cetacean', 'pinniped', 'sirenian', 'otter', 'beaver', 'rodent', 'platypus', 'mammal'].includes(archetype)) {
-    primitive(root, `${name} mammal body`, 'sphere', { x: -.05, y: 0, z: 0 },
-      { x: .66, y: .27, z: .28 }, base);
-    primitive(root, `${name} mammal head`, 'sphere', { x: .57, y: .07, z: 0 },
-      { x: .28, y: .24, z: .23 }, accent);
-    tail = primitive(root, `${name} mammal tail`, archetype === 'beaver' ? 'box' : 'cone',
-      { x: -.7, y: 0, z: 0 }, { x: .3, y: archetype === 'beaver' ? .12 : .3, z: .08 }, accent,
-      { z: 90 });
-    for (const side of [-1, 1]) primitive(root, `${name} flipper ${side}`, 'sphere',
-      { x: .05, y: -.18, z: side * .27 }, { x: .26, y: .06, z: .12 }, accent, { y: side * 26 });
+  } else if (archetype === 'cetacean') {
+    primitive(root, `${name} cetacean streamlined body`, 'sphere', { x: -.08, y: 0, z: 0 }, { x: .82, y: .3, z: .31 }, base);
+    primitive(root, `${name} cetacean melon`, 'sphere', { x: .61, y: .06, z: 0 }, { x: .34, y: .28, z: .29 }, base);
+    if (!/whale|orca|leviathan/i.test(species.name)) primitive(root, `${name} dolphin beak`, 'sphere', { x: .88, y: -.01, z: 0 }, { x: .23, y: .1, z: .13 }, accent);
+    primitive(root, `${name} dorsal fin`, 'cone', { x: -.13, y: .29, z: 0 }, { x: .17, y: .38, z: .07 }, accent);
+    for (const side of [-1, 1]) {
+      primitive(root, `${name} pectoral flipper ${side}`, 'cone', { x: .18, y: -.15, z: side * .24 }, { x: .16, y: .38, z: .07 }, accent, { x: side * 18, y: side * 65 });
+      tail = primitive(root, `${name} horizontal tail fluke ${side}`, 'cone', { x: -.88, y: side * .18, z: 0 }, { x: .18, y: .36, z: .07 }, accent, { x: 90, z: side * 28 });
+    }
+  } else if (archetype === 'pinniped') {
+    primitive(root, `${name} pinniped tapered body`, 'sphere', { x: -.14, y: 0, z: 0 }, { x: .78, y: .36, z: .38 }, base);
+    primitive(root, `${name} pinniped neck`, 'sphere', { x: .38, y: .1, z: 0 }, { x: .36, y: .32, z: .32 }, base);
+    primitive(root, `${name} pinniped head`, 'sphere', { x: .64, y: .18, z: 0 }, { x: .29, y: .27, z: .27 }, accent);
+    primitive(root, `${name} pinniped muzzle`, 'sphere', { x: .84, y: .11, z: 0 }, { x: .17, y: .11, z: .18 }, accent);
+    if (/walrus/i.test(species.name)) for (const side of [-1, 1]) primitive(root, `${name} walrus tusk ${side}`, 'cone', { x: .91, y: -.02, z: side * .09 }, { x: .045, y: .28, z: .045 }, dark, { z: 180 });
+    for (const side of [-1, 1]) {
+      primitive(root, `${name} fore flipper ${side}`, 'sphere', { x: .18, y: -.2, z: side * .31 }, { x: .31, y: .07, z: .14 }, accent, { y: side * 28 });
+      tail = primitive(root, `${name} hind flipper ${side}`, 'cone', { x: -.83, y: -.02, z: side * .12 }, { x: .26, y: .35, z: .07 }, accent, { z: 90, y: side * 18 });
+    }
+  } else if (archetype === 'sirenian' && !/mermaid/i.test(species.name)) {
+    primitive(root, `${name} sirenian barrel body`, 'sphere', { x: -.12, y: 0, z: 0 }, { x: .82, y: .4, z: .42 }, base);
+    primitive(root, `${name} sirenian blunt head`, 'sphere', { x: .57, y: .08, z: 0 }, { x: .36, y: .32, z: .33 }, accent);
+    primitive(root, `${name} sirenian muzzle`, 'sphere', { x: .81, y: -.01, z: 0 }, { x: .2, y: .14, z: .2 }, accent);
+    for (const side of [-1, 1]) primitive(root, `${name} paddle flipper ${side}`, 'sphere', { x: .16, y: -.23, z: side * .32 }, { x: .28, y: .07, z: .13 }, accent, { y: side * 24 });
+    tail = primitive(root, `${name} rounded tail paddle`, 'sphere', { x: -.86, y: 0, z: 0 }, { x: .28, y: .12, z: .46 }, accent);
+  } else if (archetype === 'sirenian') {
+    primitive(root, `${name} merfolk torso`, 'sphere', { x: .3, y: .15, z: 0 }, { x: .3, y: .52, z: .28 }, base);
+    primitive(root, `${name} merfolk head`, 'sphere', { x: .42, y: .58, z: 0 }, { x: .25, y: .25, z: .24 }, accent);
+    primitive(root, `${name} merfolk tail`, 'sphere', { x: -.25, y: -.08, z: 0 }, { x: .7, y: .22, z: .24 }, base, { z: -12 });
+    for (const side of [-1, 1]) tail = primitive(root, `${name} merfolk fluke ${side}`, 'cone', { x: -.82, y: -.18 + side * .13, z: 0 }, { x: .16, y: .34, z: .07 }, accent, { x: 90, z: side * 25 });
+  } else if (['otter', 'beaver', 'rodent', 'platypus', 'mammal'].includes(archetype)) {
+    const aquaticTail = ['beaver', 'platypus'].includes(archetype);
+    primitive(root, `${name} quadruped body`, 'sphere', { x: -.12, y: .04, z: 0 }, { x: .68, y: .34, z: .34 }, base);
+    primitive(root, `${name} quadruped shoulders`, 'sphere', { x: .28, y: .08, z: 0 }, { x: .39, y: .34, z: .34 }, base);
+    primitive(root, `${name} quadruped head`, 'sphere', { x: .58, y: .22, z: 0 }, { x: .29, y: .28, z: .28 }, accent);
+    primitive(root, `${name} muzzle`, archetype === 'platypus' ? 'box' : 'sphere', { x: .82, y: .14, z: 0 }, { x: archetype === 'platypus' ? .28 : .17, y: .11, z: archetype === 'platypus' ? .25 : .17 }, accent);
+    for (const side of [-1, 1]) for (const [label, x] of [['fore', .26], ['hind', -.38]]) primitive(root, `${name} ${label} leg ${side}`, 'cylinder', { x, y: -.25, z: side * .23 }, { x: .09, y: .29, z: .09 }, base);
+    tail = primitive(root, `${name} ${aquaticTail ? 'flat paddle' : 'tapered'} tail`, aquaticTail ? 'box' : 'cone', { x: -.77, y: .03, z: 0 }, { x: .36, y: aquaticTail ? .11 : .25, z: aquaticTail ? .22 : .07 }, accent, { z: 90 });
   } else if (archetype === 'wisp') {
     primitive(root, `${name} wisp core`, 'sphere', { x: .08, y: 0, z: 0 },
       { x: .38, y: .38, z: .38 }, base);
     for (let index = 0; index < 4; index += 1) tail = primitive(root, `${name} wisp trail ${index + 1}`,
       'sphere', { x: -.2 - index * .16, y: Math.sin(index * 1.7) * .11, z: 0 },
       { x: .2 - index * .025, y: .14, z: .14 }, index % 2 ? accent : base);
-  } else if (['octopus', 'squid', 'cuttlefish', 'jellyfish', 'anemone', 'lusca', 'softbody'].includes(archetype)) {
-    primitive(root, `${name} mantle`, 'sphere', { x: .18, y: .08, z: 0 },
-      { x: archetype === 'squid' ? .58 : .42, y: archetype === 'jellyfish' ? .28 : .48, z: .38 }, base);
-    if (archetype === 'jellyfish') primitive(root, `${name} jelly rim`, 'cylinder',
-      { x: .18, y: -.02, z: 0 }, { x: .72, y: .08, z: .72 }, accent);
-    for (let index = 0; index < (archetype === 'squid' ? 8 : 6); index += 1) {
-      tail = primitive(root, `${name} tentacle ${index + 1}`, 'cylinder',
-        { x: -.2 - index * .035, y: -.22 + (index % 2) * .08, z: (index - 2.5) * .1 },
-        { x: .045, y: .42 + (index % 3) * .07, z: .045 }, index % 2 ? accent : base,
-        { z: 68 + index * 5 });
+  } else if (['octopus', 'lusca'].includes(archetype)) {
+    primitive(root, `${name} rounded octopus mantle`, 'sphere', { x: .22, y: .12, z: 0 }, { x: .42, y: .48, z: .4 }, base);
+    for (let index = 0; index < 8; index += 1) {
+      const phase = index / 8 * Math.PI * 2;
+      tail = primitive(root, `${name} attached octopus arm ${index + 1}`, 'capsule',
+        { x: -.08 + Math.cos(phase) * .18, y: -.24, z: Math.sin(phase) * .22 },
+        { x: .055, y: .48 + (index % 3) * .06, z: .055 }, index % 2 ? accent : base,
+        { x: Math.sin(phase) * 25, z: 72 + Math.cos(phase) * 18 });
     }
+  } else if (['squid', 'cuttlefish'].includes(archetype)) {
+    primitive(root, `${name} tapered cephalopod mantle`, archetype === 'squid' ? 'cone' : 'sphere', { x: .18, y: .12, z: 0 }, { x: .66, y: .4, z: .34 }, base, { z: archetype === 'squid' ? -90 : 0 });
+    for (const side of [-1, 1]) primitive(root, `${name} mantle fin ${side}`, 'sphere', { x: -.05, y: .12, z: side * .29 }, { x: .32, y: .08, z: .18 }, accent);
+    for (let index = 0; index < 8; index += 1) tail = primitive(root, `${name} attached arm ${index + 1}`, 'capsule',
+      { x: -.25, y: -.13 + (index % 2) * .06, z: (index - 3.5) * .055 }, { x: .04, y: .4 + (index % 3) * .06, z: .04 }, index % 2 ? accent : base, { z: 74 + index * 2 });
+  } else if (['jellyfish', 'anemone', 'softbody'].includes(archetype)) {
+    primitive(root, `${name} soft bell`, 'sphere', { x: .12, y: .12, z: 0 }, { x: .48, y: .3, z: .48 }, base);
+    primitive(root, `${name} bell rim`, 'cylinder', { x: .12, y: -.02, z: 0 }, { x: .76, y: .07, z: .76 }, accent);
+    for (let index = 0; index < 8; index += 1) tail = primitive(root, `${name} soft arm ${index + 1}`, 'capsule',
+      { x: .05 + (index % 2) * .12, y: -.3, z: (index - 3.5) * .075 }, { x: .035, y: .42 + (index % 3) * .08, z: .035 }, index % 2 ? accent : base);
   } else if (['shrimp', 'insect', 'arachnid', 'horseshoe'].includes(archetype)) {
     for (let index = 0; index < 5; index += 1) primitive(root, `${name} segmented body ${index + 1}`,
       'sphere', { x: .42 - index * .2, y: index % 2 * .035, z: 0 },
@@ -251,7 +287,7 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
       { x: .3, y: .18, z: .25 }, base);
     tail = primitive(root, `${name} fan tail`, 'cone', { x: -.5, y: 0, z: 0 },
       { x: .24, y: .34, z: .08 }, accent, { z: 90 });
-  } else if (['crab', 'lobster', 'crayfish'].includes(archetype)) {
+  } else if (archetype === 'crab') {
     primitive(root, `${name} shell`, 'sphere', { x: 0, y: 0, z: 0 },
       { x: .5, y: .23, z: .42 }, base);
     primitive(root, `${name} left claw`, 'sphere', { x: .48, y: .04, z: .35 },
@@ -263,6 +299,14 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
         { x: -.18 + index * .17, y: -.13, z: side * (.34 + index * .045) },
         { x: .3, y: .035, z: .035 }, accent,
         { y: side * (28 + index * 8), z: side * 12 });
+    }
+  } else if (['lobster', 'crayfish'].includes(archetype)) {
+    primitive(root, `${name} crustacean thorax`, 'sphere', { x: .28, y: .02, z: 0 }, { x: .42, y: .24, z: .3 }, base);
+    for (let index = 0; index < 4; index += 1) primitive(root, `${name} articulated abdomen ${index + 1}`, 'sphere', { x: -.05 - index * .2, y: 0, z: 0 }, { x: .23, y: .18, z: .24 - index * .02 }, index % 2 ? accent : base);
+    for (const side of [-1, 1]) {
+      primitive(root, `${name} large claw ${side}`, 'sphere', { x: .63, y: .02, z: side * .28 }, { x: .25, y: .16, z: .2 }, accent);
+      for (let index = 0; index < 4; index += 1) primitive(root, `${name} walking leg ${side}-${index}`, 'box', { x: .2 - index * .18, y: -.13, z: side * .27 }, { x: .28, y: .035, z: .035 }, accent, { y: side * 38 });
+      tail = primitive(root, `${name} tail fan ${side}`, 'cone', { x: -.82, y: 0, z: side * .11 }, { x: .2, y: .3, z: .06 }, accent, { z: 90, y: side * 18 });
     }
   } else if (archetype === 'snail') {
     primitive(root, `${name} snail foot`, 'sphere', { x: .12, y: -.13, z: 0 },
@@ -286,16 +330,23 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
         { x: Math.cos(radians) * .38, y: 0, z: Math.sin(radians) * .38 },
         { x: .35, y: archetype === 'urchin' ? .42 : .09, z: .11 }, accent, { y: -angle, z: archetype === 'urchin' ? 0 : angle });
     }
-  } else if (['turtle', 'frog', 'salamander'].includes(archetype)) {
-    primitive(root, `${name} body`, 'sphere', { x: 0, y: 0, z: 0 },
-      { x: .54, y: archetype === 'turtle' ? .18 : .3, z: .42 }, base);
-    primitive(root, `${name} head`, 'sphere', { x: .48, y: .03, z: 0 },
-      { x: .22, y: .2, z: .2 }, accent);
-    for (const side of [-1, 1]) for (const x of [-.25, .25]) {
-      tail = primitive(root, `${name} limb ${side}-${x}`, 'sphere',
-        { x, y: -.08, z: side * .38 }, { x: .24, y: .08, z: .16 }, accent,
-        { y: side * 24 });
+  } else if (archetype === 'turtle') {
+    primitive(root, `${name} domed shell`, 'sphere', { x: 0, y: .05, z: 0 }, { x: .58, y: .24, z: .46 }, base);
+    primitive(root, `${name} lower shell`, 'sphere', { x: 0, y: -.1, z: 0 }, { x: .52, y: .1, z: .4 }, accent);
+    primitive(root, `${name} turtle head`, 'sphere', { x: .55, y: .02, z: 0 }, { x: .23, y: .2, z: .2 }, accent);
+    for (const side of [-1, 1]) for (const x of [-.27, .27]) tail = primitive(root, `${name} turtle flipper ${side}-${x}`, 'sphere', { x, y: -.1, z: side * .42 }, { x: .27, y: .07, z: .15 }, accent, { y: side * 28 });
+  } else if (archetype === 'frog') {
+    primitive(root, `${name} frog body`, 'sphere', { x: -.05, y: 0, z: 0 }, { x: .42, y: .28, z: .38 }, base);
+    primitive(root, `${name} broad frog head`, 'sphere', { x: .36, y: .12, z: 0 }, { x: .35, y: .27, z: .36 }, accent);
+    for (const side of [-1, 1]) {
+      primitive(root, `${name} frog foreleg ${side}`, 'capsule', { x: .25, y: -.18, z: side * .26 }, { x: .055, y: .3, z: .055 }, base, { z: side * 35 });
+      tail = primitive(root, `${name} powerful hind leg ${side}`, 'capsule', { x: -.35, y: -.17, z: side * .32 }, { x: .09, y: .48, z: .09 }, accent, { z: side * 58 });
     }
+  } else if (archetype === 'salamander') {
+    primitive(root, `${name} salamander body`, 'sphere', { x: -.08, y: 0, z: 0 }, { x: .65, y: .19, z: .22 }, base);
+    primitive(root, `${name} salamander head`, 'sphere', { x: .52, y: .03, z: 0 }, { x: .25, y: .2, z: .22 }, accent);
+    for (const side of [-1, 1]) for (const x of [-.3, .25]) primitive(root, `${name} salamander leg ${side}-${x}`, 'capsule', { x, y: -.12, z: side * .18 }, { x: .045, y: .25, z: .045 }, accent, { z: side * 62 });
+    tail = primitive(root, `${name} tapered salamander tail`, 'cone', { x: -.72, y: 0, z: 0 }, { x: .38, y: .2, z: .09 }, base, { z: 90 });
   } else if (['serpent', 'dragon', 'plesiosaur', 'waterhorse', 'eel'].includes(archetype)) {
     for (let index = 0; index < 4; index += 1) {
       tail = primitive(root, `${name} long body ${index + 1}`, 'sphere',
@@ -305,6 +356,11 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
     }
     primitive(root, `${name} long head`, 'sphere', { x: .55, y: .07, z: 0 },
       { x: .28, y: .23, z: .22 }, base);
+    if (archetype === 'serpent' && /alligator|crocodile/i.test(species.name)) {
+      primitive(root, `${name} crocodilian armored snout`, 'box', { x: .78, y: .04, z: 0 }, { x: .38, y: .14, z: .25 }, accent);
+      for (const side of [-1, 1]) for (const x of [-.25, .22]) primitive(root, `${name} crocodilian leg ${side}-${x}`, 'capsule', { x, y: -.14, z: side * .19 }, { x: .055, y: .27, z: .055 }, base, { z: side * 58 });
+      for (let index = 0; index < 4; index += 1) primitive(root, `${name} crocodilian back scute ${index + 1}`, 'cone', { x: .22 - index * .27, y: .18, z: 0 }, { x: .07, y: .16, z: .07 }, accent);
+    }
   } else {
     const lengthScale = clamp(visual.lengthScale ?? 1, .58, 1.55);
     const depth = clamp(visual.depth ?? 1, .55, 1.55);
