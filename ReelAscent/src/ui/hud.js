@@ -632,7 +632,7 @@ export class Hud {
   confirmSongDownvoteReason(feedback, reason, aggregate = null) {
     this.songVoteStore.set(feedback, 'down', reason);
     if (aggregate) this.setSongAggregate(aggregate);
-    // Keep the optional prompt for this result so 1–5 can revise the same vote row.
+    // Keep the optional prompt for this result so 1–6 can revise the same vote row.
     this.downvoteReasonOpen = true;
     this.downvoteReasonPending = false;
     this.feedbackError = '';

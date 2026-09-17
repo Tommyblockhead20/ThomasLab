@@ -16,6 +16,33 @@ function box(name, position, size, {
   };
 }
 
+
+function water(id, name, position, radii, {
+  depthMeters = .45,
+  fishingZoneScale = 1,
+  fishIds = [],
+  color = '#269eb8',
+  componentId = 'water',
+  metadata = {}
+} = {}) {
+  return {
+    id,
+    name,
+    identity: id,
+    position: { ...position },
+    radii: { ...radii },
+    depthMeters,
+    fishingZoneScale,
+    color,
+    fishIds: [...fishIds],
+    metadata: {
+      roomFishingWater: true,
+      componentId,
+      ...metadata
+    }
+  };
+}
+
 const shell = (width, depth, height, { doorwayWidth = 2.2, backWindows = false } = {}) => [
   box('Floor slab', { x: 0, y: -.12, z: 0 }, { x: width, y: .24, z: depth }, { materialKey: 'floor' }),
   box('Left wall', { x: -width / 2 + .11, y: height / 2, z: 0 }, { x: .22, y: height, z: depth }, { materialKey: 'wall' }),
@@ -35,6 +62,12 @@ const ceiling = (width, depth, height, lights = []) => [
 const bathroom = {
   id: 'bathroom', label: 'Bathroom', description: 'Complete public restroom with stalls, fixtures, vanity, storage and lighting.',
   dimensions: { x: 12, y: 3.4, z: 8.5 },
+  waters: [
+    water('skyreach-toilet', 'Skyscraper Restroom Toilet', { x: -3.3, y: .57, z: 2.08 }, { x: .28, z: .22 }, {
+      depthMeters: .22, fishingZoneScale: 1.05, fishIds: ['weather-loach', 'golden-shiner'], componentId: 'toilets',
+      metadata: { physicalSource: 'Toilet bowl', waterType: 'tiny-freshwater', jokeFishing: true }
+    })
+  ],
   components: [
     { id: 'shell', label: 'Shell + doorway', offset: { x: 0, y: 0, z: 0 }, objects: shell(12, 8.5, 3.4, { doorwayWidth: 2.2 }) },
     { id: 'stalls', label: 'Stall bank', offset: { x: -3.3, y: 0, z: 1.3 }, objects: [
@@ -77,6 +110,12 @@ const bathroom = {
 const restaurant = {
   id: 'restaurant', label: 'Restaurant', description: 'Finished Art-Deco restaurant blockout with host stand, bar, dining clusters and service pass.',
   dimensions: { x: 24, y: 4.1, z: 13 },
+  waters: [
+    water('skyreach-restaurant-aquarium', 'Skyscraper Restaurant Aquarium', { x: 8.5, y: 1.45, z: -3.95 }, { x: 1.55, z: .48 }, {
+      depthMeters: .82, fishingZoneScale: .9, fishIds: ['bluegill', 'golden-shiner', 'pumpkinseed'], componentId: 'aquarium',
+      metadata: { physicalSource: 'Dining-room fish tank', waterType: 'aquarium' }
+    })
+  ],
   components: [
     { id: 'shell', label: 'Shell + window wall', offset: { x: 0, y: 0, z: 0 }, objects: shell(24, 13, 4.1, { doorwayWidth: 3.2, backWindows: true }) },
     { id: 'host', label: 'Host + entry', offset: { x: 0, y: 0, z: -4.8 }, objects: [
@@ -117,6 +156,14 @@ const restaurant = {
       box('Planter right', { x: 4.2, y: .36, z: 0 }, { x: 1.1, y: .72, z: 1.1 }, { materialKey: 'stone' }),
       box('Plant right', { x: 4.2, y: 1.1, z: 0 }, { x: .72, y: 1.0, z: .72 }, { materialKey: 'plant', collision: false })
     ]},
+    { id: 'aquarium', label: 'Fish tank', offset: { x: 8.5, y: 0, z: -3.95 }, objects: [
+      box('Aquarium cabinet', { x: 0, y: .45, z: 0 }, { x: 3.8, y: .9, z: 1.25 }, { materialKey: 'wood' }),
+      box('Aquarium glass back', { x: 0, y: 1.55, z: .55 }, { x: 3.7, y: 1.5, z: .08 }, { materialKey: 'glass', collision: false }),
+      box('Aquarium glass front', { x: 0, y: 1.55, z: -.55 }, { x: 3.7, y: 1.5, z: .08 }, { materialKey: 'glass', collision: false }),
+      box('Aquarium glass left', { x: -1.81, y: 1.55, z: 0 }, { x: .08, y: 1.5, z: 1.1 }, { materialKey: 'glass', collision: false }),
+      box('Aquarium glass right', { x: 1.81, y: 1.55, z: 0 }, { x: .08, y: 1.5, z: 1.1 }, { materialKey: 'glass', collision: false }),
+      box('Aquarium top trim', { x: 0, y: 2.34, z: 0 }, { x: 3.85, y: .12, z: 1.22 }, { materialKey: 'accent', collision: false })
+    ]},
     { id: 'ceiling', label: 'Ceiling + pendant lights', offset: { x: 0, y: 0, z: 0 }, objects: ceiling(24, 13, 4.1, [{ x: -7, z: 0 }, { x: -2.3, z: 0 }, { x: 2.3, z: 0 }, { x: 7, z: 0 }]) }
   ]
 };
@@ -124,6 +171,12 @@ const restaurant = {
 const penthouse = {
   id: 'penthouse', label: 'Penthouse', description: 'Luxury penthouse blockout with lounge, kitchen, bedroom, office, dining and view wall.',
   dimensions: { x: 26, y: 4.4, z: 14 },
+  waters: [
+    water('skyreach-penthouse-jacuzzi', 'Penthouse Jacuzzi', { x: 8.4, y: .62, z: -3.1 }, { x: 2.15, z: 1.5 }, {
+      depthMeters: .72, fishingZoneScale: .92, fishIds: ['bluegill', 'channel-catfish', 'capybara'], componentId: 'jacuzzi',
+      metadata: { physicalSource: 'Penthouse jacuzzi', waterType: 'pool' }
+    })
+  ],
   components: [
     { id: 'shell', label: 'Shell + glass view wall', offset: { x: 0, y: 0, z: 0 }, objects: shell(26, 14, 4.4, { doorwayWidth: 3.2, backWindows: true }) },
     { id: 'lounge', label: 'Lounge', offset: { x: 5.2, y: 0, z: 1.6 }, objects: [
@@ -173,6 +226,11 @@ const penthouse = {
       box('Planter B', { x: 4.0, y: .4, z: 0 }, { x: 1.0, y: .8, z: 1.0 }, { materialKey: 'stone' }),
       box('Plant B', { x: 4.0, y: 1.2, z: 0 }, { x: .7, y: 1.15, z: .7 }, { materialKey: 'plant', collision: false })
     ]},
+    { id: 'jacuzzi', label: 'Jacuzzi / plunge pool', offset: { x: 8.4, y: 0, z: -3.1 }, objects: [
+      box('Jacuzzi basin', { x: 0, y: .34, z: 0 }, { x: 5.2, y: .68, z: 3.8 }, { materialKey: 'tile' }),
+      box('Jacuzzi inner dark', { x: 0, y: .58, z: 0 }, { x: 4.5, y: .16, z: 3.05 }, { materialKey: 'dark', collision: false }),
+      box('Jacuzzi step', { x: 0, y: .2, z: -2.15 }, { x: 2.0, y: .4, z: .7 }, { materialKey: 'stone' })
+    ]},
     { id: 'ceiling', label: 'Ceiling + lighting', offset: { x: 0, y: 0, z: 0 }, objects: ceiling(26, 14, 4.4, [{ x: -8, z: 0 }, { x: -3, z: 0 }, { x: 3, z: 0 }, { x: 8, z: 0 }]) }
   ]
 };
@@ -180,6 +238,12 @@ const penthouse = {
 const maintenance = {
   id: 'maintenance', label: 'Maintenance / Utility', description: 'Service room with workbench, storage, electrical cabinets, pipes and utility fixtures.',
   dimensions: { x: 14, y: 3.5, z: 10 },
+  waters: [
+    water('skyreach-maintenance-spill', 'Electrified Maintenance Spill', { x: 4.2, y: .025, z: -1.55 }, { x: 1.7, z: 1.05 }, {
+      depthMeters: .06, fishingZoneScale: 1.0, fishIds: ['electric-eel'], componentId: 'electrical',
+      metadata: { physicalSource: 'Spilled water by electrical cabinets', waterType: 'puddle', electrified: true }
+    })
+  ],
   components: [
     { id: 'shell', label: 'Service shell', offset: { x: 0, y: 0, z: 0 }, objects: shell(14, 10, 3.5, { doorwayWidth: 2.2 }) },
     { id: 'workbench', label: 'Workbench', offset: { x: -4.4, y: 0, z: 2.8 }, objects: [
@@ -216,6 +280,12 @@ const maintenance = {
 const casino = {
   id: 'casino', label: 'Casino', description: 'Art-Deco casino floor with gaming pit, roulette, slots, cashier, bar/lounge and VIP divider.',
   dimensions: { x: 28, y: 4.5, z: 14 },
+  waters: [
+    water('skyreach-casino-fountain', 'Casino Fountain', { x: 0, y: .42, z: -3.35 }, { x: 1.65, z: 1.05 }, {
+      depthMeters: .42, fishingZoneScale: .9, fishIds: ['golden-shiner', 'pumpkinseed', 'bluegill'], componentId: 'fountain',
+      metadata: { physicalSource: 'Casino fountain', waterType: 'fountain' }
+    })
+  ],
   components: [
     { id: 'shell', label: 'Casino shell + entry', offset: { x: 0, y: 0, z: 0 }, objects: shell(28, 14, 4.5, { doorwayWidth: 4.0, backWindows: false }) },
     { id: 'pit', label: 'Central card-table pit', offset: { x: 0, y: 0, z: .3 }, objects: [-4.2, 0, 4.2].flatMap((x, i) => [
@@ -253,6 +323,12 @@ const casino = {
       box('Entry arch top', { x: 0, y: 3.7, z: 0 }, { x: 5.8, y: .6, z: .6 }, { materialKey: 'accent' }),
       box('CASINO sign panel', { x: 0, y: 3.0, z: -.34 }, { x: 3.9, y: .7, z: .08 }, { materialKey: 'casino-purple', collision: false })
     ]},
+    { id: 'fountain', label: 'Casino fountain', offset: { x: 0, y: 0, z: -3.35 }, objects: [
+      box('Fountain basin', { x: 0, y: .28, z: 0 }, { x: 4.2, y: .56, z: 2.9 }, { materialKey: 'stone' }),
+      box('Fountain inner basin', { x: 0, y: .46, z: 0 }, { x: 3.5, y: .14, z: 2.15 }, { materialKey: 'dark', collision: false }),
+      box('Fountain center pedestal', { x: 0, y: .78, z: 0 }, { x: .72, y: 1.12, z: .72 }, { materialKey: 'accent' }),
+      box('Fountain crown', { x: 0, y: 1.42, z: 0 }, { x: 1.35, y: .16, z: 1.35 }, { materialKey: 'accent', collision: false })
+    ]},
     { id: 'ceiling', label: 'Ceiling + casino lighting', offset: { x: 0, y: 0, z: 0 }, objects: [
       ...ceiling(28, 14, 4.5, [{ x: -9, z: 0 }, { x: -3, z: 0 }, { x: 3, z: 0 }, { x: 9, z: 0 }]),
       box('Central ceiling accent', { x: 0, y: 4.31, z: 0 }, { x: 8.5, y: .10, z: 3.4 }, { materialKey: 'casino-purple', collision: false })
@@ -288,10 +364,16 @@ function translatedObject(object, offset, prefix, component) {
 export function makeRoomLibraryDefinition(templateId) {
   const template = getRoomLibraryTemplate(templateId);
   const objects = [];
+  const waters = [];
   for (const component of template.components) {
     component.objects.forEach((object, index) => {
       objects.push(translatedObject(object, component.offset, `ROOMLIB-${template.id}`, { ...component, _index: index }));
     });
+  }
+  for (const source of template.waters ?? []) {
+    const copy = clone(source);
+    copy.metadata = { ...(copy.metadata ?? {}), libraryAuthored: true, roomLibraryId: template.id };
+    waters.push(copy);
   }
   return {
     id: `ROOMLIB-${template.id.toUpperCase()}-V1`,
@@ -300,7 +382,7 @@ export function makeRoomLibraryDefinition(templateId) {
     version: 1,
     objects,
     movingPlatforms: [],
-    waters: [],
+    waters,
     metadata: {
       independentlyAuthored: true,
       libraryAuthored: true,
@@ -324,7 +406,14 @@ export function makeRoomComponentDefinition(templateId, componentId) {
     version: 1,
     objects: component.objects.map((object, index) => translatedObject(object, { x: 0, y: 0, z: 0 }, `ROOMCOMP-${template.id}-${component.id}`, { ...component, _index: index })),
     movingPlatforms: [],
-    waters: [],
+    waters: (template.waters ?? []).filter((waterItem) => waterItem.metadata?.componentId === component.id).map((waterItem) => {
+      const copy = clone(waterItem);
+      copy.position.x -= component.offset.x;
+      copy.position.y -= component.offset.y;
+      copy.position.z -= component.offset.z;
+      copy.metadata = { ...(copy.metadata ?? {}), libraryAuthored: true, roomLibraryId: template.id, roomComponentId: component.id };
+      return copy;
+    }),
     metadata: {
       independentlyAuthored: true,
       libraryAuthored: true,

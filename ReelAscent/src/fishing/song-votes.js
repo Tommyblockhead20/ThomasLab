@@ -1,18 +1,19 @@
 export const SONG_VOTES_STORAGE_KEY = 'reel-ascent-song-votes-v2';
 export const LEGACY_SONG_VOTES_STORAGE_KEY = 'reel-ascent-song-votes-v1';
-export const SONG_VOTE_SCHEMA_VERSION = 5;
+export const SONG_VOTE_SCHEMA_VERSION = 6;
 
 export const SONG_DOWNVOTE_REASONS = Object.freeze([
   Object.freeze({ id: 'sounds_bad', label: 'Sounds Bad' }),
   Object.freeze({ id: 'glitched', label: 'Glitched' }),
   Object.freeze({ id: 'too_hard', label: 'Too Hard' }),
   Object.freeze({ id: 'too_easy', label: 'Too Easy' }),
-  Object.freeze({ id: 'bad_instrument', label: 'Bad Instrument' })
+  Object.freeze({ id: 'bad_instrument', label: 'Bad Instrument' }),
+  Object.freeze({ id: 'bad_model', label: 'Bad Model' })
 ]);
 const DOWNVOTE_REASON_IDS = new Set(SONG_DOWNVOTE_REASONS.map((entry) => entry.id));
 export const normalizeDownvoteReason = (value) => DOWNVOTE_REASON_IDS.has(value) ? value : null;
 export const songDownvoteReasonForDigit = (code) => {
-  const match = /^(?:Digit|Numpad)([1-5])$/.exec(String(code ?? ''));
+  const match = /^(?:Digit|Numpad)([1-6])$/.exec(String(code ?? ''));
   return match ? SONG_DOWNVOTE_REASONS[Number(match[1]) - 1]?.id ?? null : null;
 };
 

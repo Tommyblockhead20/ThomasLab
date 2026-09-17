@@ -1,3 +1,66 @@
+# REEL ASCENT v21 — FISHING REBALANCE + SMALL GAMEPLAY FEATURES
+
+Status (2026-09-17): v21 is implemented in the current shared tree and the tracked frontend build is regenerated. This pass did not edit the concurrent World Editor V2.1 files or begin Skyscraper/Pirate/Athenaeum content.
+
+## v21 implementation
+
+- **Baseline probability caps:** starter tackle with no recent-catch suppression now uses strict per-species ceilings of Common **15%**, Uncommon **10%**, Rare **5%**, and Legendary **2.5%**. Cap overflow is iteratively redistributed inside the already-selected rarity. An undersized rarity pool throws a named structural-impossibility error instead of silently raising the cap. Hearthward Tutorial Pond is the sole exemption. Tackle, bobbers, lures, recent catches, forced/debug catches, and other live modifiers remain able to move player-facing odds beyond the baseline.
+- **Progression profiles:** ordinary lower waters are **65/26/7/2 C/U/R/L**, middle waters **45/30/18/7**, and upper waters **20/30/35/15**. Deliberate special profiles are cave **10/30/40/20**, summit cave **10/20/45/25**, Cloudstep **10/25/45/20**, Stoneveil summit **0/15/55/30**, waterfall **50/25/20/5**, open ocean **62/20/11/7**, and Frosthook **15/25/40/20**. Small ordinary lowland waters stay low-rarity-heavy; large/high/special waters support their reward profile with larger thematic Rare/Legendary pools.
+- **Water-by-water ecology:** all 28 playable waters now receive an explicit or tier-derived v21 rarity profile. The audit uses the same habitat selection and strict baseline table as production. No current ordinary species is unreachable, no future-reserved species leaks, no species appears in more than 14 waters, no two waters share a #1 catch, and no species appears in more than two top-three lists.
+- **Curated pool changes:** Hearthward adds **Pumpkinseed** and remains exactly three Commons. Basalt adds freshwater cave invertebrates, Mudpuppy, the cold/cave Rare set, and the cave Legendary set. Echo adds Pond Snail, Freshwater Shrimp, Freshwater Eel, Mudpuppy, Bowfin, and differentiated cave Rares/Legendaries. Obsidian adds Ramshorn Snail, Freshwater Mussel/Eel, Mudpuppy, and its differentiated cave Rares/Legendaries. High Cirque adds Brook/Brown Trout, Mountain Whitefish, Kokanee, Walleye, Bowfin, thematic high Rares and cave Legendaries, while excluding Nokken, Rainbow Trout, Freshwater Eel, Stone Loach, and Mudpuppy. Crown gains the shared high-freshwater Legendary set. Cloudstep gains alpine trout/whitefish/Kokanee plus high Rares and high-freshwater Legendaries. Hidden Ridge and Frosthook Lake gain thematic high/cold pools and exclude Nokken. Stoneveil gains the high-freshwater Legendary set. Fallglass gains Rainbow Trout, Mountain Whitefish, Arctic Grayling, and Silver Salmon. Frosthook Cold Ocean gains herring, haddock, pollock, cod, seals/porpoise, and a curated polar/deep-ocean Rare/Legendary set. Split Rock explicitly removes Stone Loach. Bluewater and Outer retain broad ocean rosters but now use different local weights; Sardine is suppressed at Bluewater.
+- **Cave identity:** hard cave-only rejection occurs before exclusivity/favored-location weighting. Basalt is led by Ashen Cave Snail/Basalt Cave Shrimp, Echo by Freshwater Eel, Obsidian by Ember Tetra, High Cirque by Snowmelt Loach, and Crown by its summit-cave Rare group. Mottled Sculpin is suppressed in each cave, Stone Loach is removed from Split Rock and no longer dominates the cave set.
+- **Brackish Mangrove:** `amber-reed-pond`/Mangrove Lagoon is now `brackish-lagoon`, with explicit fresh/brackish/salt handling. Its curated compatibility set keeps Amber Killifish and Tadpole Madtom and permits suitable estuarine/coastal species. Salinity rejection runs before exclusive/favored/configured-addition weighting, so an exclusive cannot bypass impossible water chemistry.
+- **Bluewater/ocean:** Outer Ocean remains 80 species and Bluewater remains 78. Bluewater's large-species weighting rises **0.12 → 0.20** and specimen-size bias **0.08 → 0.12**; Atlantic Herring is now its #1 while Outer Ocean is led by Sand Lance. Outer and Frosthook Cold Ocean use **1.20×** bite wait and Bluewater **1.25×**, multiplied cleanly with existing tackle timing.
+- **Underwater gravity:** bounded inland-water submersion keeps full gravity through 20%, smoothly blends to **30% gravity at 75% submersion**, and stays there when deeper. The existing stronger exit jump is preserved. Ocean, cold-ocean, and Bluewater zones remain excluded by `getWaterSubmersion()`, preserving fatal/open-ocean behavior.
+- **Old Man daily sale:** the fish-market seller is now identified as the Old Man. Once per local calendar day per save, the player chooses one owned Inventory or Aquarium specimen and sells it for exactly **2×** normal value. The normal specimen is removed, held/display references are refreshed, legitimate earnings/sale records use the existing paths, and `oldManDailySaleDate` persists under progression schema 14. Ordinary carried-catch sales remain available separately.
+- **Song feedback:** `bad_model` / **Bad Model** is the sixth downvote reason, mapped to key 6/Numpad 6, rendered beside the existing five, accepted by browser storage and the multiplayer server, included in aggregates, and added to PostgreSQL creation/migration constraints without renaming or deleting historical reasons. Frontend and Ohio Render server both need redeployment for this addition; no credential change is required.
+- **Fishing height:** the canonical normal fishing vertical tolerance is verified at **7 m**; horizontal cast behavior was not changed.
+- **Version/files:** active version is `v21`. Primary v21 source is `src/fishing/{ecology-config,fish-ecology,rarity-selection,fishing,song-votes}.js`, `src/world/mountain-v2.js` (fishing descriptors/Old Man labels only), `src/player/player.js`, `src/progression/{progression-save,progression}.js`, `src/ui/{hud,shop}.js`, `server/src/song-vote-store.js`, `index.html`, `scripts/ecology-audit.mjs`, `test/v21-focused.test.js`, regenerated tracked `dist/`, and this handoff.
+
+## Final 28-water baseline audit
+
+`C/U/R/L odds` and every listed species probability are for basic/default tackle with no recent-catch suppression. `Species C/U/R/L` gives total followed by rarity counts. `Exclusive` means currently naturally catchable in only that water.
+
+| Fishing Area | Elev. | Size | Biome | C/U/R/L odds | Species C/U/R/L | Exclusive | Top 3 |
+|---|---:|---|---|---|---|---:|---|
+| Hearthward Tutorial Pond | 3 ft | Small | freshwater | 100/0/0/0% | 3 (3/0/0/0) | 0 | Golden Shiner 33.33%; Bluegill 33.33%; Pumpkinseed 33.33% |
+| Sunwash Tidepool | 0 ft | Medium | coastal saltwater | 65/26/7/2% | 55 (15/15/14/11) | 5 | Sunwash Blenny 8.07%; Anchovy 7.73%; Hermit Crab 7.13% |
+| Blackstone Inlet | 0 ft | Large | coastal saltwater | 65/26/7/2% | 54 (15/14/15/10) | 4 | Blackstone Dogfish 14.80%; Basalt Skate 6.14%; European Conger 5.78% |
+| Fernwater Pond | 26 ft | Medium | freshwater | 65/26/7/2% | 39 (17/14/5/3) | 4 | Reed Darter 9.89%; Fernwater Bitterling 9.77%; Spotted Mud Crab 6.67% |
+| Mangrove Lagoon | 2 ft | Medium | mangrove/brackish | 65/26/7/2% | 19 (7/3/6/3) | 3 | Amber Killifish 15.00%; Tadpole Madtom 15.00%; Flounder 9.32% |
+| Basalt Grotto | 1 ft | Small | cave freshwater | 10/30/40/20% | 24 (3/4/8/9) | 3 | Ashen Cave Snail 10.00%; Basalt Cave Shrimp 10.00%; Stone Loach 8.05% |
+| Boulder Coast Lagoon | 5 ft | Large | coastal saltwater | 65/26/7/2% | 61 (15/17/14/15) | 5 | Rockweed Goby 15.00%; Blue Crab 7.56%; Sea Cucumber 6.14% |
+| Gull Crag Pond | 34 ft | Small | freshwater | 65/26/7/2% | 40 (21/13/5/1) | 3 | Crag Crawfish 11.57%; Gull Crag Ruffe 10.68%; Stonebelly Bullhead 5.10% |
+| Sheltered Mirror | 20 ft | Tiny | freshwater | 65/26/7/2% | 48 (27/13/6/2) | 3 | Lily Goby 8.40%; Silver Mirror Carp 6.39%; Glasswing Minnow 6.38% |
+| Redbank Pool | 44 ft | Small | freshwater | 65/26/7/2% | 40 (23/10/5/2) | 4 | Zebra Loach 7.48%; Redbank Shad 7.48%; Rusty Crayfish 7.36% |
+| Pineglass Lake | 51 ft | Large | freshwater | 65/26/7/2% | 38 (21/11/4/2) | 4 | Needlepine Trout 9.40%; Deepwater Mussel 8.23%; Pineglass Cisco 7.42% |
+| Red River Bend | 161 ft | Small | freshwater | 45/30/18/7% | 27 (11/7/6/3) | 3 | Rainbow Shiner 13.21%; Red River Gar 10.00%; River Lamprey 7.04% |
+| Echo Cave Pool | 112 ft | Large | cave freshwater | 10/30/40/20% | 28 (3/4/12/9) | 4 | Freshwater Eel 10.00%; Stone Loach 7.67%; Mudpuppy 6.85% |
+| Mossbell Lake | 164 ft | Large | freshwater | 45/30/18/7% | 35 (12/10/7/6) | 3 | Freshwater Drum 9.55%; Sauger 6.68%; Hillstream Loach 6.42% |
+| Split Rock Pool | 203 ft | Tiny | freshwater | 45/30/18/7% | 37 (16/10/7/4) | 3 | Split Rock Trout 9.06%; Shardnose Dace 7.46%; Kelpie 5.00% |
+| Obsidian Cup | 190 ft | Medium | cave freshwater | 10/30/40/20% | 27 (3/4/9/11) | 4 | Ember Tetra 10.00%; Mudpuppy 8.17%; Freshwater Eel 8.15% |
+| Windcut Tarn | 188 ft | Tiny | freshwater | 45/30/18/7% | 30 (14/7/4/5) | 3 | White Cloud Mountain Minnow 10.00%; Diving Beetle 9.16%; Weather Loach 6.91% |
+| Twilight Basin | 231 ft | Small | freshwater | 45/30/18/7% | 43 (21/10/8/4) | 3 | Largemouth Bass 5.60%; Smallmouth Bass 5.56%; Violet Crayfish 4.99% |
+| Cloudstep Lake | 355 ft | Large | alpine freshwater | 10/25/45/20% | 32 (2/3/14/13) | 2 | Rainbow Trout 9.18%; Kokanee Salmon 8.17%; Mountain Whitefish 7.65% |
+| Hidden Ridge Pool | 409 ft | Tiny | alpine freshwater | 15/30/40/15% | 30 (1/3/14/12) | 2 | Water Boatman 15.00%; Diving Beetle 10.00%; Mountain Whitefish 10.00% |
+| Frosthook Lake | 3 ft | Medium | cold lake | 15/25/40/20% | 29 (2/3/13/11) | 3 | Glacier Snail 13.14%; Arctic Char 10.00%; Dolly Varden 10.00% |
+| High Cirque Tarn | 358 ft | Small | cave freshwater | 10/30/40/20% | 30 (3/5/14/8) | 2 | Snowmelt Loach 10.00%; Kokanee Salmon 6.78%; Bowfin 6.21% |
+| Crown Vault | 695 ft | Large | summit cave freshwater | 10/20/45/25% | 38 (3/8/14/13) | 2 | Alpine Mudpuppy 5.00%; Cave Tetra 5.00%; Naiad 5.00% |
+| Stoneveil Tarn | 1000 ft | Tiny | summit alpine freshwater | 0/15/55/30% | 35 (0/9/14/12) | 5 | Fairy Shrimp 5.03%; Golden Trout 5.00%; Peaklight Koi 5.00% |
+| Fallglass Cascade | 35 ft | Small | waterfall freshwater | 50/25/20/5% | 20 (10/3/5/2) | 4 | Cascade Goby 15.00%; Smallmouth Bass 9.12%; Rainbow Trout 8.92% |
+| Frosthook Cold Ocean | 0 ft | Large | polar saltwater | 15/25/40/20% | 26 (3/4/9/10) | 5 | Penguin 10.00%; Pollock 7.17%; Harbor Porpoise 6.12% |
+| Bluewater Reach | 0 ft | Very Large | open ocean | 62/20/11/7% | 78 (9/14/24/31) | 3 | Atlantic Herring 9.99%; Mackerel 9.57%; Haddock 9.55% |
+| Outer Ocean | 0 ft | Very Large | open ocean | 62/20/11/7% | 80 (9/14/25/32) | 5 | Sand Lance 9.63%; Atlantic Herring 8.80%; Haddock 7.99% |
+
+## v21 audit warnings and acceptance
+
+- **Caps:** all non-tutorial baseline Common/Uncommon/Rare/Legendary probabilities pass 15/10/5/2.5%. Hearthward's three equal 33.33% Commons are intentional.
+- **Distribution:** duplicate #1 species: none. Species in top three more than twice: none. Species in more than half of waters: none. Current unreachable species: none. Future-reserved leaks: none. Hard salinity mismatches: none. Cave-only leaks: none.
+- **Zero tiers:** Hearthward intentionally has no U/R/L; Stoneveil intentionally has no Common. No other water has a zero-probability rarity tier.
+- **Count-shape exceptions:** cave, upper-alpine, summit, Frosthook, and ocean pools intentionally skew toward Rare/Legendary counts. Basalt (3/4/8/9), Obsidian (3/4/9/11), Cloudstep (2/3/14/13), Hidden Ridge (1/3/14/12), Frosthook Lake (2/3/13/11), Crown (3/8/14/13), Stoneveil (0/9/14/12), Frosthook Cold Ocean (3/4/9/10), and the two broad oceans are reviewed special-location exceptions rather than ordinary-water profiles. Windcut's 14/7/4/5 and Boulder's 15/17/14/15 are mild count inversions, but their actual odds retain middle/lower and ocean/coastal emphasis respectively.
+- **Validation:** edited JavaScript modules pass `node --check`; `node scripts/ecology-audit.mjs --json` completes; the focused ecology/movement/daily-sale/voting suite plus fishing/save/economy regressions passes **47/47**; `git diff --check` reports no whitespace errors for v21 files; and `npm run build` succeeds. Only the existing PlayCanvas worker externalization and large-chunk warnings remain.
+- **Manual checks:** hard-refresh/publish the frontend; sample low/mid/high/cave/Frosthook/ocean catch tables with starter and upgraded tackle; feel the 20–25% ocean wait increase; compare Bluewater sizes/catches against Outer; test a deep bounded-pond exit and fatal ocean; use the Old Man sale from Inventory and Aquarium across a local midnight/reload/save switch; and submit Bad Model from keyboard, touch, and a live multiplayer room. Redeploy both the frontend and Ohio Render multiplayer server; PostgreSQL initializes the expanded reason constraint on server startup.
+
 # REEL ASCENT v20.8 — APPEARANCE AVAILABILITY + SUMMIT SUPPORT REPAIR
 
 Status (2026-09-16): v20.8 is implemented in the current tree and the tracked frontend build is regenerated. This pass preserves the concurrent World Editor V2.1 work already present in the shared worktree.

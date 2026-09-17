@@ -79,12 +79,15 @@ export function getRarityProfile(modifiers = {}, availableRarities = CATCH_RARIT
   return Object.freeze(profile);
 }
 
-function capProbabilityShares(rawWeights, requestedCap = 1) {
+function capProbabilityShares(rawWeights, requestedCap = 1, { strict = false, label = 'pool' } = {}) {
   const count = rawWeights.length;
   if (!count) return [];
   const total = rawWeights.reduce((sum, value) => sum + Math.max(0, value), 0);
   if (total <= 0) return rawWeights.map(() => 1 / count);
-  const cap = Math.max(requestedCap, 1 / count);
+  if (strict && requestedCap * count < 1 - 1e-9) {
+    throw new RangeError(`Structurally impossible ${label}: ${count} candidates cannot absorb probability at ${(requestedCap * 100).toFixed(2)}% each`);
+  }
+  const cap = strict ? requestedCap : Math.max(requestedCap, 1 / count);
   const probabilities = Array(count).fill(0);
   const remaining = new Set(rawWeights.map((_, index) => index));
   let mass = 1;
@@ -136,6 +139,7 @@ export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) 
   const recentSpeciesIds = Array.isArray(modifiers.recentSpeciesIds) ? modifiers.recentSpeciesIds : [];
   const habitatWeights = modifiers.habitatWeights ?? {};
   const maximumFinalShare = clamp(modifiers.maximumSpeciesProbability ?? .25, .01, 1);
+  const baselineCaps = modifiers.baselineSpeciesProbabilityCaps ?? null;
   const nonFishMultiplier = Math.max(0, modifiers.nonFishWeightMultiplier ?? 1);
   const largeSpeciesWeightBias = Math.max(0, modifiers.largeSpeciesWeightBias ?? 0);
   const entries = [];
@@ -154,8 +158,14 @@ export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) 
         * naturallyLargeSpeciesWeight(fish, largeSpeciesWeightBias)
         * (isNonFishCreature(fish) ? nonFishMultiplier : 1);
     });
-    const withinCap = Math.min(1, maximumFinalShare / Math.max(.0001, rarityProbability));
-    const withinProbabilities = capProbabilityShares(rawWeights, withinCap);
+    const absoluteCap = baselineCaps
+      ? clamp(baselineCaps[rarity] ?? 1, .0001, 1)
+      : maximumFinalShare;
+    const withinCap = Math.min(1, absoluteCap / Math.max(.0001, rarityProbability));
+    const withinProbabilities = capProbabilityShares(rawWeights, withinCap, {
+      strict: Boolean(baselineCaps),
+      label: `${modifiers.waterId ?? 'fishing water'} ${rarity} tier`
+    });
     group.forEach((fish, index) => {
       const probability = rarityProbability * withinProbabilities[index];
       entries.push(Object.freeze({
@@ -172,10 +182,9 @@ export function buildTwoStageProbabilityTable(species, fishIds, modifiers = {}) 
   // inside that tier (for example, one Common in a small cave pool would inherit the
   // entire 60% lower-tier Common share). Apply one final feasible cap across the complete
   // pool, then recompute the diagnostic rarity/within-rarity shares from the actual odds.
-  const finalProbabilities = capProbabilityShares(
-    entries.map((entry) => entry.probability),
-    maximumFinalShare
-  );
+  const finalProbabilities = baselineCaps
+    ? entries.map((entry) => entry.probability)
+    : capProbabilityShares(entries.map((entry) => entry.probability), maximumFinalShare);
   const finalRarityProbabilities = Object.fromEntries(CATCH_RARITIES.map((rarity) => [rarity, 0]));
   entries.forEach((entry, index) => {
     finalRarityProbabilities[entry.fish.rarity] += finalProbabilities[index];

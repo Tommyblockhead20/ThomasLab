@@ -42,6 +42,14 @@ export function underwaterEscapeJumpMultiplier(submergedFraction) {
   return 1 + (Math.SQRT2 - 1) * eased;
 }
 
+export function underwaterGravityMultiplier(submergedFraction) {
+  const fraction = clamp(Number(submergedFraction) || 0, 0, 1);
+  if (fraction <= .2) return 1;
+  const t = clamp((fraction - .2) / .55, 0, 1);
+  const eased = t * t * (3 - 2 * t);
+  return 1 - .7 * eased;
+}
+
 function shirtAccent(values) {
   return values.map((value) => clamp(value * .72 + .08, 0, 1));
 }
@@ -1266,6 +1274,7 @@ export class Player {
       this.body.translation(), PLAYER_STANDING_HEIGHT
     ) ?? null;
     const underwaterJumpMultiplier = underwaterEscapeJumpMultiplier(waterSubmersion?.fraction);
+    const underwaterGravity = underwaterGravityMultiplier(waterSubmersion?.fraction);
     const canUnderwaterEscape = underwaterJumpMultiplier > 1.001;
     const swimmingZone = this.surfaceRegistry.getSwimmingZone?.(this.body.translation()) ?? null;
     if (swimmingZone) {
@@ -1613,7 +1622,7 @@ export class Player {
     } else {
       this.verticalVelocity = Math.max(
         -PLAYER_CONFIG.terminalVelocity,
-        this.verticalVelocity - PLAYER_CONFIG.gravity * dt
+        this.verticalVelocity - PLAYER_CONFIG.gravity * underwaterGravity * dt
       );
     }
 

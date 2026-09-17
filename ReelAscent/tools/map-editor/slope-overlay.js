@@ -45,9 +45,13 @@ export class SlopeOverlay {
     this.root.enabled = false;
     this.materials = Object.fromEntries(Object.entries(COLORS).map(([key, rgb]) => [key, material(rgb)]));
     this.signature = '';
+    this.pendingTimer = null;
+    this.pendingData = null;
   }
 
   clear() {
+    if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
+    this.pendingData = null;
     for (const child of [...this.root.children]) {
       for (const mesh of child._editorOwnedMeshes ?? []) { try { mesh.destroy(); } catch {} }
       child.destroy();
@@ -55,10 +59,33 @@ export class SlopeOverlay {
     this.signature = '';
   }
 
+  dataSignature(data) {
+    if (!data?.positions?.length || !data?.indices?.length) return '';
+    return `${data.positions.length}:${data.indices.length}:${data.editedAt ?? ''}:${data.topologyEditedAt ?? ''}:${data.positions[0]}:${data.positions.at(-1)}`;
+  }
+
+  scheduleRebuild(data) {
+    this.pendingData = data;
+    if (this.pendingTimer) clearTimeout(this.pendingTimer);
+    this.pendingTimer = setTimeout(() => {
+      this.pendingTimer = null;
+      const latest = this.pendingData;
+      this.pendingData = null;
+      if (this.root.enabled && latest) this.rebuild(latest);
+    }, 180);
+  }
+
   rebuild(data) {
     if (!data?.positions?.length || !data?.indices?.length) { this.clear(); return; }
-    const signature = `${data.positions.length}:${data.indices.length}:${data.positions[0]}:${data.positions.at(-1)}`;
-    this.clear();
+    const signature = this.dataSignature(data);
+    if (signature && signature === this.signature && this.root.children.length) return;
+    // Clear just the old overlay meshes, not the pending-refresh metadata.
+    if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
+    this.pendingData = null;
+    for (const child of [...this.root.children]) {
+      for (const mesh of child._editorOwnedMeshes ?? []) { try { mesh.destroy(); } catch {} }
+      child.destroy();
+    }
     const buckets = { walkable: [], awkward: [], slide: [], extreme: [] };
     const p = data.positions;
     const ids = data.indices;
@@ -92,7 +119,21 @@ export class SlopeOverlay {
   }
 
   setEnabled(enabled, data = null) {
-    if (enabled && data) this.rebuild(data);
-    this.root.enabled = Boolean(enabled);
+    const next = Boolean(enabled);
+    if (!next) {
+      this.root.enabled = false;
+      if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
+      this.pendingData = null;
+      return;
+    }
+    const wasEnabled = this.root.enabled;
+    this.root.enabled = true;
+    if (!data) return;
+    const signature = this.dataSignature(data);
+    if (signature === this.signature && this.root.children.length) return;
+    // First enable is immediate. Subsequent sculpt changes are coalesced so four large
+    // diagnostic meshes are not destroyed/recreated for every single brush click.
+    if (!wasEnabled || !this.root.children.length) this.rebuild(data);
+    else this.scheduleRebuild(data);
   }
 }

@@ -10,7 +10,7 @@ import {
   normalizeAquariumTankDisplays
 } from './aquarium.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 13;
+export const PROGRESSION_SCHEMA_VERSION = 14;
 export const HAND_EQUIPMENT_IDS = Object.freeze(['ice-axe']);
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
@@ -60,6 +60,7 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     aquariumShowcaseSpecimenIds: [],
     aquariumShowcaseManual: false,
     aquariumIncome: { bankedActiveSeconds: 0, lastObservedActiveSeconds: null, lifetimePaid: 0 },
+    oldManDailySaleDate: '',
     heldSpecimenId: null,
     ownedItems: [],
     heldItemId: null,
@@ -236,6 +237,9 @@ export function normalizeProgressionState(value = {}) {
         : null,
       lifetimePaid: Math.max(0, Math.floor(finite(value.aquariumIncome?.lifetimePaid)))
     },
+    oldManDailySaleDate: /^\d{4}-\d{2}-\d{2}$/.test(value.oldManDailySaleDate ?? '')
+      ? value.oldManDailySaleDate
+      : '',
     heldSpecimenId,
     ownedItems,
     heldItemId,

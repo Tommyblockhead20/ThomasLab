@@ -4,7 +4,7 @@ const { Pool } = pg;
 const safeId = (value, maximum) => String(value ?? '').trim().toLowerCase()
   .replace(/[^a-z0-9_:-]/g, '_').slice(0, maximum);
 export const SONG_DOWNVOTE_REASON_IDS = Object.freeze([
-  'sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument'
+  'sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument', 'bad_model'
 ]);
 const LEGACY_DOWNVOTE_REASON_IDS = Object.freeze([
   'awkward_rhythm', 'too_long', 'bad_fit', 'other'
@@ -132,7 +132,7 @@ export class PostgresSongVoteStore {
         song_id VARCHAR(180) NOT NULL,
         song_revision INTEGER NOT NULL CHECK (song_revision > 0),
         vote VARCHAR(4) NOT NULL CHECK (vote IN ('up', 'down')),
-        downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument'))),
+        downvote_reason VARCHAR(32) NULL CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN ('sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument', 'bad_model'))),
         player_name VARCHAR(18) NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -161,7 +161,7 @@ export class PostgresSongVoteStore {
       ALTER TABLE reel_ascent_song_votes
       ADD CONSTRAINT reel_ascent_song_votes_downvote_reason_check
       CHECK (downvote_reason IS NULL OR (vote = 'down' AND downvote_reason IN (
-        'sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument',
+        'sounds_bad', 'glitched', 'too_hard', 'too_easy', 'bad_instrument', 'bad_model',
         '${LEGACY_DOWNVOTE_REASON_IDS.join("', '")}'
       )))
     `);

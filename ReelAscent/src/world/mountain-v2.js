@@ -217,6 +217,78 @@ export const SKYREACH_TOWER_CONFIG = Object.freeze({
   ])
 });
 
+
+export function skyreachHollowCollisionBoxes(config = SKYREACH_TOWER_CONFIG) {
+  const thickness = .58;
+  const boxes = [];
+  for (const [index, layer] of config.collisionLayers.entries()) {
+    const height = Math.max(.05, layer.top - layer.bottom);
+    const centerY = (layer.bottom + layer.top) / 2;
+    const wallDepth = Math.max(.05, layer.depth);
+    const wallWidth = Math.max(.05, layer.width);
+    const sideDepth = Math.max(.05, wallDepth - thickness * 2);
+
+    boxes.push({
+      id: `SKYREACH-HOLLOW-${String(index + 1).padStart(2, '0')}-WEST`,
+      label: `Skyreach hollow collision layer ${index + 1} west`,
+      center: { x: -wallWidth / 2 + thickness / 2, y: centerY, z: 0 },
+      size: { x: thickness, y: height, z: sideDepth }
+    });
+    boxes.push({
+      id: `SKYREACH-HOLLOW-${String(index + 1).padStart(2, '0')}-EAST`,
+      label: `Skyreach hollow collision layer ${index + 1} east`,
+      center: { x: wallWidth / 2 - thickness / 2, y: centerY, z: 0 },
+      size: { x: thickness, y: height, z: sideDepth }
+    });
+
+    if (index === 0) {
+      // Keep the ground-level shell physically hollow and leave a real lobby-sized entrance.
+      const doorwayWidth = 4.4;
+      const doorwayHeight = 4.8;
+      const sideWidth = Math.max(.2, (wallWidth - doorwayWidth) / 2);
+      boxes.push({
+        id: 'SKYREACH-HOLLOW-01-SOUTH',
+        label: 'Skyreach hollow collision layer 1 south',
+        center: { x: 0, y: centerY, z: wallDepth / 2 - thickness / 2 },
+        size: { x: wallWidth, y: height, z: thickness }
+      });
+      boxes.push({
+        id: 'SKYREACH-HOLLOW-01-NORTH-LEFT',
+        label: 'Skyreach hollow collision layer 1 north left',
+        center: { x: -(doorwayWidth + sideWidth) / 2, y: centerY, z: -wallDepth / 2 + thickness / 2 },
+        size: { x: sideWidth, y: height, z: thickness }
+      });
+      boxes.push({
+        id: 'SKYREACH-HOLLOW-01-NORTH-RIGHT',
+        label: 'Skyreach hollow collision layer 1 north right',
+        center: { x: (doorwayWidth + sideWidth) / 2, y: centerY, z: -wallDepth / 2 + thickness / 2 },
+        size: { x: sideWidth, y: height, z: thickness }
+      });
+      const headerHeight = Math.max(.2, layer.top - doorwayHeight);
+      boxes.push({
+        id: 'SKYREACH-HOLLOW-01-NORTH-HEADER',
+        label: 'Skyreach hollow collision layer 1 north doorway header',
+        center: { x: 0, y: doorwayHeight + headerHeight / 2, z: -wallDepth / 2 + thickness / 2 },
+        size: { x: doorwayWidth, y: headerHeight, z: thickness }
+      });
+    } else {
+      boxes.push({
+        id: `SKYREACH-HOLLOW-${String(index + 1).padStart(2, '0')}-NORTH`,
+        label: `Skyreach hollow collision layer ${index + 1} north`,
+        center: { x: 0, y: centerY, z: -wallDepth / 2 + thickness / 2 },
+        size: { x: wallWidth, y: height, z: thickness }
+      });
+      boxes.push({
+        id: `SKYREACH-HOLLOW-${String(index + 1).padStart(2, '0')}-SOUTH`,
+        label: `Skyreach hollow collision layer ${index + 1} south`,
+        center: { x: 0, y: centerY, z: wallDepth / 2 - thickness / 2 },
+        size: { x: wallWidth, y: height, z: thickness }
+      });
+    }
+  }
+  return boxes;
+}
+
 export function skyreachRectanglePoint(progress, width = SKYREACH_TOWER_CONFIG.width, depth = SKYREACH_TOWER_CONFIG.depth) {
   const t = ((progress % 1) + 1) % 1;
   const perimeter = 2 * (width + depth);
@@ -673,6 +745,7 @@ export const OCEAN_FISHING_DESCRIPTOR = Object.freeze({
   id: 'outer-ocean', label: 'Outer Ocean', physicalZone: 'Ocean', tier: 'ocean', waterType: 'ocean', theme: 'coastal',
   ecologyThemes: ['sunwash', 'fernwood', 'blackstone'], uniformProbabilities: true, probabilityGroup: 'outer-ocean',
   center: MOUNTAIN_CENTER, innerRadius: OCEAN_WATER_INNER_RADIUS, outerRadius: OCEAN_VISUAL_OUTER_RADIUS - 5,
+  biteDelayMultiplier: 1.2,
   fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
 });
 
@@ -684,6 +757,7 @@ export const FROSTHOOK_COLD_OCEAN_DESCRIPTOR = Object.freeze({
   // The annulus slightly overlaps Frosthook's shortest shoreline radius so there is no
   // exposed Outer Ocean strip between the island mesh and its dedicated cold water.
   innerRadius: 18.25, outerRadius: 44, radii: [44, 39],
+  biteDelayMultiplier: 1.2,
   fish: ['polar_bear', 'penguin', 'qallupilluk', 'blue-ice-codling', 'frostglass-shrimp']
 });
 
@@ -694,8 +768,9 @@ export const BLUEWATER_REACH_DESCRIPTOR = Object.freeze({
   probabilityGroup: 'bluewater-reach', habitatAliasIds: ['outer-ocean'],
   center: BLUEWATER_WORLD_LOCATION?.worldPosition ?? MOUNTAIN_CENTER,
   innerRadius: 8, outerRadius: 50, radii: [50, 50],
-  specimenSizeBias: .08,
-  largeSpeciesWeightBias: .12,
+  biteDelayMultiplier: 1.25,
+  specimenSizeBias: .12,
+  largeSpeciesWeightBias: .20,
   fish: ['sardine', 'anchovy', 'mackerel', 'rockfish', 'sea-bass', 'flounder', 'striped-mullet']
 });
 
@@ -924,6 +999,7 @@ export function climateThemeAt(angle) {
 
 export const MOUNTAIN_FISHING_LOCATIONS = Object.freeze(EDITOR_FISHING_LAYOUT.map((location) => Object.freeze({
   ...location,
+  waterType: location.id === 'amber-reed-pond' ? 'brackish-lagoon' : location.waterType,
   // The centered summit tarn has its own alpine ecology rather than inheriting the
   // arbitrary sunwash wedge from angle zero. Every other water keeps its prior theme.
   theme: location.summit || location.offshore || location.waterfall ? location.theme : climateThemeAt(location.angle),
@@ -1310,6 +1386,9 @@ export class MountainWorld extends TestWorld {
     this.materials.decoGlass = makeMaterial([.19, .42, .5], { opacity: .56, gloss: .9, emissive: [.012, .045, .06] });
     this.materials.decoTile = makeMaterial([.78, .74, .62], { gloss: .42 });
     this.materials.athenaeumMist = makeMaterial([.56, .7, .7], { opacity: .085, gloss: .02, emissive: [.012, .02, .02], doubleSided: true });
+    this.materials.skyreachFacade = makeMaterial([.27, .31, .34], { gloss: .26, metalness: .08, emissive: [.006, .01, .014] });
+    this.materials.skyreachAccent = makeMaterial([.72, .56, .23], { gloss: .7, metalness: .42, emissive: [.045, .028, .006] });
+
 
     this.rockMaterialVariants = new Map();
     // A route should read as broken mountain rock, not a vertical row of cylinders.
@@ -1345,6 +1424,7 @@ export class MountainWorld extends TestWorld {
     this.rockSupportAudit = this.auditSolidRockSupport();
     markStartup('world:rock-support-audit');
     this.buildFishingLocations();
+    this.publishBasaltProductionFreeze();
     markStartup('world:fishing-waters');
     this.indexMapDebugObjects();
     markStartup('world:debug-id-index');
@@ -1485,6 +1565,17 @@ export class MountainWorld extends TestWorld {
     this.buildTarget.addChild(group);
     this.locationLoadGroups.set(location.id, group);
     if (location.id === 'cave-fishing-island') {
+      this.basaltProductionFreeze = {
+        schema: 1,
+        kind: 'reel-ascent-basalt-production-freeze',
+        format: 'triangle-mesh-v1',
+        coordinateSpace: 'island-local',
+        origin: { x: location.worldPosition.x, y: 0, z: location.worldPosition.z },
+        positions: [],
+        indices: [],
+        parts: [],
+        capturedAt: new Date().toISOString()
+      };
       // World Editor V2 authored objects use a stable island-local coordinate frame while the
       // legacy island mesh itself is still generated in world coordinates. This bridge lets
       // Basalt accumulate authored props/platforms now without claiming the approximate editor
@@ -1637,10 +1728,119 @@ export class MountainWorld extends TestWorld {
     );
     this.islandEntities.set(location.id, entity);
     this.islandTerrainSurfaces.set(location.id, { vertices, triangles });
+    if (location.id === 'cave-fishing-island') {
+      this.appendBasaltProductionFreezePart('island-core', vertices, triangles);
+    }
     const previousTarget = this.buildTarget;
     this.buildTarget = group;
     this.decorateOceanIsland(location);
     this.buildTarget = previousTarget;
+  }
+
+
+  appendBasaltProductionFreezePart(name, vertices, triangles) {
+    const freeze = this.basaltProductionFreeze;
+    if (!freeze || !Array.isArray(vertices) || !Array.isArray(triangles)) return;
+    const origin = freeze.origin ?? { x: 0, y: 0, z: 0 };
+    const base = freeze.positions.length / 3;
+    for (const vertex of vertices) {
+      freeze.positions.push(
+        Number(vertex[0]) - Number(origin.x || 0),
+        Number(vertex[1]) - Number(origin.y || 0),
+        Number(vertex[2]) - Number(origin.z || 0)
+      );
+    }
+    const triangleStart = freeze.indices.length / 3;
+    for (const triangle of triangles) {
+      freeze.indices.push(base + triangle[0], base + triangle[1], base + triangle[2]);
+    }
+    freeze.parts.push({
+      name: String(name || `part-${freeze.parts.length + 1}`),
+      firstVertex: base,
+      vertexCount: vertices.length,
+      firstTriangle: triangleStart,
+      triangleCount: triangles.length
+    });
+  }
+
+  publishBasaltProductionFreeze() {
+    const freeze = this.basaltProductionFreeze;
+    if (!freeze?.positions?.length || !freeze?.indices?.length) return;
+    freeze.capturedAt = new Date().toISOString();
+    freeze.metadata = {
+      source: 'actual-production-build',
+      includes: freeze.parts.map((part) => part.name),
+      vertexCount: freeze.positions.length / 3,
+      triangleCount: freeze.indices.length / 3
+    };
+    try {
+      localStorage.setItem('reel-ascent:world-editor-v2:basalt-production-freeze', JSON.stringify(freeze));
+    } catch (error) {
+      console.warn('[reel-ascent] Basalt production freeze could not be cached for the editor.', error);
+    }
+    if (typeof window !== 'undefined') {
+      window.__reelAscentBasaltProductionFreeze = freeze;
+    }
+  }
+
+  addWorldEditorPrefabWater(parentRoot, instance, water) {
+    if (!parentRoot || !water?.position || !water?.radii) return null;
+    const local = new pc.Vec3(
+      Number(water.position.x) || 0,
+      Number(water.position.y) || 0,
+      Number(water.position.z) || 0
+    );
+    const worldPoint = new pc.Vec3();
+    parentRoot.syncHierarchy();
+    parentRoot.getWorldTransform().transformPoint(local, worldPoint);
+    const scale = parentRoot.getScale?.() ?? { x: 1, y: 1, z: 1 };
+    const radii = {
+      x: Math.max(.05, Number(water.radii.x) * Math.abs(scale.x || 1)),
+      z: Math.max(.05, Number(water.radii.z) * Math.abs(scale.z || 1))
+    };
+    const depth = Math.max(.05, Number(water.depthMeters) || .45) * Math.abs(scale.y || 1);
+    const previousTarget = this.buildTarget;
+    this.buildTarget = parentRoot;
+    const visible = this.addFishingWaterSurface(
+      `${water.name || water.identity || water.id} water`,
+      local,
+      { x: Number(water.radii.x) || 1, z: Number(water.radii.z) || 1 },
+      water.metadata?.electrified ? this.materials.shallowWater : this.materials.shallowWater
+    );
+    this.buildTarget = previousTarget;
+    if (visible?.render) visible.render.castShadows = false;
+
+    const fishIds = Array.isArray(water.fishIds) ? water.fishIds.filter(Boolean) : [];
+    if (fishIds.length) {
+      const fishingScale = Number.isFinite(Number(water.fishingZoneScale)) ? Number(water.fishingZoneScale) : 1;
+      const zone = new FishingZone({
+        id: String(water.id),
+        label: String(water.name || water.identity || water.id),
+        center: { x: worldPoint.x, z: worldPoint.z },
+        radii: { x: radii.x * fishingScale, z: radii.z * fishingScale },
+        shape: 'ellipse',
+        surfaceY: worldPoint.y,
+        floorY: worldPoint.y - depth,
+        fishIds,
+        depth: depth > .9 ? 'deep' : 'shallow',
+        modifiers: {
+          biteRate: 1,
+          size: 1,
+          rarityBias: .08,
+          trophyChance: 1.02,
+          maximumSpeciesProbability: ECOLOGY_TARGETS.maximumSpeciesShare
+        }
+      });
+      zone.tier = 'skyscraper';
+      zone.waterType = water.metadata?.waterType ?? 'interior-water';
+      zone.theme = water.metadata?.electrified ? 'industrial-electric' : 'skyreach-interior';
+      zone.physicalZone = water.metadata?.physicalSource ?? water.name ?? water.id;
+      zone.canonicalWaterId = String(water.identity || water.id);
+      zone.prefabInstanceId = instance?.id ?? null;
+      zone.allowedFishIds = [...fishIds];
+      this.fishingZones.push(attachZoneEcology(zone));
+    }
+    return { entity: visible, water, instanceId: instance?.id ?? null };
   }
 
   buildBluewaterBoat(location, group) {
@@ -2007,21 +2207,23 @@ export class MountainWorld extends TestWorld {
     this.skyreachRoot = root;
     this.loadSkyreachVisualShell(root);
 
-    // v17.4 keeps the island to one imported landmark and a compact invisible hull.
-    // These overlapping volumes follow the real model's setbacks, form a continuous
-    // hole-free solid, and stay out of the climb-surface registry.
-    for (const [index, layer] of config.collisionLayers.entries()) {
+    // The old 13 setback cuboids were solid all the way through, so every authored interior
+    // sat inside an invisible block. Use thin perimeter slabs derived from the same silhouette
+    // instead: exterior traversal still hits the facade, but the tower now has usable interior
+    // volume. Layer 1 includes a real lobby-sized north entrance.
+    for (const box of skyreachHollowCollisionBoxes(config)) {
       const collision = this.addStructureBox(
         root,
-        `Skyreach non-climbable collision layer ${index + 1}`,
-        { x: 0, y: (layer.bottom + layer.top) / 2, z: 0 },
-        { x: layer.width, y: layer.top - layer.bottom, z: layer.depth },
+        box.label,
+        box.center,
+        box.size,
         this.materials.decoStone,
         {},
         true
       );
       collision.render.enabled = false;
       collision.tags.add('non-climbable');
+      collision.mapDebugId = box.id;
     }
     // World Editor V2 parkour content is authored in the same local frame as this
     // structure root. The visual ESB remains the supplied SonnySee model; only authored
@@ -2059,6 +2261,12 @@ export class MountainWorld extends TestWorld {
       for (const component of sourceBuilding.findComponents?.('render') ?? []) {
         component.castShadows = true;
         component.receiveShadows = true;
+        for (const meshInstance of component.meshInstances ?? []) {
+          const sourceName = String(meshInstance.material?.name || '').toLowerCase();
+          meshInstance.material = sourceName.includes('light')
+            ? this.materials.skyreachAccent
+            : this.materials.skyreachFacade;
+        }
       }
       visual.syncHierarchy();
 
@@ -2215,7 +2423,7 @@ export class MountainWorld extends TestWorld {
         { x: .09, y: .14, z: .09 }, this.materials.cabinWarm, {}, false);
     };
     buildNpc('Outfitter clerk', -2.2, this.materials.cabinFabric, this.materials.cabinWarm);
-    buildNpc('Fish buyer', 2.2, this.materials.deepWater, this.materials.deepRock);
+    buildNpc('Old Man fish buyer', 2.2, this.materials.deepWater, this.materials.deepRock);
     box('OUTFITTER BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.cabinWarm, {}, false);
     box('FISH MARKET SELL CATCHES counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.shallowWater, {}, false);
     const glyphs = {
@@ -2303,7 +2511,7 @@ export class MountainWorld extends TestWorld {
     });
     this.homeInteractions.push(
       counterInteraction('shop-counter', 'OPEN OUTFITTER', 'buy', 2.2),
-      counterInteraction('fishmonger-counter', 'SELL CARRIED CATCHES', 'sell', -2.2)
+      counterInteraction('fishmonger-counter', "VISIT THE OLD MAN • SELL CATCHES", 'sell', -2.2)
     );
   }
 
@@ -5642,6 +5850,7 @@ export class MountainWorld extends TestWorld {
       depth: 'deep',
       modifiers: {
         biteRate: 1.02,
+        biteDelayMultiplier: descriptor.biteDelayMultiplier,
         size: 1.08,
         rarityBias: .12,
         trophyChance: 1.12,
@@ -5673,6 +5882,7 @@ export class MountainWorld extends TestWorld {
       depth: 'deep',
       modifiers: {
         biteRate: 1,
+        biteDelayMultiplier: descriptor.biteDelayMultiplier,
         size: 1,
         specimenSizeBias: descriptor.specimenSizeBias,
         largeSpeciesWeightBias: descriptor.largeSpeciesWeightBias,
@@ -5732,6 +5942,7 @@ export class MountainWorld extends TestWorld {
       depth: 'deep',
       modifiers: {
         biteRate: .98,
+        biteDelayMultiplier: descriptor.biteDelayMultiplier,
         size: 1.04,
         rarityBias: .07,
         trophyChance: 1.08,
@@ -5759,6 +5970,9 @@ export class MountainWorld extends TestWorld {
     // construction is deleted, not disabled or pushed deeper into the mountain.
     const addCaveMesh = (name, vertices, triangles, material, friction = .92) => {
       if (!vertices.length || !triangles.length) return null;
+      if (location.offshore === 'cave-fishing-island') {
+        this.appendBasaltProductionFreezePart(name, vertices, triangles);
+      }
       const geometry = new pc.Geometry();
       geometry.positions = [];
       geometry.indices = [];

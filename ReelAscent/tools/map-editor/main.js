@@ -27,17 +27,19 @@ import {
   wrapLegacyStoneveilPatch,
   unwrapLegacyStoneveilPatch
 } from './world-level-format.js';
-import { GenericWorldScene } from './generic-scene.js';
+import { GenericWorldScene, sculptTriangleMesh } from './generic-scene.js';
 import { SlopeOverlay, slopeOverlayLegend } from './slope-overlay.js';
 import { validateWorldLevel } from './validation.js';
 import { movingPlatformPose } from '../../src/world/world-editor-v2-runtime.js';
 import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinition, makeRoomComponentDefinition } from './room-library.js';
+import { PIRATE_ASSET_LIBRARY, getPirateAsset, makePirateAssetDefinition } from './pirate-library.js';
 
 const STORAGE_KEY = 'reel-ascent-map-editor-v1';
 const CHECKPOINT_KEY = 'reel-ascent-map-editor-v1-manual-checkpoint';
 const RECOVERY_DB_NAME = 'reel-ascent-map-editor-recovery';
 const RECOVERY_STORE = 'autosaves';
 const RECOVERY_KEY = 'latest-patch';
+const STONEVEIL_AUTOSAVE_META_KEY = 'reel-ascent-map-editor-stoneveil-autosave-meta-v2';
 const CAMERA_VIEW_KEY = 'reel-ascent-map-editor-camera-view-v1';
 const MIN_BRIGHTNESS_KEY = 'reel-ascent-map-editor-min-brightness-v1';
 const WORLD_V2_ACTIVE_KEY = 'reel-ascent-world-editor-v2-active-world';
@@ -69,10 +71,10 @@ const deg = (radians) => radians * 180 / Math.PI;
 const rad = (degrees) => degrees * Math.PI / 180;
 const clone = (value) => structuredClone(value);
 
-const hadStoneveilAutosaveAtBoot = (() => {
-  try { return localStorage.getItem(STORAGE_KEY) != null; } catch { return false; }
-})();
 let patch = loadLocalPatch();
+let stoneveilProjectSignature = null;
+let stoneveilContextRecovery = null;
+let webglRecoveryCount = 0;
 let runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
 let tool = 'select';
 let selected = null;
@@ -84,6 +86,7 @@ let future = [];
 let suppressHistory = false;
 let activeBrushTransaction = false;
 let currentTerrainData = null;
+const terrainRenderState = { entity: null, mesh: null, vertexCapacity: 0, indexCapacity: 0 };
 let caveConnectStart = null;
 let activeWorldId = (() => {
   try {
@@ -292,18 +295,23 @@ try {
   }
 } catch {}
 let cameraViewSaveTimer = null;
+function cameraViewPayload() {
+  return {
+    target: { x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z },
+    yaw: cameraState.yaw,
+    pitch: cameraState.pitch,
+    distance: cameraState.distance
+  };
+}
+function saveCameraViewNow() {
+  if (cameraViewSaveTimer) { clearTimeout(cameraViewSaveTimer); cameraViewSaveTimer = null; }
+  try { sessionStorage.setItem(CAMERA_VIEW_KEY, JSON.stringify(cameraViewPayload())); } catch {}
+}
 function queueCameraViewSave() {
   if (cameraViewSaveTimer) return;
   cameraViewSaveTimer = setTimeout(() => {
     cameraViewSaveTimer = null;
-    try {
-      sessionStorage.setItem(CAMERA_VIEW_KEY, JSON.stringify({
-        target: { x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z },
-        yaw: cameraState.yaw,
-        pitch: cameraState.pitch,
-        distance: cameraState.distance
-      }));
-    } catch {}
+    saveCameraViewNow();
   }, 120);
 }
 
@@ -1087,24 +1095,43 @@ function calculateAreaWeightedNormals(positions, indices) {
 }
 
 function rebuildTerrain() {
-  destroyChildren(terrainRoot);
   const data = terrainDataForRender();
   currentTerrainData = data;
-  const geometry = new pc.Geometry();
-  geometry.positions = data.positions;
-  geometry.indices = data.indices;
-  // Use area-weighted normals. Pure local subdivision should not visibly change a broad
-  // region merely because one old triangle became several coplanar triangles.
-  geometry.normals = calculateAreaWeightedNormals(data.positions, data.indices);
-  const mesh = pc.Mesh.fromGeometry(app.graphicsDevice, geometry);
-  const entity = new pc.Entity(isMeshMode() ? 'Frozen 3D Mountain Mesh' : 'Editable Mountain');
-  entity._editorOwnedMeshes = [mesh];
-  entity.addComponent('render');
-  const terrainMaterial = collisionVisible() ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
-  entity.render.meshInstances = [new pc.MeshInstance(mesh, terrainMaterial, entity)];
-  terrainRoot.addChild(entity);
-  if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, data);
+  const normals = calculateAreaWeightedNormals(data.positions, data.indices);
+  const vertexCount = Math.floor(data.positions.length / 3);
+  const indexCount = data.indices.length;
 
+  // Keep one dynamic GPU mesh alive for Stoneveil instead of destroying/recreating a
+  // ~174k-triangle mesh after every sculpt click. Repeated full buffer allocation was a
+  // major source of GPU-memory churn and WebGL context-loss flashes in long sessions.
+  if (!terrainRenderState.mesh || !terrainRenderState.entity) {
+    const mesh = new pc.Mesh(app.graphicsDevice);
+    mesh.clear(true, true, vertexCount, indexCount);
+    const entity = new pc.Entity(isMeshMode() ? 'Frozen 3D Mountain Mesh' : 'Editable Mountain');
+    entity._editorOwnedMeshes = [mesh];
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, materials.terrain, entity)];
+    terrainRoot.addChild(entity);
+    terrainRenderState.mesh = mesh;
+    terrainRenderState.entity = entity;
+    terrainRenderState.vertexCapacity = vertexCount;
+    terrainRenderState.indexCapacity = indexCount;
+  } else if (vertexCount > terrainRenderState.vertexCapacity || indexCount > terrainRenderState.indexCapacity) {
+    terrainRenderState.vertexCapacity = Math.max(vertexCount, Math.ceil(terrainRenderState.vertexCapacity * 1.35));
+    terrainRenderState.indexCapacity = Math.max(indexCount, Math.ceil(terrainRenderState.indexCapacity * 1.35));
+    terrainRenderState.mesh.clear(true, true, terrainRenderState.vertexCapacity, terrainRenderState.indexCapacity);
+  }
+
+  const mesh = terrainRenderState.mesh;
+  mesh.setPositions(data.positions);
+  mesh.setNormals(normals);
+  mesh.setIndices(data.indices);
+  mesh.update(pc.PRIMITIVE_TRIANGLES, true);
+  terrainRenderState.entity.name = isMeshMode() ? 'Frozen 3D Mountain Mesh' : 'Editable Mountain';
+  const terrainMaterial = collisionVisible() ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
+  terrainRenderState.entity.render.meshInstances[0].material = terrainMaterial;
+
+  if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, data);
   rebuildWaterMeshes();
   rebuildTunnels();
   updatePlacedObjectHeights();
@@ -1798,16 +1825,27 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
 function historyPayload(source = patch) {
   const copy = clone(source);
   // Existing-rock snapshots can dwarf terrain edits. They are not part of Undo/Redo;
-  // preserve the currently loaded snapshot across history restores instead.
+  // preserve the currently loaded snapshot across history restores instead. Large terrain
+  // arrays are packed into typed arrays so an authored Stoneveil history step consumes a
+  // few MB instead of retaining another giant JSON string / boxed-number array graph.
   copy.bakedSnapshot = null;
-  return JSON.stringify(copy);
+  const mesh = copy.terrain?.bakedMesh;
+  if (mesh?.positions && mesh?.indices) {
+    mesh.positions = Float32Array.from(mesh.positions);
+    mesh.indices = Uint32Array.from(mesh.indices);
+  }
+  return copy;
+}
+
+function trimStoneveilHistoryStack(stack) {
+  const limit = isMeshMode() ? 10 : 120;
+  while (stack.length > limit) stack.shift();
 }
 
 function saveHistory() {
   if (suppressHistory) return;
   history.push(historyPayload());
-  const limit = isMeshMode() ? 40 : 120;
-  if (history.length > limit) history.shift();
+  trimStoneveilHistoryStack(history);
   future = [];
 }
 
@@ -1825,9 +1863,9 @@ function commit(mutator, { terrain = false, placed = false, snapshot = false, wa
   renderUi();
 }
 
-function restoreHistoryPayload(serialized) {
+function restoreHistoryPayload(payload) {
   const bakedSnapshot = patch.bakedSnapshot;
-  patch = normalizePatch(JSON.parse(serialized));
+  patch = normalizePatch(payload);
   if (!patch.bakedSnapshot && bakedSnapshot) patch.bakedSnapshot = bakedSnapshot;
   runtimeSnapshot = clone(patch.bakedSnapshot ?? runtimeSnapshot ?? { objects: [], rocks: [] });
 }
@@ -1843,6 +1881,7 @@ function undo() {
   }
   if (!history.length) return;
   future.push(historyPayload());
+  trimStoneveilHistoryStack(future);
   restoreHistoryPayload(history.pop());
   persistPatch();
   selected = null;
@@ -1861,6 +1900,7 @@ function redo() {
   }
   if (!future.length) return;
   history.push(historyPayload());
+  trimStoneveilHistoryStack(history);
   restoreHistoryPayload(future.pop());
   persistPatch();
   selected = null;
@@ -1904,7 +1944,11 @@ async function writeRecoverySnapshot() {
   const record = {
     savedAt: Date.now(),
     updatedAt: patch.updatedAt ?? null,
-    patch: clone(patch)
+    baseProjectSignature: stoneveilProjectSignature,
+    terrainSignature: stoneveilTerrainSignature(patch),
+    // IndexedDB performs structured cloning for put(). Passing the live object avoids
+    // creating a second full 3D-mesh clone in JavaScript before that clone even starts.
+    patch
   };
   return new Promise((resolve) => {
     try {
@@ -1949,9 +1993,27 @@ function patchTimestamp(value) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function stoneveilTerrainSignature(source = patch) {
+  const mesh = source?.terrain?.bakedMesh;
+  if (!mesh?.positions?.length || !mesh?.indices?.length) return 'stoneveil:no-baked-mesh';
+  let hash = 0x811c9dc5;
+  const mix = (value) => { hash ^= (value >>> 0); hash = Math.imul(hash, 0x01000193) >>> 0; };
+  mix(mesh.positions.length); mix(mesh.indices.length);
+  // 1e-5 m quantization is far below meaningful editor precision while producing a
+  // deterministic fingerprint that catches even localized terrain revisions.
+  for (const value of mesh.positions) mix(Math.round(Number(value) * 100000));
+  for (const value of mesh.indices) mix(Number(value));
+  return `triangle-mesh-v1:${mesh.positions.length / 3}:${mesh.indices.length / 3}:${hash.toString(16).padStart(8, '0')}`;
+}
+
+function recoveryMatchesCurrentProject(record) {
+  return Boolean(stoneveilProjectSignature && record?.baseProjectSignature === stoneveilProjectSignature);
+}
+
 async function recoverNewerAutosaveIfNeeded() {
   const record = await readRecoverySnapshot();
   if (!record?.patch) return false;
+  if (!recoveryMatchesCurrentProject(record)) return false;
   const recovered = normalizePatch(record.patch);
   if (patchTimestamp(recovered) <= patchTimestamp(patch)) return false;
   patch = recovered;
@@ -1964,13 +2026,24 @@ async function recoverNewerAutosaveIfNeeded() {
 }
 
 function persistPatch() {
-  // Keep the original synchronous localStorage autosave for fast startup and backwards
-  // compatibility, but do not rely on it alone: a heavily subdivided 3D mesh can exceed
-  // localStorage quota. IndexedDB is the durable large-patch recovery copy.
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(patch)); }
-  catch (error) {
-    console.warn('Map Editor localStorage autosave is full; IndexedDB recovery remains active.', error);
+  // Frozen Stoneveil is far beyond the practical localStorage payload size. Stringifying the
+  // whole mesh on every sculpt click caused multi-megabyte temporary allocations and repeated
+  // quota failures. Mesh mode now uses IndexedDB for the actual autosave and keeps only tiny
+  // metadata in localStorage. Heightfield compatibility mode retains the old localStorage path.
+  if (isMeshMode()) {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.setItem(STONEVEIL_AUTOSAVE_META_KEY, JSON.stringify({
+        updatedAt: patch.updatedAt ?? null,
+        baseProjectSignature: stoneveilProjectSignature,
+        terrainSignature: stoneveilTerrainSignature(patch)
+      }));
+    } catch {}
+    queueRecoverySnapshot();
+    return;
   }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(patch)); }
+  catch (error) { console.warn('Map Editor localStorage autosave unavailable; IndexedDB recovery remains active.', error); }
   queueRecoverySnapshot();
 }
 
@@ -2046,15 +2119,39 @@ async function reloadProjectPatch() {
     const data = await response.json();
     saveHistory();
     patch = normalizePatch(data);
+    stoneveilProjectSignature = stoneveilTerrainSignature(patch);
     runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
     selected = null;
     persistPatch();
+    // Do not leave a stale older mesh in IndexedDB if a graphics reset/page reload happens
+    // immediately after the user explicitly chose the project version.
+    await writeRecoverySnapshot();
     syncSnapshotUi();
     rebuildAll();
-    setStatus('Reloaded project map-editor-patch.json.');
+    setStatus('Reloaded and pinned the project Stoneveil patch. Browser recovery now follows this project terrain revision.');
   } catch (error) {
     setStatus(`Could not reload project patch: ${error?.message || error}`);
   }
+}
+
+async function recoverBrowserAutosaveExplicitly() {
+  if (!isStoneveilWorld()) { setStatus('Browser terrain recovery applies to Stoneveil.'); return; }
+  const record = await readRecoverySnapshot();
+  if (!record?.patch) { setStatus('No Stoneveil IndexedDB recovery snapshot is available.'); return; }
+  const recovered = normalizePatch(record.patch);
+  const sameBase = recoveryMatchesCurrentProject(record);
+  const message = sameBase
+    ? 'Recover the latest Stoneveil browser autosave? Current project state will remain available through Undo.'
+    : 'This browser recovery was created from a DIFFERENT Stoneveil project terrain revision. Recover it anyway? Use this only if you intentionally want the older/different branch.';
+  if (!confirm(message)) return;
+  saveHistory();
+  patch = recovered;
+  runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
+  selected = null;
+  persistPatch();
+  syncSnapshotUi();
+  rebuildAll();
+  setStatus(sameBase ? 'Recovered the compatible browser autosave.' : 'Recovered a browser autosave from a different project revision by explicit request.');
 }
 
 function rebuildAll() {
@@ -2071,8 +2168,6 @@ function rebuildAll() {
   rebuildTerrain();
   rebuildPlacedObjects();
   rebuildSnapshotObjects();
-  rebuildTunnels();
-  if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, currentTerrainData ?? terrainDataForRender());
   renderUi();
 }
 
@@ -2748,8 +2843,7 @@ function commitCaveConnection(startEndpoint, endEndpoint, radius) {
   const result = connectCaveSurfaces(startEndpoint, endEndpoint, radius);
   if (!result.ok) return result;
   history.push(before);
-  const limit = isMeshMode() ? 40 : 120;
-  if (history.length > limit) history.shift();
+  trimStoneveilHistoryStack(history);
   future = [];
   patch.updatedAt = new Date().toISOString();
   persistPatch();
@@ -2818,6 +2912,28 @@ function applyGenericToolAt(event) {
     selected = hit ? { kind: hit.kind, id: String(hit.id), record: hit.record } : null;
     genericScene.setSelected(selected?.id ?? null);
     renderUi();
+    return;
+  }
+  if (activeWorldId === 'cave-fishing-island' && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) {
+    const hit = genericScene.basaltTerrainHit(ray);
+    if (!hit) {
+      setStatus('Load the captured Basalt production mesh first, then sculpt the frozen candidate.');
+      return;
+    }
+    const radius = Number($('#brush-radius')?.value) || 4;
+    const strength = Number($('#brush-strength')?.value) || 1;
+    let changed = 0;
+    commitGeneric((draft) => {
+      if (draft.terrain?.mode !== 'authored-mesh-candidate') return;
+      changed = sculptTriangleMesh(draft.terrain, hit, tool, radius, strength);
+      draft.terrain.editedAt = new Date().toISOString();
+      draft.sourcePolicy.terrain = 'authored-candidate';
+    });
+    if (changed) {
+      genericScene.setBasaltReferenceMode('authored');
+      if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value = 'authored';
+      setStatus(`Basalt ${tool}: edited ${changed} connected mesh vertices. Production still uses the procedural reference until you explicitly promote it later.`);
+    }
     return;
   }
   if (tool === 'move-water') {
@@ -3107,13 +3223,17 @@ function syncWorldUi() {
   const selector = $('#world-selector');
   if (selector && selector.value !== world.id) selector.value = world.id;
   const stoneveil = isStoneveilWorld();
-  for (const id of ['brush-section', 'mesh-mode-section', 'rock-palette-section', 'plant-palette-section', 'decor-palette-section', 'mountain-profile-section']) {
+  const caveTerrain = world.id === 'cave-fishing-island' && worldHasCapability(world.id, 'terrain');
+  for (const id of ['rock-palette-section', 'plant-palette-section', 'decor-palette-section', 'mountain-profile-section', 'mesh-mode-section']) {
     const element = $(`#${id}`);
     if (element) element.hidden = !stoneveil;
   }
+  if ($('#brush-section')) $('#brush-section').hidden = !(stoneveil || caveTerrain);
   $('#generic-palette-section').hidden = !(worldHasCapability(world.id, 'parkour') || worldHasCapability(world.id, 'objects') || worldHasCapability(world.id, 'prefabs') || worldHasCapability(world.id, 'rooms'));
   if ($('#cave-migration-section')) $('#cave-migration-section').hidden = world.id !== 'cave-fishing-island';
   if ($('#skyscraper-room-library-section')) $('#skyscraper-room-library-section').hidden = world.id !== 'skyscraper';
+  if ($('#pirate-asset-library-section')) $('#pirate-asset-library-section').hidden = world.id !== 'pirate-island';
+  if ($('#skyscraper-interior-wrap')) $('#skyscraper-interior-wrap').hidden = world.id !== 'skyscraper';
   if ($('#create-prefab-foundation')) $('#create-prefab-foundation').hidden = !worldHasCapability(world.id, 'prefabs');
   if ($('#create-room-foundation')) $('#create-room-foundation').hidden = !worldHasCapability(world.id, 'rooms');
   if (world.id === 'cave-fishing-island' && $('#basalt-freeze-status')) {
@@ -3126,6 +3246,7 @@ function syncWorldUi() {
   $('#import-snapshot').hidden = !stoneveil;
   $('#bake-snapshot').hidden = !stoneveil;
   $('#freeze-core').hidden = !stoneveil;
+  if ($('#recover-browser-autosave')) $('#recover-browser-autosave').hidden = !stoneveil;
   $('#checkpoint').textContent = stoneveil ? 'Checkpoint' : 'Checkpoint World';
   $('#restore-checkpoint').textContent = stoneveil ? 'Restore Checkpoint' : 'Restore World Checkpoint';
   $('#save-patch').textContent = stoneveil ? 'Save Stoneveil Patch' : 'Save World Level';
@@ -4346,8 +4467,11 @@ function placeCompleteLibraryRoom() {
   });
   selected = { kind: 'room', id };
   genericScene.setSelected(id);
+  genericScene.setSkyscraperInteriorMode(true);
+  if ($('#skyscraper-interior-mode')) $('#skyscraper-interior-mode').checked = true;
+  focusSelectedObject();
   renderUi();
-  setStatus(`Placed complete ${template.label}. Edit Source Prefab exposes its ${template.components.length} named component groups.`);
+  setStatus(`Placed complete ${template.label}. Interior cutaway is on so the exterior shell does not hide the room. Edit Source Prefab exposes its ${template.components.length} named component groups.`);
 }
 
 function placeLibraryComponent() {
@@ -4383,6 +4507,43 @@ function placeLibraryComponent() {
   setStatus(`Placed ${template.label} component: ${component.label}. It is an independent linked module with its own root transform.`);
 }
 
+
+function populatePirateAssetUi() {
+  const select = $('#pirate-asset-template');
+  if (!select) return;
+  if (!select.options.length) {
+    for (const asset of PIRATE_ASSET_LIBRARY) select.add(new Option(asset.label, asset.id));
+  }
+  const asset = getPirateAsset(select.value || PIRATE_ASSET_LIBRARY[0]?.id);
+  if ($('#pirate-asset-description')) $('#pirate-asset-description').textContent = asset.description;
+}
+
+function placePirateAsset() {
+  if (activeWorldId !== 'pirate-island') return;
+  const level = activeGenericLevel();
+  const assetId = $('#pirate-asset-template')?.value || PIRATE_ASSET_LIBRARY[0]?.id;
+  const asset = getPirateAsset(assetId);
+  const definition = makePirateAssetDefinition(assetId);
+  const id = nextStableId(level, 'PIRATE-INSTANCE');
+  const instance = {
+    id,
+    name: `${asset.label} ${id.split('-').at(-1)}`,
+    prefabId: definition.id,
+    linked: true,
+    transform: { position: maybeSnapPosition({ x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z }), rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+    metadata: { pirateAssetId: asset.id, pirateLibrary: true }
+  };
+  commitGeneric((draft) => {
+    ensureLibraryDefinition(draft, definition);
+    draft.prefabs.instances.push(instance);
+  });
+  selected = { kind: 'prefab-instance', id };
+  genericScene.setSelected(id);
+  focusSelectedObject();
+  renderUi();
+  setStatus(`Placed pirate asset: ${asset.label}. Duplicate/move it or use Edit Source Prefab to alter the linked source.`);
+}
+
 function createTestRoom() {
   if (isStoneveilWorld() || !worldHasCapability(activeWorldId, 'rooms')) return;
   const level=activeGenericLevel();
@@ -4405,10 +4566,10 @@ function createTestRoom() {
 }
 
 
-async function importBasaltFreezeFile(file) {
+
+function importBasaltFreezeObject(raw, sourceLabel = 'production-freeze-import') {
   if (activeWorldId !== 'cave-fishing-island') return;
-  const raw=JSON.parse(await file.text());
-  const mesh=raw.terrain?.positions && raw.terrain?.indices ? raw.terrain : raw;
+  const mesh = raw.terrain?.positions && raw.terrain?.indices ? raw.terrain : raw;
   if (!Array.isArray(mesh.positions) || !Array.isArray(mesh.indices) || mesh.positions.length < 9 || mesh.indices.length < 3 || mesh.positions.length % 3 || mesh.indices.length % 3) {
     throw new Error('Basalt freeze must contain triangle-mesh positions[] and indices[] arrays.');
   }
@@ -4427,13 +4588,25 @@ async function importBasaltFreezeFile(file) {
     throw new Error('World-space Basalt freeze needs origin/worldOrigin so the editor can preserve the island-local authored frame.');
   }
   commitGeneric((draft)=>{
-    draft.terrain={ mode:'authored-mesh-candidate', format:mesh.format || 'triangle-mesh-v1', coordinateSpace:'island-local', positions, indices:mesh.indices.map(Number), source:'production-freeze-import', capturedAt:mesh.capturedAt || raw.capturedAt || new Date().toISOString(), metadata:{ ...(mesh.metadata||{}), originalCoordinateSpace:coordinateSpace } };
+    draft.terrain={ mode:'authored-mesh-candidate', format:mesh.format || 'triangle-mesh-v1', coordinateSpace:'island-local', positions, indices:mesh.indices.map(Number), source:sourceLabel, capturedAt:mesh.capturedAt || raw.capturedAt || new Date().toISOString(), parts: structuredClone(mesh.parts || raw.parts || []), metadata:{ ...(mesh.metadata||{}), originalCoordinateSpace:coordinateSpace } };
     draft.sourcePolicy.terrain='authored-candidate';
   });
-  genericScene.setBasaltReferenceMode($('#basalt-reference-mode')?.value || 'both');
+  genericScene.setBasaltReferenceMode('authored');
+  if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value='authored';
   const status=$('#basalt-freeze-status');
-  if(status) status.textContent=`Candidate imported: ${vertexCount.toLocaleString()} verts / ${(mesh.indices.length/3).toLocaleString()} triangles. Production still uses procedural terrain.`;
-  setStatus('Basalt production freeze imported as a comparison-only authored candidate. Nothing in production terrain was switched.');
+  if(status) status.textContent=`Editable candidate: ${vertexCount.toLocaleString()} verts / ${(mesh.indices.length/3).toLocaleString()} triangles. Production still uses procedural terrain.`;
+  setStatus('Basalt production freeze loaded as an editable authored candidate. Raise/Lower/Smooth/Indent/Pull now edit the island/cave mesh itself; production is not switched yet.');
+}
+
+function loadCapturedBasaltFreeze() {
+  const raw = localStorage.getItem('reel-ascent:world-editor-v2:basalt-production-freeze');
+  if (!raw) throw new Error('No captured Basalt production mesh is cached yet. Open the normal game once with this update, then return to the editor and click this again.');
+  importBasaltFreezeObject(JSON.parse(raw), 'actual-production-capture');
+}
+
+async function importBasaltFreezeFile(file) {
+  if (activeWorldId !== 'cave-fishing-island') return;
+  importBasaltFreezeObject(JSON.parse(await file.text()), 'production-freeze-file');
 }
 
 function renameSelectedRecord() {
@@ -4463,6 +4636,10 @@ function setupV21Ui() {
   $('#place-complete-room')?.addEventListener('click', placeCompleteLibraryRoom);
   $('#place-room-component')?.addEventListener('click', placeLibraryComponent);
   populateRoomLibraryUi();
+  $('#pirate-asset-template')?.addEventListener('change', populatePirateAssetUi);
+  $('#place-pirate-asset')?.addEventListener('click', placePirateAsset);
+  populatePirateAssetUi();
+  $('#skyscraper-interior-mode')?.addEventListener('change', (event) => genericScene.setSkyscraperInteriorMode(event.target.checked));
   $('#create-test-room')?.addEventListener('click', createTestRoom);
   $('#save-prefab-workspace')?.addEventListener('click', () => { persistGenericLevel(); setStatus('Prefab/room definition saved to this world autosave. Use Save World Level to download the JSON.'); });
   $('#exit-prefab-workspace')?.addEventListener('click', () => exitPrefabWorkspace());
@@ -4478,6 +4655,7 @@ function setupV21Ui() {
     }
   });
   $('#basalt-reference-mode')?.addEventListener('change', (event) => genericScene.setBasaltReferenceMode(event.target.value));
+  $('#load-basalt-capture')?.addEventListener('click', () => { try { loadCapturedBasaltFreeze(); } catch (error) { setStatus(error.message); } });
   $('#import-basalt-freeze')?.addEventListener('click', () => $('#basalt-freeze-file')?.click());
   $('#basalt-freeze-file')?.addEventListener('change', (event) => {
     const file=event.target.files?.[0];
@@ -4500,7 +4678,8 @@ $$('#tool-grid button').forEach((button) => button.addEventListener('click', () 
   if (tool === 'connect-cave') caveConnectStart = null;
   rebuildSelectionHelper();
   $$('#tool-grid button').forEach((b) => b.classList.toggle('active', b === button));
-  if (tool === 'indent' && isMeshMode()) setStatus('3D Indent: use a small brush and push the actual mesh inward. Repeat on the recessed back wall to extend a cave.');
+  if (activeWorldId === 'cave-fishing-island' && ['raise','lower','smooth','indent','pull-core'].includes(tool)) setStatus('Basalt terrain brush: this edits the frozen production candidate mesh itself. Load the captured production mesh first; production remains procedural until later promotion.');
+  else if (tool === 'indent' && isMeshMode()) setStatus('3D Indent: use a small brush and push the actual mesh inward. Repeat on the recessed back wall to extend a cave.');
   else if (tool === 'pull-core') setStatus(isMeshMode() ? 'Pull Core Out: pull the true mesh outward along its surface normal.' : 'Freeze Core to 3D Mesh first.');
   else if (tool === 'raise' && isMeshMode()) setStatus('3D Raise: moves the connected surface straight upward, not outward along its normal.');
   else if (tool === 'lower' && isMeshMode()) setStatus('3D Lower: moves the connected surface straight downward.');
@@ -4567,6 +4746,7 @@ $('#redo').addEventListener('click', redo);
 $('#checkpoint').addEventListener('click', saveManualCheckpoint);
 $('#restore-checkpoint').addEventListener('click', restoreManualCheckpoint);
 $('#reload-project-patch').addEventListener('click', reloadProjectPatch);
+$('#recover-browser-autosave')?.addEventListener('click', recoverBrowserAutosaveExplicitly);
 $('#freeze-core').addEventListener('click', freezeCoreToMesh);
 $('#return-heightfield').addEventListener('click', returnToHeightfield);
 $('#clear-legacy-caves').addEventListener('click', clearLegacyCaveExperiments);
@@ -4645,7 +4825,8 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
   if (event.button !== 0) return;
-  const meshSculptClick = isMeshMode() && ['raise', 'lower', 'smooth', 'indent', 'pull-core', 'connect-cave'].includes(tool);
+  const caveMeshSculptClick = activeWorldId === 'cave-fishing-island' && Boolean(activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate') && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool);
+  const meshSculptClick = (isMeshMode() && ['raise', 'lower', 'smooth', 'indent', 'pull-core', 'connect-cave'].includes(tool)) || caveMeshSculptClick;
   draggingBrush = !meshSculptClick && ['raise', 'lower', 'indent', 'pull-core', 'plant'].includes(tool);
   activeBrushTransaction = draggingBrush;
   if (activeBrushTransaction) saveHistory();
@@ -4944,18 +5125,41 @@ $('#minimum-brightness')?.addEventListener('input', (event) => {
 applyMinimumBrightness(minimumBrightness);
 syncWalkthroughHud();
 
-canvas.addEventListener('webglcontextlost', () => {
+canvas.addEventListener('webglcontextlost', (event) => {
+  // Calling preventDefault is required for the browser to allow restoration of this WebGL
+  // context instead of treating the loss as terminal. Keep the current in-memory editor
+  // state/camera; do NOT rerun startup source selection on a graphics-only reset.
+  event.preventDefault();
   if (walkthroughState.active) exitWalkthrough();
-  // A context loss should never cost level-design work. Persist immediately to both
-  // available autosave paths; PlayCanvas/browser recovery can then restore rendering.
-  if (isStoneveilWorld()) persistPatch();
-  else persistGenericLevel();
-  console.warn('World Editor WebGL context lost; latest active-world data queued for recovery.');
+  saveCameraViewNow();
+  stoneveilContextRecovery = {
+    worldId: activeWorldId,
+    camera: cameraViewPayload(),
+    selected: selected ? clone(selected) : null,
+    tool
+  };
+  // Every edit is already queued to IndexedDB. Avoid serializing/cloning the giant mesh again
+  // while the browser is under GPU-memory pressure. Generic worlds are small enough to persist.
+  if (!isStoneveilWorld()) persistGenericLevel();
+  console.warn('World Editor WebGL context lost; preserving the current in-memory world/camera for restoration.');
+  setStatus('Graphics reset detected — preserving current world, camera and selection…');
 });
 canvas.addEventListener('webglcontextrestored', () => {
+  webglRecoveryCount += 1;
   rebuildAll();
+  const recovery = stoneveilContextRecovery;
+  if (recovery?.worldId === activeWorldId && recovery.camera) {
+    cameraState.target.set(recovery.camera.target.x, recovery.camera.target.y, recovery.camera.target.z);
+    cameraState.yaw = recovery.camera.yaw;
+    cameraState.pitch = recovery.camera.pitch;
+    cameraState.distance = recovery.camera.distance;
+    selected = recovery.selected;
+    tool = recovery.tool || tool;
+  }
   updateCamera();
-  setStatus('Graphics context restored. Your editor state was preserved.');
+  saveCameraViewNow();
+  stoneveilContextRecovery = null;
+  setStatus(`Graphics context restored in-place (${webglRecoveryCount}). Current terrain source, camera and selection were preserved.`);
 });
 
 window.addEventListener('resize', () => app.resizeCanvas());
@@ -4964,31 +5168,32 @@ setupV21Ui();
 
 async function initializeWorldEditorV2() {
   try {
-    // A fresh browser must start from the checked-in authored Stoneveil patch. The legacy
-    // editor historically defaulted to makeEmptyPatch() when localStorage was absent, which
-    // is unsafe now that the project patch contains irreplaceable frozen level-design work.
-    if (!hadStoneveilAutosaveAtBoot) {
-      const response = await fetch('../../src/world/map-editor-patch.json', { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Stoneveil project patch HTTP ${response.status}`);
-      patch = normalizePatch(await response.json());
-      // Check large IndexedDB recovery BEFORE queueing any write. Otherwise a fresh
-      // localStorage session could overwrite a newer sculpt recovery with the project copy.
-      const recovery = await readRecoverySnapshot();
-      if (recovery?.patch) {
-        const recovered = normalizePatch(recovery.patch);
-        if (patchTimestamp(recovered) > patchTimestamp(patch)) patch = recovered;
+    // The checked-in project patch is always the Stoneveil baseline. Browser recovery is only
+    // auto-applied when it explicitly records that SAME terrain revision as its base. This
+    // prevents a later-timestamped recovery from an older mountain from silently replacing a
+    // newer game/project mountain after a reload or graphics failure.
+    const response = await fetch('../../src/world/map-editor-patch.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Stoneveil project patch HTTP ${response.status}`);
+    const projectPatch = normalizePatch(await response.json());
+    stoneveilProjectSignature = stoneveilTerrainSignature(projectPatch);
+    patch = projectPatch;
+    let compatibleRecoveryApplied = false;
+    const recovery = await readRecoverySnapshot();
+    if (recovery?.patch && recoveryMatchesCurrentProject(recovery)) {
+      const recovered = normalizePatch(recovery.patch);
+      if (patchTimestamp(recovered) > patchTimestamp(projectPatch)) {
+        patch = recovered;
+        compatibleRecoveryApplied = true;
       }
-      runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
-      persistPatch();
     }
+    runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
+    persistPatch();
     syncSnapshotUi();
     await switchWorld(activeWorldId, { keepCamera: activeWorldId === 'stoneveil-peak' });
     if (isStoneveilWorld()) {
-      setStatus(isMeshMode()
-        ? 'World Editor V2 ready. Current authored Stoneveil 3D mesh loaded intact; production patch remains compatibility-safe.'
-        : 'World Editor V2 ready in Stoneveil heightfield compatibility mode.');
-      // When localStorage already existed, it may still trail a large IndexedDB mesh save.
-      if (hadStoneveilAutosaveAtBoot) recoverNewerAutosaveIfNeeded();
+      setStatus(compatibleRecoveryApplied
+        ? 'World Editor V2.3.1 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
+        : 'World Editor V2.3.1 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
     }
   } catch (error) {
     console.error(error);

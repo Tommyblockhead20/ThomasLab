@@ -20,6 +20,7 @@ import {
   chooseStrongBobberRefusal, deriveAcceptedBobberProfile, deriveBobberAcceptance,
   getSelectiveBobberSettings, sampleBobberBiteDelay, strongestBobberHasEligibleTarget
 } from './selective-bobbers.js';
+import { BASELINE_SPECIES_PROBABILITY_CAPS } from './ecology-config.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -1978,7 +1979,8 @@ export class FishingController {
   schedulePotentialBite() {
     const biteRate = (this.zone.modifiers.biteRate ?? 1)
       * (this.progression?.getModifier('biteRate') ?? 1);
-    const biteDelayMultiplier = this.progression?.getModifier('biteDelayMultiplier') ?? 1;
+    const biteDelayMultiplier = (this.zone.modifiers.biteDelayMultiplier ?? 1)
+      * (this.progression?.getModifier('biteDelayMultiplier') ?? 1);
     const ecology = getEcologySelection(this.zone, this.cast?.target ?? this.zone.center);
     const selectionTable = getWeightedSpeciesTable(
       ecology.fishIds,
@@ -2031,18 +2033,33 @@ export class FishingController {
     if (this.biteTimer <= 0) this.beginBite();
   }
 
-  getSelectionModifiers(ecology, includeRecent = true, zone = this.zone) {
+  getSelectionModifiers(ecology, includeRecent = true, zone = this.zone, allowBaselineCaps = true) {
     const equipment = this.progression?.getModifiers?.() ?? {};
+    const recentSpeciesIds = includeRecent ? this.recentHookSpecies : [];
+    const starterEquipment = this.progression
+      && this.progression.getEquippedItem?.('rod')?.id === 'trail-rod'
+      && this.progression.getEquippedItem?.('reel')?.id === 'creek-reel'
+      && this.progression.getEquippedItem?.('line')?.id === 'standard-line'
+      && this.progression.getEquippedItem?.('lure')?.id === 'plain-spoon'
+      && this.progression.getEquippedItem?.('bobber')?.id === 'trail-bobber';
+    const baselineSpeciesProbabilityCaps = allowBaselineCaps
+      && !zone?.tutorialWater
+      && recentSpeciesIds.length === 0
+      && starterEquipment
+        ? BASELINE_SPECIES_PROBABILITY_CAPS
+        : null;
     return {
       ...zone?.modifiers,
+      waterId: zone?.id,
       rarityTier: ecology.habitat.rarityTier,
       rareProbabilityBonus: equipment.rareProbabilityBonus ?? 0,
       legendaryProbabilityBonus: equipment.legendaryProbabilityBonus ?? 0,
       nonFishWeightMultiplier: equipment.nonFishWeightMultiplier ?? 1,
       shinyChanceMultiplier: equipment.shinyChanceMultiplier ?? 1,
       specimenSizeBias: (zone?.modifiers?.specimenSizeBias ?? 0) + (equipment.specimenSizeBias ?? 0),
-      recentSpeciesIds: includeRecent ? this.recentHookSpecies : [],
+      recentSpeciesIds,
       habitatWeights: ecology.habitatWeights,
+      baselineSpeciesProbabilityCaps,
       disablePoolEnrichment: true
     };
   }
@@ -2051,7 +2068,7 @@ export class FishingController {
     this.lastFishingFailure = null;
     const ecology = getEcologySelection(this.zone, this.cast?.target ?? this.zone.center);
     const candidateIds = forcedSpeciesId ? [forcedSpeciesId] : ecology.fishIds;
-    const selectionModifiers = this.getSelectionModifiers(ecology, !forcedSpeciesId);
+    const selectionModifiers = this.getSelectionModifiers(ecology, !forcedSpeciesId, this.zone, !forcedSpeciesId);
     const selectionTable = getWeightedSpeciesTable(candidateIds, selectionModifiers);
     const potentialProfile = Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
       rarity,

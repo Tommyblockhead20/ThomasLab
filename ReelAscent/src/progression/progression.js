@@ -21,6 +21,13 @@ import { COSMETIC_BY_ID, cosmeticUnlocked } from './cosmetics.js';
 
 const copy = (value) => JSON.parse(JSON.stringify(value));
 
+export function localCalendarDayKey(value = Date.now()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export class ProgressionSystem {
   constructor(saveSystem) {
     this.saveSystem = saveSystem;
@@ -106,6 +113,36 @@ export class ProgressionSystem {
     if (legitimateAmount) this.saveSystem.recordLegitimateEarnings?.(legitimateAmount);
     this.saveSystem.recordSpeciesSold?.(specimens);
     return { ok: true, count: specimens.length, amount, specimens };
+  }
+
+  getOldManDailySaleStatus(now = Date.now()) {
+    const dayKey = localCalendarDayKey(now);
+    return {
+      dayKey,
+      lastUsedDate: this.state.oldManDailySaleDate,
+      available: Boolean(dayKey && this.state.oldManDailySaleDate !== dayKey),
+      ownedSpecimenCount: this.state.inventory.length + this.state.aquarium.length
+    };
+  }
+
+  sellOldManDailySpecimen(specimenId, now = Date.now()) {
+    const status = this.getOldManDailySaleStatus(now);
+    if (!status.available) return { ok: false, reason: 'The Old Man already bought a double-value specimen today.' };
+    const inventoryIndex = findSpecimenIndex(this.state.inventory, specimenId);
+    const aquariumIndex = findSpecimenIndex(this.state.aquarium, specimenId);
+    if (inventoryIndex < 0 && aquariumIndex < 0) return { ok: false, reason: 'Owned specimen not found' };
+    const [specimen] = inventoryIndex >= 0
+      ? this.state.inventory.splice(inventoryIndex, 1)
+      : this.state.aquarium.splice(aquariumIndex, 1);
+    if (this.state.heldSpecimenId === specimenId) this.state.heldSpecimenId = null;
+    const amount = Math.max(0, Math.floor(Number(specimen.value) || 0)) * 2;
+    this.state.money += amount;
+    this.state.oldManDailySaleDate = status.dayKey;
+    this.refreshAquariumDisplays();
+    this.commit();
+    if (specimen.provenance?.legitimate !== false) this.saveSystem.recordLegitimateEarnings?.(amount);
+    this.saveSystem.recordSpeciesSold?.([specimen]);
+    return { ok: true, specimen, amount, dayKey: status.dayKey };
   }
 
   moveInventorySpecimenToAquarium(specimenId) {

@@ -1,10 +1,149 @@
 import * as pc from 'playcanvas';
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
-import { SKYREACH_TOWER_CONFIG } from '../../src/world/mountain-v2.js';
+import { SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes } from '../../src/world/mountain-v2.js';
 import { movingPlatformPose, normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runtime.js';
 
 const clone = (value) => value == null ? value : structuredClone(value);
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+export function rayTriangleMeshHit(mesh, origin, direction) {
+  if (!mesh?.positions?.length || !mesh?.indices?.length) return null;
+  const p = mesh.positions;
+  const idx = mesh.indices;
+  let best = null;
+  for (let offset = 0; offset < idx.length; offset += 3) {
+    const ia = idx[offset] * 3, ib = idx[offset + 1] * 3, ic = idx[offset + 2] * 3;
+    const ax = p[ia], ay = p[ia + 1], az = p[ia + 2];
+    const bx = p[ib], by = p[ib + 1], bz = p[ib + 2];
+    const cx = p[ic], cy = p[ic + 1], cz = p[ic + 2];
+    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
+    const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+    const px = direction.y * e2z - direction.z * e2y;
+    const py = direction.z * e2x - direction.x * e2z;
+    const pz = direction.x * e2y - direction.y * e2x;
+    const det = e1x * px + e1y * py + e1z * pz;
+    if (Math.abs(det) < 1e-8) continue;
+    const inv = 1 / det;
+    const tx = origin.x - ax, ty = origin.y - ay, tz = origin.z - az;
+    const u = (tx * px + ty * py + tz * pz) * inv;
+    if (u < 0 || u > 1) continue;
+    const qx = ty * e1z - tz * e1y;
+    const qy = tz * e1x - tx * e1z;
+    const qz = tx * e1y - ty * e1x;
+    const v = (direction.x * qx + direction.y * qy + direction.z * qz) * inv;
+    if (v < 0 || u + v > 1) continue;
+    const t = (e2x * qx + e2y * qy + e2z * qz) * inv;
+    if (t < 0 || (best && t >= best.distance)) continue;
+    let nx = e1y * e2z - e1z * e2y;
+    let ny = e1z * e2x - e1x * e2z;
+    let nz = e1x * e2y - e1y * e2x;
+    const nl = Math.hypot(nx, ny, nz) || 1;
+    nx /= nl; ny /= nl; nz /= nl;
+    // Orient the hit normal toward the ray origin. Basalt production pieces are captured
+    // from several independently generated meshes whose winding is not guaranteed to be
+    // globally consistent. This keeps Indent reliably pushing away from the camera and
+    // Pull Core reliably pulling toward it instead of randomly reversing between parts.
+    if (nx * direction.x + ny * direction.y + nz * direction.z > 0) {
+      nx = -nx; ny = -ny; nz = -nz;
+    }
+    best = {
+      distance: t,
+      x: origin.x + direction.x * t,
+      y: origin.y + direction.y * t,
+      z: origin.z + direction.z * t,
+      normal: { x: nx, y: ny, z: nz },
+      triangleOffset: offset
+    };
+  }
+  return best;
+}
+
+function meshAdjacency(mesh) {
+  const count = Math.floor((mesh?.positions?.length || 0) / 3);
+  const adjacency = Array.from({ length: count }, () => new Set());
+  for (let i = 0; i < (mesh?.indices?.length || 0); i += 3) {
+    const a = mesh.indices[i], b = mesh.indices[i + 1], c = mesh.indices[i + 2];
+    if (adjacency[a] && adjacency[b] && adjacency[c]) {
+      adjacency[a].add(b); adjacency[a].add(c);
+      adjacency[b].add(a); adjacency[b].add(c);
+      adjacency[c].add(a); adjacency[c].add(b);
+    }
+  }
+  return adjacency;
+}
+
+function nearestTriangleVertex(mesh, hit) {
+  const ids = [
+    mesh.indices[hit.triangleOffset],
+    mesh.indices[hit.triangleOffset + 1],
+    mesh.indices[hit.triangleOffset + 2]
+  ];
+  let best = ids[0], bestDistance = Infinity;
+  for (const id of ids) {
+    const o = id * 3;
+    const d = Math.hypot(mesh.positions[o] - hit.x, mesh.positions[o + 1] - hit.y, mesh.positions[o + 2] - hit.z);
+    if (d < bestDistance) { bestDistance = d; best = id; }
+  }
+  return best;
+}
+
+export function sculptTriangleMesh(mesh, hit, mode, radius, strength) {
+  if (!mesh?.positions?.length || !mesh?.indices?.length || !hit || !Number.isInteger(hit.triangleOffset)) return 0;
+  const p = mesh.positions;
+  const adjacency = meshAdjacency(mesh);
+  const seed = nearestTriangleVertex(mesh, hit);
+  const maxDistance = Math.max(.2, Number(radius) || 3);
+  const distances = new Map([[seed, 0]]);
+  const queue = [[0, seed]];
+  while (queue.length) {
+    queue.sort((a, b) => b[0] - a[0]);
+    const [distance, index] = queue.pop();
+    if (distance !== distances.get(index) || distance > maxDistance) continue;
+    const o = index * 3;
+    for (const next of adjacency[index] ?? []) {
+      const no = next * 3;
+      const edge = Math.hypot(p[no] - p[o], p[no + 1] - p[o + 1], p[no + 2] - p[o + 2]);
+      const nextDistance = distance + edge;
+      if (nextDistance <= maxDistance && nextDistance < (distances.get(next) ?? Infinity)) {
+        distances.set(next, nextDistance);
+        queue.push([nextDistance, next]);
+      }
+    }
+  }
+  const source = p.slice();
+  const amount = Number(strength) || 1;
+  let changed = 0;
+  for (const [index, distance] of distances) {
+    const t = Math.max(0, 1 - distance / maxDistance);
+    const weight = t * t * (3 - 2 * t);
+    if (weight <= 0) continue;
+    const o = index * 3;
+    if (mode === 'smooth') {
+      const neighbors = [...(adjacency[index] ?? [])];
+      if (neighbors.length < 2) continue;
+      let ax = 0, ay = 0, az = 0;
+      for (const next of neighbors) {
+        const no = next * 3;
+        ax += source[no]; ay += source[no + 1]; az += source[no + 2];
+      }
+      ax /= neighbors.length; ay /= neighbors.length; az /= neighbors.length;
+      const blend = Math.min(.55, Math.max(.02, amount * .08)) * weight;
+      p[o] += (ax - p[o]) * blend;
+      p[o + 1] += (ay - p[o + 1]) * blend;
+      p[o + 2] += (az - p[o + 2]) * blend;
+    } else if (mode === 'raise' || mode === 'lower') {
+      p[o + 1] += (mode === 'raise' ? amount : -amount) * weight;
+    } else {
+      const sign = mode === 'indent' ? -1 : 1;
+      p[o] += hit.normal.x * amount * sign * weight;
+      p[o + 1] += hit.normal.y * amount * sign * weight;
+      p[o + 2] += hit.normal.z * amount * sign * weight;
+    }
+    changed += 1;
+  }
+  mesh.editedAt = new Date().toISOString();
+  return changed;
+}
 
 function makeMaterial(rgb, opacity = 1, emissive = 0) {
   const material = new pc.StandardMaterial();
@@ -191,7 +330,9 @@ export class GenericWorldScene {
       roomLight: makeMaterial([.95, .88, .56], 1, .35),
       casinoFelt: makeMaterial([.08, .36, .22]),
       casinoRed: makeMaterial([.44, .08, .09]),
-      casinoPurple: makeMaterial([.31, .12, .45], 1, .08)
+      casinoPurple: makeMaterial([.31, .12, .45], 1, .08),
+      skyreachFacade: makeMaterial([.27, .31, .34], 1, .03),
+      skyreachAccent: makeMaterial([.72, .56, .23], 1, .12)
     };
     this.level = null;
     this.world = null;
@@ -207,6 +348,7 @@ export class GenericWorldScene {
     this.collisionEntries = [];
     this.workspaceDefinition = null;
     this.basaltReferenceMode = 'both';
+    this.skyscraperInteriorMode = true;
     this.editorHiddenIds = new Set();
     this.root.enabled = false;
   }
@@ -228,6 +370,21 @@ export class GenericWorldScene {
   setCollisionMode(mode = 'normal') {
     this.collisionMode = ['normal', 'overlay', 'collision-only', 'selected'].includes(mode) ? mode : 'normal';
     this.applyCollisionMode();
+  }
+
+  setSkyscraperInteriorMode(enabled = true) {
+    this.skyscraperInteriorMode = Boolean(enabled);
+    this.applyCollisionMode();
+  }
+
+  editableBasaltTerrain() {
+    return this.world?.id === 'cave-fishing-island' && this.level?.terrain?.mode === 'authored-mesh-candidate'
+      ? this.level.terrain : null;
+  }
+
+  basaltTerrainHit(ray) {
+    const mesh = this.editableBasaltTerrain();
+    return mesh ? rayTriangleMeshHit(mesh, ray.origin, ray.direction) : null;
   }
 
   setBasaltReferenceMode(mode = 'both') {
@@ -336,13 +493,14 @@ export class GenericWorldScene {
       position: { x: 0, y: 190, z: 0 },
       asset: '/assets/models/empire-state-building.glb',
       attribution: 'SonnySee — CC BY 3.0',
-      collision: '13-volume runtime proxy'
+      collision: 'hollow perimeter collision shell derived from the 13 setback layers'
     };
-    for (const layer of SKYREACH_TOWER_CONFIG.collisionLayers) {
+    for (const box of skyreachHollowCollisionBoxes(SKYREACH_TOWER_CONFIG)) {
       this.referenceCollisionBoxes.push({
-        center: { x: 0, y: (layer.bottom + layer.top) / 2, z: 0 },
-        size: { x: layer.width, y: layer.top - layer.bottom, z: layer.depth },
-        kind: 'building', id: `__esb-collider-${this.referenceCollisionBoxes.length + 1}`
+        center: clone(box.center),
+        size: clone(box.size),
+        kind: 'building-shell',
+        id: box.id
       });
     }
     this.app.assets.loadFromUrl('/assets/models/empire-state-building.glb', 'container', (error, asset) => {
@@ -352,6 +510,12 @@ export class GenericWorldScene {
       if (!building) { imported.destroy?.(); return; }
       const plane = imported.findByName?.('Plane');
       if (plane && plane !== building) plane.enabled = false;
+      for (const component of building.findComponents?.('render') ?? []) {
+        for (const meshInstance of component.meshInstances ?? []) {
+          const sourceName = String(meshInstance.material?.name || '').toLowerCase();
+          meshInstance.material = sourceName.includes('light') ? this.materials.skyreachAccent : this.materials.skyreachFacade;
+        }
+      }
       const placement = new pc.Entity('ESB reference — SonnySee CC BY 3.0');
       placement.addChild(imported);
       this.referenceRoot.addChild(placement);
@@ -528,6 +692,19 @@ export class GenericWorldScene {
         this.prefabMovingEntries.push({ entity, definition: child, instance });
         if (child.collision !== false && child.visible !== false) this.prefabCollisionEntries.push({ entity, record: child, instance, moving: true });
       }
+      for (const sourceWater of definition.waters ?? []) {
+        const water = sourceWater;
+        const radii = water.radii ?? { x: 1, z: 1 };
+        const position = water.position ?? { x: 0, y: 0, z: 0 };
+        const entity = new pc.Entity(`${instance.name || instance.id}: ${water.name || water.id}`);
+        entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
+        entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
+        entity.setLocalScale(Math.max(.1, finite(radii.x, 1) * 2), .07, Math.max(.1, finite(radii.z, 1) * 2));
+        entity.editorKind = 'prefab-instance-water';
+        entity.editorRecord = water;
+        entity.editorId = `${instance.id}/${water.id || water.identity || 'water'}`;
+        root.addChild(entity);
+      }
     }
   }
 
@@ -570,7 +747,8 @@ export class GenericWorldScene {
     const mode = this.collisionMode || 'normal';
     this.collisionRoot.enabled = mode !== 'normal';
     const hideVisuals = mode === 'collision-only';
-    this.referenceRoot.enabled = !hideVisuals;
+    const hideSkyscraperFacade = this.world?.id === 'skyscraper' && this.skyscraperInteriorMode && !this.workspaceDefinition;
+    this.referenceRoot.enabled = !hideVisuals && !hideSkyscraperFacade;
     this.workspaceRoot.enabled = !hideVisuals;
     this.waterRoot.enabled = !hideVisuals;
     this.objectRoot.enabled = !hideVisuals;
@@ -621,6 +799,10 @@ export class GenericWorldScene {
 
   surfaceHit(ray) {
     let best = null;
+    const basaltHit = this.basaltTerrainHit(ray);
+    if (basaltHit && this.basaltReferenceMode !== 'procedural') {
+      best = { ...basaltHit, kind: 'authored-terrain', surfaceId: '__basalt-authored-terrain' };
+    }
     for (const box of this.referenceCollisionBoxes) {
       const hit = rayAabbHit(ray.origin, ray.direction, box.center, {
         x: box.size.x / 2, y: box.size.y / 2, z: box.size.z / 2

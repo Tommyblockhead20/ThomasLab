@@ -29,7 +29,7 @@
     <header id="topbar">
       <div class="brand">
         <strong>REEL ASCENT</strong>
-        <span>WORLD EDITOR V2.2</span>
+        <span>WORLD EDITOR V2.3.1</span>
         <select id="world-selector" aria-label="World / scene"></select>
       </div>
       <div class="top-actions">
@@ -38,6 +38,7 @@
         <button id="checkpoint" title="Store a browser-local safety checkpoint before a risky edit">Checkpoint</button>
         <button id="restore-checkpoint" title="Restore your latest manual safety checkpoint">Restore Checkpoint</button>
         <button id="reload-project-patch" title="Reload the current world data from the dev server">Reload Project Data</button>
+        <button id="recover-browser-autosave" title="Explicitly load the latest Stoneveil IndexedDB autosave, including one from a different project terrain revision">Recover Browser Autosave</button>
         <button id="open-patch">Open Level / Patch</button>
         <button id="import-snapshot">Import Runtime Snapshot</button>
         <button id="bake-snapshot" disabled>Bake Rocks Into Editor</button>
@@ -133,9 +134,18 @@
       <section id="cave-migration-section" hidden>
         <h2>Basalt Terrain <button class="help-dot" type="button" data-tip="Import an exact production-geometry freeze captured by the game. Candidate terrain is comparison-only until explicitly promoted in a later validated migration." aria-label="Basalt migration help">?</button></h2>
         <label>Terrain view <select id="basalt-reference-mode"><option value="procedural">Procedural reference</option><option value="authored">Frozen candidate</option><option value="both" selected>Compare both</option></select></label>
-        <div class="row-actions"><button id="import-basalt-freeze" type="button">Import Production Freeze</button></div>
+        <div class="row-actions"><button id="load-basalt-capture" type="button">Load Captured Production Mesh</button><button id="import-basalt-freeze" type="button">Import Freeze JSON</button></div>
         <input id="basalt-freeze-file" type="file" accept="application/json,.json" hidden />
         <div id="basalt-freeze-status" class="compact-status hint">No frozen candidate imported.</div>
+      </section>
+
+      <section id="pirate-asset-library-section" hidden>
+        <h2>Pirate Asset Kit <button class="help-dot" type="button" data-tip="Place authored modular pirate assemblies. Each asset remains a linked prefab that can be moved, duplicated, or opened in the prefab workspace." aria-label="Pirate asset help">?</button></h2>
+        <label>Asset
+          <select id="pirate-asset-template"></select>
+        </label>
+        <div id="pirate-asset-description" class="compact-status hint"></div>
+        <div class="row-actions"><button id="place-pirate-asset" type="button">Place Asset</button></div>
       </section>
 
       <section id="generic-palette-section" hidden>
@@ -200,6 +210,7 @@
         <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
         <label id="slope-toggle-wrap" title="Classify the actual authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
         <label class="toolbar-select" title="Inspect the geometry the player actually collides with">Collision <select id="collision-mode"><option value="normal">Normal</option><option value="overlay">Visual + Collision</option><option value="collision-only">Collision Only</option><option value="selected">Selected Collision</option></select></label>
+        <label id="skyscraper-interior-wrap" title="Hide the imported exterior shell while authoring rooms inside the tower"><input id="skyscraper-interior-mode" type="checkbox" checked /> Interior cutaway</label>
         <label class="walkthrough-persistent" title="Editor-only ambient light floor. Keeps dark cave geometry readable without changing the saved map or production lighting." style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
           Min brightness <output id="minimum-brightness-out">55%</output>
           <input id="minimum-brightness" type="range" min="35" max="85" step="5" value="55" style="width:100px;" />

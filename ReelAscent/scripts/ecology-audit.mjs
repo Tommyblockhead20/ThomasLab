@@ -1,5 +1,6 @@
 import { FISH_SPECIES, getWeightedSpeciesTable } from '../src/fishing/fish-data.js';
-import { getEcologySelection } from '../src/fishing/fish-ecology.js';
+import { attachZoneEcology, getEcologySelection } from '../src/fishing/fish-ecology.js';
+import { BASELINE_SPECIES_PROBABILITY_CAPS } from '../src/fishing/ecology-config.js';
 import { FishingZone } from '../src/fishing/fishing-zone.js';
 import { ALL_FISHING_WATER_DESCRIPTORS, MOUNTAIN_CENTER } from '../src/world/mountain-v2.js';
 
@@ -20,7 +21,9 @@ function zoneFromDescriptor(water) {
         : water.tier === 'ocean' ? 'ocean' : water.waterfall ? 'waterfall' : water.tier,
       rarityBias: water.rarityBias,
       maximumSpeciesProbability: water.maximumSpeciesProbability ?? .25,
-      largeSpeciesWeightBias: water.largeSpeciesWeightBias ?? 0
+      largeSpeciesWeightBias: water.largeSpeciesWeightBias ?? 0,
+      specimenSizeBias: water.specimenSizeBias ?? 0,
+      biteDelayMultiplier: water.biteDelayMultiplier ?? 1
     }
   });
   Object.assign(zone, {
@@ -33,28 +36,60 @@ function zoneFromDescriptor(water) {
     allowedRarities: water.allowedRarities,
     allowedFishIds: water.allowedFishIds
   });
-  return zone;
+  if (water.tutorialWater) zone.allowedFishIds = [...water.fish];
+  zone.tutorialWater = Boolean(water.tutorialWater);
+  return attachZoneEcology(zone);
 }
 
 export function buildEcologyAudit() {
   const zones = ALL_FISHING_WATER_DESCRIPTORS.map(zoneFromDescriptor);
+  const sizeLabel = (radius) => radius <= 3.5 ? 'Tiny'
+    : radius <= 5 ? 'Small'
+      : radius <= 8 ? 'Medium'
+        : radius <= 14 ? 'Large' : 'Very Large';
+  const biomeLabel = (habitat) => habitat.cave ? `${habitat.tier === 'summit' ? 'summit ' : ''}cave freshwater`
+    : habitat.salinity === 'brackish' ? 'mangrove/brackish'
+      : habitat.waterType === 'cold-ocean' ? 'polar saltwater'
+        : ['ocean', 'bluewater-ocean'].includes(habitat.waterType) ? 'open ocean'
+          : habitat.waterfall ? 'waterfall freshwater'
+            : habitat.ice ? 'cold lake'
+              : habitat.summit ? 'summit alpine freshwater'
+                : habitat.tier === 'upper' ? 'alpine freshwater'
+                  : habitat.salinity === 'salt' ? 'coastal saltwater' : 'freshwater';
   const watersBySpecies = new Map(FISH_SPECIES.map((fish) => [fish.id, []]));
   const waters = zones.map((zone) => {
     const selection = getEcologySelection(zone);
     const table = getWeightedSpeciesTable(selection.fishIds, {
       ...zone.modifiers, rarityTier: selection.habitat.rarityTier,
-      habitatWeights: selection.habitatWeights, disablePoolEnrichment: true
+      waterId: zone.id,
+      habitatWeights: selection.habitatWeights,
+      baselineSpeciesProbabilityCaps: zone.tutorialWater ? null : BASELINE_SPECIES_PROBABILITY_CAPS,
+      disablePoolEnrichment: true
     }).filter((entry) => entry.probability > 0);
     for (const entry of table) watersBySpecies.get(entry.fish.id)?.push({
       waterId: zone.id, probability: entry.probability
     });
     return {
       id: zone.id, name: zone.label, waterType: zone.waterType,
+      habitat: selection.habitat,
+      elevationFeet: Math.max(0, Math.round((Number(zone.surfaceY) || 0) * 3.28084)),
+      approximateSize: sizeLabel(selection.habitat.equivalentRadius),
+      biome: biomeLabel(selection.habitat),
       eligibleSpecies: table.length,
       exclusives: [],
       rarities: Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
         rarity, table.filter((entry) => entry.fish.rarity === rarity).length
       ])),
+      rarityOdds: Object.fromEntries(['Common', 'Uncommon', 'Rare', 'Legendary'].map((rarity) => [
+        rarity, table.filter((entry) => entry.fish.rarity === rarity)
+          .reduce((sum, entry) => sum + entry.probability, 0)
+      ])),
+      probabilityTable: table.map((entry) => ({
+        id: entry.fish.id,
+        name: entry.fish.name,
+        rarity: entry.fish.rarity,
+        probability: entry.probability
+      })),
       topTen: [...table].sort((a, b) => b.probability - a.probability).slice(0, 10)
         .map((entry) => ({ id: entry.fish.id, name: entry.fish.name,
           probability: Math.round(entry.probability * 10000) / 100 })),

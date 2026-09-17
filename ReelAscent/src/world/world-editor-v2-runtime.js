@@ -406,16 +406,23 @@ function attachPrefabLikeInstance(world, root, definition, instance, state) {
     const platform = addMovingPlatform(world, instanceRoot, instanceChildRecord(instance, child));
     if (platform) state.movingPlatforms.push(platform);
   }
-  // Waters/interactables are intentionally retained in the prefab schema even though the
-  // milestone-1 production bridge only instantiates collision/parkour geometry. Keeping them
-  // local to the prefab definition avoids a future room-coordinate migration.
+  for (const sourceWater of definition.waters ?? []) {
+    const water = clone(sourceWater);
+    water.id = `${instance.id}/${sourceWater.id || sourceWater.identity || 'water'}`;
+    water.identity = String(sourceWater.identity || sourceWater.id || water.id);
+    water.prefabInstanceId = instance.id;
+    if (typeof world.addWorldEditorPrefabWater === 'function') {
+      const created = world.addWorldEditorPrefabWater(instanceRoot, instance, water);
+      if (created) state.waters.push(created);
+    }
+  }
   return instanceRoot;
 }
 
 export function attachWorldEditorLevelToStructure(world, root, levelInput) {
   const level = normalizeWorldEditorLevel(levelInput);
   if (!world || !root || !world.RAPIER || !world.physicsWorld) return null;
-  const state = { level, root, staticEntities: [], movingPlatforms: [], prefabRoots: [], elapsedSeconds: 0 };
+  const state = { level, root, staticEntities: [], movingPlatforms: [], prefabRoots: [], waters: [], elapsedSeconds: 0 };
   for (const item of level.objects) {
     const entity = addStaticObject(world, root, item);
     if (entity) state.staticEntities.push(entity);

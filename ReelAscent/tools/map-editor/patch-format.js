@@ -84,8 +84,10 @@ export function normalizePatch(input) {
 
 function normalizeBakedMesh(value) {
   if (!value || typeof value !== 'object') return null;
-  const positions = Array.isArray(value.positions) ? value.positions.map(Number).filter(Number.isFinite) : [];
-  const indices = Array.isArray(value.indices) ? value.indices.map((n) => Math.trunc(Number(n))).filter(Number.isFinite) : [];
+  const positionSource = Array.isArray(value.positions) || ArrayBuffer.isView(value.positions) ? value.positions : [];
+  const indexSource = Array.isArray(value.indices) || ArrayBuffer.isView(value.indices) ? value.indices : [];
+  const positions = Array.from(positionSource, Number).filter(Number.isFinite);
+  const indices = Array.from(indexSource, (n) => Math.trunc(Number(n))).filter(Number.isFinite);
   if (positions.length < 9 || positions.length % 3 || indices.length < 3 || indices.length % 3) return null;
   const vertexCount = positions.length / 3;
   if (indices.some((index) => index < 0 || index >= vertexCount)) return null;

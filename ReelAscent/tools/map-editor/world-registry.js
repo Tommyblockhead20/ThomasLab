@@ -7,7 +7,7 @@ export const WORLD_EDITOR_WORLDS = Object.freeze([
   Object.freeze({
     id: 'cave-fishing-island', label: 'CAVE FISHING ISLAND / BASALT GROTTO', runtimeLocationId: 'cave-fishing-island',
     dataUrl: '../../src/world/world-editor-levels/cave-fishing-island.json', kind: 'generic',
-    capabilities: ['select', 'objects', 'water', 'walkthrough', 'collision-debug']
+    capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
   }),
   Object.freeze({
     id: 'skyscraper', label: 'SKYSCRAPER / ESB', runtimeLocationId: 'skyreach-foundation',

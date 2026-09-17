@@ -1,7 +1,11 @@
 import { FISH_SPECIES, getWeightedSpeciesTable } from './fish-data.js';
+import {
+  BRACKISH_COMPATIBLE_SPECIES,
+  ecologyConfigForWater
+} from './ecology-config.js';
 
 export const ECOLOGY_TARGETS = Object.freeze({
-  waters: 30,
+  waters: 28,
   species: 300,
   // Current catchable species are counted separately from future-reserved roster
   // entries. Individual waters vary instead of carrying a fixed exclusive quota.
@@ -13,8 +17,9 @@ export const ECOLOGY_TARGETS = Object.freeze({
 });
 
 const SALT_WATER_TYPES = new Set(['ocean', 'cold-ocean', 'bluewater-ocean', 'tidepool', 'inlet', 'lagoon']);
+const BRACKISH_WATER_TYPES = new Set(['brackish-lagoon']);
 const TYPE_FAMILIES = Object.freeze({
-  coast: new Set(['ocean', 'bluewater-ocean', 'tidepool', 'inlet', 'lagoon']),
+  coast: new Set(['ocean', 'bluewater-ocean', 'tidepool', 'inlet', 'lagoon', 'brackish-lagoon']),
   'cold-coast': new Set(['cold-ocean']),
   still: new Set(['pond', 'pool', 'lake', 'tarn', 'summit-pond', 'ice-pool']),
   flow: new Set(['stream-pool', 'waterfall-pool']),
@@ -87,7 +92,8 @@ export function getZoneHabitat(zone, point = zone.center) {
     rarityTier,
     waterType,
     typeFamily: typeFamily(waterType),
-    salinity: SALT_WATER_TYPES.has(waterType) ? 'salt' : 'fresh',
+    salinity: BRACKISH_WATER_TYPES.has(waterType) ? 'brackish'
+      : SALT_WATER_TYPES.has(waterType) ? 'salt' : 'fresh',
     theme: visualTheme,
     ecologyTheme,
     ecologyThemes: Object.freeze(ecologyThemes),
@@ -102,18 +108,32 @@ export function getZoneHabitat(zone, point = zone.center) {
   });
 }
 
-export function getHabitatWeight(fish, habitat) {
+function salinityIsCompatible(fish, preference, habitat) {
+  if (preference.salinity === 'both') return true;
+  if (Array.isArray(preference.salinities)) return preference.salinities.includes(habitat.salinity);
+  if (habitat.salinity === 'brackish' && BRACKISH_COMPATIBLE_SPECIES.has(fish.id)) return true;
+  return !preference.salinity || preference.salinity === habitat.salinity;
+}
+
+export function getHabitatWeight(fish, habitat, waterConfig = ecologyConfigForWater(habitat.zoneId, habitat)) {
   if (fish.futureReserved) return 0;
   if (OBLIGATE_CAVE_SPECIES.has(fish.id) && !habitat.cave) return 0;
   const preference = fish.habitat ?? {};
+  const excluded = waterConfig.exclusions.includes(fish.id);
+  if (excluded || !salinityIsCompatible(fish, preference, habitat)) return 0;
   const compatibleWaterIds = new Set([habitat.zoneId, ...(habitat.habitatAliasIds ?? [])]);
   if (preference.exclusiveWaterId) {
     if (habitat.zoneId !== preference.exclusiveWaterId) return 0;
     // This is a strong Stage-B preference only. Rarity has already been chosen separately.
     return (({ Common: 4.2, Uncommon: 4.8, Rare: 5.6, Legendary: 6.4 })[fish.rarity] ?? 4.8)
+      * (waterConfig.speciesWeights[fish.id] ?? 1)
       * waterSizeWeight(fish, habitat) * localAbundance(fish.id, habitat.zoneId);
   }
-  if (preference.salinity && preference.salinity !== 'both' && preference.salinity !== habitat.salinity) return 0;
+  const configuredAddition = waterConfig.additions.includes(fish.id);
+  if (configuredAddition) {
+    return Math.max(.001, (waterConfig.speciesWeights[fish.id] ?? 1)
+      * waterSizeWeight(fish, habitat) * localAbundance(fish.id, habitat.zoneId));
+  }
   if (preference.tiers?.length && !preference.tiers.includes(habitat.tier)) return 0;
   if (preference.waterIds?.length && !preference.waterIds.some((id) => compatibleWaterIds.has(id))) return 0;
   if (preference.themes?.length && !habitat.ecologyThemes.some((theme) => preference.themes.includes(theme))) return 0;
@@ -143,11 +163,13 @@ export function getHabitatWeight(fish, habitat) {
   if (habitat.waterfall) featureWeight *= preference.waterTypes?.includes('waterfall-pool') ? 1.28 : .84;
   if (habitat.summit) featureWeight *= preference.tiers?.includes('summit') ? 1.24 : .8;
   return Math.max(.001, typeWeight * themeWeight * featureWeight * favoredWaterWeight
+    * (waterConfig.speciesWeights[fish.id] ?? 1)
     * waterSizeWeight(fish, habitat) * localAbundance(fish.id, habitat.zoneId));
 }
 
 export function getEcologySelection(zone, point = zone.center) {
   const habitat = getZoneHabitat(zone, point);
+  const waterConfig = ecologyConfigForWater(zone.id, habitat);
   const allowedIds = Array.isArray(zone.allowedFishIds) && zone.allowedFishIds.length
     ? new Set(zone.allowedFishIds)
     : null;
@@ -155,7 +177,7 @@ export function getEcologySelection(zone, point = zone.center) {
     ? new Set(zone.allowedRarities)
     : null;
   const entries = FISH_SPECIES
-    .map((fish) => ({ fish, weight: getHabitatWeight(fish, habitat) }))
+    .map((fish) => ({ fish, weight: getHabitatWeight(fish, habitat, waterConfig) }))
     .filter((entry) => entry.weight > 0
       && (!allowedIds || allowedIds.has(entry.fish.id))
       && (!allowedRarities || allowedRarities.has(entry.fish.rarity)));
@@ -170,6 +192,8 @@ export function attachZoneEcology(zone) {
   zone.getHabitatAt = (point = zone.center) => getZoneHabitat(zone, point);
   zone.getEcologySelection = (point = zone.center) => getEcologySelection(zone, point);
   const baseline = getEcologySelection(zone, zone.center);
+  const waterConfig = ecologyConfigForWater(zone.id, baseline.habitat);
+  zone.modifiers = { ...zone.modifiers, rarityProfile: waterConfig.rarityProfile };
   zone.fishIds = [...baseline.fishIds];
   zone.ecologyWeights = { ...baseline.habitatWeights };
   zone.ecologyTheme = baseline.habitat.ecologyTheme;
