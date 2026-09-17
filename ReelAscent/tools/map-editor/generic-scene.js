@@ -2,6 +2,7 @@ import * as pc from 'playcanvas';
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
 import { SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes } from '../../src/world/mountain-v2.js';
 import { movingPlatformPose, normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runtime.js';
+import { edgeKey, faceVertices, meshDiagnostics, vertex } from './mesh-authoring.js';
 
 const clone = (value) => value == null ? value : structuredClone(value);
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -345,8 +346,9 @@ export class GenericWorldScene {
     this.objectRoot = new pc.Entity('Authored Objects');
     this.pathRoot = new pc.Entity('Moving Platform Paths');
     this.collisionRoot = new pc.Entity('Collision Debug');
+    this.meshOverlayRoot = new pc.Entity('Mesh Topology Overlay');
     this.workspaceRoot = new pc.Entity('Prefab Workspace Reference');
-    for (const child of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot]) this.root.addChild(child);
+    for (const child of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot]) this.root.addChild(child);
     this.materials = {
       reference: makeMaterial([.45, .48, .47]),
       referenceGlass: makeMaterial([.46, .61, .7], .72),
@@ -354,6 +356,11 @@ export class GenericWorldScene {
       moving: makeMaterial([.28, .63, .82]),
       water: makeMaterial([.08, .54, .7], .68),
       selected: makeMaterial([1, .7, .08], 1, .08),
+      meshVertex: makeMaterial([1, .83, .12], 1, .15),
+      meshEdge: makeMaterial([1, .48, .08], 1, .12),
+      meshFace: makeMaterial([.98, .68, .08], .58, .12),
+      boundary: makeMaterial([1, .1, .75], 1, .18),
+      nonManifold: makeMaterial([1, .08, .08], 1, .2),
       path: makeMaterial([1, .5, .08], .82, .18),
       collision: makeMaterial([1, .12, .12], .15, .12),
       pirate: makeMaterial([.27, .42, .28]),
@@ -395,6 +402,8 @@ export class GenericWorldScene {
     this.basaltReferenceMode = 'both';
     this.skyscraperInteriorMode = true;
     this.editorHiddenIds = new Set();
+    this.meshSelection = { vertices: new Set(), edges: new Set(), faces: new Set() };
+    this.meshOverlayOptions = { showBoundary: false, showNonManifold: false };
     this.libraryMaterials = new Map();
     this.root.enabled = false;
   }
@@ -457,6 +466,38 @@ export class GenericWorldScene {
     this.applyCollisionMode();
   }
 
+  setMeshSelection(selection, options = {}) {
+    this.meshSelection = selection || { vertices: new Set(), edges: new Set(), faces: new Set() };
+    this.meshOverlayOptions = { ...this.meshOverlayOptions, ...options };
+    this.buildMeshOverlay();
+  }
+
+  buildMeshOverlay() {
+    destroyChildren(this.meshOverlayRoot);
+    const mesh = this.editableBasaltTerrain();
+    if (!mesh) return;
+    const selection = this.meshSelection;
+    const makeEdge = (key, material, radius = .035) => {
+      const [a, b] = String(key).split(':').map(Number);
+      const av = vertex(mesh, a), bv = vertex(mesh, b);
+      const segment = createSegment(this.meshOverlayRoot, `Mesh edge ${key}`, { x: av[0], y: av[1], z: av[2] }, { x: bv[0], y: bv[1], z: bv[2] }, material);
+      if (segment) segment.setLocalScale(radius, radius, Math.max(.01, segment.getLocalScale().z));
+    };
+    for (const id of selection.vertices ?? []) {
+      const point = vertex(mesh, id);
+      createPrimitive(this.meshOverlayRoot, `Mesh vertex ${id}`, 'sphere', { x: point[0], y: point[1], z: point[2] }, { x: .18, y: .18, z: .18 }, this.materials.meshVertex);
+    }
+    for (const key of selection.edges ?? []) makeEdge(key, this.materials.meshEdge, .06);
+    for (const face of selection.faces ?? []) {
+      const ids = faceVertices(mesh, face);
+      const positions = ids.flatMap((id) => vertex(mesh, id));
+      this.buildMeshEntity(`Selected face ${face}`, positions, [0, 1, 2], this.materials.meshFace, this.meshOverlayRoot);
+    }
+    const diagnostics = meshDiagnostics(mesh);
+    if (this.meshOverlayOptions.showBoundary) for (const key of diagnostics.boundaryEdges) makeEdge(key, this.materials.boundary, .045);
+    if (this.meshOverlayOptions.showNonManifold) for (const key of diagnostics.nonManifoldEdges) makeEdge(key, this.materials.nonManifold, .065);
+  }
+
   setEditorHidden(id, hidden = true) {
     const key = String(id);
     if (hidden) this.editorHiddenIds.add(key); else this.editorHiddenIds.delete(key);
@@ -465,6 +506,19 @@ export class GenericWorldScene {
   }
 
   isEditorHidden(id) { return this.editorHiddenIds.has(String(id)); }
+
+  isolateSelection(id = this.selectedId) {
+    this.editorHiddenIds.clear();
+    for (const key of this.entities.keys()) if (String(key) !== String(id)) this.editorHiddenIds.add(String(key));
+    this.applyEditorVisibility();
+    this.applyCollisionMode();
+  }
+
+  showAll() {
+    this.editorHiddenIds.clear();
+    this.applyEditorVisibility();
+    this.applyCollisionMode();
+  }
 
   applyEditorVisibility() {
     for (const [id, entity] of this.entities) entity.enabled = !this.editorHiddenIds.has(String(id));
@@ -505,7 +559,7 @@ export class GenericWorldScene {
   }
 
   rebuild() {
-    for (const root of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot]) destroyChildren(root);
+    for (const root of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot]) destroyChildren(root);
     this.entities.clear();
     this.movingEntities.clear();
     this.prefabCollisionEntries = [];
@@ -535,6 +589,7 @@ export class GenericWorldScene {
     this.applySelectionMaterials();
     this.applyEditorVisibility();
     this.applyCollisionMode();
+    this.buildMeshOverlay();
   }
 
   buildSkyscraperReference() {
@@ -604,7 +659,9 @@ export class GenericWorldScene {
       this.buildMeshEntity('Basalt Hollow procedural reference', data.positions, data.indices, this.materials.reference, this.referenceRoot);
     }
     if (candidate?.positions?.length && candidate?.indices?.length && this.basaltReferenceMode !== 'procedural') {
-      this.buildMeshEntity('Basalt Hollow frozen production candidate', candidate.positions, candidate.indices, this.materials.referenceGlass, this.referenceRoot);
+      const entity = this.buildMeshEntity('Basalt Hollow frozen production candidate', candidate.positions, candidate.indices, this.materials.referenceGlass, this.referenceRoot);
+      Object.assign(entity, { editorKind: 'terrain-mesh', editorRecord: candidate, editorId: '__basalt-authored-terrain' });
+      this.entities.set(entity.editorId, entity);
     }
     // Until candidate promotion, walkthrough collision intentionally remains the conservative
     // procedural reference. The candidate is visual comparison data, not a silent production switch.
@@ -684,6 +741,12 @@ export class GenericWorldScene {
         if (segment) segment.setLocalScale(Math.max(.1, finite(radii.x, 1.25) * 2), .07,
           Math.max(.1, segment.getLocalScale().z));
       }
+      points.forEach((point, index) => {
+        const id = `__waterpath__:${water.id || water.identity}:${index}`;
+        const node = createSphere(this.waterRoot, `${water.name || water.id} path node ${index + 1}`, point, .18, this.materials.path);
+        Object.assign(node, { editorKind: 'water-path-node', editorId: id, editorRecord: { ...water, pathNodeIndex: index } });
+        this.entities.set(id, node);
+      });
     } else {
       entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
       entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
@@ -953,6 +1016,8 @@ export class GenericWorldScene {
 
   selectedRecord(id) {
     if (id === this.referenceRecord?.id) return this.referenceRecord;
+    if (id === '__basalt-authored-terrain') return this.editableBasaltTerrain();
+    if (String(id).startsWith('__waterpath__:')) return this.entities.get(String(id))?.editorRecord ?? null;
     if (String(id).startsWith('__waypoint__:')) return this.entities.get(String(id))?.editorRecord ?? null;
     if (this.workspaceDefinition) {
       return (this.workspaceDefinition.objects ?? []).find((item) => item.id === id)

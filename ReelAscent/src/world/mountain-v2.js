@@ -3,6 +3,7 @@ import SKYREACH_WORLD_EDITOR_LEVEL from './world-editor-levels/skyscraper.json' 
 import CAVE_FISHING_WORLD_EDITOR_LEVEL from './world-editor-levels/cave-fishing-island.json' with { type: 'json' };
 import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from './world-editor-v2-runtime.js';
 import { buildVeiledAthenaeumV2 } from './library-island-v2.js';
+import { updateVeiledAthenaeumRides } from './library-island-v2.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
 import {
@@ -2319,6 +2320,7 @@ export class MountainWorld extends TestWorld {
   updateKinematics(dt = 1 / 60) {
     this.movingSurfaceMotion.clear();
     updateWorldEditorKinematics(this, dt);
+    updateVeiledAthenaeumRides(this, dt);
   }
 
   getSurfaceMotion(collider) {

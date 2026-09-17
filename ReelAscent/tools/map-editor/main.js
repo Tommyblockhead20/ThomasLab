@@ -40,6 +40,40 @@ import {
 import { movingPlatformPose } from '../../src/world/world-editor-v2-runtime.js';
 import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinition, makeRoomComponentDefinition } from './room-library.js';
 import { PIRATE_ASSET_LIBRARY, getPirateAsset, makePirateAssetDefinition } from './pirate-library.js';
+import { assetsForWorld, getV3Asset } from './asset-library-v3.js';
+import {
+  boundaryLoops,
+  createFace,
+  deleteFaces,
+  edgeKey,
+  faceVertices,
+  fillBoundary,
+  flipFaces,
+  growFaceSelection,
+  makeMeshSelection,
+  mergeNearbyVertices,
+  meshDiagnostics,
+  moveSelectedVertices,
+  recalculateVertexNormals,
+  selectConnectedFaces,
+  shrinkFaceSelection,
+  vertex,
+  weldVertices
+} from './mesh-authoring.js';
+import {
+  cutRectangularOpeningInBox,
+  extendStairAssembly,
+  generateStairAssembly,
+  makeBookshelfPrefab,
+  makeFireplacePrefab
+} from './architectural-tools.js';
+import {
+  addWaterPathNode,
+  deleteWaterPathNode,
+  normalizeWaterPath,
+  reverseWaterPath,
+  validateWaterPath
+} from './water-path-tools.js';
 
 const STORAGE_KEY = 'reel-ascent-map-editor-v1';
 const CHECKPOINT_KEY = 'reel-ascent-map-editor-v1-manual-checkpoint';
@@ -84,6 +118,9 @@ let stoneveilContextRecovery = null;
 let webglRecoveryCount = 0;
 let runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
 let tool = 'select';
+let authoringMode = 'object';
+let meshSelection = makeMeshSelection();
+let selectedWaterPathNode = null;
 let selected = null;
 let idCounter = Date.now() % 1000000;
 let draggingBrush = false;
@@ -2922,16 +2959,178 @@ function raySphereDistance(origin, direction, center, radius) {
   return t >= 0 ? t : null;
 }
 
+function updateMeshAuthoringUi() {
+  const mesh = activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate'
+    ? activeGenericLevel().terrain : null;
+  const status = $('#mesh-selection-status');
+  if (!status) return;
+  if (!mesh) {
+    status.textContent = 'Load the captured Basalt production mesh to use topology tools.';
+    return;
+  }
+  const report = meshDiagnostics(mesh);
+  status.textContent = `${meshSelection.vertices.size} vertices · ${meshSelection.edges.size} edges · ${meshSelection.faces.size} faces selected · ${report.boundaryEdges.length} boundary / ${report.nonManifoldEdges.length} non-manifold edges`;
+  genericScene?.setMeshSelection(meshSelection, {
+    showBoundary: Boolean($('#show-boundary-edges')?.checked),
+    showNonManifold: Boolean($('#show-nonmanifold-edges')?.checked)
+  });
+}
+
+function setAuthoringMode(mode = 'object') {
+  authoringMode = ['object', 'mesh', 'sculpt', 'water', 'path'].includes(mode) ? mode : 'object';
+  for (const button of $$('[data-authoring-mode]')) button.classList.toggle('active', button.dataset.authoringMode === authoringMode);
+  for (const panel of $$('[data-mode-panel]')) panel.hidden = panel.dataset.modePanel !== authoringMode;
+  if ($('#mesh-authoring-section')) $('#mesh-authoring-section').hidden = !(authoringMode === 'mesh' && activeWorldId === 'cave-fishing-island');
+  if ($('#water-path-section')) $('#water-path-section').hidden = authoringMode !== 'path';
+  if ($('#library-tools-section')) $('#library-tools-section').hidden = !['library-island', 'cave-fishing-island', 'pirate-island'].includes(activeWorldId);
+  if (authoringMode === 'sculpt' && !['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) tool = 'raise';
+  if (authoringMode === 'mesh') tool = 'select';
+  $$('#tool-grid button').forEach((button) => button.classList.toggle('active', button.dataset.tool === tool));
+  updateMeshAuthoringUi();
+}
+
+function selectBasaltMeshElement(event, ray) {
+  const mesh = activeGenericLevel()?.terrain;
+  const hit = genericScene.basaltTerrainHit(ray);
+  if (!hit || mesh?.mode !== 'authored-mesh-candidate') return false;
+  const face = Math.floor(hit.triangleOffset / 3);
+  const ids = faceVertices(mesh, face);
+  const mode = $('#mesh-selection-mode')?.value || 'face';
+  const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+  if (!additive) meshSelection = makeMeshSelection();
+  let bucket;
+  let value;
+  if (mode === 'vertex') {
+    value = ids.reduce((best, id) => {
+      const p = vertex(mesh, id);
+      const distance = Math.hypot(p[0] - hit.x, p[1] - hit.y, p[2] - hit.z);
+      return distance < best.distance ? { id, distance } : best;
+    }, { id: ids[0], distance: Infinity }).id;
+    bucket = meshSelection.vertices;
+  } else if (mode === 'edge') {
+    value = [[ids[0], ids[1]], [ids[1], ids[2]], [ids[2], ids[0]]].reduce((best, pair) => {
+      const a = vertex(mesh, pair[0]), b = vertex(mesh, pair[1]);
+      const distance = Math.hypot((a[0] + b[0]) * .5 - hit.x, (a[1] + b[1]) * .5 - hit.y, (a[2] + b[2]) * .5 - hit.z);
+      return distance < best.distance ? { key: edgeKey(...pair), distance } : best;
+    }, { key: edgeKey(ids[0], ids[1]), distance: Infinity }).key;
+    bucket = meshSelection.edges;
+  } else {
+    value = face;
+    bucket = meshSelection.faces;
+  }
+  if (additive && bucket.has(value)) bucket.delete(value); else bucket.add(value);
+  selected = { kind: 'terrain-mesh', id: '__basalt-authored-terrain', record: mesh };
+  genericScene.setSelected(selected.id);
+  updateMeshAuthoringUi();
+  renderUi();
+  return true;
+}
+
+function mutateBasaltMesh(operation, successMessage) {
+  const current = activeGenericLevel()?.terrain;
+  if (current?.mode !== 'authored-mesh-candidate') {
+    setStatus('Load the captured Basalt production mesh first.');
+    return;
+  }
+  try {
+    commitGeneric((draft) => {
+      draft.terrain = operation(draft.terrain);
+      draft.terrain.mode = 'authored-mesh-candidate';
+      draft.sourcePolicy.terrain = 'authored-candidate';
+    });
+    updateMeshAuthoringUi();
+    setStatus(`${successMessage} The candidate remains non-production until explicitly promoted.`);
+  } catch (error) {
+    setStatus(error.message);
+  }
+}
+
+function selectedMeshVertexIds(mesh) {
+  const ids = new Set(meshSelection.vertices);
+  for (const key of meshSelection.edges) for (const id of key.split(':').map(Number)) ids.add(id);
+  for (const face of meshSelection.faces) for (const id of faceVertices(mesh, face)) ids.add(id);
+  return [...ids];
+}
+
+function selectedPathWater() {
+  const level = activeGenericLevel();
+  if (!level || !selected) return null;
+  if (selected.kind === 'water-v2') return level.waters.find((water) => String(water.id || water.identity) === selected.id) || null;
+  if (selected.kind === 'water-path-node') {
+    const [, waterId, nodeIndex] = selected.id.split(':');
+    selectedWaterPathNode = Number(nodeIndex);
+    return level.waters.find((water) => String(water.id || water.identity) === waterId) || null;
+  }
+  return null;
+}
+
+function editorWaterPath(water) {
+  return normalizeWaterPath({
+    id: water.id, name: water.name, type: water.metadata?.waterType || (water.metadata?.closedLoop ? 'lazy-river' : 'stream'),
+    pathLocal: water.metadata?.pathLocal || [], surfaceY: water.position?.y,
+    width: water.metadata?.pathWidth || water.radii?.x, depth: water.depthMeters,
+    flowSpeed: water.metadata?.flowSpeed, direction: water.metadata?.flowDirection,
+    closed: water.metadata?.closedLoop, fishable: water.metadata?.fishable !== false
+  });
+}
+
+function writeEditorWaterPath(water, pathInput) {
+  const path = normalizeWaterPath(pathInput);
+  const xs = path.points.map((point) => point.x), zs = path.points.map((point) => point.z);
+  const centerX = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : water.position.x;
+  const centerZ = zs.length ? (Math.min(...zs) + Math.max(...zs)) / 2 : water.position.z;
+  const zRadius = zs.length ? Math.max(.1, (Math.max(...zs) - Math.min(...zs)) / 2) : water.radii.z;
+  water.shape = 'path';
+  water.position = { x: centerX, y: path.points[0]?.y ?? water.position.y, z: centerZ };
+  water.radii = { x: path.width, z: zRadius };
+  water.depthMeters = path.depth;
+  water.metadata = {
+    ...water.metadata, libraryWaterShape: 'path', pathLocal: path.points.map((point) => [point.x, point.z]),
+    pathWidth: path.width, pathOriginalCenter: [centerX, centerZ], pathOriginalRadii: [path.width, zRadius],
+    waterType: path.type, closedLoop: path.closed, flowSpeed: path.flowSpeed,
+    flowDirection: path.direction, fishable: path.fishable
+  };
+  return water;
+}
+
+function mutateSelectedWaterPath(mutator, message) {
+  const water = selectedPathWater();
+  if (!water || water.shape !== 'path') return setStatus('Select a path-shaped water or one of its path nodes first.');
+  commitGeneric((draft) => {
+    const target = draft.waters.find((item) => String(item.id || item.identity) === String(water.id || water.identity));
+    writeEditorWaterPath(target, mutator(editorWaterPath(target)));
+  });
+  setStatus(message);
+  updateWaterPathUi();
+}
+
+function updateWaterPathUi() {
+  const water = selectedPathWater();
+  const status = $('#path-status');
+  if (!status) return;
+  if (!water || water.shape !== 'path') { status.textContent = 'Select a path water or node.'; return; }
+  const path = editorWaterPath(water);
+  const issues = validateWaterPath(path);
+  if ($('#path-width')) $('#path-width').value = String(path.width);
+  if ($('#path-flow')) $('#path-flow').value = String(path.flowSpeed);
+  status.textContent = `${path.points.length - (path.closed ? 1 : 0)} nodes · ${path.closed ? 'closed loop' : 'open path'} · ${issues.length ? `${issues.length} validation issue(s)` : 'valid'}`;
+}
+
 function applyGenericToolAt(event) {
   const level = activeGenericLevel();
   if (!level) return;
   const ray = pointerRay(event);
   const definition = activePrefabDefinition(level);
+  if (authoringMode === 'mesh' && activeWorldId === 'cave-fishing-island' && tool === 'select') {
+    if (selectBasaltMeshElement(event, ray)) return;
+  }
   if (tool === 'select') {
     const hit = genericScene.pick(ray);
     selected = hit ? { kind: hit.kind, id: String(hit.id), record: hit.record } : null;
+    if (selected?.kind === 'water-path-node') selectedWaterPathNode = Number(selected.id.split(':').at(-1));
     genericScene.setSelected(selected?.id ?? null);
     renderUi();
+    updateWaterPathUi();
     return;
   }
   if (activeWorldId === 'cave-fishing-island' && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) {
@@ -3260,6 +3459,7 @@ function syncWorldUi() {
   if ($('#cave-migration-section')) $('#cave-migration-section').hidden = world.id !== 'cave-fishing-island';
   if ($('#skyscraper-room-library-section')) $('#skyscraper-room-library-section').hidden = world.id !== 'skyscraper';
   if ($('#pirate-asset-library-section')) $('#pirate-asset-library-section').hidden = world.id !== 'pirate-island';
+  if ($('#library-tools-section')) $('#library-tools-section').hidden = !['library-island', 'cave-fishing-island', 'pirate-island'].includes(world.id);
   if ($('#skyscraper-interior-wrap')) $('#skyscraper-interior-wrap').hidden = world.id !== 'skyscraper';
   if ($('#create-prefab-foundation')) $('#create-prefab-foundation').hidden = !worldHasCapability(world.id, 'prefabs');
   if ($('#create-room-foundation')) $('#create-room-foundation').hidden = !worldHasCapability(world.id, 'rooms');
@@ -3287,6 +3487,8 @@ function syncWorldUi() {
     const capability = capabilityByTool[button.dataset.tool];
     button.hidden = Boolean(capability && !worldHasCapability(world.id, capability));
   }
+  populateV3AssetUi();
+  setAuthoringMode(authoringMode);
 }
 
 function renderGenericSelection() {
@@ -3313,6 +3515,19 @@ function renderGenericSelection() {
   const libraryKind = record.metadata?.librarySourceKind || '—';
   meta.innerHTML = `<dt>Type</dt><dd>${selected.kind}</dd><dt>Stable ID</dt><dd title="${selected.id}">${selected.id}</dd><dt>Parent / source</dt><dd title="${parentLabel}">${parentLabel}</dd>${activeWorldId === 'library-island' ? `<dt>Authored role</dt><dd>${libraryKind}</dd><dt>Material role</dt><dd>${materialRole}</dd>` : ''}`;
   fields.appendChild(meta);
+
+  if (selected.kind === 'terrain-mesh') {
+    const report = meshDiagnostics(activeGenericLevel().terrain);
+    const note = document.createElement('p');
+    note.className = 'compact-help';
+    note.textContent = `${report.vertexCount.toLocaleString()} vertices · ${report.faceCount.toLocaleString()} faces · ${report.boundaryEdges.length} boundary edges · ${report.nonManifoldEdges.length} non-manifold edges. This remains an authored candidate, not production authority.`;
+    fields.appendChild(note);
+    $('#duplicate-selected').disabled = true;
+    $('#hide-selected').disabled = true;
+    $('#rename-selected').disabled = true;
+    $('#edit-source-prefab').hidden = true;
+    return;
+  }
 
   if (!['architecture-reference', 'waypoint'].includes(selected.kind)) {
     const nameWrap = document.createElement('label');
@@ -3650,6 +3865,16 @@ function renderOutliner() {
   } else {
     const level = activeGenericLevel();
     if (activeWorldId === 'skyscraper') groups.push(['ESB Reference', [{ id:'__architecture__', name:'Empire State Building', kind:'architecture-reference', type:'reference' }]]);
+    if (activeWorldId === 'cave-fishing-island' && level?.terrain?.mode === 'authored-mesh-candidate') {
+      groups.push(['Terrain Mesh', [{
+        id:'__basalt-authored-terrain', name:`Captured Basalt · ${Math.floor(level.terrain.positions.length / 3).toLocaleString()} vertices`,
+        kind:'terrain-mesh', type:'triangle mesh', hideable:true
+      }]]);
+      groups.push(['Terrain Mesh Parts', (level.terrain.parts ?? []).map((part, index) => ({
+        id:`__basalt-part__:${index}`, name:part.name || `Mesh part ${index + 1}`, kind:'terrain-mesh-part', type:`${part.triangleCount || 0} faces`,
+        firstTriangle:Number(part.firstTriangle) || 0, triangleCount:Number(part.triangleCount) || 0
+      }))]);
+    }
     groups.push(['Waters', (level?.waters ?? []).map((item) => ({
       id:String(item.id||item.identity), name:item.name||item.id, kind:'water-v2', type:'water',
       renameable:true, deletable:activeWorldId !== 'library-island', hideable:true
@@ -3711,10 +3936,22 @@ function renderOutliner() {
       if (selected?.id === item.id) main.classList.add('selected');
       main.title = `${item.id} · ${item.type}`;
       main.innerHTML = `<span class="outliner-name">${item.name}</span><span class="outliner-type">${item.type}</span>`;
-      main.addEventListener('click', () => { selected={kind:item.kind,id:item.id}; if(!isStoneveilWorld()) genericScene.setSelected(item.id); renderUi(); });
+      main.addEventListener('click', () => {
+        if (item.kind === 'terrain-mesh-part') {
+          meshSelection = makeMeshSelection({ faces: Array.from({ length:item.triangleCount }, (_, offset) => item.firstTriangle + offset) });
+          selected = { kind:'terrain-mesh', id:'__basalt-authored-terrain' };
+          genericScene.setSelected(selected.id);
+          setAuthoringMode('mesh');
+          updateMeshAuthoringUi();
+        } else {
+          selected={kind:item.kind,id:item.id};
+          if(!isStoneveilWorld()) genericScene.setSelected(item.id);
+        }
+        renderUi();
+      });
       itemRow.appendChild(main);
       const actions = [
-        ['◎','Focus',()=>focusOutlinerItem(item),true],
+        ['◎','Focus',()=>focusOutlinerItem(item),item.kind !== 'terrain-mesh-part'],
         [genericItemHidden(item) || (isStoneveilWorld() && editorHiddenStoneveilIds.has(String(item.id))) ? '○':'◉','Toggle editor visibility',()=>setEditorItemHidden(item, !(genericItemHidden(item) || (isStoneveilWorld() && editorHiddenStoneveilIds.has(String(item.id))))),Boolean(item.hideable)],
         ['✎','Rename',()=>renameOutlinerItem(item),Boolean(item.renameable)],
         ['×','Delete',()=>deleteOutlinerItem(item),Boolean(item.deletable)]
@@ -4605,6 +4842,110 @@ function placeLibraryComponent() {
   setStatus(`Placed ${template.label} component: ${component.label}. It is an independent linked module with its own root transform.`);
 }
 
+function populateV3AssetUi() {
+  const select = $('#v3-asset-template');
+  if (!select) return;
+  const assets = assetsForWorld(activeWorldId);
+  const previous = select.value;
+  select.replaceChildren(...assets.map((asset) => new Option(`${asset.category} — ${asset.name}`, asset.id)));
+  if (assets.some((asset) => asset.id === previous)) select.value = previous;
+  const asset = getV3Asset(select.value);
+  if ($('#v3-asset-description')) $('#v3-asset-description').textContent = asset?.description || 'No v3 assets are registered for this world.';
+  if ($('#place-v3-asset')) $('#place-v3-asset').disabled = !asset;
+}
+
+function placeV3Asset() {
+  if (isStoneveilWorld()) return;
+  const level = activeGenericLevel();
+  const asset = getV3Asset($('#v3-asset-template')?.value);
+  if (!level || !asset || !asset.worlds.includes(activeWorldId)) return;
+  const definition = clone(asset.definition);
+  if (activeWorldId === 'library-island') {
+    definition.metadata = {
+      ...definition.metadata, librarySourceKind: 'prefab-definition', librarySourceId: definition.id,
+      authoredPrefabMetadata: clone(asset.definition.metadata ?? {})
+    };
+    for (const object of definition.objects) object.metadata = {
+      ...object.metadata, librarySourceKind: 'prefab-part', librarySourceId: object.id, librarySourceHadId: true
+    };
+  }
+  const id = nextStableId(level, 'V3-ASSET');
+  const instance = {
+    id, name: `${asset.name} ${id.split('-').at(-1)}`, prefabId: definition.id, linked: true,
+    transform: { position: maybeSnapPosition({ x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z }), rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+    metadata: activeWorldId === 'library-island'
+      ? { librarySourceKind: 'prefab-instance', librarySourceId: id, librarySourceIndex: -1, v3AssetId: asset.id }
+      : { v3AssetId: asset.id }
+  };
+  commitGeneric((draft) => {
+    ensureLibraryDefinition(draft, definition);
+    draft.prefabs.instances.push(instance);
+  });
+  selected = { kind: 'prefab-instance', id };
+  genericScene.setSelected(id);
+  focusSelectedObject();
+  setStatus(`Placed linked v3 asset: ${asset.name}.`);
+}
+
+function cutSelectedRectangularOpening() {
+  if (activeWorldId !== 'library-island' || selected?.kind !== 'world-object') return setStatus('Select one axis-aligned Library wall or floor slab first.');
+  const level = activeGenericLevel();
+  const record = level?.objects?.find((item) => item.id === selected.id);
+  if (!record) return;
+  try {
+    const dimensions = record.size || { x: 1, y: 1, z: 1 };
+    const thicknessAxis = Object.entries(dimensions).sort((a, b) => a[1] - b[1])[0][0];
+    const planeAxes = ['x', 'y', 'z'].filter((axis) => axis !== thicknessAxis);
+    const fragments = cutRectangularOpeningInBox(record, {
+      thicknessAxis,
+      center: clone(record.transform.position),
+      size: { [planeAxes[0]]: Number($('#opening-width')?.value) || 3, [planeAxes[1]]: Number($('#opening-height')?.value) || 3.4 }
+    });
+    commitGeneric((draft) => {
+      const index = draft.objects.findIndex((item) => item.id === record.id);
+      if (index >= 0) draft.objects.splice(index, 1, ...fragments.map((item) => ({
+        ...item, metadata: { ...item.metadata, librarySourceKind: 'part', librarySourceId: item.id, librarySourceHadId: true }
+      })));
+    });
+    selected = { kind: 'world-object', id: fragments[0].id };
+    genericScene.setSelected(selected.id);
+    setStatus(`Cut a real rectangular opening into ${record.name || record.id}; the source slab was replaced by four collision-matched fragments.`);
+  } catch (error) { setStatus(error.message); }
+}
+
+function generateEditorStairs() {
+  if (isStoneveilWorld()) return;
+  const level = activeGenericLevel();
+  const rise = Number($('#stair-rise')?.value) || 3;
+  const run = Number($('#stair-run')?.value) || 5;
+  const id = nextStableId(level, 'STAIR');
+  const start = maybeSnapPosition({ x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z });
+  const stair = generateStairAssembly({ id, name: `Stair ${id.split('-').at(-1)}`, start, end: { x: start.x, y: start.y + rise, z: start.z - run }, width: Number($('#stair-width')?.value) || 2.4, stepCount: Number($('#stair-count')?.value) || 14 });
+  if (activeWorldId === 'library-island') for (const step of stair.steps) step.metadata = {
+    ...step.metadata, librarySourceKind: 'part', librarySourceId: step.id, librarySourceHadId: true
+  };
+  commitGeneric((draft) => draft.objects.push(...stair.steps));
+  selected = { kind: 'world-object', id: stair.steps[0].id };
+  genericScene.setSelected(selected.id);
+  setStatus(`Generated ${stair.steps.length} collision-matched stair treads (${stair.properties.riserHeight.toFixed(2)} m rise each).`);
+}
+
+function extendSelectedStairs() {
+  const level = activeGenericLevel();
+  const selectedStep = level?.objects?.find((item) => item.id === selected?.id);
+  const stairId = selectedStep?.metadata?.stairId;
+  const existing = (level?.objects || []).filter((item) => item.metadata?.stairId === stairId);
+  if (!stairId || existing.length < 2) return setStatus('Select a stair generated by the v3 stair tool first.');
+  try {
+    const extension = extendStairAssembly(existing, 5, 'down');
+    if (activeWorldId === 'library-island') for (const step of extension) step.metadata = {
+      ...step.metadata, librarySourceKind: 'part', librarySourceId: step.id, librarySourceHadId: true
+    };
+    commitGeneric((draft) => draft.objects.push(...extension));
+    setStatus(`Extended ${stairId} downward by ${extension.length} usable treads.`);
+  } catch (error) { setStatus(error.message); }
+}
+
 
 function populatePirateAssetUi() {
   const select = $('#pirate-asset-template');
@@ -4728,6 +5069,17 @@ function setupV21Ui() {
   $('#validation-filter')?.addEventListener('change', (event) => { validationFilter=event.target.value||'all'; renderValidation(); });
   $('#refresh-validation')?.addEventListener('click', renderValidation);
   $('#focus-selected')?.addEventListener('click', () => focusSelectedObject());
+  $('#isolate-selected')?.addEventListener('click', () => {
+    if (isStoneveilWorld()) return setStatus('Stoneveil isolation remains available through its existing layer toggles.');
+    if (!selected) return setStatus('Select an object first.');
+    genericScene.isolateSelection(selected.id);
+    setStatus(`Isolated ${selected.id}. Use Show All to restore editor visibility.`);
+  });
+  $('#show-all-objects')?.addEventListener('click', () => {
+    if (isStoneveilWorld()) editorHiddenStoneveilIds.clear(); else genericScene.showAll();
+    renderUi();
+    setStatus('All editor objects are visible.');
+  });
   $('#rename-selected')?.addEventListener('click', renameSelectedRecord);
   $('#edit-source-prefab')?.addEventListener('click', () => { const def=definitionForSelectedInstance(); if(def) enterPrefabWorkspace(def.id); });
   $('#room-library-template')?.addEventListener('change', populateRoomLibraryUi);
@@ -4736,6 +5088,11 @@ function setupV21Ui() {
   populateRoomLibraryUi();
   $('#pirate-asset-template')?.addEventListener('change', populatePirateAssetUi);
   $('#place-pirate-asset')?.addEventListener('click', placePirateAsset);
+  $('#v3-asset-template')?.addEventListener('change', populateV3AssetUi);
+  $('#place-v3-asset')?.addEventListener('click', placeV3Asset);
+  $('#cut-rectangular-opening')?.addEventListener('click', cutSelectedRectangularOpening);
+  $('#generate-stairs')?.addEventListener('click', generateEditorStairs);
+  $('#extend-stairs')?.addEventListener('click', extendSelectedStairs);
   populatePirateAssetUi();
   $('#skyscraper-interior-mode')?.addEventListener('change', (event) => genericScene.setSkyscraperInteriorMode(event.target.checked));
   $('#create-test-room')?.addEventListener('click', createTestRoom);
@@ -4785,6 +5142,86 @@ $$('#tool-grid button').forEach((button) => button.addEventListener('click', () 
   else if (tool === 'connect-cave') setStatus(isMeshMode() ? 'Connect Cave Ends: click one dead-end wall, then click the other. The tool opens both local patches and stitches their terrain boundaries into one continuous mesh. Esc cancels.' : 'Freeze Core to 3D Mesh first.');
   else setStatus(`Tool: ${button.textContent}`);
 }));
+
+$$('[data-authoring-mode]').forEach((button) => button.addEventListener('click', () => setAuthoringMode(button.dataset.authoringMode)));
+$('#mesh-clear-selection')?.addEventListener('click', () => { meshSelection = makeMeshSelection(); updateMeshAuthoringUi(); });
+$('#show-boundary-edges')?.addEventListener('change', updateMeshAuthoringUi);
+$('#show-nonmanifold-edges')?.addEventListener('change', updateMeshAuthoringUi);
+$('#mesh-select-connected')?.addEventListener('click', () => {
+  const mesh = activeGenericLevel()?.terrain;
+  const seed = meshSelection.faces.values().next().value;
+  if (mesh?.mode !== 'authored-mesh-candidate' || seed == null) return setStatus('Select a Basalt face first.');
+  meshSelection.faces = selectConnectedFaces(mesh, seed);
+  updateMeshAuthoringUi();
+});
+$('#mesh-grow')?.addEventListener('click', () => {
+  const mesh = activeGenericLevel()?.terrain;
+  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  meshSelection.faces = growFaceSelection(mesh, meshSelection.faces);
+  updateMeshAuthoringUi();
+});
+$('#mesh-shrink')?.addEventListener('click', () => {
+  const mesh = activeGenericLevel()?.terrain;
+  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  meshSelection.faces = shrinkFaceSelection(mesh, meshSelection.faces);
+  updateMeshAuthoringUi();
+});
+$('#mesh-apply-move')?.addEventListener('click', () => mutateBasaltMesh(
+  (mesh) => moveSelectedVertices(mesh, meshSelection, {
+    x: Number($('#mesh-move-x')?.value) || 0,
+    y: Number($('#mesh-move-y')?.value) || 0,
+    z: Number($('#mesh-move-z')?.value) || 0
+  }), 'Moved the selected topology.'
+));
+$('#mesh-create-face')?.addEventListener('click', () => mutateBasaltMesh(
+  (mesh) => createFace(mesh, selectedMeshVertexIds(mesh)), 'Created one real triangle face.'
+));
+$('#mesh-delete-faces')?.addEventListener('click', () => {
+  if (!meshSelection.faces.size) return setStatus('Select one or more faces first.');
+  mutateBasaltMesh((mesh) => deleteFaces(mesh, meshSelection.faces), 'Deleted the selected face topology.');
+  meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
+});
+$('#mesh-flip-faces')?.addEventListener('click', () => mutateBasaltMesh(
+  (mesh) => flipFaces(mesh, meshSelection.faces), 'Flipped the selected face winding.'
+));
+$('#mesh-fill-hole')?.addEventListener('click', () => {
+  const mesh = activeGenericLevel()?.terrain;
+  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  const selectedIds = new Set(selectedMeshVertexIds(mesh));
+  const loops = boundaryLoops(mesh).filter((loop) => loop.closed);
+  const loop = loops.find((candidate) => selectedIds.size && [...selectedIds].every((id) => candidate.vertices.includes(id)))
+    ?? (loops.length === 1 ? loops[0] : null);
+  if (!loop) return setStatus('Select vertices/edges from one closed boundary loop, then Fill Boundary.');
+  mutateBasaltMesh((value) => fillBoundary(value, loop.vertices), `Filled a ${loop.vertices.length - 1}-vertex boundary with real faces.`);
+  meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
+});
+$('#mesh-weld')?.addEventListener('click', () => {
+  const mesh = activeGenericLevel()?.terrain;
+  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  const ids = selectedMeshVertexIds(mesh);
+  mutateBasaltMesh((value) => weldVertices(value, ids), `Welded ${ids.length} selected vertices.`);
+  meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
+});
+$('#mesh-merge-nearby')?.addEventListener('click', () => {
+  mutateBasaltMesh((mesh) => mergeNearbyVertices(mesh, .01), 'Merged duplicate vertices within 1 cm.');
+  meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
+});
+$('#mesh-recalculate-normals')?.addEventListener('click', () => mutateBasaltMesh(
+  (mesh) => recalculateVertexNormals(mesh), 'Recalculated vertex normals.'
+));
+$('#path-add-node')?.addEventListener('click', () => mutateSelectedWaterPath(
+  (path) => addWaterPathNode(path, { x: cameraState.target.x, y: path.points[0]?.y || 0, z: cameraState.target.z }, selectedWaterPathNode),
+  'Added a water-path node at the camera target.'
+));
+$('#path-delete-node')?.addEventListener('click', () => {
+  if (!Number.isInteger(selectedWaterPathNode)) return setStatus('Select a path node first.');
+  mutateSelectedWaterPath((path) => deleteWaterPathNode(path, selectedWaterPathNode), 'Deleted the selected water-path node.');
+  selectedWaterPathNode = null;
+});
+$('#path-close-loop')?.addEventListener('click', () => mutateSelectedWaterPath((path) => normalizeWaterPath({ ...path, type: 'lazy-river', closed: true }), 'Closed the water path into a lazy-river loop.'));
+$('#path-reverse')?.addEventListener('click', () => mutateSelectedWaterPath(reverseWaterPath, 'Reversed the authored water flow direction.'));
+$('#path-width')?.addEventListener('change', () => mutateSelectedWaterPath((path) => ({ ...path, width: Math.max(.1, Number($('#path-width').value) || 1.5) }), 'Updated the production water-path width.'));
+$('#path-flow')?.addEventListener('change', () => mutateSelectedWaterPath((path) => ({ ...path, flowSpeed: Math.max(0, Number($('#path-flow').value) || 0) }), 'Updated the authored flow speed.'));
 
 $('#brush-radius').addEventListener('input', () => $('#brush-radius-out').textContent = `${$('#brush-radius').value} m`);
 $('#brush-strength').addEventListener('input', () => $('#brush-strength-out').textContent = `${$('#brush-strength').value}`);
@@ -5290,8 +5727,8 @@ async function initializeWorldEditorV2() {
     await switchWorld(activeWorldId, { keepCamera: activeWorldId === 'stoneveil-peak' });
     if (isStoneveilWorld()) {
       setStatus(compatibleRecoveryApplied
-        ? 'World Editor V2.3.1 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
-        : 'World Editor V2.3.1 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
+        ? 'World Editor V3 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
+        : 'World Editor V3 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
     }
   } catch (error) {
     console.error(error);

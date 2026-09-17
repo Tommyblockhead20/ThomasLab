@@ -1,3 +1,34 @@
+# REEL ASCENT — WORLD EDITOR V3
+
+Status (2026-09-17): the current World Editor is now V3. This pass preserves every V2.3.1 recovery safeguard, keeps `src/world/map-editor-patch.json` byte-identical, retains the authoritative Library scene, and does not promote the Basalt captured mesh into production.
+
+- **Mode architecture:** Object, Mesh, Sculpt, Water, and Path modes organize context-sensitive controls. Existing Stoneveil sculpt behavior remains intact.
+- **Shared mesh authoring:** `tools/map-editor/mesh-authoring.js` owns selection/topology diagnostics and durable mesh mutations. Basalt supports click vertex/edge/face selection, connected/grow/shrink, numeric move, create/delete/flip faces, boundary fill, weld, merge-nearby, and recalculated normals. Selected topology, boundary edges, and non-manifold edges render as editor-only overlays.
+- **Basalt authority:** all operations edit the exact captured `authored-mesh-candidate` positions/indices and round-trip through the existing generic level. Production remains procedural until an explicit later promotion; the editor continues to label the freeze as a candidate.
+- **Library structural editing:** Cut Rectangular Opening deterministically replaces an axis-aligned primitive with four real authored fragments, so rendering and collision agree. Both production balcony stair heads are now physically open rather than visually masked. The stair generator produces editable treads from rise/run/width/count and can extend a generated flight downward by five steps.
+- **Validation:** captured meshes report open/non-manifold edges, isolated vertices, zero-area/thin/duplicate triangles. Authored primitives have duplicate/near-coplanar thin-surface z-fighting checks that avoid ordinary perpendicular joins. Path water validates closure, width/depth, sharp corners, and self-intersections. Very large global object sets defer the quadratic z-fight scan instead of risking V2.3.1 stability.
+- **Library assets:** the authoritative shelf prefab now has a real frame, recessed back, separate shelves, trim, and varied individual book blocks while the complete scene stays at 409/420 authored render entities. A substantial masonry fireplace, non-colliding flame geometry, and ninth local light are installed in the Grand Hall. The v3 linked asset browser also offers standard/tall/double shelves and simple/monumental fireplaces.
+- **Water/lazy river:** `tools/map-editor/water-path-tools.js` is shared by editor and runtime. Path Mode provides node selection, add/delete, close, reverse, width, flow, and validation. `rideWaters` keeps the new `athenaeum-lazy-river` separate from the three canonical fishing waters. Production builds the same closed path and three stable spline-following tubes; entering a tube uses the established seat path, the seat anchor follows the tube, and normal interaction dismounts it.
+- **Asset expansion:** v3 adds linked Basalt natural ledge, cave arch, and column-cluster assets plus Pirate rope bridge, watch scaffold, and wreck-bow assemblies. Existing Pirate assets remain available.
+- **Visibility and prefabs:** Isolate Selected / Show All are non-destructive editor-only visibility tools. New complex assets remain linked prefab sources with local children; the Library adapter preserves prefab metadata and ride-only water without creating a second scene implementation.
+- **Files:** new `tools/map-editor/{mesh-authoring,architectural-tools,water-path-tools,asset-library-v3}.js` and `test/world-editor-v3.test.js`; updated `tools/map-editor/{index.html,editor.css,main.js,generic-scene.js,validation.js,library-scene-adapter.js,WORLD_EDITOR_V2.md}`, `src/world/{library-island-v2.scene.json,library-island-v2.js,mountain-v2.js}`, `src/ui/home-interaction.js`, `test/v22-library-island.test.js`, and this handoff.
+- **Automated checks:** v3 focused tests cover mesh editing/repair, opening cuts, stair generation/extension, z-fight detection, shelf/fireplace geometry, lazy-river serialization/pose, Library round-trip, and the exact Stoneveil patch SHA-256. The previous v22 lossless adapter, canonical fishing-water, and shared-source checks remain passing after their authored render/light expectation was advanced for v3.
+- **Collision behavior:** Library openings/stairs use the same authored primitive records for visuals and production collision. Basalt topology saves into the candidate mesh; because candidate promotion is deliberately out of scope, production Basalt collision does not silently change.
+- **Known limitations:** no browser visual/walkthrough playtest is claimed. Object multi-select, 3D transform gizmos, box-select, arbitrary boolean/CSG, mesh extrusion/inset/subdivide, dragged path nodes, waterfall-specific snapping, collision obstruction analysis, and player-capsule clearance overlays remain incomplete. The existing upper-archive stair starts on the balcony and was not guessed to be the reported “missing bottom five” flight; the reusable extension tool is supplied so the correct selected flight can be extended safely during visual review.
+
+## World Editor V3 manual release checklist
+
+1. [ ] Basalt: import the captured freeze, enter Mesh Mode, select/move vertex/edge/face topology, delete a face, show its boundary, fill it, export/reload, and inspect collision policy.
+2. [ ] Library: walk both ground-to-balcony stairs through the new real floor openings; confirm no head collision and no accidental fall-through around the border.
+3. [ ] Library: use Cut Opening on a disposable axis-aligned slab and verify visual/collision agreement.
+4. [ ] Generate stairs, extend them downward by five, and validate riser/tread spacing in Walkthrough.
+5. [ ] Refresh z-fight validation, focus a synthetic/known pair, and confirm perpendicular floor/wall joins are not false positives.
+6. [ ] Inspect shelf readability and Grand Hall fireplace flame/light/collision.
+7. [ ] Edit/reverse the lazy-river path, ride every tube for a full loop, then dismount.
+8. [ ] Place/edit linked Library, Pirate, and Basalt v3 assets.
+9. [ ] Repeat edits/world switches and confirm no frequent WebGL resets.
+10. [ ] Load Stoneveil and confirm current authored geometry plus recovery fingerprint remain unchanged.
+
 # REEL ASCENT v22.1 — CROWN CAVE AUTHORITY REGRESSION FIX
 
 Status (2026-09-17): both authored Crown cave entrances are no longer covered by the legacy procedural summit-side shell. The tracked frontend build is regenerated.

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark" />
-  <title>Reel Ascent — World Editor V2.1</title>
+  <title>Reel Ascent — World Editor V3</title>
   <link rel="stylesheet" href="./editor.css" />
   <style>
     #walkthrough-hud {
@@ -29,7 +29,7 @@
     <header id="topbar">
       <div class="brand">
         <strong>REEL ASCENT</strong>
-        <span>WORLD EDITOR V2.3.1</span>
+        <span>WORLD EDITOR V3</span>
         <select id="world-selector" aria-label="World / scene"></select>
       </div>
       <div class="top-actions">
@@ -51,6 +51,16 @@
     </header>
 
     <aside id="left-panel" class="panel">
+      <section id="authoring-mode-section">
+        <h2>Authoring Mode <button class="help-dot" type="button" data-tip="Modes keep object placement, direct topology, sculpting, water bounds, and path nodes context-specific." aria-label="Authoring mode help">?</button></h2>
+        <div id="authoring-mode-grid" class="mode-grid" role="tablist" aria-label="Editor authoring mode">
+          <button type="button" data-authoring-mode="object" class="active">Object</button>
+          <button type="button" data-authoring-mode="mesh">Mesh</button>
+          <button type="button" data-authoring-mode="sculpt">Sculpt</button>
+          <button type="button" data-authoring-mode="water">Water</button>
+          <button type="button" data-authoring-mode="path">Path</button>
+        </div>
+      </section>
       <section>
         <h2>Tool</h2>
         <div id="tool-grid" class="tool-grid">
@@ -137,6 +147,67 @@
         <div class="row-actions"><button id="load-basalt-capture" type="button">Load Captured Production Mesh</button><button id="import-basalt-freeze" type="button">Import Freeze JSON</button></div>
         <input id="basalt-freeze-file" type="file" accept="application/json,.json" hidden />
         <div id="basalt-freeze-status" class="compact-status hint">No frozen candidate imported.</div>
+      </section>
+
+      <section id="mesh-authoring-section" data-mode-panel="mesh" hidden>
+        <h2>Mesh Topology <button class="help-dot" type="button" data-tip="Directly select and repair the captured Basalt triangle mesh. Boundary and non-manifold analysis is editor-only; edits persist in the exported world level." aria-label="Mesh topology help">?</button></h2>
+        <label>Selection <select id="mesh-selection-mode"><option value="vertex">Vertex</option><option value="edge">Edge</option><option value="face" selected>Face</option></select></label>
+        <div class="row-actions wrap">
+          <button id="mesh-select-connected" type="button">Connected</button>
+          <button id="mesh-grow" type="button">Grow</button>
+          <button id="mesh-shrink" type="button">Shrink</button>
+          <button id="mesh-clear-selection" type="button">Clear</button>
+        </div>
+        <div class="field-grid three">
+          <label>Move X <input id="mesh-move-x" type="number" step="0.05" value="0" /></label>
+          <label>Move Y <input id="mesh-move-y" type="number" step="0.05" value="0" /></label>
+          <label>Move Z <input id="mesh-move-z" type="number" step="0.05" value="0" /></label>
+        </div>
+        <div class="row-actions wrap">
+          <button id="mesh-apply-move" type="button">Move Selection</button>
+          <button id="mesh-create-face" type="button">Create Face</button>
+          <button id="mesh-delete-faces" type="button">Delete Face(s)</button>
+          <button id="mesh-fill-hole" type="button">Fill Boundary</button>
+          <button id="mesh-flip-faces" type="button">Flip Winding</button>
+          <button id="mesh-weld" type="button">Weld Vertices</button>
+          <button id="mesh-merge-nearby" type="button">Merge Nearby</button>
+          <button id="mesh-recalculate-normals" type="button">Recalculate Normals</button>
+        </div>
+        <label><input id="show-boundary-edges" type="checkbox" /> Show open/boundary edges</label>
+        <label><input id="show-nonmanifold-edges" type="checkbox" /> Show non-manifold edges</label>
+        <div id="mesh-selection-status" class="compact-status hint">No mesh elements selected.</div>
+      </section>
+
+      <section id="library-tools-section" hidden>
+        <h2>Architecture Tools <button class="help-dot" type="button" data-tip="Cut Opening replaces one axis-aligned slab/wall with four real production pieces around a rectangular opening. Stair and asset tools create reusable authored records." aria-label="Architecture tool help">?</button></h2>
+        <div data-mode-panel="mesh" hidden>
+          <div class="field-grid two">
+            <label>Opening width <input id="opening-width" type="number" min="0.5" step="0.1" value="3.0" /></label>
+            <label>Opening length/height <input id="opening-height" type="number" min="0.5" step="0.1" value="3.4" /></label>
+          </div>
+          <button id="cut-rectangular-opening" type="button" class="primary">Cut Rectangular Opening</button>
+        </div>
+        <div data-mode-panel="object">
+          <label>Asset <select id="v3-asset-template"></select></label>
+          <div id="v3-asset-description" class="compact-status hint"></div>
+          <div class="row-actions"><button id="place-v3-asset" type="button">Place Linked Asset</button></div>
+          <details><summary>Stair Generator</summary>
+            <div class="field-grid two">
+              <label>Rise <input id="stair-rise" type="number" step="0.1" value="3" /></label>
+              <label>Run <input id="stair-run" type="number" step="0.1" value="5" /></label>
+              <label>Width <input id="stair-width" type="number" min="0.5" step="0.1" value="2.4" /></label>
+              <label>Steps <input id="stair-count" type="number" min="1" step="1" value="14" /></label>
+            </div>
+            <div class="row-actions"><button id="generate-stairs" type="button">Generate Stairs</button><button id="extend-stairs" type="button">Extend Down 5</button></div>
+          </details>
+        </div>
+      </section>
+
+      <section id="water-path-section" data-mode-panel="path" hidden>
+        <h2>Water Path <button class="help-dot" type="button" data-tip="Select a path/lazy-river water, then edit its closed loop and flow without changing its canonical water ID." aria-label="Water path help">?</button></h2>
+        <div class="row-actions wrap"><button id="path-add-node" type="button">Add Node</button><button id="path-delete-node" type="button">Delete Node</button><button id="path-close-loop" type="button">Close Loop</button><button id="path-reverse" type="button">Reverse Flow</button></div>
+        <div class="field-grid two"><label>Width <input id="path-width" type="number" min="0.1" step="0.1" value="1.5" /></label><label>Flow m/s <input id="path-flow" type="number" min="0" step="0.05" value="0.65" /></label></div>
+        <div id="path-status" class="compact-status hint">Select a path water.</div>
       </section>
 
       <section id="pirate-asset-library-section" hidden>
@@ -245,6 +316,7 @@
       <section id="outliner-section">
         <h2>Outliner <button class="help-dot" type="button" data-tip="Search name, type, or stable ID. Eye controls visibility; target focuses camera; pencil renames safe authored records." aria-label="Outliner help">?</button></h2>
         <input id="outliner-search" type="search" placeholder="Filter name / ID / type…" autocomplete="off" />
+        <div class="row-actions"><button id="isolate-selected" type="button">Isolate Selected</button><button id="show-all-objects" type="button">Show All</button></div>
         <div id="outliner" class="outliner"></div>
       </section>
 

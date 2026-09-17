@@ -112,16 +112,19 @@ function helperToObject(item, sourceKind, sourceIndex) {
   };
 }
 
-function waterToEditor(water, index) {
+function waterToEditor(water, index, sourceCollection = 'waters') {
   const surfaceY = finite(water.surfaceLocalY);
   const depth = Math.max(.05, surfaceY - finite(water.floorLocalY, surfaceY - .7));
   let position;
   let radii;
   const metadata = {
-    librarySourceKind: 'water', librarySourceId: water.id, librarySourceIndex: index,
+    librarySourceKind: 'water', librarySourceId: water.id, librarySourceIndex: index, librarySourceCollection: sourceCollection,
     libraryWaterShape: water.shape || 'ellipse',
     pathLocal: clone(water.pathLocal ?? null), pathWidth: water.pathWidth ?? null,
-    fishIds: clone(water.fishIds ?? []), waterType: water.waterType, theme: water.theme
+    fishIds: clone(water.fishIds ?? []), waterType: water.waterType, theme: water.theme,
+    closedLoop: water.closedLoop ?? null, flowSpeed: water.flowSpeed ?? null,
+    flowDirection: water.flowDirection ?? null, fishable: water.fishable ?? null,
+    rideable: water.rideable ?? null
   };
   if (water.shape === 'path' && Array.isArray(water.pathLocal) && water.pathLocal.length) {
     const xs = water.pathLocal.map((point) => finite(point?.[0]));
@@ -150,7 +153,7 @@ function prefabDefinitionToEditor(id, prefab) {
       sourceKind: 'prefab-part', sourceIndex: index, prefix: id
     })),
     movingPlatforms: [], waters: [],
-    metadata: { librarySourceKind: 'prefab-definition', librarySourceId: id }
+    metadata: { librarySourceKind: 'prefab-definition', librarySourceId: id, authoredPrefabMetadata: clone(prefab.metadata ?? {}) }
   };
 }
 
@@ -177,7 +180,10 @@ export function adaptLibrarySceneToEditor(scene) {
       objects: 'authored-scene', movingPlatforms: 'authored-scene', prefabs: 'authored-scene'
     },
     terrain: null,
-    waters: (source.waters ?? []).map(waterToEditor),
+    waters: [
+      ...(source.waters ?? []).map((water, index) => waterToEditor(water, index, 'waters')),
+      ...(source.rideWaters ?? []).map((water, index) => waterToEditor(water, index, 'rideWaters'))
+    ],
     objects: [
       ...(source.parts ?? []).map((part, index) => partToObject(part, { sourceIndex: index })),
       ...(source.lights ?? []).map((item, index) => helperToObject(item, 'light', index)),
@@ -273,6 +279,12 @@ function editorWaterToScene(water, sourceById) {
       Math.round((finite(water.position?.x) + (finite(point?.[0]) - finite(oldCenter[0])) * sx) * 1e9) / 1e9,
       Math.round((finite(water.position?.z) + (finite(point?.[1]) - finite(oldCenter[1])) * sz) * 1e9) / 1e9
     ]);
+    result.waterType = water.metadata?.waterType || base.waterType;
+    if (water.metadata?.closedLoop != null || base.closedLoop != null) result.closedLoop = water.metadata?.closedLoop === true;
+    if (water.metadata?.flowSpeed != null || base.flowSpeed != null) result.flowSpeed = Math.max(0, finite(water.metadata?.flowSpeed, base.flowSpeed ?? 0));
+    if (water.metadata?.flowDirection != null || base.flowDirection != null) result.flowDirection = water.metadata?.flowDirection === -1 ? -1 : 1;
+    if (water.metadata?.fishable != null || base.fishable != null) result.fishable = water.metadata?.fishable !== false;
+    if (water.metadata?.rideable != null || base.rideable != null) result.rideable = water.metadata?.rideable === true;
     delete result.centerLocal;
     delete result.radii;
   } else {
@@ -293,7 +305,7 @@ export function serializeLibrarySceneFromEditor(level) {
     light: new Map((source.lights ?? []).map((item) => [item.id, item])),
     marker: new Map((source.markers ?? []).map((item) => [item.id, item])),
     bench: new Map((source.benches ?? []).map((item) => [item.id, item])),
-    water: new Map((source.waters ?? []).map((item) => [item.id, item])),
+    water: new Map([...(source.waters ?? []), ...(source.rideWaters ?? [])].map((item) => [item.id, item])),
     instance: new Map((source.instances ?? []).map((item) => [item.id, item]))
   };
   const byKind = (kind) => (level.objects ?? []).filter((item) => item.metadata?.librarySourceKind === kind);
@@ -301,16 +313,24 @@ export function serializeLibrarySceneFromEditor(level) {
   source.lights = byKind('light').map((item) => objectToHelper(item, sourceMaps.light, 'light'));
   source.markers = byKind('marker').map((item) => objectToHelper(item, sourceMaps.marker, 'marker'));
   source.benches = byKind('bench').map((item) => objectToHelper(item, sourceMaps.bench, 'bench'));
-  source.waters = (level.waters ?? []).map((item) => editorWaterToScene(item, sourceMaps.water));
+  source.waters = (level.waters ?? []).filter((item) => item.metadata?.librarySourceCollection !== 'rideWaters')
+    .map((item) => editorWaterToScene(item, sourceMaps.water));
+  source.rideWaters = (level.waters ?? []).filter((item) => item.metadata?.librarySourceCollection === 'rideWaters')
+    .map((item) => editorWaterToScene(item, sourceMaps.water));
   source.prefabs = Object.fromEntries((level.prefabs?.definitions ?? []).map((definition) => {
     const base = clone(source.prefabs?.[definition.metadata?.librarySourceId || definition.id] ?? {});
     const originalParts = new Map((base.parts ?? []).map((part, index) => [part.id || `${definition.id}-part-${String(index + 1).padStart(3, '0')}`, part]));
-    return [definition.id, {
+    const result = {
       ...base,
       parts: (definition.objects ?? []).map((object) => {
         return objectToPart(object, originalParts);
       })
-    }];
+    };
+    if (definition.name && definition.name !== (base.name || definition.id)) result.name = definition.name;
+    if (base.version != null || (definition.version ?? 1) !== 1) result.version = definition.version ?? base.version;
+    const authoredMetadata = definition.metadata?.authoredPrefabMetadata;
+    if (authoredMetadata && JSON.stringify(authoredMetadata) !== JSON.stringify(base.metadata ?? {})) result.metadata = clone(authoredMetadata);
+    return [definition.id, result];
   }));
   source.instances = (level.prefabs?.instances ?? []).map((instance) => {
     const base = clone(sourceMaps.instance.get(instance.metadata?.librarySourceId) ?? {});
@@ -348,7 +368,7 @@ export function validateLibraryAuthoredScene(scene) {
   };
   if (!isLibraryAuthoredScene(scene)) issues.push({ severity: 'error', message: `Expected ${LIBRARY_SCENE_SCHEMA} targeting veiled-athenaeum.` });
   for (const [group, list] of Object.entries({
-    parts: scene?.parts, instances: scene?.instances, waters: scene?.waters,
+    parts: scene?.parts, instances: scene?.instances, waters: scene?.waters, rideWaters: scene?.rideWaters,
     lights: scene?.lights, markers: scene?.markers, benches: scene?.benches
   })) for (const item of list ?? []) addId(item, group);
   const materials = new Set(Object.keys(scene?.materials ?? {}));
@@ -374,7 +394,7 @@ export function validateLibraryAuthoredScene(scene) {
   }
   const waters = new Set((scene?.waters ?? []).map((item) => item.id));
   for (const id of LIBRARY_WATER_IDS) if (!waters.has(id)) issues.push({ severity: 'error', message: `Canonical fishing water ${id} is missing.` });
-  for (const water of scene?.waters ?? []) {
+  for (const water of [...(scene?.waters ?? []), ...(scene?.rideWaters ?? [])]) {
     if (!(finite(water.surfaceLocalY) > finite(water.floorLocalY))) issues.push({ severity: 'error', message: `Water ${water.id} has invalid depth.` });
     if (water.shape === 'path' && (!(finite(water.pathWidth) > 0) || (water.pathLocal?.length ?? 0) < 2)) {
       issues.push({ severity: 'error', message: `Path water ${water.id} has invalid dimensions.` });

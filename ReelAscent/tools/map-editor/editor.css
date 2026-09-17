@@ -37,6 +37,9 @@ select { width: 100%; }
 .panel section { background: var(--panel2); border: 1px solid #28352f; border-radius: 9px; padding: 10px; margin-bottom: 9px; }
 h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 9px; color: #c7d8cd; }
 .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mode-grid { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:4px; }
+.mode-grid button { min-width:0; padding:6px 3px; font-size:10px; }
+.mode-grid button.active { background:#2f6040; border-color:#62b978; color:#fff; }
 .triple { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 7px 0; }
 .triple input { width: 100%; }
 .hint { color: var(--muted); font-size: 11px; line-height: 1.4; margin: 7px 0; }
@@ -52,6 +55,9 @@ h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 
 .row-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 #selected-id { display: block; margin: 4px 0 8px; color: var(--accent2); word-break: break-all; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.field-grid.three { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.field-grid.two { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.row-actions.wrap { flex-wrap:wrap; }
 .field-grid .wide { grid-column: 1 / -1; }
 dl { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; font-size: 12px; margin: 0 0 9px; }
 dt { color: var(--muted); }

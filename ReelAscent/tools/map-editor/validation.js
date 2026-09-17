@@ -1,4 +1,7 @@
 import { serializeLibrarySceneFromEditor, validateLibraryAuthoredScene } from './library-scene-adapter.js';
+import { meshDiagnostics } from './mesh-authoring.js';
+import { findLikelyZFighting } from './architectural-tools.js';
+import { authoredWaterToPath, validateWaterPath } from './water-path-tools.js';
 
 function issue(severity, code, message, { objectId = null, objectType = null, worldId = null } = {}) {
   return { severity, code, message, objectId, objectType, worldId };
@@ -53,6 +56,17 @@ export function validateWorldLevel(level) {
       warnings.push(issue('error', 'invalid-transform', `${item.name || item.id} has a non-finite position.`, { objectId: item.id, objectType: item.type, worldId }));
     }
   }
+  const zFightThreshold = Math.max(.0001, Number(level?.metadata?.zFightThresholdMeters) || .01);
+  if ((level?.objects?.length ?? 0) <= 500) {
+    for (const overlap of findLikelyZFighting(level?.objects ?? [], zFightThreshold)) {
+      warnings.push(issue(overlap.severity, overlap.code, overlap.message, {
+        objectId: overlap.objectId, objectType: 'surface', worldId
+      }));
+      warnings.at(-1).otherObjectId = overlap.otherObjectId;
+    }
+  } else {
+    warnings.push(issue('info', 'z-fighting-scan-deferred', 'Global z-fighting scan deferred for this very large object set; validate a selected group or prefab instead.', { worldId }));
+  }
   for (const item of level?.movingPlatforms ?? []) {
     if (!Array.isArray(item.path?.points) || item.path.points.length < 2) {
       warnings.push(issue('error', 'moving-path', `${item.name || item.id} needs at least two path points.`, { objectId: item.id, objectType: 'moving-platform', worldId }));
@@ -67,6 +81,21 @@ export function validateWorldLevel(level) {
     if (!(rx > 0) || !(rz > 0)) warnings.push(issue('error', 'water-dimensions', `${water.name || id} has invalid water radii.`, { objectId: id, objectType: 'water', worldId }));
     if (water.depthMeters != null && !(Number(water.depthMeters) > 0)) warnings.push(issue('error', 'water-depth', `${water.name || id} has invalid depth.`, { objectId: id, objectType: 'water', worldId }));
     if (water.fishingZoneScale != null && !(Number(water.fishingZoneScale) > 0)) warnings.push(issue('error', 'water-fishing-scale', `${water.name || id} has an invalid fishing-zone scale.`, { objectId: id, objectType: 'water', worldId }));
+    if (water.shape === 'path' || water.metadata?.libraryWaterShape === 'path') {
+      const authored = water.metadata?.pathLocal
+        ? {
+            ...water, pathLocal: water.metadata.pathLocal, surfaceLocalY: water.position?.y,
+            pathWidth: water.radii?.x, waterType: water.metadata?.waterType,
+            closedLoop: water.metadata?.closedLoop, flowSpeed: water.metadata?.flowSpeed,
+            flowDirection: water.metadata?.flowDirection, fishable: water.metadata?.fishable
+          }
+        : water;
+      for (const problem of validateWaterPath(authoredWaterToPath(authored))) {
+        warnings.push(issue(problem.severity, problem.code, `${water.name || id}: ${problem.message}`, {
+          objectId: id, objectType: 'water-path', worldId
+        }));
+      }
+    }
   }
 
   const definitions = new Map((level?.prefabs?.definitions ?? []).map((item) => [item.id, item]));
@@ -96,7 +125,22 @@ export function validateWorldLevel(level) {
     const vertexCount = Math.floor((level.terrain.positions?.length ?? 0) / 3);
     const triangleCount = Math.floor((level.terrain.indices?.length ?? 0) / 3);
     if (!vertexCount || !triangleCount) warnings.push(issue('error', 'basalt-candidate-empty', 'Basalt frozen terrain candidate is empty.', { worldId }));
-    else warnings.push(issue('info', 'basalt-candidate', `Basalt frozen candidate contains ${vertexCount.toLocaleString()} vertices / ${triangleCount.toLocaleString()} triangles and is comparison-only.`, { worldId }));
+    else {
+      warnings.push(issue('info', 'basalt-candidate', `Basalt frozen candidate contains ${vertexCount.toLocaleString()} vertices / ${triangleCount.toLocaleString()} triangles and is comparison-only.`, { objectId: '__basalt-authored-terrain', objectType: 'terrain-mesh', worldId }));
+      const diagnostics = meshDiagnostics(level.terrain);
+      const meshIssue = (severity, code, count, label) => {
+        if (!count) return;
+        warnings.push(issue(severity, code, `Basalt mesh has ${count.toLocaleString()} ${label}.`, {
+          objectId: '__basalt-authored-terrain', objectType: 'terrain-mesh', worldId
+        }));
+      };
+      meshIssue('warning', 'mesh-open-boundary', diagnostics.boundaryEdges.length, 'open boundary edges');
+      meshIssue('error', 'mesh-non-manifold', diagnostics.nonManifoldEdges.length, 'non-manifold edges');
+      meshIssue('warning', 'mesh-isolated-vertices', diagnostics.isolatedVertices.length, 'isolated vertices');
+      meshIssue('error', 'mesh-zero-area', diagnostics.zeroAreaFaces.length, 'zero-area triangles');
+      meshIssue('warning', 'mesh-thin-faces', diagnostics.thinFaces.length, 'extremely thin triangles');
+      meshIssue('warning', 'mesh-duplicate-faces', diagnostics.duplicateFaces.length, 'duplicate triangle pairs');
+    }
   }
   return warnings;
 }

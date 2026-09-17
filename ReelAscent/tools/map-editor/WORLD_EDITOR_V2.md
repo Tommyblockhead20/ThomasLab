@@ -1,4 +1,34 @@
-# REEL ASCENT WORLD EDITOR V2.3.1
+# REEL ASCENT WORLD EDITOR V3
+
+## V3 mesh, architecture, and water authoring
+
+V3 keeps every V2.3.1 recovery and source-of-truth guarantee while adding context-specific Object, Mesh, Sculpt, Water, and Path modes.
+
+- Basalt's captured `authored-mesh-candidate` is directly selectable by vertex, edge, or face. Topology operations include connected/grow/shrink selection, numeric movement, create/delete/flip faces, boundary fill, weld, merge-nearby, and normal recalculation. Boundary and non-manifold edges have editor-only overlays and validation diagnostics. The candidate stays comparison-only until an explicit future promotion.
+- Library Cut Opening replaces one axis-aligned wall/floor/ceiling record with four real authored/collidable fragments. It does not place a masking rectangle. Both production balcony stair heads now use this physical opening pattern.
+- The stair generator creates individually editable collision-matched treads from rise/run/width/count, and can extend a generated flight downward by five steps.
+- Likely z-fighting validation detects duplicate or near-coplanar thin parallel authored surfaces while excluding ordinary perpendicular floor/wall joins.
+- The v3 asset browser adds detailed shelf/fireplace variants, Basalt ledges/arches/columns, and Pirate bridge/scaffold/wreck assemblies as linked prefab definitions.
+- Path Mode exposes authored path nodes, add/delete/close/reverse operations, width, flow speed, and loop/corner/intersection validation. The authoritative Athenaeum scene includes one stable ride-only lazy river descriptor; production and editor consume the same path.
+- The production lazy river uses stable spline following rather than precision physics. Three circulating tubes can be clicked/interacted with, hold the seated player to the live path anchor, complete the closed loop, and use the ordinary seated dismount path.
+- Isolate Selected and Show All provide non-destructive editor-only visibility control.
+
+### V3 manual validation
+
+1. Load Basalt, import the captured production freeze, enter Mesh Mode, select a face/edge/vertex, and move it numerically.
+2. Delete a Basalt face, enable boundary edges, fill the resulting closed boundary, recalculate normals, export/reload, and verify the repair remains.
+3. Confirm Basalt still says authored candidate and production has not silently switched authority.
+4. Load Library Island and walk both balcony stair flights through the new physical slab openings.
+5. Select an axis-aligned test slab, use Cut Rectangular Opening, and verify visual and collision geometry share the opening.
+6. Generate a stair flight and extend it downward by five treads.
+7. Refresh Validation and inspect any z-fighting/topology/water-path result by clicking it.
+8. Place each shelf/fireplace variant, enter Edit Source Prefab, and confirm linked instances retain local children.
+9. Enter Path Mode, edit the lazy-river loop, reverse flow, export/reload, and confirm width/depth/direction persist.
+10. In the game, board each lazy-river tube, ride a complete loop, and dismount with the normal seat interaction.
+11. Place the Pirate rope bridge/watch scaffold/wreck bow and Basalt ledge/arch/column assets.
+12. Repeat mesh edits and world switching, then load Stoneveil and verify the current authored mountain and recovery fingerprint are unchanged.
+
+Known limitations: v3 is a focused lightweight level editor, not a general CSG package. Cut Opening currently requires an axis-aligned primitive; Basalt has no box-select, extrusion, arbitrary booleans, or transform gizmo yet; object multi-select is not implemented; path nodes are selected in 3D but repositioned through the current target/add-node workflow rather than drag gizmos; waterfall-specific snapping and player-capsule clearance overlays remain future work. Browser visual/walkthrough validation is still required.
 
 ## V2.3.1 Stoneveil stability / recovery
 

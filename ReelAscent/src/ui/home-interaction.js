@@ -133,6 +133,15 @@ export class HomeInteractionController {
   }
 
   update() {
+    if (this.player.benchSeat) {
+      const dynamic = this.world.homeInteractions?.find((interaction) => interaction.id === this.player.benchSeat.id && interaction.dynamicSeat);
+      if (dynamic?.seatPosition) {
+        this.player.benchSeat.seatPosition = { ...dynamic.seatPosition };
+        this.player.benchSeat.basePosition = { ...dynamic.seatPosition };
+        this.player.benchSeat.exitPosition = dynamic.exitPosition ? { ...dynamic.exitPosition } : this.player.benchSeat.exitPosition;
+        this.player.benchSeat.facingYaw = dynamic.facingYaw;
+      }
+    }
     if (this.pendingSeat) {
       if (performance.now() > this.pendingSeat.expiresAt) {
         this.pendingSeat = null;

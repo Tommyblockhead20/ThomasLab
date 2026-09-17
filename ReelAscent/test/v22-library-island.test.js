@@ -21,9 +21,9 @@ test('v22 authored scene validates and retains the production entity budget', ()
   const renderCount = scene.parts.length
     + scene.instances.reduce((sum, instance) => sum + scene.prefabs[instance.prefab].parts.length, 0)
     + scene.benches.length * 2;
-  assert.equal(renderCount, 285);
+  assert.ok(renderCount >= 400, 'v3 shelf/fireplace geometry should remain present');
   assert.ok(renderCount <= scene.performance.maximumAuthoredRenderEntities);
-  assert.equal(scene.lights.length, 8);
+  assert.equal(scene.lights.length, 9);
   assert.equal(scene.parts.filter((part) => part.material === 'mist').length, 6);
 });
 

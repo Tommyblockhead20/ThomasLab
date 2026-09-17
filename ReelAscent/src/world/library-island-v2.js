@@ -3,6 +3,7 @@ import SCENE from './library-island-v2.scene.json' with { type: 'json' };
 import { PLAYER_FOOT_OFFSET } from '../config.js';
 import { attachZoneEcology, ECOLOGY_TARGETS } from '../fishing/fish-ecology.js';
 import { FishingZone } from '../fishing/fishing-zone.js';
+import { normalizeWaterPath, waterPathPose } from '../../tools/map-editor/water-path-tools.js';
 
 const finiteVec = (value, length = 3) => Array.isArray(value)
   && value.length >= length
@@ -136,6 +137,7 @@ function addLight(root, light, counters) {
 }
 
 function addFishingWater(world, root, water) {
+  if (water.fishable === false) return null;
   const fishingScale = Math.max(.05, Number(water.fishingZoneScale) || 1);
   const surfaceY = localToWorld(root, [0, Number(water.surfaceLocalY) || 0, 0]).y;
   const floorY = localToWorld(root, [0, Number(water.floorLocalY) || -.7, 0]).y;
@@ -190,6 +192,73 @@ function addFishingWater(world, root, water) {
   return authored;
 }
 
+function addLazyRiver(world, root, water, materials, counters, rootYaw) {
+  if (water.waterType !== 'lazy-river' || water.rideable === false || water.shape !== 'path') return null;
+  const path = normalizeWaterPath({
+    id: water.id, name: water.label, type: 'lazy-river', pathLocal: water.pathLocal,
+    surfaceLocalY: water.surfaceLocalY, pathWidth: water.pathWidth,
+    depthMeters: (Number(water.surfaceLocalY) || 0) - (Number(water.floorLocalY) || -.7),
+    flowSpeed: water.flowSpeed, direction: water.flowDirection, closed: water.closedLoop !== false,
+    fishable: false
+  });
+  const riverRoot = new pc.Entity(`Veiled Athenaeum ${water.label} ride`);
+  root.addChild(riverRoot);
+  for (let index = 1; index < path.points.length; index += 1) {
+    const a = path.points[index - 1], b = path.points[index];
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const length = Math.hypot(dx, dz);
+    if (length < .01) continue;
+    addScenePrimitive(world, riverRoot, `LIBRARY-${slug(water.id)}-SURFACE-${index}`,
+      `${water.label} water ${index}`, 'box',
+      [(a.x + b.x) / 2, (a.y + b.y) / 2 - .045, (a.z + b.z) / 2],
+      [path.width * 2, .09, length + path.width * .6], materials.waterBright ?? materials.water,
+      [0, Math.atan2(dx, dz) * 180 / Math.PI, 0], false);
+    counters.render += 1;
+  }
+  const tubes = [];
+  for (let index = 0; index < 3; index += 1) {
+    const holder = new pc.Entity(`${water.label} tube ${index + 1}`);
+    riverRoot.addChild(holder);
+    addScenePrimitive(world, holder, `LIBRARY-${slug(water.id)}-TUBE-${index + 1}`,
+      `${water.label} tube ${index + 1}`, 'cylinder', [0, .08, 0], [1.25, .18, 1.25],
+      materials[['bookRed', 'brass', 'bookBlue'][index]] ?? materials.brass, [0, 0, 0], false);
+    counters.render += 1;
+    const interaction = {
+      id: `${water.id}-tube-${index + 1}`, label: 'RIDE TUBE', action: 'bench', dynamicSeat: true,
+      seatKind: 'lazy river tube', position: { x: 0, y: 0, z: 0 }, seatPosition: { x: 0, y: 0, z: 0 },
+      exitPosition: { x: 0, y: 0, z: 0 }, facingYaw: rootYaw, range: 2.25
+    };
+    world.homeInteractions.push(interaction);
+    tubes.push({ holder, interaction, offset: index * 9.5 });
+  }
+  const ride = { root, riverRoot, path, tubes, elapsed: 0, rootYaw };
+  world.veiledAthenaeumLazyRivers ??= [];
+  world.veiledAthenaeumLazyRivers.push(ride);
+  updateVeiledAthenaeumRides(world, 0);
+  return ride;
+}
+
+export function updateVeiledAthenaeumRides(world, dt = 0) {
+  for (const ride of world.veiledAthenaeumLazyRivers ?? []) {
+    ride.elapsed += Math.max(0, Number(dt) || 0);
+    for (const tube of ride.tubes) {
+      const pose = waterPathPose(ride.path, tube.offset + ride.elapsed * ride.path.flowSpeed);
+      tube.holder.setLocalPosition(pose.position.x, pose.position.y, pose.position.z);
+      tube.holder.setLocalEulerAngles(0, pose.yaw, 0);
+      const seat = localToWorld(ride.root, [pose.position.x, pose.position.y + .28, pose.position.z]);
+      const exit = localToWorld(ride.root, [
+        pose.position.x - pose.tangent.z * 1.55,
+        pose.position.y + .2,
+        pose.position.z + pose.tangent.x * 1.55
+      ]);
+      tube.interaction.position = { ...seat, y: seat.y - PLAYER_FOOT_OFFSET };
+      tube.interaction.seatPosition = { ...seat, y: seat.y + PLAYER_FOOT_OFFSET };
+      tube.interaction.exitPosition = { ...exit, y: exit.y + PLAYER_FOOT_OFFSET };
+      tube.interaction.facingYaw = ride.rootYaw + pose.yaw;
+    }
+  }
+}
+
 function addBench(world, root, bench, materials, counters, rootYaw) {
   const position = finiteVec(bench.position) ? bench.position : [0, .42, 0];
   const yaw = Number(bench.facingYaw) || 0;
@@ -238,6 +307,7 @@ export function validateVeiledAthenaeumScene(scene = SCENE) {
   for (const part of scene.parts ?? []) claim(part.id, 'scene part');
   for (const item of scene.instances ?? []) claim(item.id, 'prefab instance');
   for (const water of scene.waters ?? []) claim(water.id, 'water');
+  for (const water of scene.rideWaters ?? []) claim(water.id, 'ride water');
   for (const marker of scene.markers ?? []) claim(marker.id, 'marker');
   for (const bench of scene.benches ?? []) claim(bench.id, 'bench');
   const renderEstimate = (scene.parts?.length ?? 0)
@@ -272,6 +342,8 @@ export function buildVeiledAthenaeumV2(world, location) {
   for (const bench of SCENE.benches ?? []) addBench(world, root, bench, materials, counters, rootYaw);
 
   const fishingZones = [];
+  world.veiledAthenaeumLazyRivers = [];
+  for (const water of SCENE.rideWaters ?? []) addLazyRiver(world, root, water, materials, counters, rootYaw);
   for (const water of SCENE.waters ?? []) {
     const zone = addFishingWater(world, root, water);
     if (zone) fishingZones.push(zone);

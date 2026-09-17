@@ -8,20 +8,16 @@ const bytes = (path) => readFile(new URL(`../${path}`, import.meta.url));
 const sha256 = (buffer) => createHash('sha256').update(buffer).digest('hex');
 
 const STONEVEIL_SHA256 = 'ddf597dc9bdf432f5972ecbecc80b7d2639eba8a14a6c9adc6820b0bf7610623';
+const CURRENT_STONEVEIL_SHA256 = '815674c382c711cf9def2d4ff07ac7dcc205b0e472daa67a284b23516474e5dd';
 
-test('Stoneveil safety backup is exact and matches authoritative patch when present', async () => {
+test('Stoneveil legacy backup and current authoritative patch retain their exact independent fingerprints', async () => {
   const backup = await bytes('src/world/map-editor-patch.v1-backup.json');
   assert.equal(sha256(backup), STONEVEIL_SHA256);
-  const patch = JSON.parse(backup.toString('utf8'));
-  assert.equal(patch.terrain.bakedMesh.format, 'triangle-mesh-v1');
-  assert.equal(patch.terrain.bakedMesh.positions.length / 3, 88959);
-  assert.equal(patch.terrain.bakedMesh.indices.length / 3, 173535);
   try {
     const current = await bytes('src/world/map-editor-patch.json');
-    assert.deepEqual(current, backup);
+    assert.equal(sha256(current), CURRENT_STONEVEIL_SHA256);
   } catch (error) {
-    // The downloadable overlay intentionally omits the authoritative patch so merging it
-    // cannot overwrite the user's current Stoneveil. In the full repo the comparison above runs.
+    // Downloadable overlays intentionally omit the authoritative patch.
     if (error?.code !== 'ENOENT') throw error;
   }
 });
@@ -58,13 +54,13 @@ test('runtime bridges V2 data into Skyreach and Basalt without replacing their s
   assert.match(mountain, /updateWorldEditorKinematics\(this, dt\)/);
 });
 
-test('World Editor V2.3.1 shell exposes all five worlds and the new authoring controls', async () => {
+test('World Editor V3 shell exposes all five worlds and the new authoring controls', async () => {
   const registry = await text('tools/map-editor/world-registry.js');
   const html = await text('tools/map-editor/index.html');
   for (const id of ['stoneveil-peak', 'cave-fishing-island', 'skyscraper', 'pirate-island', 'library-island']) {
     assert.match(registry, new RegExp(id));
   }
-  assert.match(html, /WORLD EDITOR V2\.3\.1/);
+  assert.match(html, /WORLD EDITOR V3/);
   assert.match(html, /id="world-selector"/);
   assert.match(html, /data-tool="moving-platform"/);
   assert.match(html, /id="show-slope"/);
@@ -191,4 +187,3 @@ test('V2.3.1 reduces Stoneveil GPU and memory churn during sculpting', async () 
   assert.match(slope, /180/);
   assert.match(format, /ArrayBuffer\.isView\(value\.positions\)/);
 });
-
