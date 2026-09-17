@@ -1,3 +1,5 @@
+import { serializeLibrarySceneFromEditor, validateLibraryAuthoredScene } from './library-scene-adapter.js';
+
 function issue(severity, code, message, { objectId = null, objectType = null, worldId = null } = {}) {
   return { severity, code, message, objectId, objectType, worldId };
 }
@@ -5,6 +7,15 @@ function issue(severity, code, message, { objectId = null, objectType = null, wo
 export function validateWorldLevel(level) {
   const warnings = [];
   const worldId = level?.worldId ?? null;
+  if (worldId === 'library-island' && level?.metadata?.libraryAuthoredScene) {
+    try {
+      for (const item of validateLibraryAuthoredScene(serializeLibrarySceneFromEditor(level))) {
+        warnings.push(issue(item.severity, 'library-authored-scene', item.message, { worldId }));
+      }
+    } catch (error) {
+      warnings.push(issue('error', 'library-adapter', error?.message || String(error), { worldId }));
+    }
+  }
   const seen = new Map();
   const records = [
     ...(level?.objects ?? []),

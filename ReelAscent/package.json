@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "test": "node --test",
+    "validate:library": "node scripts/validate-library-island.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

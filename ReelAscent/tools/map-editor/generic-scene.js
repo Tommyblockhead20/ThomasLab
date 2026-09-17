@@ -158,6 +158,22 @@ function makeMaterial(rgb, opacity = 1, emissive = 0) {
   return material;
 }
 
+function makeAuthoredMaterial(spec = {}) {
+  const rgb = spec.diffuse ?? [.5, .5, .5];
+  const material = makeMaterial(rgb, spec.opacity ?? 1);
+  const emissive = spec.emissive ?? [0, 0, 0];
+  material.emissive = new pc.Color(emissive[0] ?? 0, emissive[1] ?? 0, emissive[2] ?? 0);
+  material.emissiveIntensity = spec.emissiveIntensity ?? 1;
+  material.gloss = spec.gloss ?? .12;
+  material.metalness = spec.metalness ?? 0;
+  if (spec.doubleSided) {
+    material.cull = pc.CULLFACE_NONE;
+    material.twoSidedLighting = true;
+  }
+  material.update();
+  return material;
+}
+
 function destroyChildren(root) {
   for (const child of [...root.children]) {
     for (const mesh of child._editorOwnedMeshes ?? []) { try { mesh.destroy(); } catch {} }
@@ -244,6 +260,22 @@ function createSphere(parent, name, position, radius, material) {
   return entity;
 }
 
+function createPrimitive(parent, name, type, position, size, material, rotation = {}, record = null) {
+  const primitive = ['box', 'sphere', 'cylinder', 'cone', 'capsule'].includes(type) ? type : 'box';
+  if (primitive === 'box') return createBox(parent, name, position, size, material, rotation, record);
+  const entity = new pc.Entity(name);
+  entity._editorBaseMaterial = material;
+  entity.addComponent('render', {
+    type: primitive, material, castShadows: material?.opacity >= 1, receiveShadows: material?.opacity >= 1
+  });
+  parent.addChild(entity);
+  entity.setLocalPosition(position.x, position.y, position.z);
+  entity.setLocalScale(size.x, size.y, size.z);
+  entity.setLocalEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+  if (record) Object.assign(entity, record);
+  return entity;
+}
+
 function createSegment(parent, name, a, b, material) {
   const va = new pc.Vec3(a.x, a.y, a.z);
   const vb = new pc.Vec3(b.x, b.y, b.z);
@@ -253,6 +285,19 @@ function createSegment(parent, name, a, b, material) {
   const entity = createBox(parent, name, midpoint, { x: .08, y: .08, z: length }, material, {}, null);
   entity.lookAt(vb);
   return entity;
+}
+
+function libraryBenchCollisionBoxes(item) {
+  const p = item.transform?.position ?? { x: 0, y: 0, z: 0 };
+  const yaw = finite(item.transform?.rotation?.y);
+  const rad = yaw * Math.PI / 180;
+  return [
+    { center: { ...p }, size: { x: 2.05, y: .18, z: .5 }, rotation: { x: 0, y: yaw, z: 0 } },
+    {
+      center: { x: p.x - Math.sin(rad) * .28, y: p.y + .48, z: p.z - Math.cos(rad) * .28 },
+      size: { x: 2.05, y: .82, z: .18 }, rotation: { x: 0, y: yaw, z: 0 }
+    }
+  ];
 }
 
 function caveReferenceMesh(location) {
@@ -350,6 +395,7 @@ export class GenericWorldScene {
     this.basaltReferenceMode = 'both';
     this.skyscraperInteriorMode = true;
     this.editorHiddenIds = new Set();
+    this.libraryMaterials = new Map();
     this.root.enabled = false;
   }
 
@@ -360,6 +406,10 @@ export class GenericWorldScene {
     });
     this.elapsedSeconds = 0;
     this.selectedId = null;
+    this.libraryMaterials.clear();
+    for (const [id, spec] of Object.entries(this.level.librarySceneSource?.materials ?? {})) {
+      this.libraryMaterials.set(String(id).toLowerCase(), makeAuthoredMaterial(spec));
+    }
     this.rebuild();
   }
 
@@ -422,6 +472,7 @@ export class GenericWorldScene {
 
   materialForRecord(record, fallback = this.materials.platform) {
     const key = String(record?.metadata?.materialKey || '').toLowerCase();
+    if (this.libraryMaterials.has(key)) return this.libraryMaterials.get(key);
     const map = {
       wall: this.materials.roomWall, ceiling: this.materials.roomCeiling, floor: this.materials.roomFloor,
       wood: this.materials.roomWood, metal: this.materials.roomMetal, glass: this.materials.roomGlass,
@@ -474,7 +525,8 @@ export class GenericWorldScene {
     if (this.world.id === 'skyscraper') this.buildSkyscraperReference();
     else if (this.world.id === 'cave-fishing-island') this.buildCaveReference();
     else if (this.world.id === 'pirate-island') this.buildPirateReference();
-    else if (this.world.id === 'library-island') this.buildLibraryReference();
+    // Library Island's authored objects below are the production scene. Never layer the
+    // retired work-pad/silhouette reference beneath the canonical scene.
     this.buildWaters();
     this.buildObjects();
     this.buildMovingPlatforms();
@@ -617,9 +669,26 @@ export class GenericWorldScene {
     const radii = water.radii ?? { x: 4, z: 4 };
     const position = water.position ?? { x: 0, y: 0, z: 0 };
     const entity = new pc.Entity(water.name || water.id || 'Water');
-    entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
-    entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
-    entity.setLocalScale(Math.max(.1, finite(radii.x, 4) * 2), .07, Math.max(.1, finite(radii.z, 4) * 2));
+    if (water.shape === 'path' && Array.isArray(water.metadata?.pathLocal)) {
+      const oldCenter = water.metadata.pathOriginalCenter ?? [finite(position.x), finite(position.z)];
+      const oldRadii = water.metadata.pathOriginalRadii ?? [finite(radii.x, 1.25), finite(radii.z, 1)];
+      const sx = Math.max(.01, finite(radii.x, oldRadii[0])) / Math.max(.01, finite(oldRadii[0], 1));
+      const sz = Math.max(.01, finite(radii.z, oldRadii[1])) / Math.max(.01, finite(oldRadii[1], 1));
+      const points = water.metadata.pathLocal.map((point) => ({
+        x: finite(position.x) + (finite(point?.[0]) - finite(oldCenter[0])) * sx,
+        y: finite(position.y) - .035,
+        z: finite(position.z) + (finite(point?.[1]) - finite(oldCenter[1])) * sz
+      }));
+      for (let index = 1; index < points.length; index += 1) {
+        const segment = createSegment(entity, `${water.name || water.id} segment ${index}`, points[index - 1], points[index], this.materials.water);
+        if (segment) segment.setLocalScale(Math.max(.1, finite(radii.x, 1.25) * 2), .07,
+          Math.max(.1, segment.getLocalScale().z));
+      }
+    } else {
+      entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
+      entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
+      entity.setLocalScale(Math.max(.1, finite(radii.x, 4) * 2), .07, Math.max(.1, finite(radii.z, 4) * 2));
+    }
     entity.editorKind = this.workspaceDefinition ? 'prefab-child-water' : 'water-v2';
     entity.editorRecord = water;
     entity.editorId = String(water.id || water.identity || 'water');
@@ -632,9 +701,28 @@ export class GenericWorldScene {
 
   buildObjectRecord(item, kind = 'world-object') {
     if (item.visible === false) return null;
-    const entity = createBox(this.objectRoot, item.name || item.id, item.transform.position, item.size, this.materialForRecord(item), item.transform.rotation, {
-      editorKind: kind, editorRecord: item, editorId: item.id
-    });
+    const sourceKind = item.metadata?.librarySourceKind;
+    let entity;
+    if (sourceKind === 'bench') {
+      entity = new pc.Entity(item.name || item.id);
+      entity.setLocalPosition(item.transform.position.x, item.transform.position.y, item.transform.position.z);
+      entity.setLocalEulerAngles(0, item.transform.rotation.y ?? 0, 0);
+      const material = this.materialForRecord(item);
+      createBox(entity, `${item.name} seat`, { x: 0, y: 0, z: 0 }, { x: 2.05, y: .18, z: .5 }, material);
+      createBox(entity, `${item.name} back`, { x: 0, y: .48, z: -.28 }, { x: 2.05, y: .82, z: .18 }, material);
+      this.objectRoot.addChild(entity);
+      Object.assign(entity, { editorKind: kind, editorRecord: item, editorId: item.id });
+    } else if (sourceKind === 'light' || sourceKind === 'marker') {
+      const primitive = sourceKind === 'light' ? 'sphere' : 'cone';
+      entity = createPrimitive(this.objectRoot, item.name || item.id, primitive,
+        item.transform.position, item.size, this.materialForRecord(item), item.transform.rotation,
+        { editorKind: kind, editorRecord: item, editorId: item.id });
+    } else {
+      entity = createPrimitive(this.objectRoot, item.name || item.id,
+        item.metadata?.authoredPrimitive || item.type, item.transform.position, item.size,
+        this.materialForRecord(item), item.transform.rotation,
+        { editorKind: kind, editorRecord: item, editorId: item.id });
+    }
     this.entities.set(item.id, entity);
     return entity;
   }
@@ -683,7 +771,9 @@ export class GenericWorldScene {
       this.objectRoot.addChild(root);
       this.entities.set(instance.id, root);
       for (const child of definition.objects ?? []) {
-        const entity = createBox(root, child.name || child.id, child.transform.position, child.size, this.materialForRecord(child), child.transform.rotation);
+        const entity = createPrimitive(root, child.name || child.id,
+          child.metadata?.authoredPrimitive || child.type, child.transform.position, child.size,
+          this.materialForRecord(child), child.transform.rotation);
         if (child.collision !== false && child.visible !== false) this.prefabCollisionEntries.push({ entity, record: child, instance });
       }
       for (const child of definition.movingPlatforms ?? []) {
@@ -723,6 +813,12 @@ export class GenericWorldScene {
       : [...(this.level.objects ?? []), ...(this.level.movingPlatforms ?? [])];
     for (const item of sourceObjects) {
       if (item.collision === false || item.visible === false) continue;
+      if (item.metadata?.librarySourceKind === 'bench') {
+        for (const [index, box] of libraryBenchCollisionBoxes(item).entries()) {
+          addDebugBox(item.id, `${item.id} ${index ? 'back' : 'seat'} collider`, box.center, box.size, box.rotation);
+        }
+        continue;
+      }
       const moving = item.type === 'moving-platform' || item.path?.points;
       const position = moving ? movingPlatformPose(item, this.elapsedSeconds) : item.transform.position;
       addDebugBox(item.id, `${item.id} collider`, position, item.size, item.transform?.rotation ?? {});
@@ -827,6 +923,12 @@ export class GenericWorldScene {
     const boxes = this.referenceCollisionBoxes.map((box) => ({ ...clone(box), moving: false }));
     for (const item of this.level.objects ?? []) {
       if (item.visible === false || item.collision === false) continue;
+      if (item.metadata?.librarySourceKind === 'bench') {
+        for (const [index, box] of libraryBenchCollisionBoxes(item).entries()) {
+          boxes.push({ ...box, id: `${item.id}/${index ? 'back' : 'seat'}`, moving: false });
+        }
+        continue;
+      }
       boxes.push({ center: clone(item.transform.position), size: clone(item.size), rotation: clone(item.transform.rotation), id: item.id, moving: false });
     }
     for (const item of this.level.movingPlatforms ?? []) {

@@ -1,3 +1,50 @@
+# REEL ASCENT v22 — VEILED ATHENAEUM PRODUCTION + WORLD EDITOR INTEGRATION
+
+Status (2026-09-17): v22 is implemented in the current shared tree. `src/world/library-island-v2.scene.json` is now the single authored Library Island source consumed by production and World Editor V2.3.1. The tracked frontend build is regenerated. `src/world/map-editor-patch.json` was not modified.
+
+## v22 implementation
+
+- **One authoritative scene:** `src/world/library-island-v2.scene.json` owns the Athenaeum's 119 direct parts, 7 prefab definitions, 41 prefab instances, 3 fishing waters, 8 lights, 10 markers, 5 benches, 6 localized mist volumes, material palette, gameplay metadata, and performance limits. Production imports it through `src/world/library-island-v2.js`; the editor registry points directly to the same JSON.
+- **Production runtime:** `buildVeiledAthenaeumV2()` creates one location-relative structure root, authored primitives/materials, linked prefab instances, collision, lights, localized mist geometry, bench interactions, markers, and fishing zones. Runtime and editor both use the scene's local XYZ values under the same root convention. Library map-debug entries include the building, markers, and canonical waters.
+- **Legacy status:** the old procedural obscured foundation/silhouette/roof/mist branch is removed from production and the editor no longer draws its fake Athenaeum work-pad/reference. The ordinary procedural satellite-island landmass remains intentionally as ground/coast support; travel/location registration remains legacy-backed metadata. `src/world/world-editor-levels/library-island.json` is retained only as an unused compatibility artifact and is no longer referenced by the editor registry or production.
+- **Travel/location:** the existing `veiled-athenaeum` location ID and coordinates remain stable. Its theme/functions now identify the water-library/fishing destination, chart concealment is disabled, outward docking is explicit, and the destination is enabled.
+- **Lossless editor adapter:** `tools/map-editor/library-scene-adapter.js` adapts the rich authored schema into the existing V2 editing surface without flattening the saved file. Export reconstructs the canonical authored schema while preserving unknown top-level, record, prefab, water/ecology, atmosphere, and future-compatible properties. Untouched load/export is byte-structure-equivalent after JSON parsing.
+- **Editor outliner:** Library selection loads the actual scene and groups architecture, reading/archive/study/hidden/upper areas, bridges/terraces, fishable and decorative water, waterfalls, lights, benches, markers/interactions, mist, landscaping/decor, prefab instances, and remaining architecture. Search, select, focus, hide, rename, duplicate, delete-where-safe, and prefab-source workspace behavior reuse V2.3.1. Canonical fishing waters cannot be deleted from the outliner.
+- **Prefabs:** definitions remain definitions and instances retain `prefabId`, local child transforms, and independent instance transform/scale. Editing a definition in the existing prefab workspace updates all linked editor instances and exports back into the scene's prefab dictionary; instances are not permanently expanded into direct parts.
+- **Materials/rendering:** the editor builds lightweight PlayCanvas materials from the authored palette, including stone, dark/moss stone, wood, brass/metal, books, greenery, water, mist, glow, tile, and flowers. Boxes/spheres/cylinders/cones/capsules retain their authored primitive and material role instead of collapsing to gray boxes. Production uses the same palette data.
+- **Lights/atmosphere:** lights are first-class selectable helpers with stable IDs, type/color information, editable position/intensity/range, and lossless source records. Mist remains localized authored volume geometry with bounds and authored opacity visible in the inspector; it does not change global fog.
+- **Water:** fishable waters retain the exact IDs `athenaeum-grand-canal`, `athenaeum-atrium-basin`, and `athenaeum-hidden-archive-pool`. Position, surface, depth, ellipse radii, and path dimensions round-trip. Decorative water/waterfalls remain ordinary authored visual parts and do not become extra fishing zones.
+- **Fishing integration:** each runtime zone is built directly from its authored water record. Its explicit `fishIds` are guaranteed reviewed anchors in the normal compatible habitat pool, and the hidden cave record explicitly selects the existing Echo cave probability group so all v21 rarity caps remain structurally achievable. The shared rarity, equipment, bobber, tackle, cap, and specimen pipelines calculate final selection. No second Library fishing descriptor exists.
+- **Benches/markers/collision:** benches preserve stable IDs, seat/exit/fishing metadata, runtime interactions, and two-piece seat/back collision in production and editor walkthrough/debug. Markers retain kind, label, position, and facing with editor helpers but no forced production geometry. Structural and prefab collision use the authored `solid` state; rounded production primitives intentionally use matching conservative cuboid collision.
+- **Saving/recovery:** Save/Export on Library Island downloads `library-island-v2.scene.json`, ready to replace `src/world/library-island-v2.scene.json`; browsers cannot write the repository source directly. Library autosave, history, and manual checkpoints store one canonical scene payload under the Library-specific world key rather than repeatedly nesting source plus derived editor arrays. Stoneveil/Skyscraper/Basalt/Pirate keys and V2.3.1 recovery code are unchanged.
+- **Validation:** the adapter validates stable/duplicate IDs, canonical waters, material references, prefab references/instance transforms, primitive types, water dimensions/depth, lights, markers, benches, and bench-to-water references. `npm run validate:library` reports **PASS**: 285 render entities, 8 lights, 6 mist volumes, 3 waters, 10 markers, and 5 benches, all within authored limits.
+- **Tests/build:** changed/new JavaScript passes `node --check`; v22 focused tests pass **7/7**, including lossless unknown-field round-trip, representative direct/prefab/water transform fidelity, and viable basic-tackle pools retaining all authored anchors; the selected existing World Editor/Skyscraper/Basalt/Pirate/recovery suite passes **9/9**; v21 ecology tests pass in the mixed run; `npm run build` succeeds with only the existing PlayCanvas worker-externalization and large-chunk warnings. The historical v20.7 Crown source-regex assertion still fails against the current baseline (the same expected text is absent in `HEAD`), and the old exact-backup editor test is incompatible with the current authoritative Stoneveil patch/backup hashes. `git diff` confirms this pass did not touch `src/world/map-editor-patch.json`.
+- **Files:** added `src/world/{library-island-v2.scene.json,library-island-v2.js}`, `tools/map-editor/library-scene-adapter.js`, `scripts/validate-library-island.mjs`, and `test/v22-library-island.test.js`; updated `src/world/{mountain-v2.js,world-locations.js}`, `src/fishing/fish-ecology.js`, `tools/map-editor/{world-registry.js,generic-scene.js,main.js,validation.js}`, `package.json`, regenerated tracked `dist/`, and this handoff.
+- **Known limitations:** no browser visual/walkthrough playtest was claimed in this pass. Light color/type are shown and preserved but only position/intensity/range currently have dedicated numeric controls. The editor's conservative primitive collision display is not a triangle-accurate surface for curved decoration. Installing an exported scene still requires replacing the source JSON and rebuilding the frontend.
+
+## v22 manual release checklist
+
+1. [ ] Start the normal game and travel to Library Island.
+2. [ ] Confirm the new Athenaeum appears with no old silhouette overlap.
+3. [ ] Walk arrival → entrance → reading/archive/study/hidden/upper areas.
+4. [ ] Cross representative bridges and terraces and check doors/openings.
+5. [ ] Inspect canals, pools, waterfalls, decorative water, materials, lighting, and localized mist.
+6. [ ] Fish Grand Canal, Atrium Basin, and Hidden Archive Pool.
+7. [ ] Sit on representative normal and fishing benches; verify clean exit.
+8. [ ] Open World Editor V2.3.1 and select Library Island.
+9. [ ] Confirm the authored scene visually corresponds to production.
+10. [ ] Search/select/focus/hide/rename a direct architecture part and inspect stable ID/material role.
+11. [ ] Move that part, export `library-island-v2.scene.json`, install it at `src/world/`, rebuild, and confirm the production position matches.
+12. [ ] Edit a prefab source and confirm all linked instances update.
+13. [ ] Move/rotate/scale one prefab instance and confirm children stay local.
+14. [ ] Move/resize each ellipse/path water and verify runtime geometry/fishing follows after export/install.
+15. [ ] Inspect all four collision modes, especially floors, bridges, terraces, benches, and door gaps.
+16. [ ] Enter/leave Walkthrough and verify controller collision plus editor camera/selection/world restoration.
+17. [ ] Verify light position/intensity/range export and mist remains local rather than global.
+18. [ ] Switch to Stoneveil and confirm the current authored mountain is unchanged.
+19. [ ] Switch among Basalt, Skyscraper, and Pirate and confirm independent state/autosaves.
+20. [ ] Reload the editor and confirm the Library-specific autosave restores without affecting other worlds.
+
 # REEL ASCENT v21 — FISHING REBALANCE + SMALL GAMEPLAY FEATURES
 
 Status (2026-09-17): v21 is implemented in the current shared tree and the tracked frontend build is regenerated. This pass did not edit the concurrent World Editor V2.1 files or begin Skyscraper/Pirate/Athenaeum content.

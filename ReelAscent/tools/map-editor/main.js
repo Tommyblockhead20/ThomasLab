@@ -30,6 +30,13 @@ import {
 import { GenericWorldScene, sculptTriangleMesh } from './generic-scene.js';
 import { SlopeOverlay, slopeOverlayLegend } from './slope-overlay.js';
 import { validateWorldLevel } from './validation.js';
+import {
+  LIBRARY_SCENE_FILENAME,
+  adaptLibrarySceneToEditor,
+  isLibraryAuthoredScene,
+  normalizeLibraryEditorPayload,
+  serializeLibrarySceneFromEditor
+} from './library-scene-adapter.js';
 import { movingPlatformPose } from '../../src/world/world-editor-v2-runtime.js';
 import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinition, makeRoomComponentDefinition } from './room-library.js';
 import { PIRATE_ASSET_LIBRARY, getPirateAsset, makePirateAssetDefinition } from './pirate-library.js';
@@ -1639,14 +1646,23 @@ function nextId(prefix) {
   return `${prefix}-${String(idCounter).padStart(6, '0')}`;
 }
 
+function isLibraryWorld(worldId = activeWorldId) { return worldId === 'library-island'; }
+
+function genericStoredPayload(level = activeGenericLevel(), worldId = activeWorldId) {
+  return isLibraryWorld(worldId) ? serializeLibrarySceneFromEditor(level) : level;
+}
+
 function loadGenericAutosave(worldId) {
   try {
     const raw = localStorage.getItem(genericStorageKey(worldId));
-    return raw ? normalizeWorldEditorLevel(JSON.parse(raw), {
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (isLibraryWorld(worldId)) return normalizeLibraryEditorPayload(parsed);
+    return normalizeWorldEditorLevel(parsed, {
       worldId,
       displayName: getWorldEditorWorld(worldId).label,
       runtimeLocationId: getWorldEditorWorld(worldId).runtimeLocationId
-    }) : null;
+    });
   } catch { return null; }
 }
 
@@ -1657,7 +1673,9 @@ async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
   }
   const response = await fetch(world.dataUrl, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Could not load ${world.label}: HTTP ${response.status}`);
-  return normalizeWorldEditorLevel(await response.json(), {
+  const payload = await response.json();
+  if (world.kind === 'library-authored-scene') return adaptLibrarySceneToEditor(payload);
+  return normalizeWorldEditorLevel(payload, {
     worldId: world.id, displayName: world.label, runtimeLocationId: world.runtimeLocationId
   });
 }
@@ -1665,7 +1683,7 @@ async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
 function persistGenericLevel(level = activeGenericLevel()) {
   if (!level) return;
   level.updatedAt = new Date().toISOString();
-  try { localStorage.setItem(genericStorageKey(level.worldId), JSON.stringify(level)); }
+  try { localStorage.setItem(genericStorageKey(level.worldId), JSON.stringify(genericStoredPayload(level, level.worldId))); }
   catch (error) { console.warn('World Editor V2 generic autosave failed.', error); }
 }
 
@@ -1681,7 +1699,7 @@ function saveGenericHistory() {
   const level = activeGenericLevel();
   if (!level) return;
   const stack = genericHistoryFor();
-  stack.push(JSON.stringify(level));
+  stack.push(JSON.stringify(genericStoredPayload(level)));
   if (stack.length > 120) stack.shift();
   genericFutures.set(activeWorldId, []);
 }
@@ -1699,7 +1717,9 @@ function commitGeneric(mutator, { rebuild = true, recordHistory = true } = {}) {
 }
 
 function replaceActiveGenericLevel(level, { persist = true } = {}) {
-  const normalized = normalizeWorldEditorLevel(level, {
+  const normalized = isLibraryWorld()
+    ? normalizeLibraryEditorPayload(level)
+    : normalizeWorldEditorLevel(level, {
     worldId: activeWorldId,
     displayName: activeWorld().label,
     runtimeLocationId: activeWorld().runtimeLocationId
@@ -1874,7 +1894,7 @@ function undo() {
   if (!isStoneveilWorld()) {
     const stack = genericHistoryFor();
     if (!stack.length) return;
-    genericFutureFor().push(JSON.stringify(activeGenericLevel()));
+    genericFutureFor().push(JSON.stringify(genericStoredPayload()));
     replaceActiveGenericLevel(JSON.parse(stack.pop()), { persist: true });
     rebuildAll();
     return;
@@ -1893,7 +1913,7 @@ function redo() {
   if (!isStoneveilWorld()) {
     const stack = genericFutureFor();
     if (!stack.length) return;
-    genericHistoryFor().push(JSON.stringify(activeGenericLevel()));
+    genericHistoryFor().push(JSON.stringify(genericStoredPayload()));
     replaceActiveGenericLevel(JSON.parse(stack.pop()), { persist: true });
     rebuildAll();
     return;
@@ -2058,7 +2078,7 @@ function checkpointPayload(source = patch) {
 function saveManualCheckpoint() {
   try {
     if (!isStoneveilWorld()) {
-      const record = { savedAt: new Date().toISOString(), level: clone(activeGenericLevel()) };
+      const record = { savedAt: new Date().toISOString(), level: clone(genericStoredPayload()) };
       localStorage.setItem(genericCheckpointKey(), JSON.stringify(record));
       setStatus(`World checkpoint saved at ${new Date(record.savedAt).toLocaleTimeString()}.`);
       return;
@@ -3002,7 +3022,14 @@ function applyGenericToolAt(event) {
       id, name: `${tool === 'platform' ? 'Parkour Platform' : 'World Object'} ${id.split('-').at(-1)}`, type: 'box', category,
       transform: { position, rotation: { x: 0, y: yaw, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       size, collision: true, climbMaterial, visible: true,
-      metadata: activeWorldId === 'skyscraper' && !prefabWorkspace.active ? { routeGroup: 'Unassigned' } : {}
+      metadata: activeWorldId === 'skyscraper' && !prefabWorkspace.active
+        ? { routeGroup: 'Unassigned' }
+        : isLibraryWorld()
+          ? {
+              librarySourceKind: definition ? 'prefab-part' : 'part', librarySourceId: id,
+              librarySourceHadId: true, materialKey: 'stone', materialRole: 'stone', authoredPrimitive: 'box'
+            }
+          : {}
     };
     commitGeneric((draft) => {
       const owner = prefabWorkspace.active
@@ -3282,7 +3309,9 @@ function renderGenericSelection() {
   const meta = document.createElement('dl');
   meta.className = 'inspector-meta';
   const parentLabel = record.parentId || record.prefabInstanceId || (selected.kind === 'room' || selected.kind === 'prefab-instance' ? record.prefabId : null) || '—';
-  meta.innerHTML = `<dt>Type</dt><dd>${selected.kind}</dd><dt>Stable ID</dt><dd title="${selected.id}">${selected.id}</dd><dt>Parent / source</dt><dd title="${parentLabel}">${parentLabel}</dd>`;
+  const materialRole = record.metadata?.materialRole || record.metadata?.materialKey || '—';
+  const libraryKind = record.metadata?.librarySourceKind || '—';
+  meta.innerHTML = `<dt>Type</dt><dd>${selected.kind}</dd><dt>Stable ID</dt><dd title="${selected.id}">${selected.id}</dd><dt>Parent / source</dt><dd title="${parentLabel}">${parentLabel}</dd>${activeWorldId === 'library-island' ? `<dt>Authored role</dt><dd>${libraryKind}</dd><dt>Material role</dt><dd>${materialRole}</dd>` : ''}`;
   fields.appendChild(meta);
 
   if (!['architecture-reference', 'waypoint'].includes(selected.kind)) {
@@ -3336,7 +3365,7 @@ function renderGenericSelection() {
     identity.textContent = `Fishing identity: ${record.identity || record.id}. Geometry edits preserve this ecology ID.`;
     fields.appendChild(identity);
     $('#duplicate-selected').disabled = true;
-    $('#hide-selected').disabled = false;
+    $('#hide-selected').disabled = isLibraryWorld() && selected.kind === 'water-v2';
     $('#rename-selected').disabled = false;
     $('#edit-source-prefab').hidden = true;
     return;
@@ -3363,6 +3392,37 @@ function renderGenericSelection() {
       ['Size X', record.size.x, 'gsx'], ['Size Y', record.size.y, 'gsy'], ['Size Z', record.size.z, 'gsz']
     ], onGenericField);
     $('#edit-source-prefab').hidden = true;
+  }
+
+  if (record.metadata?.librarySourceKind === 'light') {
+    addNumberGrid([
+      ['Intensity', record.metadata.lightIntensity ?? 1, 'lightintensity'],
+      ['Range', record.metadata.lightRange ?? 10, 'lightrange']
+    ], onGenericField);
+    const color = record.metadata.lightColor ?? [1, 1, 1];
+    const note = document.createElement('p');
+    note.className = 'compact-help';
+    note.textContent = `${record.metadata.lightType || 'omni'} light · RGB ${color.map((value) => Number(value).toFixed(2)).join(' / ')}`;
+    fields.appendChild(note);
+  }
+  if (record.metadata?.librarySourceKind === 'marker') {
+    const note = document.createElement('p');
+    note.className = 'compact-help';
+    note.textContent = `Interaction marker: ${record.metadata.markerKind || 'interaction'}.`;
+    fields.appendChild(note);
+  }
+  if (record.metadata?.librarySourceKind === 'bench' && record.metadata.fishingFacing) {
+    const note = document.createElement('p');
+    note.className = 'compact-help';
+    note.textContent = `Fishing bench faces canonical water ${record.metadata.fishingFacing}.`;
+    fields.appendChild(note);
+  }
+  if (activeWorldId === 'library-island' && record.metadata?.materialKey === 'mist') {
+    const opacity = activeGenericLevel()?.librarySceneSource?.materials?.mist?.opacity;
+    const note = document.createElement('p');
+    note.className = 'compact-help';
+    note.textContent = `Localized mist volume · authored material opacity ${Number(opacity ?? 0).toFixed(2)}. This does not alter global fog.`;
+    fields.appendChild(note);
   }
 
   if (activeWorldId === 'skyscraper' && !prefabWorkspace.active && ['world-object', 'moving-platform'].includes(selected.kind)) {
@@ -3484,6 +3544,8 @@ function onGenericField(event) {
     if (key === 'gsx') record.size.x = Math.max(.05, value);
     if (key === 'gsy') record.size.y = Math.max(.05, value);
     if (key === 'gsz') record.size.z = Math.max(.05, value);
+    if (key === 'lightintensity') record.metadata.lightIntensity = Math.max(0, value);
+    if (key === 'lightrange') record.metadata.lightRange = Math.max(.1, value);
     if (selected.kind === 'moving-platform' || selected.kind === 'prefab-child-moving') {
       if (key === 'mpspeed') record.path.speed = Math.max(.05, value);
       if (key === 'mppause') record.path.pauseSeconds = Math.max(0, value);
@@ -3588,14 +3650,32 @@ function renderOutliner() {
   } else {
     const level = activeGenericLevel();
     if (activeWorldId === 'skyscraper') groups.push(['ESB Reference', [{ id:'__architecture__', name:'Empire State Building', kind:'architecture-reference', type:'reference' }]]);
-    else if (activeWorldId === 'library-island') groups.push(['Athenaeum Reference', [{ id:'__architecture__', name:'The Veiled Athenaeum', kind:'architecture-reference', type:'reference' }]]);
-    groups.push(['Waters', (level?.waters ?? []).map((item) => ({ id:String(item.id||item.identity), name:item.name||item.id, kind:'water-v2', type:'water', renameable:true, deletable:true, hideable:true }))]);
+    groups.push(['Waters', (level?.waters ?? []).map((item) => ({
+      id:String(item.id||item.identity), name:item.name||item.id, kind:'water-v2', type:'water',
+      renameable:true, deletable:activeWorldId !== 'library-island', hideable:true
+    }))]);
     const objects = (level?.objects ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'world-object',type:item.type||item.category||'object',renameable:true,deletable:true,hideable:true, route:item.metadata?.routeGroup || 'Unassigned' }));
     if (activeWorldId === 'skyscraper') {
       for (const route of ['Route A','Route B','Route C','Route D','Shared / Crossover','Unassigned']) {
         const items = objects.filter((item) => item.route === route);
         const movers = (level?.movingPlatforms ?? []).filter((item) => (item.metadata?.routeGroup || 'Unassigned') === route).map((item) => ({ id:item.id,name:item.name||item.id,kind:'moving-platform',type:'moving-platform',renameable:true,deletable:true,hideable:true,route }));
         if (items.length || movers.length) groups.push([route, [...items, ...movers]]);
+      }
+    } else if (activeWorldId === 'library-island') {
+      const sourceObjects = level?.objects ?? [];
+      const categoryOrder = [
+        'Architecture — Arrival / Entrance', 'Grand Reading Areas', 'Archive Areas',
+        'Waterfall Atrium', 'Study Areas', 'Hidden Archive Areas', 'Upper Galleries',
+        'Bridges / Terraces', 'Waterfalls / Decorative Water', 'Decorative Water',
+        'Lights', 'Benches', 'Markers / Interactions', 'Mist / Atmosphere',
+        'Landscaping / Decor', 'Architecture / Misc'
+      ];
+      for (const category of categoryOrder) {
+        const items = sourceObjects.filter((item) => item.category === category).map((item) => ({
+          id:item.id, name:item.name||item.id, kind:'world-object', type:item.type||'object',
+          renameable:true, deletable:true, hideable:true
+        }));
+        if (items.length) groups.push([category, items]);
       }
     } else {
       groups.push(['Objects', objects]);
@@ -4101,6 +4181,10 @@ function hideSelected() {
   if (!selected) return;
   if (!isStoneveilWorld()) {
     const target = { ...selected };
+    if (isLibraryWorld() && target.kind === 'water-v2') {
+      setStatus('Canonical Library fishing waters cannot be deleted; move or resize the authored water instead.');
+      return;
+    }
     if (target.kind === 'waypoint') {
       const info=genericScene.selectedRecord(target.id);
       if (info?.platformId) {
@@ -4214,11 +4298,12 @@ function returnToHeightfield() {
 }
 
 async function savePatch() {
-  const data = isStoneveilWorld() ? patch : activeGenericLevel();
+  const data = isStoneveilWorld() ? patch : genericStoredPayload();
   if (!data) return;
   data.updatedAt = new Date().toISOString();
-  if (!isStoneveilWorld()) persistGenericLevel(data);
-  const filename = isStoneveilWorld() ? 'map-editor-patch.json' : `${activeWorldId}.json`;
+  if (!isStoneveilWorld()) persistGenericLevel(activeGenericLevel());
+  const filename = isStoneveilWorld() ? 'map-editor-patch.json'
+    : isLibraryWorld() ? LIBRARY_SCENE_FILENAME : `${activeWorldId}.json`;
   const text = JSON.stringify(data, null, 2);
   if ('showSaveFilePicker' in window) {
     try {
@@ -4235,12 +4320,17 @@ async function savePatch() {
       if (error?.name === 'AbortError') return;
     }
   }
-  if (isStoneveilWorld()) downloadJson(filename, patch);
+  if (isStoneveilWorld() || isLibraryWorld()) downloadJson(filename, data);
   else downloadWorldLevel(data, filename);
   setStatus(`${activeWorld().label} downloaded.`);
 }
 
 function exportActiveWorldV2() {
+  if (isLibraryWorld()) {
+    downloadJson(LIBRARY_SCENE_FILENAME, serializeLibrarySceneFromEditor(activeGenericLevel()));
+    setStatus('Exported the production-compatible Veiled Athenaeum authored scene.');
+    return;
+  }
   const level = isStoneveilWorld() ? wrapLegacyStoneveilPatch(patch) : normalizeWorldEditorLevel(activeGenericLevel());
   downloadWorldLevel(level, `${activeWorldId}-world-editor-v2.json`);
   setStatus(isStoneveilWorld()
@@ -4252,6 +4342,14 @@ async function loadJsonFile(file, type) {
   const text = await file.text();
   const data = JSON.parse(text);
   if (type === 'patch') {
+    if (isLibraryAuthoredScene(data)) {
+      await switchWorld('library-island');
+      saveGenericHistory();
+      replaceActiveGenericLevel(data, { persist: true });
+      rebuildAll();
+      setStatus(`Loaded Veiled Athenaeum authored scene: ${file.name}`);
+      return;
+    }
     if (data?.kind === WORLD_EDITOR_LEVEL_KIND) {
       if (data.worldId === 'stoneveil-peak') {
         await switchWorld('stoneveil-peak');

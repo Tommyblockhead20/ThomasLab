@@ -2,6 +2,7 @@ import * as pc from 'playcanvas';
 import SKYREACH_WORLD_EDITOR_LEVEL from './world-editor-levels/skyscraper.json' with { type: 'json' };
 import CAVE_FISHING_WORLD_EDITOR_LEVEL from './world-editor-levels/cave-fishing-island.json' with { type: 'json' };
 import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from './world-editor-v2-runtime.js';
+import { buildVeiledAthenaeumV2 } from './library-island-v2.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
 import {
@@ -2113,27 +2114,11 @@ export class MountainWorld extends TestWorld {
         { y: index * 47, z: index % 2 ? 1.5 : -1.5 }, { castShadows: false });
       }
     } else if (location.id === 'veiled-athenaeum') {
-      // Keep only an indistinct massing silhouette. Low-alpha, overlapping volumes create
-      // local mist around this island without changing the scene-wide fog settings.
-      this.addBox('Veiled Athenaeum obscured foundation', { x, y: y + .22, z },
-        { x: 12.8, y: .44, z: 10.2 }, this.materials.islandRock, { y: 8 });
-      this.addBox('Veiled Athenaeum distant silhouette', { x, y: y + 2.45, z: z + .3 },
-        { x: 9.2, y: 4.2, z: 6.9 }, this.materials.cave, { y: 8 });
-      this.addBox('Veiled Athenaeum softened roofline', { x, y: y + 4.82, z: z + .3 },
-        { x: 10.6, y: .48, z: 8.1 }, this.materials.cabinRoof, { x: 2, y: 8, z: -2 });
-      for (let index = 0; index < 12; index += 1) {
-        const theta = index * Math.PI * 2 / 12 + .17;
-        const radius = 8 + index % 4 * 4.1;
-        this.createPrimitive(`Veiled Athenaeum localized mist ${index + 1}`, 'sphere', {
-          x: x + Math.cos(theta) * radius,
-          y: y + 2.2 + index % 3 * .55,
-          z: z + Math.sin(theta) * radius * .72
-        }, {
-          x: 8.5 + index % 3 * 2.1,
-          y: 2.2 + index % 2 * .7,
-          z: 6.6 + index % 4 * 1.35
-        }, this.materials.athenaeumMist, { y: index * 31 }, { castShadows: false, receiveShadows: false });
-      }
+      // One authored scene is authoritative in both production and World Editor V2.3.1.
+      // Returning here prevents the former placeholder silhouette from being layered under it.
+      const report = buildVeiledAthenaeumV2(this, location);
+      if (!report) console.error('[Veiled Athenaeum] Authored scene validation failed; island was not built.');
+      return;
     }
     const islandBench = {
       'shop-island': { radial: 7.6, tangent: 8.8, towardCenter: false },
@@ -3666,8 +3651,15 @@ export class MountainWorld extends TestWorld {
       ['BUILDING-HEARTHWARD-CABIN-01', this.homeCabinRoot],
       ['BUILDING-OUTFITTER-01', this.shopRoot],
       ['BUILDING-GLASSWATER-AQUARIUM-01', this.publicAquariumRoot],
+      ['BUILDING-VEILED-ATHENAEUM-01', this.veiledAthenaeumRoot],
       ['BUILDING-ESB-01', this.skyreachRoot]
     ]) if (entity) add(id, entity.name, entity.getPosition(), entity);
+    for (const marker of this.libraryIslandMarkers ?? []) {
+      add(`MARKER-${slug(marker.id)}`, marker.label || marker.kind || marker.id, marker.position);
+    }
+    for (const zone of this.libraryIslandFishingZones ?? []) {
+      add(`WATER-${slug(zone.id)}`, zone.label, { x: zone.center.x, y: zone.surfaceY, z: zone.center.z });
+    }
     this.mapDebugObjects = objects;
   }
 

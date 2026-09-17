@@ -21,8 +21,8 @@ export const WORLD_EDITOR_WORLDS = Object.freeze([
   }),
   Object.freeze({
     id: 'library-island', label: 'LIBRARY ISLAND / VEILED ATHENAEUM', runtimeLocationId: 'veiled-athenaeum',
-    dataUrl: '../../src/world/world-editor-levels/library-island.json', kind: 'generic',
-    capabilities: ['select', 'objects', 'water', 'prefabs', 'rooms', 'walkthrough', 'collision-debug']
+    dataUrl: '../../src/world/library-island-v2.scene.json', kind: 'library-authored-scene',
+    capabilities: ['select', 'objects', 'water', 'prefabs', 'lights', 'markers', 'benches', 'walkthrough', 'collision-debug']
   })
 ]);
 

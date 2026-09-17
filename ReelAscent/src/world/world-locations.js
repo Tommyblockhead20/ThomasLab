@@ -195,9 +195,9 @@ export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
     id: 'veiled-athenaeum', displayName: 'The Veiled Athenaeum', type: 'mythical-library-island',
     // Same southwest chart quadrant, but pushed toward the map corner as a remote landmark.
     angle: 246, radius: 1620, radii: { x: 31, z: 25 }, elevation: .88,
-    theme: 'veiled', functions: ['veiled'], dockLength: 15,
-    destinationEnabled: false,
-    concealDetails: true
+    theme: 'veiled-water-library', functions: ['veiled', 'library', 'water-garden', 'fishing'], dockLength: 15,
+    dockSide: 'outward', destinationEnabled: true,
+    concealDetails: false
   }),
   islandLocation({
     id: 'skyreach-foundation', displayName: 'Skyreach Foundation', type: 'large-island-foundation',

@@ -169,7 +169,12 @@ export function getHabitatWeight(fish, habitat, waterConfig = ecologyConfigForWa
 
 export function getEcologySelection(zone, point = zone.center) {
   const habitat = getZoneHabitat(zone, point);
-  const waterConfig = ecologyConfigForWater(zone.id, habitat);
+  const waterConfig = ecologyConfigForWater(zone.probabilityGroup ?? zone.id, habitat);
+  // Fully authored waters may declare reviewed anchor species before those new water IDs
+  // exist in the global ecology table. Guarantee those anchors while retaining the normal
+  // compatible habitat pool; this keeps v21 rarity caps structurally achievable and avoids
+  // turning a four-anchor scene record into an accidental four-species-only water.
+  const authoredIds = new Set(Array.isArray(zone.authoredFishIds) ? zone.authoredFishIds : []);
   const allowedIds = Array.isArray(zone.allowedFishIds) && zone.allowedFishIds.length
     ? new Set(zone.allowedFishIds)
     : null;
@@ -177,8 +182,11 @@ export function getEcologySelection(zone, point = zone.center) {
     ? new Set(zone.allowedRarities)
     : null;
   const entries = FISH_SPECIES
-    .map((fish) => ({ fish, weight: getHabitatWeight(fish, habitat, waterConfig) }))
-    .filter((entry) => entry.weight > 0
+    .map((fish) => {
+      const naturalWeight = getHabitatWeight(fish, habitat, waterConfig);
+      return { fish, weight: naturalWeight > 0 ? naturalWeight : authoredIds.has(fish.id) ? (waterConfig.speciesWeights[fish.id] ?? 1) : 0 };
+    })
+    .filter((entry) => !entry.fish.futureReserved && entry.weight > 0
       && (!allowedIds || allowedIds.has(entry.fish.id))
       && (!allowedRarities || allowedRarities.has(entry.fish.rarity)));
   return Object.freeze({
@@ -192,7 +200,7 @@ export function attachZoneEcology(zone) {
   zone.getHabitatAt = (point = zone.center) => getZoneHabitat(zone, point);
   zone.getEcologySelection = (point = zone.center) => getEcologySelection(zone, point);
   const baseline = getEcologySelection(zone, zone.center);
-  const waterConfig = ecologyConfigForWater(zone.id, baseline.habitat);
+  const waterConfig = ecologyConfigForWater(zone.probabilityGroup ?? zone.id, baseline.habitat);
   zone.modifiers = { ...zone.modifiers, rarityProfile: waterConfig.rarityProfile };
   zone.fishIds = [...baseline.fishIds];
   zone.ecologyWeights = { ...baseline.habitatWeights };
