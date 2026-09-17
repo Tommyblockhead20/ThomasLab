@@ -1433,11 +1433,48 @@ export class MountainWorld extends TestWorld {
     markStartup('world:active-location');
     applyWorldObjectPatch(this, MAP_EDITOR_PATCH, MOUNTAIN_CENTER);
     markStartup('world:map-editor-overrides');
+    this.stoneveilTerrainAuthority = this.auditStoneveilTerrainAuthority();
+    if (this.authoredStoneveilCoreActive) {
+      const audit = this.stoneveilTerrainAuthority;
+      console.info(`Stoneveil terrain authority: baked render ${audit.bakedRenders}, baked collider ${audit.bakedColliders}, legacy main ${audit.legacyMainColliders}, legacy crown ${audit.legacyCrownColliders}.`);
+    }
     installMapEditorBridge(this, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
   }
 
   point(angle, radius, y, tangentOffset = 0) {
     return radialPoint(angle, radius, y, tangentOffset);
+  }
+
+  auditStoneveilTerrainAuthority() {
+    const entities = [];
+    const stack = [this.buildTarget ?? this.root];
+    while (stack.length) {
+      const entity = stack.pop();
+      if (!entity) continue;
+      entities.push(entity);
+      stack.push(...(entity.children ?? []));
+    }
+    const baked = entities.filter((entity) => entity.name === 'Map Editor baked 3D mountain core' && entity.enabled !== false);
+    const legacyMain = entities.filter((entity) => entity.name === 'Continuous irregular mountain body' && entity.enabled !== false);
+    const legacyCrown = entities.filter((entity) => entity.name === 'Stoneveil Peak summit crown - sheer ungrippable shell' && entity.enabled !== false);
+    const crownNamed = entities.filter((entity) => /crown|summit/i.test(entity.name ?? ''))
+      .filter((entity) => entity.render || entity.physicsCollider)
+      .map((entity) => Object.freeze({
+        name: entity.name,
+        render: Boolean(entity.render),
+        collider: Boolean(entity.physicsCollider)
+      }));
+    return Object.freeze({
+      bakedRenders: baked.filter((entity) => entity.render).length,
+      bakedColliders: baked.filter((entity) => entity.physicsCollider).length,
+      legacyMainRenders: legacyMain.filter((entity) => entity.render).length,
+      legacyMainColliders: legacyMain.filter((entity) => entity.physicsCollider).length,
+      legacyCrownRenders: legacyCrown.filter((entity) => entity.render).length,
+      legacyCrownColliders: legacyCrown.filter((entity) => entity.physicsCollider).length,
+      crownNamed: Object.freeze(crownNamed),
+      valid: !this.authoredStoneveilCoreActive || (baked.length === 1
+        && baked[0].render && baked[0].physicsCollider && !legacyMain.length && !legacyCrown.length)
+    });
   }
 
   terrainY(angle, radius) {
@@ -5161,6 +5198,10 @@ export class MountainWorld extends TestWorld {
   }
 
   buildSummitCrown() {
+    // The authored bake owns the Crown's sides and both cave mouths, but intentionally
+    // ends at the summit rim. Keep only the basin/top triangles in authored mode and
+    // merge them into the baked terrain entity later. Creating this legacy side shell
+    // as a second render/collider is what sealed both authored Crown entrances.
     // A subdivided shell lets the same proven aperture filter cut a localized Crown cave
     // mouth. The old two-triangle-tall wedges would have removed an entire face from base
     // to summit for one opening.
@@ -5246,12 +5287,26 @@ export class MountainWorld extends TestWorld {
         [lastSurfaceRing + index, lastSurfaceRing + next, topNext]
       );
     }
-    const triangles = [...visibleSideTriangles, ...topTriangles];
+    const triangles = this.authoredStoneveilCoreActive
+      ? topTriangles
+      : [...visibleSideTriangles, ...topTriangles];
 
     // Rock grounding ray-tests the same filtered, faceted shell the player sees.
-    this.crownSideTriangles = visibleSideTriangles.map((triangle) => (
+    this.crownSideTriangles = (this.authoredStoneveilCoreActive ? [] : visibleSideTriangles).map((triangle) => (
       triangle.map((vertexIndex) => vertices[vertexIndex])
     ));
+
+    if (this.authoredStoneveilCoreActive) {
+      this.authoredSummitInfill = Object.freeze({
+        positions: Object.freeze(vertices.flatMap(([x, y, z]) => [
+          x + MOUNTAIN_CENTER.x,
+          y,
+          z + MOUNTAIN_CENTER.z
+        ])),
+        indices: Object.freeze(triangles.flat())
+      });
+      return;
+    }
 
     const geometry = new pc.Geometry();
     geometry.positions = [];

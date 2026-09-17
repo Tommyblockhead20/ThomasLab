@@ -31,6 +31,16 @@ test('authored Stoneveil keeps summit floor but excludes duplicate Crown sides',
   ]);
   assert.match(source, /this\.authoredStoneveilCoreActive\s*\? topTriangles/);
   assert.match(source, /authoredSummitInfill/);
+  const crownMethod = source.slice(
+    source.indexOf('  buildSummitCrown() {'),
+    source.indexOf('  buildSummitBench() {')
+  );
+  const authoredBranch = crownMethod.indexOf('if (this.authoredStoneveilCoreActive)');
+  const authoredReturn = crownMethod.indexOf('return;', authoredBranch);
+  const legacyEntity = crownMethod.indexOf("new pc.Entity('Stoneveil Peak summit crown - sheer ungrippable shell')");
+  assert.ok(authoredBranch >= 0, 'authored Crown branch exists');
+  assert.ok(authoredReturn > authoredBranch, 'authored Crown branch exits after publishing summit-only infill');
+  assert.ok(legacyEntity > authoredReturn, 'authored mode exits before legacy Crown render/collider creation');
   assert.match(runtime, /summitIndices\.map\(\(index\) => index \+ summitVertexOffset\)/);
   assert.match(runtime, /editorIncludesSummitInfill/);
   assert.match(source, /auditStoneveilTerrainAuthority\(\)/);

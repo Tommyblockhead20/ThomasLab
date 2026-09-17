@@ -1,3 +1,13 @@
+# REEL ASCENT v22.1 — CROWN CAVE AUTHORITY REGRESSION FIX
+
+Status (2026-09-17): both authored Crown cave entrances are no longer covered by the legacy procedural summit-side shell. The tracked frontend build is regenerated.
+
+- **Confirmed root cause:** the v22 tree had regressed `MountainWorld.buildSummitCrown()` to always create `Stoneveil Peak summit crown - sheer ungrippable shell`, including its visible PlayCanvas mesh and Rapier trimesh collider, even though `terrain.bakedMesh` was the authoritative mountain. This duplicate 360-degree side shell sat in front of both authored Crown openings.
+- **Fix:** authored Stoneveil mode now publishes only the summit basin/top triangles as `authoredSummitInfill`, returns before legacy Crown entity/collider creation, and merges the summit support into the one baked terrain render/collider. Procedural fallback mode still retains its full summit shell.
+- **Runtime proof:** a local rebuilt-game startup reported `Stoneveil terrain authority: baked render 1, baked collider 1, legacy main 0, legacy crown 0.` The authority report remains exposed through `window.__reelAscent.getStoneveilTerrainAuthority()`.
+- **Regression protection:** the focused test now verifies not only the summit-only branch but that its `return` occurs before construction of the named legacy Crown entity. `test/v20-7-focused.test.js` passes 5/5 and the production Vite build succeeds.
+- **Scope:** no authored baked mountain vertices, cave locations, cave water, fishing data, route rocks, or map-editor patch data were changed. This is frontend/world code only; publish the rebuilt frontend. No multiplayer/Render redeploy is needed.
+
 # REEL ASCENT v22 — VEILED ATHENAEUM PRODUCTION + WORLD EDITOR INTEGRATION
 
 Status (2026-09-17): v22 is implemented in the current shared tree. `src/world/library-island-v2.scene.json` is now the single authored Library Island source consumed by production and World Editor V2.3.1. The tracked frontend build is regenerated. `src/world/map-editor-patch.json` was not modified.
