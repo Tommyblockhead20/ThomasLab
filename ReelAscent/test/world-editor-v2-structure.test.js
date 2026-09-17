@@ -54,13 +54,13 @@ test('runtime bridges V2 data into Skyreach and Basalt without replacing their s
   assert.match(mountain, /updateWorldEditorKinematics\(this, dt\)/);
 });
 
-test('World Editor V3 shell exposes all five worlds and the new authoring controls', async () => {
+test('World Editor V4 shell exposes all five worlds and the new authoring controls', async () => {
   const registry = await text('tools/map-editor/world-registry.js');
   const html = await text('tools/map-editor/index.html');
   for (const id of ['stoneveil-peak', 'cave-fishing-island', 'skyscraper', 'pirate-island', 'library-island']) {
     assert.match(registry, new RegExp(id));
   }
-  assert.match(html, /WORLD EDITOR V3/);
+  assert.match(html, /WORLD EDITOR V4/);
   assert.match(html, /id="world-selector"/);
   assert.match(html, /data-tool="moving-platform"/);
   assert.match(html, /id="show-slope"/);

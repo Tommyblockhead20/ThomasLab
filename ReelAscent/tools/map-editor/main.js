@@ -40,16 +40,20 @@ import {
 import { movingPlatformPose } from '../../src/world/world-editor-v2-runtime.js';
 import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinition, makeRoomComponentDefinition } from './room-library.js';
 import { PIRATE_ASSET_LIBRARY, getPirateAsset, makePirateAssetDefinition } from './pirate-library.js';
+import { ensurePirateIslandTerrain } from './pirate-terrain.js';
 import { assetsForWorld, getV3Asset } from './asset-library-v3.js';
 import {
   boundaryLoops,
+  bridgeEdgeChains,
   createFace,
   deleteFaces,
   edgeKey,
   faceVertices,
   fillBoundary,
+  flattenSelection,
   flipFaces,
   growFaceSelection,
+  inflateSelection,
   makeMeshSelection,
   mergeNearbyVertices,
   meshDiagnostics,
@@ -57,12 +61,14 @@ import {
   recalculateVertexNormals,
   selectConnectedFaces,
   shrinkFaceSelection,
+  subdivideFaces,
   vertex,
   weldVertices
 } from './mesh-authoring.js';
 import {
   cutRectangularOpeningInBox,
   extendStairAssembly,
+  findLikelyZFighting,
   generateStairAssembly,
   makeBookshelfPrefab,
   makeFireplacePrefab
@@ -146,6 +152,8 @@ let slopeOverlay = null;
 let outlinerFilter = '';
 let validationIssues = [];
 let validationFilter = 'all';
+let zFightResults = [];
+const ignoredZFightPairs = new Set();
 const editorHiddenStoneveilIds = new Set();
 let draggingWaypoint = null;
 const prefabWorkspace = { active: false, definitionId: null, returnCamera: null, returnSelection: null };
@@ -387,6 +395,19 @@ for (const material of [materials.terrain, materials.terrainXray, materials.terr
 
 genericScene = new GenericWorldScene(app, sceneRoot);
 slopeOverlay = new SlopeOverlay(app, stoneveilRoot, PLAYER_CONFIG);
+window.addEventListener('reel-ascent:editor-status', (event) => {
+  const detail = event.detail || {};
+  if (detail.worldId && detail.worldId !== activeWorldId) return;
+  if (detail.message) setStatus(detail.message);
+  if (detail.state === 'ready' && detail.worldId === 'skyscraper' && detail.bounds) {
+    const { center, halfExtents } = detail.bounds;
+    cameraState.target.set(center.x, center.y, center.z);
+    cameraState.distance = Math.max(60, Math.hypot(halfExtents.x, halfExtents.y, halfExtents.z) * 2.6);
+    cameraState.yaw = 38;
+    cameraState.pitch = -10;
+    updateCamera();
+  }
+});
 
 const waterMaterialCache = new Map();
 function normalizeHexColor(value, fallback = '#269eb8') {
@@ -1703,18 +1724,83 @@ function loadGenericAutosave(worldId) {
   } catch { return null; }
 }
 
+function ensurePirateStarterComposition(level) {
+  if (!level || level.worldId !== 'pirate-island') return level;
+  level.prefabs ??= { definitions: [], instances: [] };
+  level.prefabs.definitions ??= [];
+  level.prefabs.instances ??= [];
+  if (level.metadata?.pirateStarterCompositionV4) return level;
+  const placements = [
+    ['dock-section', { x: 20, y: .18, z: 2 }, 88],
+    ['ship-bow', { x: -18, y: .5, z: 9 }, -28],
+    ['ship-mid', { x: -12.5, y: .65, z: 6 }, -28],
+    ['mast-rig', { x: -10, y: 1.1, z: 5 }, -18],
+    ['treasure-camp', { x: 5, y: 2.1, z: -4 }, 15],
+    ['palm-cluster', { x: 10, y: 1.4, z: 8 }, 12],
+    ['reef-rocks', { x: 18, y: -.25, z: -10 }, 33],
+    ['pirate-watch-scaffold-v3', { x: -2, y: 2.1, z: 7 }, -10]
+  ];
+  const v3Assets = new Map(assetsForWorld('pirate-island').map((asset) => [asset.id, asset]));
+  for (const [assetId, position, yaw] of placements) {
+    let definition;
+    const pirateAsset = PIRATE_ASSET_LIBRARY.find((asset) => asset.id === assetId);
+    if (pirateAsset) definition = makePirateAssetDefinition(assetId);
+    else {
+      const asset = v3Assets.get(assetId);
+      if (!asset) continue;
+      definition = {
+        id: `EDITOR-ASSET-${asset.id.toUpperCase()}`, name: asset.label, kind: 'assembly', version: 1,
+        objects: structuredClone(asset.objects), movingPlatforms: [], waters: [],
+        metadata: { editorAssetId: asset.id, description: asset.description }
+      };
+    }
+    if (!level.prefabs.definitions.some((item) => item.id === definition.id)) level.prefabs.definitions.push(definition);
+    const id = `PIRATE-STARTER-${assetId.toUpperCase()}`;
+    if (!level.prefabs.instances.some((item) => item.id === id)) level.prefabs.instances.push({
+      id, name: definition.name, prefabId: definition.id, linked: true,
+      transform: { position: { ...position }, rotation: { x: 0, y: yaw, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      metadata: { pirateStarterV4: true, assetId }
+    });
+  }
+  level.metadata = { ...level.metadata, pirateStarterCompositionV4: true };
+  return level;
+}
+
+function hydrateCachedBasaltProductionTerrain(level) {
+  if (!level || level.worldId !== 'cave-fishing-island' || level.terrain?.mode === 'authored-mesh-candidate') return level;
+  try {
+    const freeze = JSON.parse(localStorage.getItem('reel-ascent:world-editor-v2:basalt-production-freeze') || 'null');
+    if (!freeze?.positions?.length || !freeze?.indices?.length || freeze.positions.length % 3 || freeze.indices.length % 3) return level;
+    const vertexCount = freeze.positions.length / 3;
+    if (!freeze.indices.every((index) => Number.isInteger(Number(index)) && Number(index) >= 0 && Number(index) < vertexCount)) return level;
+    level.terrain = {
+      mode: 'authored-mesh-candidate', format: freeze.format || 'triangle-mesh-v1', coordinateSpace: 'island-local',
+      positions: freeze.positions.map(Number), indices: freeze.indices.map(Number),
+      source: 'actual-production-capture', capturedAt: freeze.capturedAt,
+      parts: structuredClone(freeze.parts || []), metadata: structuredClone(freeze.metadata || {})
+    };
+    level.sourcePolicy = { ...level.sourcePolicy, terrain: 'authored-candidate' };
+    return level;
+  } catch { return level; }
+}
+
 async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
   if (preferAutosave) {
     const autosave = loadGenericAutosave(world.id);
-    if (autosave) return autosave;
+    if (autosave) return world.id === 'pirate-island'
+      ? ensurePirateStarterComposition(ensurePirateIslandTerrain(autosave))
+      : hydrateCachedBasaltProductionTerrain(autosave);
   }
   const response = await fetch(world.dataUrl, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Could not load ${world.label}: HTTP ${response.status}`);
   const payload = await response.json();
   if (world.kind === 'library-authored-scene') return adaptLibrarySceneToEditor(payload);
-  return normalizeWorldEditorLevel(payload, {
+  const level = normalizeWorldEditorLevel(payload, {
     worldId: world.id, displayName: world.label, runtimeLocationId: world.runtimeLocationId
   });
+  return world.id === 'pirate-island'
+    ? ensurePirateStarterComposition(ensurePirateIslandTerrain(level))
+    : hydrateCachedBasaltProductionTerrain(level);
 }
 
 function persistGenericLevel(level = activeGenericLevel()) {
@@ -1869,6 +1955,10 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
     if (!genericLevels.has(activeWorldId)) {
       genericLevels.set(activeWorldId, await loadGenericProjectLevel(world, { preferAutosave: true }));
     }
+    if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate') {
+      genericScene.basaltReferenceMode = 'authored';
+      if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value = 'authored';
+    }
     genericScene.setWorld(world, activeGenericLevel());
     genericScene.setEnabled(true);
     genericScene.setCollisionMode(currentCollisionMode());
@@ -1876,7 +1966,9 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
   if (!keepCamera) setWorldCameraDefaults(activeWorldId);
   syncWorldUi();
   rebuildAll();
-  setStatus(`${world.label} loaded. ${isStoneveilWorld() ? 'Legacy authored Stoneveil patch remains the production-safe source.' : 'Edits autosave independently for this world.'}`);
+  if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.terrain?.mode !== 'authored-mesh-candidate') {
+    setStatus('Basalt production mesh unavailable. Open the normal game once to publish the exact multi-part freeze, then use Load Captured Production Mesh. The visible procedural reference is not production-authoritative.');
+  } else setStatus(`${world.label} loaded. ${isStoneveilWorld() ? 'Legacy authored Stoneveil patch remains the production-safe source.' : 'Edits autosave independently for this world.'}`);
 }
 
 function historyPayload(source = patch) {
@@ -2960,16 +3052,38 @@ function raySphereDistance(origin, direction, center, radius) {
 }
 
 function updateMeshAuthoringUi() {
-  const mesh = activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate'
-    ? activeGenericLevel().terrain : null;
+  const terrain = activeGenericLevel()?.terrain;
+  const mesh = terrain?.positions?.length && terrain?.indices?.length
+    && ['authored-mesh-candidate', 'authored-triangle-mesh'].includes(terrain.mode) ? terrain : null;
   const status = $('#mesh-selection-status');
   if (!status) return;
   if (!mesh) {
-    status.textContent = 'Load the captured Basalt production mesh to use topology tools.';
+    status.textContent = activeWorldId === 'pirate-island'
+      ? 'Pirate Island authored terrain is unavailable; reload project data.'
+      : 'Load the captured Basalt production mesh to use topology tools.';
+    for (const id of ['#mesh-apply-move','#mesh-create-face','#mesh-delete-faces','#mesh-fill-hole','#mesh-bridge','#mesh-flip-faces','#mesh-flatten','#mesh-inflate','#mesh-deflate','#mesh-subdivide','#mesh-weld','#mesh-merge-nearby','#mesh-recalculate-normals']) {
+      const button = $(id); if (button) button.disabled = true;
+    }
     return;
   }
   const report = meshDiagnostics(mesh);
   status.textContent = `${meshSelection.vertices.size} vertices · ${meshSelection.edges.size} edges · ${meshSelection.faces.size} faces selected · ${report.boundaryEdges.length} boundary / ${report.nonManifoldEdges.length} non-manifold edges`;
+  const selectedVertexCount = selectedMeshVertexIds(mesh).length;
+  const enabled = (id, value, reason) => {
+    const button = $(id); if (!button) return;
+    button.disabled = !value; button.title = value ? '' : reason;
+  };
+  enabled('#mesh-apply-move', selectedVertexCount > 0, 'Select vertices, edges, or faces first.');
+  enabled('#mesh-create-face', meshSelection.vertices.size === 3 && !meshSelection.edges.size && !meshSelection.faces.size, 'Select exactly three vertices.');
+  enabled('#mesh-delete-faces', meshSelection.faces.size > 0, 'Select one or more faces.');
+  enabled('#mesh-fill-hole', selectedVertexCount >= 3, 'Select a closed boundary loop.');
+  enabled('#mesh-bridge', meshSelection.edges.size >= 2, 'Select two separate edge chains.');
+  enabled('#mesh-flip-faces', meshSelection.faces.size > 0, 'Select one or more faces.');
+  enabled('#mesh-flatten', selectedVertexCount >= 2, 'Select at least two vertices through any mesh element.');
+  enabled('#mesh-inflate', selectedVertexCount > 0, 'Select mesh elements first.');
+  enabled('#mesh-deflate', selectedVertexCount > 0, 'Select mesh elements first.');
+  enabled('#mesh-subdivide', meshSelection.faces.size > 0, 'Select one or more faces.');
+  enabled('#mesh-weld', selectedVertexCount >= 2, 'Select at least two vertices.');
   genericScene?.setMeshSelection(meshSelection, {
     showBoundary: Boolean($('#show-boundary-edges')?.checked),
     showNonManifold: Boolean($('#show-nonmanifold-edges')?.checked)
@@ -2980,7 +3094,7 @@ function setAuthoringMode(mode = 'object') {
   authoringMode = ['object', 'mesh', 'sculpt', 'water', 'path'].includes(mode) ? mode : 'object';
   for (const button of $$('[data-authoring-mode]')) button.classList.toggle('active', button.dataset.authoringMode === authoringMode);
   for (const panel of $$('[data-mode-panel]')) panel.hidden = panel.dataset.modePanel !== authoringMode;
-  if ($('#mesh-authoring-section')) $('#mesh-authoring-section').hidden = !(authoringMode === 'mesh' && activeWorldId === 'cave-fishing-island');
+  if ($('#mesh-authoring-section')) $('#mesh-authoring-section').hidden = !(authoringMode === 'mesh' && ['cave-fishing-island', 'pirate-island'].includes(activeWorldId));
   if ($('#water-path-section')) $('#water-path-section').hidden = authoringMode !== 'path';
   if ($('#library-tools-section')) $('#library-tools-section').hidden = !['library-island', 'cave-fishing-island', 'pirate-island'].includes(activeWorldId);
   if (authoringMode === 'sculpt' && !['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) tool = 'raise';
@@ -2991,8 +3105,8 @@ function setAuthoringMode(mode = 'object') {
 
 function selectBasaltMeshElement(event, ray) {
   const mesh = activeGenericLevel()?.terrain;
-  const hit = genericScene.basaltTerrainHit(ray);
-  if (!hit || mesh?.mode !== 'authored-mesh-candidate') return false;
+  const hit = genericScene.terrainMeshHit(ray);
+  if (!hit || !['authored-mesh-candidate', 'authored-triangle-mesh'].includes(mesh?.mode)) return false;
   const face = Math.floor(hit.triangleOffset / 3);
   const ids = faceVertices(mesh, face);
   const mode = $('#mesh-selection-mode')?.value || 'face';
@@ -3019,7 +3133,7 @@ function selectBasaltMeshElement(event, ray) {
     bucket = meshSelection.faces;
   }
   if (additive && bucket.has(value)) bucket.delete(value); else bucket.add(value);
-  selected = { kind: 'terrain-mesh', id: '__basalt-authored-terrain', record: mesh };
+  selected = { kind: 'terrain-mesh', id: genericScene.terrainMeshId(), record: mesh };
   genericScene.setSelected(selected.id);
   updateMeshAuthoringUi();
   renderUi();
@@ -3028,18 +3142,21 @@ function selectBasaltMeshElement(event, ray) {
 
 function mutateBasaltMesh(operation, successMessage) {
   const current = activeGenericLevel()?.terrain;
-  if (current?.mode !== 'authored-mesh-candidate') {
-    setStatus('Load the captured Basalt production mesh first.');
+  if (!['authored-mesh-candidate', 'authored-triangle-mesh'].includes(current?.mode)) {
+    setStatus(activeWorldId === 'pirate-island' ? 'Reload the Pirate Island authored terrain first.' : 'Load the captured Basalt production mesh first.');
     return;
   }
+  const originalMode = current.mode;
   try {
     commitGeneric((draft) => {
       draft.terrain = operation(draft.terrain);
-      draft.terrain.mode = 'authored-mesh-candidate';
-      draft.sourcePolicy.terrain = 'authored-candidate';
+      draft.terrain.mode = originalMode;
+      draft.sourcePolicy.terrain = originalMode === 'authored-mesh-candidate' ? 'authored-candidate' : 'authored';
     });
     updateMeshAuthoringUi();
-    setStatus(`${successMessage} The candidate remains non-production until explicitly promoted.`);
+    setStatus(originalMode === 'authored-mesh-candidate'
+      ? `${successMessage} The candidate remains non-production until explicitly promoted.`
+      : `${successMessage} Pirate Island terrain remains an editable authored mesh.`);
   } catch (error) {
     setStatus(error.message);
   }
@@ -3121,7 +3238,7 @@ function applyGenericToolAt(event) {
   if (!level) return;
   const ray = pointerRay(event);
   const definition = activePrefabDefinition(level);
-  if (authoringMode === 'mesh' && activeWorldId === 'cave-fishing-island' && tool === 'select') {
+  if (authoringMode === 'mesh' && ['cave-fishing-island', 'pirate-island'].includes(activeWorldId) && tool === 'select') {
     if (selectBasaltMeshElement(event, ray)) return;
   }
   if (tool === 'select') {
@@ -3133,25 +3250,29 @@ function applyGenericToolAt(event) {
     updateWaterPathUi();
     return;
   }
-  if (activeWorldId === 'cave-fishing-island' && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) {
-    const hit = genericScene.basaltTerrainHit(ray);
+  if (['cave-fishing-island', 'pirate-island'].includes(activeWorldId) && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) {
+    const hit = genericScene.terrainMeshHit(ray);
     if (!hit) {
-      setStatus('Load the captured Basalt production mesh first, then sculpt the frozen candidate.');
+      setStatus(activeWorldId === 'pirate-island' ? 'Pirate Island terrain is unavailable; reload project data.' : 'Load the captured Basalt production mesh first, then sculpt the frozen candidate.');
       return;
     }
     const radius = Number($('#brush-radius')?.value) || 4;
     const strength = Number($('#brush-strength')?.value) || 1;
     let changed = 0;
     commitGeneric((draft) => {
-      if (draft.terrain?.mode !== 'authored-mesh-candidate') return;
+      if (!['authored-mesh-candidate', 'authored-triangle-mesh'].includes(draft.terrain?.mode)) return;
       changed = sculptTriangleMesh(draft.terrain, hit, tool, radius, strength);
       draft.terrain.editedAt = new Date().toISOString();
-      draft.sourcePolicy.terrain = 'authored-candidate';
+      draft.sourcePolicy.terrain = draft.terrain.mode === 'authored-mesh-candidate' ? 'authored-candidate' : 'authored';
     });
     if (changed) {
-      genericScene.setBasaltReferenceMode('authored');
-      if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value = 'authored';
-      setStatus(`Basalt ${tool}: edited ${changed} connected mesh vertices. Production still uses the procedural reference until you explicitly promote it later.`);
+      if (activeWorldId === 'cave-fishing-island') {
+        genericScene.setBasaltReferenceMode('authored');
+        if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value = 'authored';
+      }
+      setStatus(activeWorldId === 'pirate-island'
+        ? `Pirate Island ${tool}: edited ${changed} connected terrain vertices.`
+        : `Basalt ${tool}: edited ${changed} connected mesh vertices. Production still uses the procedural reference until you explicitly promote it later.`);
     }
     return;
   }
@@ -3449,7 +3570,7 @@ function syncWorldUi() {
   const selector = $('#world-selector');
   if (selector && selector.value !== world.id) selector.value = world.id;
   const stoneveil = isStoneveilWorld();
-  const caveTerrain = world.id === 'cave-fishing-island' && worldHasCapability(world.id, 'terrain');
+  const caveTerrain = ['cave-fishing-island', 'pirate-island'].includes(world.id) && worldHasCapability(world.id, 'terrain');
   for (const id of ['rock-palette-section', 'plant-palette-section', 'decor-palette-section', 'mountain-profile-section', 'mesh-mode-section']) {
     const element = $(`#${id}`);
     if (element) element.hidden = !stoneveil;
@@ -3865,13 +3986,15 @@ function renderOutliner() {
   } else {
     const level = activeGenericLevel();
     if (activeWorldId === 'skyscraper') groups.push(['ESB Reference', [{ id:'__architecture__', name:'Empire State Building', kind:'architecture-reference', type:'reference' }]]);
-    if (activeWorldId === 'cave-fishing-island' && level?.terrain?.mode === 'authored-mesh-candidate') {
+    if (['cave-fishing-island', 'pirate-island'].includes(activeWorldId)
+      && level?.terrain?.positions?.length && level?.terrain?.indices?.length) {
+      const terrainId = activeWorldId === 'pirate-island' ? '__pirate-authored-terrain' : '__basalt-authored-terrain';
       groups.push(['Terrain Mesh', [{
-        id:'__basalt-authored-terrain', name:`Captured Basalt · ${Math.floor(level.terrain.positions.length / 3).toLocaleString()} vertices`,
+        id:terrainId, name:`${activeWorldId === 'pirate-island' ? 'Pirate Island' : 'Captured Basalt'} · ${Math.floor(level.terrain.positions.length / 3).toLocaleString()} vertices`,
         kind:'terrain-mesh', type:'triangle mesh', hideable:true
       }]]);
       groups.push(['Terrain Mesh Parts', (level.terrain.parts ?? []).map((part, index) => ({
-        id:`__basalt-part__:${index}`, name:part.name || `Mesh part ${index + 1}`, kind:'terrain-mesh-part', type:`${part.triangleCount || 0} faces`,
+        id:`__terrain-part__:${index}`, name:part.name || `Mesh part ${index + 1}`, kind:'terrain-mesh-part', type:`${part.triangleCount || 0} faces`,
         firstTriangle:Number(part.firstTriangle) || 0, triangleCount:Number(part.triangleCount) || 0
       }))]);
     }
@@ -3939,7 +4062,7 @@ function renderOutliner() {
       main.addEventListener('click', () => {
         if (item.kind === 'terrain-mesh-part') {
           meshSelection = makeMeshSelection({ faces: Array.from({ length:item.triangleCount }, (_, offset) => item.firstTriangle + offset) });
-          selected = { kind:'terrain-mesh', id:'__basalt-authored-terrain' };
+          selected = { kind:'terrain-mesh', id:genericScene.terrainMeshId() };
           genericScene.setSelected(selected.id);
           setAuthoringMode('mesh');
           updateMeshAuthoringUi();
@@ -4845,9 +4968,21 @@ function placeLibraryComponent() {
 function populateV3AssetUi() {
   const select = $('#v3-asset-template');
   if (!select) return;
-  const assets = assetsForWorld(activeWorldId);
+  const query = String($('#v3-asset-search')?.value || '').trim().toLowerCase();
+  const assets = assetsForWorld(activeWorldId).filter((asset) => !query
+    || `${asset.name} ${asset.category} ${asset.description}`.toLowerCase().includes(query));
   const previous = select.value;
-  select.replaceChildren(...assets.map((asset) => new Option(`${asset.category} — ${asset.name}`, asset.id)));
+  select.replaceChildren();
+  const byCategory = new Map();
+  for (const asset of assets) {
+    if (!byCategory.has(asset.category)) byCategory.set(asset.category, []);
+    byCategory.get(asset.category).push(asset);
+  }
+  for (const [category, categoryAssets] of [...byCategory].sort(([a], [b]) => a.localeCompare(b))) {
+    const group = document.createElement('optgroup'); group.label = category;
+    for (const asset of categoryAssets.sort((a, b) => a.name.localeCompare(b.name))) group.append(new Option(asset.name, asset.id));
+    select.appendChild(group);
+  }
   if (assets.some((asset) => asset.id === previous)) select.value = previous;
   const asset = getV3Asset(select.value);
   if ($('#v3-asset-description')) $('#v3-asset-description').textContent = asset?.description || 'No v3 assets are registered for this world.';
@@ -5061,6 +5196,101 @@ function renameSelectedRecord() {
   renderUi();
 }
 
+function zFightSourceRecords(level = activeGenericLevel()) {
+  if (!level) return [];
+  if (prefabWorkspace.active) return activePrefabDefinition(level)?.objects ?? [];
+  return level.objects ?? [];
+}
+
+function zFightPairKey(result) {
+  return [String(result.objectId), String(result.otherObjectId)].sort().join('::');
+}
+
+function scanZFighting() {
+  if (isStoneveilWorld()) {
+    zFightResults = [];
+    renderZFightingResults('Stoneveil uses the dedicated terrain/cave diagnostics; this scan targets authored object geometry.');
+    return;
+  }
+  const threshold = Math.max(.0001, Number($('#zfight-threshold')?.value) || .01);
+  zFightResults = findLikelyZFighting(zFightSourceRecords(), threshold)
+    .filter((result) => !ignoredZFightPairs.has(zFightPairKey(result)));
+  renderZFightingResults();
+  setStatus(zFightResults.length
+    ? `Found ${zFightResults.length} likely z-fighting pair(s). Cyan marks A; magenta marks B.`
+    : 'No likely authored-object z-fighting pairs found at this threshold.');
+}
+
+function focusZFightPair(result, selectSecond = false) {
+  const id = String(selectSecond ? result.otherObjectId : result.objectId);
+  genericScene.setDiagnosticPair(result.objectId, result.otherObjectId);
+  selected = { kind: prefabWorkspace.active ? 'prefab-child-object' : 'world-object', id };
+  genericScene.setSelected(id);
+  focusSelectedObject();
+  genericScene.setDiagnosticPair(result.objectId, result.otherObjectId);
+  renderUi();
+}
+
+function mutateZFightObject(id, mutator) {
+  commitGeneric((draft) => {
+    const source = prefabWorkspace.active
+      ? (draft.prefabs?.definitions ?? []).find((item) => item.id === prefabWorkspace.definitionId)?.objects
+      : draft.objects;
+    const record = (source ?? []).find((item) => item.id === id);
+    if (record) mutator(record, source);
+  });
+  scanZFighting();
+}
+
+function renderZFightingResults(emptyMessage = '') {
+  const container = $('#zfight-results');
+  if (!container) return;
+  container.replaceChildren();
+  if (!zFightResults.length) {
+    container.textContent = emptyMessage || 'No likely overlaps in the current scan.';
+    return;
+  }
+  const threshold = Math.max(.0001, Number($('#zfight-threshold')?.value) || .01);
+  for (const result of zFightResults) {
+    const row = document.createElement('div');
+    row.className = 'diagnostic-result';
+    const title = document.createElement('strong');
+    title.textContent = result.code === 'duplicate-overlapping-surface' ? 'Exact overlapping bounds' : `Near-coplanar ${String(result.axis).toUpperCase()} surfaces`;
+    row.append(
+      title,
+      Object.assign(document.createElement('div'), { textContent: `A: ${result.objectId} · B: ${result.otherObjectId} · separation ${Number(result.separation || 0).toFixed(4)} m` }),
+      Object.assign(document.createElement('div'), { textContent: result.message })
+    );
+    const actions = document.createElement('div'); actions.className = 'row-actions';
+    const button = (label, handler, disabled = false, titleText = '') => {
+      const element = document.createElement('button'); element.type = 'button'; element.textContent = label; element.disabled = disabled; element.title = titleText;
+      if (!disabled) element.addEventListener('click', handler);
+      actions.appendChild(element);
+    };
+    button('Focus pair', () => focusZFightPair(result));
+    button('Select A', () => focusZFightPair(result, false));
+    button('Select B', () => focusZFightPair(result, true));
+    if (result.axis) {
+      button(`Offset A +${result.axis.toUpperCase()}`, () => mutateZFightObject(result.objectId, (record) => { record.transform.position[result.axis] += Math.max(.002, threshold * 2); }));
+      button(`Offset A −${result.axis.toUpperCase()}`, () => mutateZFightObject(result.objectId, (record) => { record.transform.position[result.axis] -= Math.max(.002, threshold * 2); }));
+      button(`Offset B +${result.axis.toUpperCase()}`, () => mutateZFightObject(result.otherObjectId, (record) => { record.transform.position[result.axis] += Math.max(.002, threshold * 2); }));
+      button(`Offset B −${result.axis.toUpperCase()}`, () => mutateZFightObject(result.otherObjectId, (record) => { record.transform.position[result.axis] -= Math.max(.002, threshold * 2); }));
+    }
+    const exact = result.code === 'duplicate-overlapping-surface';
+    button('Merge Coplanar', () => {
+      if (!confirm(`Remove duplicate ${result.otherObjectId} and keep ${result.objectId}?`)) return;
+      mutateZFightObject(result.otherObjectId, (_record, source) => source.splice(source.findIndex((item) => item.id === result.otherObjectId), 1));
+    }, !exact, exact ? '' : 'Safe merge is only offered for identical bounds.');
+    button(exact ? 'Delete Exact Duplicate' : 'Delete B', () => {
+      if (!confirm(`Delete ${result.otherObjectId}?`)) return;
+      mutateZFightObject(result.otherObjectId, (_record, source) => source.splice(source.findIndex((item) => item.id === result.otherObjectId), 1));
+    });
+    button('Ignore pair', () => { ignoredZFightPairs.add(zFightPairKey(result)); scanZFighting(); });
+    row.appendChild(actions);
+    container.appendChild(row);
+  }
+}
+
 function setupV21Ui() {
   setupResizableRightPanel();
   setupCollapsibleSections();
@@ -5068,6 +5298,7 @@ function setupV21Ui() {
   $('#outliner-search')?.addEventListener('input', (event) => { outlinerFilter=event.target.value||''; renderOutliner(); });
   $('#validation-filter')?.addEventListener('change', (event) => { validationFilter=event.target.value||'all'; renderValidation(); });
   $('#refresh-validation')?.addEventListener('click', renderValidation);
+  $('#scan-zfighting')?.addEventListener('click', scanZFighting);
   $('#focus-selected')?.addEventListener('click', () => focusSelectedObject());
   $('#isolate-selected')?.addEventListener('click', () => {
     if (isStoneveilWorld()) return setStatus('Stoneveil isolation remains available through its existing layer toggles.');
@@ -5089,6 +5320,7 @@ function setupV21Ui() {
   $('#pirate-asset-template')?.addEventListener('change', populatePirateAssetUi);
   $('#place-pirate-asset')?.addEventListener('click', placePirateAsset);
   $('#v3-asset-template')?.addEventListener('change', populateV3AssetUi);
+  $('#v3-asset-search')?.addEventListener('input', populateV3AssetUi);
   $('#place-v3-asset')?.addEventListener('click', placeV3Asset);
   $('#cut-rectangular-opening')?.addEventListener('click', cutSelectedRectangularOpening);
   $('#generate-stairs')?.addEventListener('click', generateEditorStairs);
@@ -5108,6 +5340,11 @@ function setupV21Ui() {
       genericScene.setCollisionMode(mode);
       setStatus(mode==='normal'?'Collision inspection off.':`Collision mode: ${event.target.selectedOptions[0]?.textContent || mode}.`);
     }
+  });
+  $('#show-picking-targets')?.addEventListener('change', (event) => {
+    if (isStoneveilWorld()) return setStatus('Picking-target debug is available for the shared generic-world picking layer.');
+    genericScene.setPickingTargetsVisible(event.target.checked);
+    setStatus(event.target.checked ? 'Selectable picking bounds are visible in teal.' : 'Picking-target debug hidden.');
   });
   $('#basalt-reference-mode')?.addEventListener('change', (event) => genericScene.setBasaltReferenceMode(event.target.value));
   $('#load-basalt-capture')?.addEventListener('click', () => { try { loadCapturedBasaltFreeze(); } catch (error) { setStatus(error.message); } });
@@ -5150,19 +5387,19 @@ $('#show-nonmanifold-edges')?.addEventListener('change', updateMeshAuthoringUi);
 $('#mesh-select-connected')?.addEventListener('click', () => {
   const mesh = activeGenericLevel()?.terrain;
   const seed = meshSelection.faces.values().next().value;
-  if (mesh?.mode !== 'authored-mesh-candidate' || seed == null) return setStatus('Select a Basalt face first.');
+  if (!['authored-mesh-candidate', 'authored-triangle-mesh'].includes(mesh?.mode) || seed == null) return setStatus('Select a terrain face first.');
   meshSelection.faces = selectConnectedFaces(mesh, seed);
   updateMeshAuthoringUi();
 });
 $('#mesh-grow')?.addEventListener('click', () => {
   const mesh = activeGenericLevel()?.terrain;
-  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  if (!['authored-mesh-candidate', 'authored-triangle-mesh'].includes(mesh?.mode)) return;
   meshSelection.faces = growFaceSelection(mesh, meshSelection.faces);
   updateMeshAuthoringUi();
 });
 $('#mesh-shrink')?.addEventListener('click', () => {
   const mesh = activeGenericLevel()?.terrain;
-  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  if (!['authored-mesh-candidate', 'authored-triangle-mesh'].includes(mesh?.mode)) return;
   meshSelection.faces = shrinkFaceSelection(mesh, meshSelection.faces);
   updateMeshAuthoringUi();
 });
@@ -5186,7 +5423,7 @@ $('#mesh-flip-faces')?.addEventListener('click', () => mutateBasaltMesh(
 ));
 $('#mesh-fill-hole')?.addEventListener('click', () => {
   const mesh = activeGenericLevel()?.terrain;
-  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  if (!['authored-mesh-candidate', 'authored-triangle-mesh'].includes(mesh?.mode)) return;
   const selectedIds = new Set(selectedMeshVertexIds(mesh));
   const loops = boundaryLoops(mesh).filter((loop) => loop.closed);
   const loop = loops.find((candidate) => selectedIds.size && [...selectedIds].every((id) => candidate.vertices.includes(id)))
@@ -5195,9 +5432,59 @@ $('#mesh-fill-hole')?.addEventListener('click', () => {
   mutateBasaltMesh((value) => fillBoundary(value, loop.vertices), `Filled a ${loop.vertices.length - 1}-vertex boundary with real faces.`);
   meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
 });
+function selectedEdgeChains(edges) {
+  const adjacency = new Map();
+  for (const key of edges) {
+    const [a, b] = String(key).split(':').map(Number);
+    if (!adjacency.has(a)) adjacency.set(a, new Set());
+    if (!adjacency.has(b)) adjacency.set(b, new Set());
+    adjacency.get(a).add(b); adjacency.get(b).add(a);
+  }
+  const remaining = new Set(adjacency.keys());
+  const chains = [];
+  while (remaining.size) {
+    const component = new Set();
+    const queue = [remaining.values().next().value];
+    while (queue.length) {
+      const id = queue.pop(); if (component.has(id)) continue;
+      component.add(id); remaining.delete(id);
+      for (const next of adjacency.get(id) ?? []) if (!component.has(next)) queue.push(next);
+    }
+    const endpoints = [...component].filter((id) => (adjacency.get(id)?.size || 0) === 1);
+    if (endpoints.length !== 2) return [];
+    const chain = [endpoints[0]];
+    let previous = null, current = endpoints[0];
+    while (current !== endpoints[1]) {
+      const next = [...(adjacency.get(current) ?? [])].find((id) => id !== previous);
+      if (next == null) return [];
+      chain.push(next); previous = current; current = next;
+    }
+    chains.push(chain);
+  }
+  return chains;
+}
+$('#mesh-bridge')?.addEventListener('click', () => {
+  const chains = selectedEdgeChains(meshSelection.edges);
+  if (chains.length !== 2 || chains[0].length !== chains[1].length) return setStatus('Bridge requires two separate connected edge chains with equal vertex counts.');
+  mutateBasaltMesh((mesh) => bridgeEdgeChains(mesh, chains[0], chains[1]), `Bridged two ${chains[0].length}-vertex edge chains.`);
+});
+$('#mesh-flatten')?.addEventListener('click', () => mutateBasaltMesh(
+  (mesh) => flattenSelection(mesh, meshSelection, $('#mesh-flatten-axis')?.value || 'y'), 'Flattened the selected topology.'
+));
+$('#mesh-inflate')?.addEventListener('click', () => mutateBasaltMesh(
+  (mesh) => inflateSelection(mesh, meshSelection, Math.abs(Number($('#mesh-inflate-amount')?.value) || .15)), 'Inflated the selected topology along vertex normals.'
+));
+$('#mesh-deflate')?.addEventListener('click', () => mutateBasaltMesh(
+  (mesh) => inflateSelection(mesh, meshSelection, -Math.abs(Number($('#mesh-inflate-amount')?.value) || .15)), 'Deflated the selected topology along vertex normals.'
+));
+$('#mesh-subdivide')?.addEventListener('click', () => {
+  if (!meshSelection.faces.size) return setStatus('Select one or more faces to subdivide.');
+  mutateBasaltMesh((mesh) => subdivideFaces(mesh, meshSelection.faces), 'Subdivided each selected face into four editable faces.');
+  meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
+});
 $('#mesh-weld')?.addEventListener('click', () => {
   const mesh = activeGenericLevel()?.terrain;
-  if (mesh?.mode !== 'authored-mesh-candidate') return;
+  if (!['authored-mesh-candidate', 'authored-triangle-mesh'].includes(mesh?.mode)) return;
   const ids = selectedMeshVertexIds(mesh);
   mutateBasaltMesh((value) => weldVertices(value, ids), `Welded ${ids.length} selected vertices.`);
   meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
@@ -5360,7 +5647,9 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
   if (event.button !== 0) return;
-  const caveMeshSculptClick = activeWorldId === 'cave-fishing-island' && Boolean(activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate') && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool);
+  const caveMeshSculptClick = ['cave-fishing-island', 'pirate-island'].includes(activeWorldId)
+    && ['authored-mesh-candidate', 'authored-triangle-mesh'].includes(activeGenericLevel()?.terrain?.mode)
+    && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool);
   const meshSculptClick = (isMeshMode() && ['raise', 'lower', 'smooth', 'indent', 'pull-core', 'connect-cave'].includes(tool)) || caveMeshSculptClick;
   draggingBrush = !meshSculptClick && ['raise', 'lower', 'indent', 'pull-core', 'plant'].includes(tool);
   activeBrushTransaction = draggingBrush;
@@ -5370,6 +5659,10 @@ canvas.addEventListener('pointerdown', (event) => {
 });
 canvas.addEventListener('pointermove', (event) => {
   if (walkthroughState.active) return;
+  if (!isStoneveilWorld() && authoringMode === 'mesh' && ['cave-fishing-island', 'pirate-island'].includes(activeWorldId)) {
+    const meshRay = pointerRay(event);
+    genericScene.setMeshHover(genericScene.terrainMeshHit(meshRay), $('#mesh-selection-mode')?.value || 'face');
+  } else if (!isStoneveilWorld()) genericScene.setMeshHover(null);
   const hit = isStoneveilWorld() ? rayTerrainHit(event) : genericScene.surfaceHit(pointerRay(event));
   if (hit) $('#cursor-info').textContent = isStoneveilWorld()
     ? `x ${hit.x.toFixed(1)} · z ${hit.z.toFixed(1)} · ${Math.round(hit.y * FEET_PER_METER)} ft`
@@ -5727,8 +6020,8 @@ async function initializeWorldEditorV2() {
     await switchWorld(activeWorldId, { keepCamera: activeWorldId === 'stoneveil-peak' });
     if (isStoneveilWorld()) {
       setStatus(compatibleRecoveryApplied
-        ? 'World Editor V3 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
-        : 'World Editor V3 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
+        ? 'World Editor V4 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
+        : 'World Editor V4 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
     }
   } catch (error) {
     console.error(error);

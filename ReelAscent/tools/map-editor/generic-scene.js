@@ -347,8 +347,10 @@ export class GenericWorldScene {
     this.pathRoot = new pc.Entity('Moving Platform Paths');
     this.collisionRoot = new pc.Entity('Collision Debug');
     this.meshOverlayRoot = new pc.Entity('Mesh Topology Overlay');
+    this.meshHoverRoot = new pc.Entity('Mesh Hover Preview');
+    this.pickingDebugRoot = new pc.Entity('Picking Target Debug');
     this.workspaceRoot = new pc.Entity('Prefab Workspace Reference');
-    for (const child of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot]) this.root.addChild(child);
+    for (const child of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot, this.meshHoverRoot, this.pickingDebugRoot]) this.root.addChild(child);
     this.materials = {
       reference: makeMaterial([.45, .48, .47]),
       referenceGlass: makeMaterial([.46, .61, .7], .72),
@@ -356,13 +358,17 @@ export class GenericWorldScene {
       moving: makeMaterial([.28, .63, .82]),
       water: makeMaterial([.08, .54, .7], .68),
       selected: makeMaterial([1, .7, .08], 1, .08),
+      diagnosticA: makeMaterial([.05, .9, 1], 1, .14),
+      diagnosticB: makeMaterial([1, .12, .72], 1, .14),
       meshVertex: makeMaterial([1, .83, .12], 1, .15),
       meshEdge: makeMaterial([1, .48, .08], 1, .12),
       meshFace: makeMaterial([.98, .68, .08], .58, .12),
+      meshHover: makeMaterial([.15, .95, 1], .72, .18),
       boundary: makeMaterial([1, .1, .75], 1, .18),
       nonManifold: makeMaterial([1, .08, .08], 1, .2),
       path: makeMaterial([1, .5, .08], .82, .18),
       collision: makeMaterial([1, .12, .12], .15, .12),
+      pickingTarget: makeMaterial([.08, 1, .78], .12, .18),
       pirate: makeMaterial([.27, .42, .28]),
       library: makeMaterial([.30, .27, .38]),
       workspaceGrid: makeMaterial([.34, .38, .31], .28),
@@ -390,20 +396,26 @@ export class GenericWorldScene {
     this.world = null;
     this.elapsedSeconds = 0;
     this.entities = new Map();
+    this.rebuildRevision = 0;
     this.referenceCollisionBoxes = [];
     this.movingEntities = new Map();
     this.prefabCollisionEntries = [];
     this.prefabMovingEntries = [];
     this.selectedId = null;
+    this.diagnosticPair = [];
     this.referenceRecord = null;
     this.collisionMode = 'normal';
     this.collisionEntries = [];
     this.workspaceDefinition = null;
     this.basaltReferenceMode = 'both';
-    this.skyscraperInteriorMode = true;
+    // The exterior must be visible when the level first opens. Interior authors can
+    // explicitly enable cutaway after selecting/placing an interior room.
+    this.skyscraperInteriorMode = false;
     this.editorHiddenIds = new Set();
     this.meshSelection = { vertices: new Set(), edges: new Set(), faces: new Set() };
     this.meshOverlayOptions = { showBoundary: false, showNonManifold: false };
+    this.meshHoverKey = '';
+    this.pickingTargetsVisible = false;
     this.libraryMaterials = new Map();
     this.root.enabled = false;
   }
@@ -436,14 +448,24 @@ export class GenericWorldScene {
     this.applyCollisionMode();
   }
 
-  editableBasaltTerrain() {
-    return this.world?.id === 'cave-fishing-island' && this.level?.terrain?.mode === 'authored-mesh-candidate'
-      ? this.level.terrain : null;
+  editableTerrainMesh() {
+    const terrain = this.level?.terrain;
+    const supported = (this.world?.id === 'cave-fishing-island' && terrain?.mode === 'authored-mesh-candidate')
+      || (this.world?.id === 'pirate-island' && terrain?.mode === 'authored-triangle-mesh');
+    return supported && terrain?.positions?.length && terrain?.indices?.length ? terrain : null;
+  }
+
+  editableBasaltTerrain() { return this.editableTerrainMesh(); }
+
+  terrainMeshId() { return this.world?.id === 'pirate-island' ? '__pirate-authored-terrain' : '__basalt-authored-terrain'; }
+
+  terrainMeshHit(ray) {
+    const mesh = this.editableTerrainMesh();
+    return mesh ? rayTriangleMeshHit(mesh, ray.origin, ray.direction) : null;
   }
 
   basaltTerrainHit(ray) {
-    const mesh = this.editableBasaltTerrain();
-    return mesh ? rayTriangleMeshHit(mesh, ray.origin, ray.direction) : null;
+    return this.terrainMeshHit(ray);
   }
 
   setBasaltReferenceMode(mode = 'both') {
@@ -466,15 +488,74 @@ export class GenericWorldScene {
     this.applyCollisionMode();
   }
 
+  setDiagnosticPair(firstId = null, secondId = null) {
+    this.diagnosticPair = [firstId, secondId].filter(Boolean).map(String);
+    this.applySelectionMaterials();
+  }
+
+  setPickingTargetsVisible(visible = false) {
+    this.pickingTargetsVisible = Boolean(visible);
+    this.buildPickingTargets();
+  }
+
+  buildPickingTargets() {
+    destroyChildren(this.pickingDebugRoot);
+    this.pickingDebugRoot.enabled = this.pickingTargetsVisible;
+    if (!this.pickingTargetsVisible) return;
+    for (const [id, entity] of this.entities) {
+      entity.syncHierarchy();
+      let bounds = null;
+      for (const component of entity.findComponents?.('render') ?? []) for (const meshInstance of component.meshInstances ?? []) {
+        if (!bounds) bounds = meshInstance.aabb.clone(); else bounds.add(meshInstance.aabb);
+      }
+      if (!bounds) continue;
+      createBox(this.pickingDebugRoot, `Pick target ${id}`,
+        { x: bounds.center.x, y: bounds.center.y, z: bounds.center.z },
+        { x: bounds.halfExtents.x * 2 + .02, y: bounds.halfExtents.y * 2 + .02, z: bounds.halfExtents.z * 2 + .02 },
+        this.materials.pickingTarget);
+    }
+  }
+
   setMeshSelection(selection, options = {}) {
     this.meshSelection = selection || { vertices: new Set(), edges: new Set(), faces: new Set() };
     this.meshOverlayOptions = { ...this.meshOverlayOptions, ...options };
     this.buildMeshOverlay();
   }
 
+  setMeshHover(hit = null, mode = 'face') {
+    const mesh = this.editableTerrainMesh();
+    const face = hit ? Math.floor(hit.triangleOffset / 3) : -1;
+    const key = mesh && face >= 0 ? `${mode}:${face}:${hit.triangleOffset}` : '';
+    if (key === this.meshHoverKey) return;
+    this.meshHoverKey = key;
+    destroyChildren(this.meshHoverRoot);
+    if (!mesh || face < 0) return;
+    const ids = faceVertices(mesh, face);
+    if (mode === 'vertex') {
+      const id = ids.reduce((best, candidate) => {
+        const p = vertex(mesh, candidate);
+        const distance = Math.hypot(p[0] - hit.x, p[1] - hit.y, p[2] - hit.z);
+        return distance < best.distance ? { id: candidate, distance } : best;
+      }, { id: ids[0], distance: Infinity }).id;
+      const point = vertex(mesh, id);
+      createPrimitive(this.meshHoverRoot, `Hovered vertex ${id}`, 'sphere', { x: point[0], y: point[1], z: point[2] }, { x: .24, y: .24, z: .24 }, this.materials.meshHover);
+    } else if (mode === 'edge') {
+      const pair = [[ids[0], ids[1]], [ids[1], ids[2]], [ids[2], ids[0]]].reduce((best, candidate) => {
+        const a = vertex(mesh, candidate[0]), b = vertex(mesh, candidate[1]);
+        const distance = Math.hypot((a[0] + b[0]) * .5 - hit.x, (a[1] + b[1]) * .5 - hit.y, (a[2] + b[2]) * .5 - hit.z);
+        return distance < best.distance ? { pair: candidate, distance } : best;
+      }, { pair: [ids[0], ids[1]], distance: Infinity }).pair;
+      const a = vertex(mesh, pair[0]), b = vertex(mesh, pair[1]);
+      const segment = createSegment(this.meshHoverRoot, 'Hovered edge', { x: a[0], y: a[1], z: a[2] }, { x: b[0], y: b[1], z: b[2] }, this.materials.meshHover);
+      if (segment) segment.setLocalScale(.08, .08, Math.max(.01, segment.getLocalScale().z));
+    } else {
+      this.buildMeshEntity(`Hovered face ${face}`, ids.flatMap((id) => vertex(mesh, id)), [0, 1, 2], this.materials.meshHover, this.meshHoverRoot);
+    }
+  }
+
   buildMeshOverlay() {
     destroyChildren(this.meshOverlayRoot);
-    const mesh = this.editableBasaltTerrain();
+    const mesh = this.editableTerrainMesh();
     if (!mesh) return;
     const selection = this.meshSelection;
     const makeEdge = (key, material, radius = .035) => {
@@ -542,6 +623,7 @@ export class GenericWorldScene {
   applySelectionMaterials() {
     for (const [id, entity] of this.entities) {
       const selected = id === this.selectedId;
+      const diagnosticIndex = this.diagnosticPair.indexOf(String(id));
       const stack = [entity];
       while (stack.length) {
         const node = stack.pop();
@@ -552,14 +634,18 @@ export class GenericWorldScene {
               : entity.editorKind === 'waypoint' ? this.materials.path
                 : (node.editorKind === 'moving-platform' || entity.editorKind === 'moving-platform')
                   ? this.materials.moving : this.materials.platform);
-          mesh.material = selected ? this.materials.selected : base;
+          mesh.material = selected ? this.materials.selected
+            : diagnosticIndex === 0 ? this.materials.diagnosticA
+              : diagnosticIndex === 1 ? this.materials.diagnosticB : base;
         }
       }
     }
   }
 
   rebuild() {
-    for (const root of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot]) destroyChildren(root);
+    const rebuildRevision = ++this.rebuildRevision;
+    for (const root of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot, this.meshHoverRoot, this.pickingDebugRoot]) destroyChildren(root);
+    this.meshHoverKey = '';
     this.entities.clear();
     this.movingEntities.clear();
     this.prefabCollisionEntries = [];
@@ -574,9 +660,10 @@ export class GenericWorldScene {
       this.applySelectionMaterials();
       this.applyEditorVisibility();
       this.applyCollisionMode();
+      this.buildPickingTargets();
       return;
     }
-    if (this.world.id === 'skyscraper') this.buildSkyscraperReference();
+    if (this.world.id === 'skyscraper') this.buildSkyscraperReference(rebuildRevision);
     else if (this.world.id === 'cave-fishing-island') this.buildCaveReference();
     else if (this.world.id === 'pirate-island') this.buildPirateReference();
     // Library Island's authored objects below are the production scene. Never layer the
@@ -590,9 +677,28 @@ export class GenericWorldScene {
     this.applyEditorVisibility();
     this.applyCollisionMode();
     this.buildMeshOverlay();
+    this.buildPickingTargets();
   }
 
-  buildSkyscraperReference() {
+  emitEditorStatus(message, detail = {}) {
+    window.dispatchEvent(new CustomEvent('reel-ascent:editor-status', { detail: { message, ...detail } }));
+  }
+
+  registerSelectable(entity, { id, kind, record, worldId = this.world?.id, meshPartId = null }) {
+    if (!entity || id == null) return entity;
+    Object.assign(entity, {
+      editorSelectable: true,
+      editorId: String(id),
+      editorKind: kind,
+      editorRecord: record,
+      editorWorldId: worldId,
+      editorMeshPartId: meshPartId
+    });
+    this.entities.set(String(id), entity);
+    return entity;
+  }
+
+  buildSkyscraperReference(rebuildRevision = this.rebuildRevision) {
     this.referenceRecord = {
       id: '__architecture__',
       name: 'Empire State Building',
@@ -610,14 +716,26 @@ export class GenericWorldScene {
         id: box.id
       });
     }
+    this.emitEditorStatus('Loading Empire State Building reference…', { state: 'loading', worldId: 'skyscraper' });
     this.app.assets.loadFromUrl('/assets/models/empire-state-building.glb', 'container', (error, asset) => {
-      if (error || !asset?.resource || this.world?.id !== 'skyscraper') return;
+      if (rebuildRevision !== this.rebuildRevision || this.world?.id !== 'skyscraper') return;
+      if (error || !asset?.resource) {
+        this.emitEditorStatus(`Empire State Building failed to load: ${error?.message || error || 'container resource unavailable'}`, { state: 'error', worldId: 'skyscraper' });
+        return;
+      }
       const imported = asset.resource.instantiateRenderEntity();
-      const building = imported.findByName?.('ESB');
-      if (!building) { imported.destroy?.(); return; }
+      // The current GLB exposes an ESB node, but render the complete imported hierarchy
+      // as a safe fallback so a harmless exporter node rename can never make the editor blank.
+      const building = imported.findByName?.('ESB') || imported;
       const plane = imported.findByName?.('Plane');
       if (plane && plane !== building) plane.enabled = false;
-      for (const component of building.findComponents?.('render') ?? []) {
+      const renderComponents = building.findComponents?.('render') ?? [];
+      if (!renderComponents.some((component) => component.meshInstances?.length)) {
+        imported.destroy?.();
+        this.emitEditorStatus('Empire State Building failed to load: the GLB contained no render meshes.', { state: 'error', worldId: 'skyscraper' });
+        return;
+      }
+      for (const component of renderComponents) {
         for (const meshInstance of component.meshInstances ?? []) {
           const sourceName = String(meshInstance.material?.name || '').toLowerCase();
           meshInstance.material = sourceName.includes('light') ? this.materials.skyreachAccent : this.materials.skyreachFacade;
@@ -633,7 +751,7 @@ export class GenericWorldScene {
       );
       placement.syncHierarchy();
       let bounds = null;
-      for (const component of building.findComponents?.('render') ?? []) {
+      for (const component of renderComponents) {
         for (const meshInstance of component.meshInstances ?? []) {
           if (!bounds) bounds = meshInstance.aabb.clone(); else bounds.add(meshInstance.aabb);
         }
@@ -646,6 +764,18 @@ export class GenericWorldScene {
           position.y - minimum.y - SKYREACH_TOWER_CONFIG.visualGroundEmbed,
           position.z - bounds.center.z
         );
+        placement.syncHierarchy();
+        let finalBounds = null;
+        for (const component of renderComponents) for (const meshInstance of component.meshInstances ?? []) {
+          if (!finalBounds) finalBounds = meshInstance.aabb.clone(); else finalBounds.add(meshInstance.aabb);
+        }
+        this.emitEditorStatus('Empire State Building reference loaded.', {
+          state: 'ready', worldId: 'skyscraper',
+          bounds: finalBounds ? {
+            center: { x: finalBounds.center.x, y: finalBounds.center.y, z: finalBounds.center.z },
+            halfExtents: { x: finalBounds.halfExtents.x, y: finalBounds.halfExtents.y, z: finalBounds.halfExtents.z }
+          } : null
+        });
       }
     });
   }
@@ -660,8 +790,7 @@ export class GenericWorldScene {
     }
     if (candidate?.positions?.length && candidate?.indices?.length && this.basaltReferenceMode !== 'procedural') {
       const entity = this.buildMeshEntity('Basalt Hollow frozen production candidate', candidate.positions, candidate.indices, this.materials.referenceGlass, this.referenceRoot);
-      Object.assign(entity, { editorKind: 'terrain-mesh', editorRecord: candidate, editorId: '__basalt-authored-terrain' });
-      this.entities.set(entity.editorId, entity);
+      this.registerSelectable(entity, { id: '__basalt-authored-terrain', kind: 'terrain-mesh', record: candidate });
     }
     // Until candidate promotion, walkthrough collision intentionally remains the conservative
     // procedural reference. The candidate is visual comparison data, not a silent production switch.
@@ -696,8 +825,14 @@ export class GenericWorldScene {
   }
 
   buildPirateReference() {
-    createBox(this.referenceRoot, 'Pirate Island placeholder work pad', { x: 0, y: -.2, z: 0 }, { x: 44, y: .4, z: 36 }, this.materials.pirate);
-    this.referenceCollisionBoxes.push({ center: { x: 0, y: -.2, z: 0 }, size: { x: 44, y: .4, z: 36 }, kind: 'placeholder' });
+    const terrain = this.editableTerrainMesh();
+    if (!terrain) {
+      this.emitEditorStatus('Pirate Island terrain is unavailable; reload project data to regenerate the authored starter mesh.', { state: 'error', worldId: 'pirate-island' });
+      return;
+    }
+    const entity = this.buildMeshEntity('Pirate Island authored terrain', terrain.positions, terrain.indices, this.materials.pirate, this.referenceRoot);
+    this.registerSelectable(entity, { id: '__pirate-authored-terrain', kind: 'terrain-mesh', record: terrain });
+    this.emitEditorStatus(`Pirate Island authored terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: 'pirate-island' });
   }
 
   buildLibraryReference() {
@@ -744,8 +879,7 @@ export class GenericWorldScene {
       points.forEach((point, index) => {
         const id = `__waterpath__:${water.id || water.identity}:${index}`;
         const node = createSphere(this.waterRoot, `${water.name || water.id} path node ${index + 1}`, point, .18, this.materials.path);
-        Object.assign(node, { editorKind: 'water-path-node', editorId: id, editorRecord: { ...water, pathNodeIndex: index } });
-        this.entities.set(id, node);
+        this.registerSelectable(node, { id, kind: 'water-path-node', record: { ...water, pathNodeIndex: index } });
       });
     } else {
       entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
@@ -756,7 +890,7 @@ export class GenericWorldScene {
     entity.editorRecord = water;
     entity.editorId = String(water.id || water.identity || 'water');
     this.waterRoot.addChild(entity);
-    this.entities.set(entity.editorId, entity);
+    this.registerSelectable(entity, { id: entity.editorId, kind: entity.editorKind, record: water });
     return entity;
   }
 
@@ -786,7 +920,7 @@ export class GenericWorldScene {
         this.materialForRecord(item), item.transform.rotation,
         { editorKind: kind, editorRecord: item, editorId: item.id });
     }
-    this.entities.set(item.id, entity);
+    this.registerSelectable(entity, { id: item.id, kind, record: item });
     return entity;
   }
 
@@ -798,7 +932,7 @@ export class GenericWorldScene {
     const entity = createBox(this.objectRoot, item.name || item.id, position, item.size, this.materials.moving, item.transform.rotation, {
       editorKind: kind, editorRecord: item, editorId: item.id
     });
-    this.entities.set(item.id, entity);
+    this.registerSelectable(entity, { id: item.id, kind, record: item });
     this.movingEntities.set(item.id, entity);
     const points = item.path?.points ?? [];
     for (let index = 0; index < points.length; index += 1) {
@@ -807,7 +941,7 @@ export class GenericWorldScene {
       waypoint.editorKind = 'waypoint';
       waypoint.editorRecord = { platformId: item.id, index, point: points[index], workspace: Boolean(this.workspaceDefinition) };
       waypoint.editorId = waypointId;
-      this.entities.set(waypointId, waypoint);
+      this.registerSelectable(waypoint, { id: waypointId, kind: 'waypoint', record: waypoint.editorRecord });
       if (index) createSegment(this.pathRoot, `${item.id} path ${index}`, points[index - 1], points[index], this.materials.path);
     }
     return entity;
@@ -823,7 +957,10 @@ export class GenericWorldScene {
     ];
     for (const instance of instances) {
       const definition = definitions.get(instance.prefabId);
-      if (!definition) continue;
+      if (!definition) {
+        this.emitEditorStatus(`Prefab source missing: ${instance.prefabId || '(empty id)'} for ${instance.name || instance.id}.`, { state: 'error', worldId: this.world?.id });
+        continue;
+      }
       const root = new pc.Entity(instance.name || instance.id);
       root.setLocalPosition(instance.transform.position.x, instance.transform.position.y, instance.transform.position.z);
       root.setLocalEulerAngles(instance.transform.rotation.x, instance.transform.rotation.y, instance.transform.rotation.z);
@@ -832,7 +969,7 @@ export class GenericWorldScene {
       root.editorRecord = instance;
       root.editorId = instance.id;
       this.objectRoot.addChild(root);
-      this.entities.set(instance.id, root);
+      this.registerSelectable(root, { id: instance.id, kind: instance._editorKind, record: instance });
       for (const child of definition.objects ?? []) {
         const entity = createPrimitive(root, child.name || child.id,
           child.metadata?.authoredPrimitive || child.type, child.transform.position, child.size,
@@ -933,14 +1070,30 @@ export class GenericWorldScene {
   }
 
   pick(ray) {
-    let best = null;
+    const terrainHit = this.terrainMeshHit(ray);
+    let best = terrainHit ? {
+      distance: terrainHit.distance,
+      id: this.terrainMeshId(), kind: 'terrain-mesh', record: this.editableTerrainMesh()
+    } : null;
     for (const [id, entity] of this.entities) {
-      const position = entity.getPosition();
-      const scale = entity.getLocalScale();
-      const radius = Math.max(.45, Math.hypot(scale.x, scale.y, scale.z) * .55);
-      const distance = raySphereDistance(ray.origin, ray.direction, position, radius);
-      if (distance != null && (!best || distance < best.distance)) {
-        best = { distance, id, kind: entity.editorKind, record: entity.editorRecord };
+      if (entity.editorKind === 'terrain-mesh') continue; // exact triangle hit above, never a loose terrain AABB proxy
+      let entityDistance = null;
+      entity.syncHierarchy();
+      for (const component of entity.findComponents?.('render') ?? []) {
+        for (const meshInstance of component.meshInstances ?? []) {
+          const box = meshInstance.aabb;
+          if (!box) continue;
+          const distance = rayAabbDistance(ray.origin, ray.direction, box.center, box.halfExtents);
+          if (distance != null && (entityDistance == null || distance < entityDistance)) entityDistance = distance;
+        }
+      }
+      // Water-path nodes and deliberately empty prefab roots still need a modest pick target.
+      if (entityDistance == null) {
+        const position = entity.getPosition();
+        entityDistance = raySphereDistance(ray.origin, ray.direction, position, .45);
+      }
+      if (entityDistance != null && (!best || entityDistance < best.distance)) {
+        best = { distance: entityDistance, id, kind: entity.editorKind, record: entity.editorRecord };
       }
     }
     if (this.world?.id === 'skyscraper' && this.referenceRecord) {
@@ -958,9 +1111,9 @@ export class GenericWorldScene {
 
   surfaceHit(ray) {
     let best = null;
-    const basaltHit = this.basaltTerrainHit(ray);
-    if (basaltHit && this.basaltReferenceMode !== 'procedural') {
-      best = { ...basaltHit, kind: 'authored-terrain', surfaceId: '__basalt-authored-terrain' };
+    const terrainHit = this.terrainMeshHit(ray);
+    if (terrainHit && (this.world?.id !== 'cave-fishing-island' || this.basaltReferenceMode !== 'procedural')) {
+      best = { ...terrainHit, kind: 'authored-terrain', surfaceId: this.terrainMeshId() };
     }
     for (const box of this.referenceCollisionBoxes) {
       const hit = rayAabbHit(ray.origin, ray.direction, box.center, {

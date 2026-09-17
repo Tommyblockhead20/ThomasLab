@@ -195,6 +195,62 @@ export function moveSelectedVertices(meshInput, selection, delta = {}) {
   return touch(mesh);
 }
 
+function selectedVertexSet(mesh, selection) {
+  const ids = new Set(selection?.vertices ?? []);
+  for (const face of selection?.faces ?? []) for (const id of faceVertices(mesh, face)) ids.add(id);
+  for (const key of selection?.edges ?? []) for (const id of String(key).split(':').map(Number)) ids.add(id);
+  return ids;
+}
+
+export function flattenSelection(meshInput, selection, axis = 'y') {
+  const mesh = normalizeEditableMesh(meshInput);
+  const component = { x: 0, y: 1, z: 2 }[axis] ?? 1;
+  const ids = [...selectedVertexSet(mesh, selection)];
+  if (ids.length < 2) throw new Error('Flatten requires at least two selected vertices.');
+  const average = ids.reduce((sum, id) => sum + mesh.positions[id * 3 + component], 0) / ids.length;
+  for (const id of ids) mesh.positions[id * 3 + component] = average;
+  return touch(mesh);
+}
+
+export function inflateSelection(meshInput, selection, distance = .1) {
+  let mesh = recalculateVertexNormals(meshInput);
+  const ids = selectedVertexSet(mesh, selection);
+  if (!ids.size) throw new Error('Inflate/Deflate requires selected mesh elements.');
+  const amount = finite(distance, .1);
+  for (const id of ids) {
+    const offset = id * 3;
+    mesh.positions[offset] += mesh.normals[offset] * amount;
+    mesh.positions[offset + 1] += mesh.normals[offset + 1] * amount;
+    mesh.positions[offset + 2] += mesh.normals[offset + 2] * amount;
+  }
+  return touch(mesh);
+}
+
+export function subdivideFaces(meshInput, faceIds) {
+  const mesh = normalizeEditableMesh(meshInput);
+  const selected = new Set([...faceIds].map(Number));
+  if (!selected.size) throw new Error('Subdivide requires one or more selected faces.');
+  const midpointByEdge = new Map();
+  const midpoint = (a, b) => {
+    const key = edgeKey(a, b);
+    if (midpointByEdge.has(key)) return midpointByEdge.get(key);
+    const av = vertex(mesh, a), bv = vertex(mesh, b);
+    const id = mesh.positions.length / 3;
+    mesh.positions.push((av[0] + bv[0]) / 2, (av[1] + bv[1]) / 2, (av[2] + bv[2]) / 2);
+    midpointByEdge.set(key, id);
+    return id;
+  };
+  const indices = [];
+  for (let face = 0; face < mesh.indices.length / 3; face += 1) {
+    const [a, b, c] = faceVertices(mesh, face);
+    if (!selected.has(face)) { indices.push(a, b, c); continue; }
+    const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
+    indices.push(a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca);
+  }
+  mesh.indices = indices;
+  return touch(mesh);
+}
+
 export function fillBoundary(meshInput, loopInput) {
   const mesh = normalizeEditableMesh(meshInput);
   let loop = [...loopInput].map(Number);

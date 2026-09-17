@@ -1,3 +1,50 @@
+# REEL ASCENT — WORLD EDITOR V4 REPAIR / INTEGRATION PASS
+
+Status (2026-09-17): V4 repairs the current editor integration rather than replacing it. `src/world/map-editor-patch.json` remains byte-identical at SHA-256 `815674C382C711CF9DEF2D4FF07AC7DCC205B0E472DAA67A284B23516474E5DD`; Library still round-trips through its authoritative `src/world/library-island-v2.scene.json`; Basalt remains a non-production candidate; and V2.3.1 recovery/WebGL safeguards remain in place.
+
+## Root causes found and fixed
+
+- **Invisible ESB:** the GLB and `/assets/models/empire-state-building.glb` path were valid. The editor initialized `skyscraperInteriorMode` and the checkbox to `true`, so `applyCollisionMode()` disabled the entire reference root immediately after load. V4 defaults cutaway off, keeps the real GLB, falls back safely if an exporter renames the `ESB` node, surfaces loading/success/error status, ignores stale async callbacks by rebuild revision, preserves facade/accent material roles, and frames the actual post-scale bounds after load.
+- **Library/prefab clicking:** generic picking used a sphere derived from the selectable root's local scale. Prefab roots normally have scale 1 while visible descendants can span many metres, so rendered shelves, fireplaces, rooms, and architecture missed the pick sphere. V4 registers stable selectable metadata and ray-tests every descendant render mesh's world AABB, resolving the hit to the authoritative object/instance ID. Prefab instances select their root; the inspector's `Edit Source Prefab` action remains the explicit drill-down path. Existing Library IDs serialize back through the authoritative adapter.
+- **Basalt clicking:** Object Mode previously treated the terrain like a tiny entity-origin sphere. Object Mode now uses an exact triangle hit against the same positions/indices being rendered. Mesh Mode maps the exact hit triangle to face/nearest edge/nearest vertex and renders a separate lightweight hover helper plus the existing selected face/edge/vertex overlays. Hover does not rebuild the production mesh.
+- **Partial Basalt view:** production capture is initialized before the island core and accumulates the core plus every offshore cave mesh built by `buildCaveInteriorShell()`, retaining `parts[]` ranges. The editor now automatically consumes a valid cached production freeze on world load and defaults to the authored view, rather than requiring the user to discover the import button. In the browser smoke test this produced 806 vertices, 1,365 triangles, and six named parts: island core, entrance apron, cave floor, left wall, right wall, and tunnel lining. The capture is still explicitly an authored candidate and is not promoted into gameplay.
+- **Pirate square:** `buildPirateReference()` no longer creates the 44×36 rectangular work pad. Pirate loads a deterministic irregular authored triangle mesh (73 vertices / 120 triangles) with shoreline skirt, beach/low coast, and raised interior parts. The same Mesh/Sculpt tools edit it, and the generated arrays persist in autosave/export. Eight linked starter assemblies establish the dock, wreck, mast, camp/treasure, palms, reef, and lookout composition.
+- **Hidden z-fight code:** detection existed only inside validation. V4 exposes `Geometry Diagnostics → Scan Z-Fighting`, lists object IDs and separation, highlights A/B cyan/magenta, and provides Focus, Select A/B, Offset A/B ±, confirmed exact-duplicate deletion, safe exact-bounds merge, and Ignore. Ambiguous geometry is never auto-deleted.
+
+## Mesh authoring now wired
+
+- Direct operations: Move, Create Face, Delete Face(s), Fill Boundary, Bridge Edge Chains, Flip Winding, Flatten X/Y/Z, Inflate, Deflate, Subdivide Faces, Weld, Merge Nearby, Recalculate Normals, Connected/Grow/Shrink selection.
+- Sculpt operations: Raise, Lower, Smooth, Indent, and Pull Core operate on the exact editable terrain mesh hit.
+- Open and non-manifold edge overlays use computed topology and draw against the same mesh coordinates.
+- Commands disable contextually with a tooltip when the required face/edge/vertex selection is missing.
+- The outliner exposes the terrain root and named source-part face ranges. Viewport selection and outliner selection share the same stable terrain ID.
+- `Picking targets` in the viewport toolbar visualizes the registered selectable bounds for generic-world objects. Basalt/Pirate terrain itself always uses exact triangle picking, not its debug AABB.
+
+## Library and Pirate assets
+
+- Library shelves now include frames, tops/bottom shelf boards, backs where appropriate, shelf boards, and varied books placed on boards. Variants include standard, tall, double-sided, archive, grand double, narrow, low, and corner.
+- Both small and monumental fireplaces contain a physical hearth, masonry jambs, lintel, mantle, firebox, logs, non-colliding flames, and warm-light metadata.
+- The categorized/searchable Library browser now exposes 42 placeable linked assets, including the requested seating, tables/desks, lectern/manuscript stand, cart/ladder/books, globe/map/display/storage pieces, lighting, decor, columns/arches/railings/balcony, doors/secret shelf door/windows, and stair segment/landing.
+- Pirate now exposes 30+ selectable linked assemblies across docks, ship/wreck modules, wheel/cannon/anchor, cargo/treasure/camp props, dinghy, vegetation/driftwood/coral, ruins, and cave-mouth pieces. Every definition produces visible object records with stable IDs and `pirateLibrary` metadata.
+
+## Verification completed
+
+- `node --check` passes for the editor entry, generic scene, mesh/architecture/water modules, Pirate terrain, and both asset libraries.
+- Focused tests: 37/37 pass across `world-editor-v4`, v3 topology/architecture/water, v2 structure, and v22 Library integration.
+- `npm run build` passes (1,305 modules). Existing PlayCanvas worker externalization and large-chunk warnings remain warnings only.
+- Browser smoke test on the live Vite editor found no console errors. ESB reported `Empire State Building reference loaded` with cutaway off; Pirate reported authored terrain, three mesh parts, and eight starter instances; Library exposed 149 direct objects, 42 prefab instances, 42 searchable assets, and source-backed selection (`arrival-plinth`); Geometry Diagnostics executed; Basalt loaded the six-part candidate above.
+- Library validator remains green except the existing informational warning that the lazy river is shallower than 0.45 m.
+
+## Known limitations / honest manual follow-up
+
+- A browser must have run the normal game once after the production capture code exists for the exact Basalt freeze to be present in that origin's local storage. If no capture exists, the editor shows the clearly labelled procedural reference and an explicit `Load Captured Production Mesh` workflow; it does not invent an approximate mesh and call it production.
+- Basalt remains comparison/editing data until a separate reviewed production promotion. This pass intentionally does not change gameplay authority.
+- Geometry Diagnostics currently scans direct authored object records (or the open prefab source workspace) using box bounds. It does not yet flatten every linked instance child into world space, and safe merge is deliberately limited to identical bounds.
+- Generic object/prefab picking uses visible descendant world AABBs for performance; terrain mesh selection is exact triangle picking. Extremely overlapping generic objects can still require the outliner or Picking Targets debug mode to choose the intended root.
+- The narrow in-app browser viewport could verify status, source IDs, counts, controls, and console cleanliness, but was too narrow for a reliable manual cave-wall pointer acceptance sequence. Exact ray/face/edge/vertex mapping and serialized topology changes are covered by focused tests; repeat the full pointer sequence once in the normal full-width browser before production promotion.
+
+---
+
 # REEL ASCENT — WORLD EDITOR V3
 
 Status (2026-09-17): the current World Editor is now V3. This pass preserves every V2.3.1 recovery safeguard, keeps `src/world/map-editor-patch.json` byte-identical, retains the authoritative Library scene, and does not promote the Basalt captured mesh into production.

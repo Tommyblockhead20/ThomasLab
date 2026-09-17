@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark" />
-  <title>Reel Ascent — World Editor V3</title>
+  <title>Reel Ascent — World Editor V4</title>
   <link rel="stylesheet" href="./editor.css" />
   <style>
     #walkthrough-hud {
@@ -29,7 +29,7 @@
     <header id="topbar">
       <div class="brand">
         <strong>REEL ASCENT</strong>
-        <span>WORLD EDITOR V3</span>
+        <span>WORLD EDITOR V4</span>
         <select id="world-selector" aria-label="World / scene"></select>
       </div>
       <div class="top-actions">
@@ -163,12 +163,21 @@
           <label>Move Y <input id="mesh-move-y" type="number" step="0.05" value="0" /></label>
           <label>Move Z <input id="mesh-move-z" type="number" step="0.05" value="0" /></label>
         </div>
+        <div class="field-grid two">
+          <label>Flatten axis <select id="mesh-flatten-axis"><option value="x">X</option><option value="y" selected>Y</option><option value="z">Z</option></select></label>
+          <label>Inflate amount <input id="mesh-inflate-amount" type="number" step="0.05" value="0.15" /></label>
+        </div>
         <div class="row-actions wrap">
           <button id="mesh-apply-move" type="button">Move Selection</button>
           <button id="mesh-create-face" type="button">Create Face</button>
           <button id="mesh-delete-faces" type="button">Delete Face(s)</button>
           <button id="mesh-fill-hole" type="button">Fill Boundary</button>
+          <button id="mesh-bridge" type="button" title="Select two separate, equally sized connected edge chains">Bridge Edge Chains</button>
           <button id="mesh-flip-faces" type="button">Flip Winding</button>
+          <button id="mesh-flatten" type="button">Flatten</button>
+          <button id="mesh-inflate" type="button">Inflate</button>
+          <button id="mesh-deflate" type="button">Deflate</button>
+          <button id="mesh-subdivide" type="button">Subdivide Faces</button>
           <button id="mesh-weld" type="button">Weld Vertices</button>
           <button id="mesh-merge-nearby" type="button">Merge Nearby</button>
           <button id="mesh-recalculate-normals" type="button">Recalculate Normals</button>
@@ -179,7 +188,7 @@
       </section>
 
       <section id="library-tools-section" hidden>
-        <h2>Architecture Tools <button class="help-dot" type="button" data-tip="Cut Opening replaces one axis-aligned slab/wall with four real production pieces around a rectangular opening. Stair and asset tools create reusable authored records." aria-label="Architecture tool help">?</button></h2>
+        <h2>Architecture & Asset Tools <button class="help-dot" type="button" data-tip="Cut Opening replaces one axis-aligned slab/wall with four real production pieces around a rectangular opening. Stair and asset tools create reusable authored records." aria-label="Architecture tool help">?</button></h2>
         <div data-mode-panel="mesh" hidden>
           <div class="field-grid two">
             <label>Opening width <input id="opening-width" type="number" min="0.5" step="0.1" value="3.0" /></label>
@@ -188,7 +197,8 @@
           <button id="cut-rectangular-opening" type="button" class="primary">Cut Rectangular Opening</button>
         </div>
         <div data-mode-panel="object">
-          <label>Asset <select id="v3-asset-template"></select></label>
+          <label>Asset search <input id="v3-asset-search" type="search" placeholder="Shelf, chair, fireplace, stair…" autocomplete="off" /></label>
+          <label>Categorized asset <select id="v3-asset-template"></select></label>
           <div id="v3-asset-description" class="compact-status hint"></div>
           <div class="row-actions"><button id="place-v3-asset" type="button">Place Linked Asset</button></div>
           <details><summary>Stair Generator</summary>
@@ -281,7 +291,8 @@
         <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
         <label id="slope-toggle-wrap" title="Classify the actual authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
         <label class="toolbar-select" title="Inspect the geometry the player actually collides with">Collision <select id="collision-mode"><option value="normal">Normal</option><option value="overlay">Visual + Collision</option><option value="collision-only">Collision Only</option><option value="selected">Selected Collision</option></select></label>
-        <label id="skyscraper-interior-wrap" title="Hide the imported exterior shell while authoring rooms inside the tower"><input id="skyscraper-interior-mode" type="checkbox" checked /> Interior cutaway</label>
+        <label title="Visualize the registered viewport picking bounds for authorable objects"><input id="show-picking-targets" type="checkbox" /> Picking targets</label>
+        <label id="skyscraper-interior-wrap" title="Hide the imported exterior shell while authoring rooms inside the tower"><input id="skyscraper-interior-mode" type="checkbox" /> Interior cutaway</label>
         <label class="walkthrough-persistent" title="Editor-only ambient light floor. Keeps dark cave geometry readable without changing the saved map or production lighting." style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
           Min brightness <output id="minimum-brightness-out">55%</output>
           <input id="minimum-brightness" type="range" min="35" max="85" step="5" value="55" style="width:100px;" />
@@ -349,6 +360,12 @@
         <div class="validation-toolbar"><select id="validation-filter" aria-label="Validation severity filter"><option value="all">All</option><option value="error">Errors</option><option value="warning">Warnings</option><option value="info">Info</option></select><button id="refresh-validation" type="button">Refresh</button></div>
         <div id="validation-list" class="validation-list hint">No warnings.</div>
         <div id="slope-legend" class="slope-legend" hidden></div>
+      </section>
+
+      <section id="geometry-diagnostics-section">
+        <h2>Geometry Diagnostics <button class="help-dot" type="button" data-tip="Scans authored box geometry for exact duplicates and near-coplanar overlapping thin surfaces. Results highlight both objects and offer explicit, undoable fixes." aria-label="Geometry diagnostics help">?</button></h2>
+        <div class="field-grid two"><label>Threshold m <input id="zfight-threshold" type="number" min="0.0001" max="0.25" step="0.001" value="0.01" /></label><button id="scan-zfighting" type="button">Scan Z-Fighting</button></div>
+        <div id="zfight-results" class="diagnostic-results hint">Run a scan to inspect authored geometry.</div>
       </section>
 
       <section>

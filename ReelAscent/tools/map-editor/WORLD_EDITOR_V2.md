@@ -1,4 +1,8 @@
-# REEL ASCENT WORLD EDITOR V3
+# REEL ASCENT WORLD EDITOR V4
+
+## V4 repair / integration pass
+
+V4 fixes the shared editor integration before extending authoring breadth: ESB now opens with the real GLB visible and framed; generic picking resolves visible descendant render bounds to stable source IDs; Basalt automatically uses the cached complete production capture and supports face/edge/vertex hover; Pirate Island starts from an irregular authored mesh; and Geometry Diagnostics exposes explicit z-fighting actions. The Library asset browser is categorized/searchable and includes completed shelf/fireplace assemblies plus a broad furniture/architecture kit.
 
 ## V3 mesh, architecture, and water authoring
 

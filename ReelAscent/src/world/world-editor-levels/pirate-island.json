@@ -6,18 +6,18 @@
   "runtimeLocationId": "pirate-island",
   "updatedAt": null,
   "sourcePolicy": {
-    "terrain": "authored-future",
+    "terrain": "authored",
     "architecture": "authored-future",
     "waters": "authored-future",
     "objects": "authored",
     "movingPlatforms": "authored",
     "prefabs": "authored"
   },
-  "terrain": null,
+  "terrain": { "mode": "authored-triangle-mesh", "format": "pirate-island-v4", "editable": true, "positions": [], "indices": [], "parts": [] },
   "waters": [],
   "objects": [],
   "movingPlatforms": [],
   "prefabs": { "definitions": [], "instances": [] },
   "rooms": [],
-  "metadata": { "coordinateSpace": "pirate-island-local", "status": "placeholder-scene" }
+  "metadata": { "coordinateSpace": "pirate-island-local", "status": "authored-starter-scene", "pirateTerrainVersion": 4 }
 }

@@ -163,6 +163,11 @@ h2 { display:flex; align-items:center; gap:5px; margin-bottom:7px; }
 .validation-item.selectable { cursor:pointer; }
 .validation-item.selectable:hover { background:#18231d; }
 .validation-item.error { border-left-color:#ff7168; color:#ffc0bb; }
+.diagnostic-results { display:flex; flex-direction:column; gap:7px; margin-top:7px; }
+.diagnostic-result { border:1px solid #3a4a42; border-radius:6px; padding:7px; background:#101713; }
+.diagnostic-result strong { display:block; color:#f2d28a; margin-bottom:4px; }
+.diagnostic-result .row-actions { flex-wrap:wrap; }
+.diagnostic-result .row-actions button { font-size:10px; padding:4px 6px; }
 .source-policy-status { display:flex; gap:4px; flex-wrap:wrap; margin:6px 0 8px; }
 .source-chip { border:1px solid #34463d; border-radius:999px; padding:3px 6px; font-size:9px; text-transform:uppercase; letter-spacing:.04em; }
 .source-chip.authored { border-color:#4d9a64; color:#a8e9b8; }
