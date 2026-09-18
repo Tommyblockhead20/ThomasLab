@@ -1,5 +1,6 @@
 import * as pc from 'playcanvas';
 import SCENE from './library-island-v2.scene.json' with { type: 'json' };
+import { stockLibraryScene } from './library-shelf-stocking.js';
 import { PLAYER_FOOT_OFFSET } from '../config.js';
 import { attachZoneEcology, ECOLOGY_TARGETS } from '../fishing/fish-ecology.js';
 import { FishingZone } from '../fishing/fishing-zone.js';
@@ -101,8 +102,52 @@ function addPart(world, parent, part, materials, stablePrefix, instanceScale = [
   return entity;
 }
 
-function addPrefabInstance(world, root, instance, materials, counters) {
-  const prefab = SCENE.prefabs?.[instance.prefab];
+function addBatchedBookParts(world, parent, parts, material, stableId, instanceScale, counters) {
+  if (!parts.length) return null;
+  const positions = [];
+  const indices = [];
+  const corners = [
+    [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+    [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]
+  ];
+  const faces = [[0, 2, 1, 0, 3, 2], [4, 5, 6, 4, 6, 7], [0, 1, 5, 0, 5, 4], [3, 7, 6, 3, 6, 2], [1, 2, 6, 1, 6, 5], [0, 4, 7, 0, 7, 3]];
+  for (const part of parts) {
+    const position = finiteVec(part.position) ? part.position : [0, 0, 0];
+    const size = finiteVec(part.size) ? part.size : [1, 1, 1];
+    const rotation = finiteVec(part.rotation) ? part.rotation : [0, 0, 0];
+    const rx = rotation[0] * Math.PI / 180;
+    const ry = rotation[1] * Math.PI / 180;
+    const rz = rotation[2] * Math.PI / 180;
+    const start = positions.length / 3;
+    for (const corner of corners) {
+      let x = corner[0] * size[0] * instanceScale[0] * .5;
+      let y = corner[1] * size[1] * instanceScale[1] * .5;
+      let z = corner[2] * size[2] * instanceScale[2] * .5;
+      if (rx) [y, z] = [y * Math.cos(rx) - z * Math.sin(rx), y * Math.sin(rx) + z * Math.cos(rx)];
+      if (ry) [x, z] = [x * Math.cos(ry) + z * Math.sin(ry), -x * Math.sin(ry) + z * Math.cos(ry)];
+      if (rz) [x, y] = [x * Math.cos(rz) - y * Math.sin(rz), x * Math.sin(rz) + y * Math.cos(rz)];
+      positions.push(x + position[0] * instanceScale[0], y + position[1] * instanceScale[1], z + position[2] * instanceScale[2]);
+    }
+    for (const face of faces) for (const index of face) indices.push(start + index);
+  }
+  const mesh = new pc.Mesh(world.app.graphicsDevice);
+  mesh.setPositions(positions);
+  mesh.setNormals(pc.calculateNormals(positions, indices));
+  mesh.setIndices(indices);
+  mesh.update(pc.PRIMITIVE_TRIANGLES);
+  const entity = new pc.Entity(`Veiled Athenaeum batched books ${stableId}`);
+  entity.addComponent('render');
+  entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+  entity.mapObjectId = stableId;
+  entity.libraryBatchedBookCount = parts.length;
+  parent.addChild(entity);
+  counters.render += 1;
+  counters.batchedBooks = (counters.batchedBooks ?? 0) + parts.length;
+  return entity;
+}
+
+function addPrefabInstance(world, root, instance, materials, counters, prefabs = SCENE.prefabs) {
+  const prefab = prefabs?.[instance.prefab];
   if (!prefab?.parts?.length) return null;
   const holder = new pc.Entity(`Veiled Athenaeum prefab ${instance.id}`);
   holder.mapObjectId = `LIBRARY-PREFAB-${slug(instance.id)}`;
@@ -112,8 +157,19 @@ function addPrefabInstance(world, root, instance, materials, counters) {
   const scale = finiteVec(instance.scale) ? instance.scale : [1, 1, 1];
   holder.setLocalPosition(position[0], position[1], position[2]);
   holder.setLocalEulerAngles(rotation[0], rotation[1], rotation[2]);
-  for (const part of prefab.parts) addPart(
+  const generatedBooks = (prefab.parts ?? []).filter((part) => part.metadata?.generatedStocking === true);
+  for (const part of (prefab.parts ?? []).filter((part) => part.metadata?.generatedStocking !== true)) addPart(
     world, holder, part, materials, `LIBRARY-${slug(instance.id)}`, scale, counters
+  );
+  const byMaterial = new Map();
+  for (const part of generatedBooks) {
+    const materialId = part.material || 'bookGreen';
+    if (!byMaterial.has(materialId)) byMaterial.set(materialId, []);
+    byMaterial.get(materialId).push(part);
+  }
+  for (const [materialId, books] of byMaterial) addBatchedBookParts(
+    world, holder, books, materials[materialId] ?? world.materials?.decoStone,
+    `LIBRARY-${slug(instance.id)}-BATCHED-${slug(materialId)}`, scale, counters
   );
   return holder;
 }
@@ -310,8 +366,13 @@ export function validateVeiledAthenaeumScene(scene = SCENE) {
   for (const water of scene.rideWaters ?? []) claim(water.id, 'ride water');
   for (const marker of scene.markers ?? []) claim(marker.id, 'marker');
   for (const bench of scene.benches ?? []) claim(bench.id, 'bench');
+  const prefabRenderCost = (prefab) => {
+    const parts = prefab?.parts ?? [];
+    const generated = parts.filter((part) => part.metadata?.generatedStocking === true);
+    return parts.length - generated.length + new Set(generated.map((part) => part.material || 'bookGreen')).size;
+  };
   const renderEstimate = (scene.parts?.length ?? 0)
-    + (scene.instances ?? []).reduce((sum, item) => sum + (scene.prefabs?.[item.prefab]?.parts?.length ?? 0), 0)
+    + (scene.instances ?? []).reduce((sum, item) => sum + prefabRenderCost(scene.prefabs?.[item.prefab]), 0)
     + (scene.benches?.length ?? 0) * 2;
   if (renderEstimate > (scene.performance?.maximumAuthoredRenderEntities ?? 420)) {
     errors.push(`Estimated render entities ${renderEstimate} exceed budget.`);
@@ -327,28 +388,29 @@ export function validateVeiledAthenaeumScene(scene = SCENE) {
 }
 
 export function buildVeiledAthenaeumV2(world, location) {
-  const validation = validateVeiledAthenaeumScene();
-  if (!validation.ok || location?.id !== SCENE.locationId) return null;
-  const floorY = location.elevation + (Number(SCENE.floorOffset) || 1.28);
+  const scene = stockLibraryScene(SCENE, { density: .92 });
+  const validation = validateVeiledAthenaeumScene(scene);
+  if (!validation.ok || location?.id !== scene.locationId) return null;
+  const floorY = location.elevation + (Number(scene.floorOffset) || 1.28);
   const root = world.createStructureRoot('The Veiled Athenaeum V2 authored scene',
     location.angle, location.radius, floorY, location.id);
   root.mapObjectId = 'LIBRARY-VEILED-ATHENAEUM-V2';
   const materials = sceneMaterials(world);
-  const counters = { render: 0, colliders: 0, lights: 0 };
-  for (const part of SCENE.parts ?? []) addPart(world, root, part, materials, 'LIBRARY-SCENE', [1, 1, 1], counters);
-  for (const instance of SCENE.instances ?? []) addPrefabInstance(world, root, instance, materials, counters);
-  for (const light of SCENE.lights ?? []) addLight(root, light, counters);
+  const counters = { render: 0, colliders: 0, lights: 0, batchedBooks: 0 };
+  for (const part of scene.parts ?? []) addPart(world, root, part, materials, 'LIBRARY-SCENE', [1, 1, 1], counters);
+  for (const instance of scene.instances ?? []) addPrefabInstance(world, root, instance, materials, counters, scene.prefabs);
+  for (const light of scene.lights ?? []) addLight(root, light, counters);
   const rootYaw = 90 - location.angle;
-  for (const bench of SCENE.benches ?? []) addBench(world, root, bench, materials, counters, rootYaw);
+  for (const bench of scene.benches ?? []) addBench(world, root, bench, materials, counters, rootYaw);
 
   const fishingZones = [];
   world.veiledAthenaeumLazyRivers = [];
-  for (const water of SCENE.rideWaters ?? []) addLazyRiver(world, root, water, materials, counters, rootYaw);
-  for (const water of SCENE.waters ?? []) {
+  for (const water of scene.rideWaters ?? []) addLazyRiver(world, root, water, materials, counters, rootYaw);
+  for (const water of scene.waters ?? []) {
     const zone = addFishingWater(world, root, water);
     if (zone) fishingZones.push(zone);
   }
-  const markers = (SCENE.markers ?? []).map((marker) => ({
+  const markers = (scene.markers ?? []).map((marker) => ({
     id: marker.id,
     kind: marker.kind,
     label: marker.label,
@@ -359,11 +421,12 @@ export function buildVeiledAthenaeumV2(world, location) {
   world.libraryIslandMarkers = markers;
   world.libraryIslandFishingZones = fishingZones;
   world.veiledAthenaeumSceneReport = Object.freeze({
-    sceneId: SCENE.sceneId,
-    version: SCENE.version,
+    sceneId: scene.sceneId,
+    version: scene.version,
     renderEntities: counters.render,
     colliders: counters.colliders,
     lights: counters.lights,
+    batchedBooks: counters.batchedBooks,
     fishingWaterIds: Object.freeze(fishingZones.map((zone) => zone.id)),
     markerIds: Object.freeze(markers.map((marker) => marker.id)),
     validation

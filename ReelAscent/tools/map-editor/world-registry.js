@@ -5,6 +5,21 @@ export const WORLD_EDITOR_WORLDS = Object.freeze([
     capabilities: ['select', 'terrain', 'water', 'rocks', 'vegetation', 'decor', 'walkthrough', 'slope-diagnostic', 'collision-debug']
   }),
   Object.freeze({
+    id: 'home-island', label: 'HEARTHWARD ISLE / HOME', runtimeLocationId: 'home-island',
+    dataUrl: null, kind: 'production-island',
+    capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
+  }),
+  Object.freeze({
+    id: 'shop-island', label: "OUTFITTER'S REACH / SHOP", runtimeLocationId: 'shop-island',
+    dataUrl: null, kind: 'production-island',
+    capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
+  }),
+  Object.freeze({
+    id: 'aquarium-island', label: 'GLASSWATER ISLE / AQUARIUM', runtimeLocationId: 'aquarium-island',
+    dataUrl: null, kind: 'production-island',
+    capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
+  }),
+  Object.freeze({
     id: 'cave-fishing-island', label: 'CAVE FISHING ISLAND / BASALT GROTTO', runtimeLocationId: 'cave-fishing-island',
     dataUrl: '../../src/world/world-editor-levels/cave-fishing-island.json', kind: 'generic',
     capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
@@ -20,9 +35,19 @@ export const WORLD_EDITOR_WORLDS = Object.freeze([
     capabilities: ['select', 'terrain', 'objects', 'water', 'prefabs', 'rooms', 'walkthrough', 'collision-debug']
   }),
   Object.freeze({
+    id: 'normal-fishing-island', label: 'MANGROVE CAY', runtimeLocationId: 'normal-fishing-island',
+    dataUrl: null, kind: 'production-island',
+    capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
+  }),
+  Object.freeze({
+    id: 'cold-island', label: 'FROSTHOOK ISLE', runtimeLocationId: 'cold-island',
+    dataUrl: null, kind: 'production-island',
+    capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
+  }),
+  Object.freeze({
     id: 'library-island', label: 'LIBRARY ISLAND / VEILED ATHENAEUM', runtimeLocationId: 'veiled-athenaeum',
     dataUrl: '../../src/world/library-island-v2.scene.json', kind: 'library-authored-scene',
-    capabilities: ['select', 'objects', 'water', 'prefabs', 'lights', 'markers', 'benches', 'walkthrough', 'collision-debug']
+    capabilities: ['select', 'terrain', 'objects', 'water', 'prefabs', 'lights', 'markers', 'benches', 'walkthrough', 'collision-debug']
   })
 ]);
 

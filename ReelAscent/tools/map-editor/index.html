@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark" />
-  <title>Reel Ascent — World Editor V4</title>
+  <title>Reel Ascent — World Editor V4.1</title>
   <link rel="stylesheet" href="./editor.css" />
   <style>
     #walkthrough-hud {
@@ -193,8 +193,12 @@
           <div class="field-grid two">
             <label>Opening width <input id="opening-width" type="number" min="0.5" step="0.1" value="3.0" /></label>
             <label>Opening length/height <input id="opening-height" type="number" min="0.5" step="0.1" value="3.4" /></label>
+            <label>Offset U <input id="opening-offset-u" type="number" step="0.1" value="0" /></label>
+            <label>Offset V <input id="opening-offset-v" type="number" step="0.1" value="0" /></label>
+            <label>Placement <select id="opening-snap"><option value="free" selected>Free</option><option value="grid">Grid snap</option><option value="center">Center snap</option><option value="edge">Edge snap</option></select></label>
           </div>
-          <button id="cut-rectangular-opening" type="button" class="primary">Cut Rectangular Opening</button>
+          <div class="row-actions"><button id="cut-rectangular-opening" type="button" class="primary">Place Cut Rectangle</button><button id="apply-rectangular-opening" type="button" disabled>Apply Cut</button><button id="cancel-rectangular-opening" type="button" disabled>Cancel</button></div>
+          <div id="cutout-status" class="compact-status hint">Select an axis-aligned floor, wall, or ceiling, then place the opening on that surface.</div>
         </div>
         <div data-mode-panel="object">
           <label>Asset search <input id="v3-asset-search" type="search" placeholder="Shelf, chair, fireplace, stair…" autocomplete="off" /></label>
@@ -286,12 +290,16 @@
         <button data-view="top">Top</button>
         <button data-view="north">North Side</button>
         <button data-view="west">West Side</button>
+        <button id="orbit-view-surface" title="Set a stable orbit pivot from the viewport center or nearby surface">Orbit Around View / Surface</button>
+        <button id="frame-selected" title="Frame every selected object (F)">Frame Selected</button>
+        <button id="frame-world" title="Frame all visible authoring geometry">Frame World</button>
         <button id="walkthrough-toggle" title="First-person terrain playtest using the game's player capsule, gravity, jump and slope settings">Walkthrough</button>
         <label><input id="show-waters" type="checkbox" checked /> Waters</label>
         <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
         <label id="slope-toggle-wrap" title="Classify the actual authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
         <label class="toolbar-select" title="Inspect the geometry the player actually collides with">Collision <select id="collision-mode"><option value="normal">Normal</option><option value="overlay">Visual + Collision</option><option value="collision-only">Collision Only</option><option value="selected">Selected Collision</option></select></label>
         <label title="Visualize the registered viewport picking bounds for authorable objects"><input id="show-picking-targets" type="checkbox" /> Picking targets</label>
+        <label id="hide-library-books-wrap" title="Debug shelf frames and boards without books"><input id="hide-library-books" type="checkbox" /> Hide Books</label>
         <label id="skyscraper-interior-wrap" title="Hide the imported exterior shell while authoring rooms inside the tower"><input id="skyscraper-interior-mode" type="checkbox" /> Interior cutaway</label>
         <label class="walkthrough-persistent" title="Editor-only ambient light floor. Keeps dark cave geometry readable without changing the saved map or production lighting." style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
           Min brightness <output id="minimum-brightness-out">55%</output>
@@ -299,6 +307,7 @@
         </label>
         <label id="existing-rocks-label" title="Import a runtime snapshot once, or bake it into the editor patch so it persists"><input id="show-snapshot-rocks" type="checkbox" checked disabled /> Existing rocks (import snapshot)</label>
       </div>
+      <div id="box-selection-preview" hidden></div>
       <div id="prefab-workspace-banner" hidden><strong id="prefab-workspace-name">Prefab Workspace</strong><span>Local origin is (0,0,0). Child transforms are local.</span><button id="prefab-workspace-return" type="button">Return to World</button></div>
       <div id="walkthrough-hud" hidden>
         <div class="walkthrough-head">
@@ -338,8 +347,21 @@
           <strong id="selected-name"></strong>
           <code id="selected-id"></code>
           <div id="selection-fields"></div>
+          <div id="group-transform-panel" hidden>
+            <div class="compact-status"><strong id="selection-count">1 selected</strong> · one shared gizmo</div>
+            <label>Pivot <select id="selection-pivot-mode"><option value="center" selected>Selection Center / Median</option><option value="active">Active Object</option><option value="individual">Individual Origins</option></select></label>
+            <div class="row-actions transform-mode-row"><button type="button" data-transform-gizmo="move" class="active">Move</button><button type="button" data-transform-gizmo="rotate">Rotate</button><button type="button" data-transform-gizmo="scale">Scale</button></div>
+            <div class="row-actions"><button id="select-same-type" type="button">Select Same Type</button><button id="select-same-source" type="button">Select Same Source</button></div>
+            <div class="field-grid three">
+              <label>Delta X <input id="group-delta-x" type="number" step="0.1" value="0" /></label>
+              <label>Delta Y <input id="group-delta-y" type="number" step="0.1" value="0" /></label>
+              <label>Delta Z <input id="group-delta-z" type="number" step="0.1" value="0" /></label>
+            </div>
+            <button id="apply-group-transform" type="button">Apply Group Delta</button>
+            <div class="row-actions"><button id="hide-group-selection" type="button">Hide Selected</button><button id="show-group-selection" type="button">Show Selected</button></div>
+          </div>
           <div class="row-actions">
-            <button id="focus-selected">Focus</button>
+            <button id="focus-selected">Focus Selected</button>
             <button id="rename-selected">Rename</button>
             <button id="duplicate-selected">Duplicate</button>
             <button id="edit-source-prefab" hidden>Edit Source Prefab</button>
@@ -372,7 +394,7 @@
         <h2>Camera</h2>
         <label>Move speed <output id="camera-move-value">22%</output><input id="camera-move-speed" type="range" min="10" max="150" step="1" value="22" /></label>
         <label>Wheel zoom <output id="camera-zoom-value">24%</output><input id="camera-zoom-speed" type="range" min="5" max="150" step="1" value="24" /></label>
-        <div class="compact-help">WASD/QE move · right-drag orbit · middle/Shift-right pan · wheel zoom · F focus · Ctrl+D duplicate · Delete remove. <button class="help-dot" type="button" data-tip="Home resets view. X toggles Stoneveil X-Ray. Walkthrough uses Esc to exit, F Walk/Fly, R reset. Ctrl+Z/Y undo/redo." aria-label="Camera shortcut help">?</button></div>
+        <div class="compact-help">Right-drag: orbit around nearby view/surface · middle/Shift-right: pan · WASD/QE: fly · wheel: zoom. Shift+Click: add/remove selection · Ctrl/Cmd+Click: toggle · drag empty viewport: box select · Alt+Click: cycle overlaps · F: frame selected · Ctrl/Cmd+D: duplicate · Delete: remove · Esc: cancel. <button class="help-dot" type="button" data-tip="Use the Move/Rotate/Scale buttons in Selected for the shared gizmo. Home frames the current world. X toggles Stoneveil X-Ray. Walkthrough uses Esc to exit, F Walk/Fly, R reset. Ctrl/Cmd+Z/Y undo/redo." aria-label="Camera shortcut help">?</button></div>
       </section>
     </aside>
   </main>

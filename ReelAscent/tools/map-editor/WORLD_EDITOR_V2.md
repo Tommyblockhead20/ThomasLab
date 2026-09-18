@@ -195,7 +195,9 @@ Room/component material intent is stored as metadata and previewed with differen
 
 ### Library Island / Veiled Athenaeum
 
-`Library Island / Veiled Athenaeum` is now a fifth World Editor scene. It has independent V2 state, autosave, generic objects/water/prefabs/rooms, walkthrough and collision inspection. The editor shows the current production island footprint and Athenaeum obscured foundation/silhouette/roofline as a **reference only**. Production is not switched to V2-authored terrain or architecture by this addition.
+`Library Island / Veiled Athenaeum` has independent state, autosave, generic objects/water/prefabs/rooms, walkthrough, collision inspection, and the exact production-generated island/coast/submerged-apron triangle mesh transformed into Athenaeum-local space. It is selectable and available to Mesh/Sculpt tools; no square work-pad substitute is created. Production architecture remains sourced from `library-island-v2.scene.json`.
+
+V4.1 also exposes every physical satellite island: Hearthward, Outfitter's Reach, Glasswater, Mangrove Cay, and Frosthook have dedicated exact production-terrain views; Skyreach Foundation terrain appears in the Skyscraper view; and Basalt shows the exact generated outer terrain whenever the higher-detail full cave capture is unavailable. Pirate and Library retain specialized scenes. Bluewater Reach is a registry-defined virtual boat/open-water location and therefore has no island terrain tab. Satellite edits autosave/export independently and are not silently promoted into the runtime generator.
 
 This foundation exists so future Athenaeum terrain, modular reading/archive rooms, lighting and interaction authoring can use shared editor systems instead of becoming another hard-coded special case.
 

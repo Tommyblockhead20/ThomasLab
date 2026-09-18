@@ -23,7 +23,7 @@ const LIBRARY_FURNITURE = [
   shelf('athenaeum-shelf-narrow-v4', 'Athenaeum Shelf — Narrow', { width: 1.8, height: 4.2, shelfCount: 6, bookDensity: .7 }),
   shelf('athenaeum-shelf-archive-v4', 'Athenaeum Shelf — Archive', { width: 5.2, height: 5.8, shelfCount: 8, bookDensity: .94 }),
   shelf('athenaeum-shelf-low-v4', 'Athenaeum Shelf — Low', { width: 4.4, height: 2.1, shelfCount: 4, bookDensity: .72 }),
-  shelf('athenaeum-shelf-grand-v4', 'Athenaeum Shelf — Grand Double', { width: 6.2, height: 6.1, shelfCount: 8, doubleSided: true, bookDensity: .9 }),
+  shelf('athenaeum-shelf-grand-v4', 'Grand Athenaeum Shelf', { width: 6.2, height: 6.1, shelfCount: 8, doubleSided: true, bookDensity: .9 }),
   libraryAssembly('library-reading-table-v4', 'Long Reading Table', 'Tables', 'A substantial reading table with trestle legs and brass reading lamps.', [
     part('top', { x: 0, y: 1.02, z: 0 }, { x: 6.2, y: .24, z: 1.8 }, 'woodLight'), ...legs('table', 6.2, 1.8, .95),
     part('spine', { x: 0, y: .55, z: 0 }, { x: 4.5, y: .18, z: .18 }, 'wood'),

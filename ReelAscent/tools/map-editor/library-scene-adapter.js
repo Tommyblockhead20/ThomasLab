@@ -1,4 +1,7 @@
 import { normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runtime.js';
+import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
+import { buildOceanIslandTerrainData } from '../../src/world/mountain-v2.js';
+import { stockLibraryScene } from '../../src/world/library-shelf-stocking.js';
 
 export const LIBRARY_SCENE_SCHEMA = 'reel-ascent-authored-scene-v2';
 export const LIBRARY_WORLD_ID = 'library-island';
@@ -30,14 +33,44 @@ export function isLibraryAuthoredScene(value) {
 export function librarySceneLocalToEditor(value) { return objectVector(value); }
 export function libraryEditorToSceneLocal(value) { return arrayVector(value); }
 
+export function libraryProductionTerrain() {
+  const location = SMALL_ISLAND_LOCATIONS.find((item) => item.id === 'veiled-athenaeum');
+  if (!location) return null;
+  const source = buildOceanIslandTerrainData(location);
+  const floorY = location.elevation + 1.28;
+  const yaw = (90 - location.angle) * Math.PI / 180;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const positions = [];
+  for (const [worldX, worldY, worldZ] of source.vertices) {
+    const dx = worldX - location.worldPosition.x;
+    const dz = worldZ - location.worldPosition.z;
+    positions.push(dx * cos - dz * sin, worldY - floorY, dx * sin + dz * cos);
+  }
+  return {
+    mode: 'production-island-terrain', format: 'triangle-mesh-v1', coordinateSpace: 'library-root-local',
+    positions, indices: source.triangles.flat(),
+    parts: [{ name: 'full island terrain / coastline / submerged apron', firstVertex: 0, vertexCount: source.vertices.length, firstTriangle: 0, triangleCount: source.triangles.length }],
+    metadata: {
+      source: 'buildOceanIslandTerrainData(veiled-athenaeum)', productionAuthoritative: true,
+      locationId: location.id, rootFloorY: floorY, rootYawDegrees: 90 - location.angle
+    }
+  };
+}
+
 function architectureGroup(part = {}) {
   const text = `${part.id ?? ''} ${part.name ?? ''}`.toLowerCase();
-  if (part.material === 'mist') return 'Mist / Atmosphere';
+  if (part.material === 'mist') return 'Atmosphere';
   if (['water', 'waterBright'].includes(part.material)) {
     return /fall|cascade/.test(text) ? 'Waterfalls / Decorative Water' : 'Decorative Water';
   }
   if (['leaf', 'leafLight', 'flower', 'stoneMoss'].includes(part.material)
-    || /garden|tree|vine|planter|moss|flower/.test(text)) return 'Landscaping / Decor';
+    || /garden|tree|vine|planter|moss|flower/.test(text)) return 'Landscaping';
+  if (/stair|step|landing/.test(text)) return 'Stairs';
+  if (/ceiling|roof|soffit/.test(text)) return 'Ceilings';
+  if (/floor|slab|deck|platform/.test(text)) return 'Floors';
+  if (/shelf|bookcase|archive bay/.test(text)) return 'Shelves';
+  if (/chair|bench|table|desk|couch|lectern|cabinet|furniture/.test(text)) return 'Furniture';
   if (/arrival|dock|entry|foyer/.test(text)) return 'Architecture — Arrival / Entrance';
   if (/grand|reading|hall/.test(text)) return 'Grand Reading Areas';
   if (/hidden|secret/.test(text)) return 'Hidden Archive Areas';
@@ -46,7 +79,7 @@ function architectureGroup(part = {}) {
   if (/study|desk|quiet/.test(text)) return 'Study Areas';
   if (/upper|gallery|balcony|terrace/.test(text)) return 'Upper Galleries';
   if (/bridge|canal|walkway/.test(text)) return 'Bridges / Terraces';
-  return 'Architecture / Misc';
+  return 'Architecture';
 }
 
 function partToObject(part, { sourceKind = 'part', sourceIndex = 0, prefix = '' } = {}) {
@@ -170,16 +203,16 @@ function prefabInstanceToEditor(instance, index) {
 
 export function adaptLibrarySceneToEditor(scene) {
   if (!isLibraryAuthoredScene(scene)) throw new Error(`Expected ${LIBRARY_SCENE_SCHEMA} for veiled-athenaeum.`);
-  const source = clone(scene);
+  const source = stockLibraryScene(scene, { density: .92 });
   const input = {
     worldId: LIBRARY_WORLD_ID,
     displayName: 'LIBRARY ISLAND / VEILED ATHENAEUM',
     runtimeLocationId: 'veiled-athenaeum',
     sourcePolicy: {
-      terrain: 'procedural-island-base', architecture: 'authored-scene', waters: 'authored-scene',
+      terrain: 'production-generator', architecture: 'authored-scene', waters: 'authored-scene',
       objects: 'authored-scene', movingPlatforms: 'authored-scene', prefabs: 'authored-scene'
     },
-    terrain: null,
+    terrain: libraryProductionTerrain(),
     waters: [
       ...(source.waters ?? []).map((water, index) => waterToEditor(water, index, 'waters')),
       ...(source.rideWaters ?? []).map((water, index) => waterToEditor(water, index, 'rideWaters'))
@@ -196,7 +229,9 @@ export function adaptLibrarySceneToEditor(scene) {
       instances: (source.instances ?? []).map(prefabInstanceToEditor)
     },
     rooms: [],
-    librarySceneSource: source,
+    // Keep the untouched authored source for lossless save/export. The editor and
+    // production runtime both derive the dense shelf variant from that same source.
+    librarySceneSource: clone(scene),
     metadata: {
       libraryAuthoredScene: true, authoredSceneId: source.sceneId, authoredSceneVersion: source.version,
       productionPath: 'src/world/library-island-v2.scene.json'
@@ -300,6 +335,7 @@ function editorWaterToScene(water, sourceById) {
 export function serializeLibrarySceneFromEditor(level) {
   const source = clone(level?.librarySceneSource);
   if (!isLibraryAuthoredScene(source)) throw new Error('Library editor level is missing its authoritative scene source.');
+  const stockedBaseline = stockLibraryScene(source, { density: .92 });
   const sourceMaps = {
     part: new Map((source.parts ?? []).map((item) => [item.id, item])),
     light: new Map((source.lights ?? []).map((item) => [item.id, item])),
@@ -319,7 +355,8 @@ export function serializeLibrarySceneFromEditor(level) {
     .map((item) => editorWaterToScene(item, sourceMaps.water));
   source.prefabs = Object.fromEntries((level.prefabs?.definitions ?? []).map((definition) => {
     const base = clone(source.prefabs?.[definition.metadata?.librarySourceId || definition.id] ?? {});
-    const originalParts = new Map((base.parts ?? []).map((part, index) => [part.id || `${definition.id}-part-${String(index + 1).padStart(3, '0')}`, part]));
+    const baselinePrefab = clone(stockedBaseline.prefabs?.[definition.metadata?.librarySourceId || definition.id] ?? base);
+    const originalParts = new Map((baselinePrefab.parts ?? []).map((part, index) => [part.id || `${definition.id}-part-${String(index + 1).padStart(3, '0')}`, part]));
     const result = {
       ...base,
       parts: (definition.objects ?? []).map((object) => {
@@ -330,6 +367,10 @@ export function serializeLibrarySceneFromEditor(level) {
     if (base.version != null || (definition.version ?? 1) !== 1) result.version = definition.version ?? base.version;
     const authoredMetadata = definition.metadata?.authoredPrefabMetadata;
     if (authoredMetadata && JSON.stringify(authoredMetadata) !== JSON.stringify(base.metadata ?? {})) result.metadata = clone(authoredMetadata);
+    // Dense default stocking is a derived presentation/runtime layer. If the user
+    // has not edited that generated definition, export the original authored
+    // prefab exactly so an open/save cycle stays lossless.
+    if (JSON.stringify(result) === JSON.stringify(baselinePrefab)) return [definition.id, base];
     return [definition.id, result];
   }));
   source.instances = (level.prefabs?.instances ?? []).map((instance) => {
@@ -352,7 +393,12 @@ export function serializeLibrarySceneFromEditor(level) {
 export function normalizeLibraryEditorPayload(payload) {
   if (isLibraryAuthoredScene(payload)) return adaptLibrarySceneToEditor(payload);
   if (payload?.metadata?.libraryAuthoredScene && isLibraryAuthoredScene(payload.librarySceneSource)) {
-    return adaptLibrarySceneToEditor(serializeLibrarySceneFromEditor(normalizeWorldEditorLevel(payload)));
+    const normalized = normalizeWorldEditorLevel(payload);
+    const adapted = adaptLibrarySceneToEditor(serializeLibrarySceneFromEditor(normalized));
+    if (normalized.terrain?.mode === 'production-island-terrain' && normalized.terrain?.positions?.length) {
+      adapted.terrain = clone(normalized.terrain);
+    }
+    return adapted;
   }
   throw new Error('This file is not a Veiled Athenaeum authored scene or compatible editor autosave.');
 }

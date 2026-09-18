@@ -46,9 +46,10 @@ export function cutRectangularOpeningInBox(recordInput, openingInput = {}) {
     [opening.u0, opening.u1, opening.v1, bounds.v1, 'upper']
   ];
   const sourceId = cleanId(record.id || record.name);
+  const openingId = cleanId(openingInput.id || `opening-${Math.round((center[u] - position[u]) * 100)}-${Math.round((center[v] - position[v]) * 100)}`);
   return rectangles.map(([u0, u1, v0, v1, suffix]) => {
     const part = clone(record);
-    part.id = `${sourceId}-opening-${suffix}`;
+    part.id = `${sourceId}-${openingId}-${suffix}`;
     part.name = `${record.name || record.id || 'Surface'} — opening ${suffix}`;
     const nextPosition = { x: position.x, y: position.y, z: position.z };
     nextPosition[u] = (u0 + u1) / 2;
@@ -65,7 +66,11 @@ export function cutRectangularOpeningInBox(recordInput, openingInput = {}) {
     }
     part.metadata = {
       ...(part.metadata ?? {}), cutOpeningSourceId: String(record.id || ''),
-      cutOpening: { thicknessAxis, center: clone(center), size: clone(openingSize), fragment: suffix }
+      cutOpening: {
+        id: openingId, thicknessAxis, center: clone(center), size: clone(openingSize), fragment: suffix,
+        offsetU: finite(center[u], position[u]) - position[u], offsetV: finite(center[v], position[v]) - position[v],
+        planeAxes: [u, v]
+      }
     };
     return part;
   });
@@ -200,31 +205,47 @@ function part(id, name, position, size, materialKey, options = {}) {
   };
 }
 
-export function makeBookshelfPrefab({ id = 'library-shelf', width = 3.4, height = 3.6, depth = .55, shelfCount = 4, doubleSided = false, bookDensity = .78 } = {}) {
+export function normalizeBookDensity(value = 'full') {
+  if (typeof value === 'string') return ({ sparse: .38, medium: .62, full: .84, packed: .96 })[value.toLowerCase()] ?? .84;
+  return Math.max(.2, Math.min(1, finite(value, .84)));
+}
+
+export function makeBookshelfPrefab({ id = 'library-shelf', width = 3.4, height = 3.6, depth = .55, shelfCount = 5, doubleSided = false, bookDensity = 'full' } = {}) {
   const objects = [];
   const frame = .14;
+  const density = normalizeBookDensity(bookDensity);
   objects.push(part(`${id}-left`, 'left frame', { x: -width / 2 + frame / 2, y: height / 2, z: 0 }, { x: frame, y: height, z: depth }, 'wood'));
   objects.push(part(`${id}-right`, 'right frame', { x: width / 2 - frame / 2, y: height / 2, z: 0 }, { x: frame, y: height, z: depth }, 'wood'));
   objects.push(part(`${id}-top`, 'crown trim', { x: 0, y: height - frame / 2, z: 0 }, { x: width + .16, y: frame, z: depth + .12 }, 'brass', { collision: false }));
   if (!doubleSided) objects.push(part(`${id}-back`, 'recessed back', { x: 0, y: height / 2, z: depth * .43 }, { x: width - frame * 2, y: height - frame, z: .1 }, 'wood'));
-  for (let shelf = 0; shelf < shelfCount; shelf += 1) {
-    const y = frame + shelf * ((height - frame * 2) / Math.max(1, shelfCount - 1));
-    objects.push(part(`${id}-shelf-${shelf}`, `shelf ${shelf + 1}`, { x: 0, y, z: 0 }, { x: width - frame, y: .1, z: depth }, 'wood'));
-    if (shelf === shelfCount - 1) continue;
-    const slots = Math.max(3, Math.round((width - .35) / .24 * Math.max(.2, Math.min(1, bookDensity))));
-    for (let book = 0; book < slots; book += 1) {
-      if ((book + shelf * 3) % 11 === 8) continue;
-      const bookWidth = .12 + (book % 3) * .035;
-      const x = -width / 2 + .28 + book * ((width - .56) / slots);
-      const bookHeight = .48 + ((book * 7 + shelf * 5) % 5) * .055;
+  const bayHeight = (height - frame * 2) / Math.max(1, shelfCount);
+  for (let shelf = 0; shelf <= shelfCount; shelf += 1) {
+    const y = frame + shelf * bayHeight;
+    const boardName = shelf === 0 ? 'base shelf' : shelf === shelfCount ? 'top shelf' : `shelf board ${shelf}`;
+    objects.push(part(`${id}-shelf-${shelf}`, boardName, { x: 0, y, z: 0 }, { x: width - frame, y: .12, z: depth }, 'wood'));
+    if (shelf === shelfCount) continue;
+    const usableWidth = width - .52;
+    const targetWidth = usableWidth * (.68 + density * .29) * (.94 + ((shelf * 17) % 9) / 100);
+    let cursor = -usableWidth / 2;
+    let occupied = 0;
+    let book = 0;
+    while (occupied < targetWidth && book < 80) {
+      const bookWidth = .115 + ((book * 5 + shelf * 3) % 5) * .023;
+      const gap = book && (book + shelf * 2) % 9 === 6 ? .09 : .018 + ((book + shelf) % 3) * .008;
+      if (occupied + gap + bookWidth > targetWidth + .04) break;
+      cursor += gap + bookWidth / 2;
+      const bookHeight = Math.min(bayHeight - .16, .46 + ((book * 7 + shelf * 5) % 6) * .052);
       const material = ['bookGreen', 'bookRed', 'bookBlue'][(book + shelf) % 3];
       objects.push(part(`${id}-book-${shelf}-${book}`, `book ${shelf + 1}-${book + 1}`,
-        { x, y: y + .1 + bookHeight / 2, z: doubleSided && book % 2 ? .13 : -.13 },
+        { x: cursor, y: y + .075 + bookHeight / 2, z: doubleSided && book % 2 ? .13 : -.13 },
         { x: bookWidth, y: bookHeight, z: .22 }, material,
-        { collision: false, rotation: { x: 0, y: 0, z: book % 7 === 5 ? 7 : 0 }, category: 'books' }));
+        { collision: false, rotation: { x: 0, y: 0, z: book % 11 === 8 ? (shelf % 2 ? -7 : 7) : 0 }, category: 'books', metadata: { bookCluster: Math.floor(book / 4) } }));
+      cursor += bookWidth / 2;
+      occupied += gap + bookWidth;
+      book += 1;
     }
   }
-  return { id, name: 'Detailed Bookshelf', kind: 'library-furniture', version: 1, objects, movingPlatforms: [], waters: [], metadata: { assetCategory: 'Library/Shelves', width, height, shelfCount, bookDensity, doubleSided } };
+  return { id, name: 'Detailed Bookshelf', kind: 'library-furniture', version: 2, objects, movingPlatforms: [], waters: [], metadata: { assetCategory: 'Library/Shelves', width, height, shelfCount, bookDensity: density, bookDensityLabel: density >= .92 ? 'Packed' : density >= .76 ? 'Full' : density >= .5 ? 'Medium' : 'Sparse', doubleSided } };
 }
 
 export function makeFireplacePrefab({ id = 'athenaeum-fireplace', monumental = true, flameOn = true } = {}) {

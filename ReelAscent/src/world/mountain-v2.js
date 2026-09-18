@@ -676,6 +676,102 @@ export function oceanFloorHeightAt(radius, shorelineY = -.32) {
   });
 }
 
+// Authoritative island surface generator shared by production and the World Editor.
+// Keeping the topology in one function prevents the editor from drifting back to a flat
+// proxy pad while production renders the real coastline, submerged apron, and island top.
+export function buildOceanIslandTerrainData(location) {
+  const segments = 36;
+  const topRingFactors = location.id === 'home-island' ? [.84, .68, .52, .36, .2]
+    : location.id === 'normal-fishing-island' ? [.84, .68, .52, .36, .2]
+      : [.68, .2];
+  const ringFactors = [...ISLAND_UNDERWATER_PROFILE.radiusFactors, ...topRingFactors];
+  const ringHeights = [
+    oceanFloorHeightAt(location.radius) + .12,
+    OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * 1.7,
+    OCEAN_SURFACE_Y - ISLAND_UNDERWATER_PROFILE.intermediateDepth * .68,
+    OCEAN_SURFACE_Y - .16,
+    ...topRingFactors.map((factor) => lerp(location.elevation + .06, location.elevation + .16,
+      1 - factor / Math.max(...topRingFactors)))
+  ];
+  const homePondCenter = location.id === 'home-island'
+    ? radialPoint(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius + 8.25, HOME_CABIN_CONFIG.floorY, -7.8)
+    : null;
+  const homeRadians = degreesToRadians(HOME_CABIN_CONFIG.angle);
+  const mangroveLagoonCenter = location.id === 'normal-fishing-island' ? location.worldPosition : null;
+  const vertices = [];
+  for (let ring = 0; ring < ringFactors.length; ring += 1) {
+    for (let segment = 0; segment < segments; segment += 1) {
+      const theta = segment * Math.PI * 2 / segments;
+      const angle = segment * 360 / segments;
+      const footprintScale = islandFootprintScale(location.id, angle);
+      const vertexX = location.worldPosition.x + Math.cos(theta) * location.radii.x * ringFactors[ring] * footprintScale;
+      const vertexZ = location.worldPosition.z + Math.sin(theta) * location.radii.z * ringFactors[ring] * footprintScale;
+      let vertexY = ringHeights[ring];
+      if (location.id === 'cold-island' && ring >= 4) {
+        const lakeRadius = Math.hypot((vertexX - location.worldPosition.x) / 6.35, (vertexZ - location.worldPosition.z) / 5.05);
+        vertexY = lerp(vertexY, .96 - .78, 1 - smoothstep(.72, 1.18, lakeRadius));
+      }
+      if (homePondCenter && ring >= ISLAND_UNDERWATER_PROFILE.radiusFactors.length) {
+        const dx = vertexX - homePondCenter.x;
+        const dz = vertexZ - homePondCenter.z;
+        const pondLocalX = dx * Math.sin(homeRadians) - dz * Math.cos(homeRadians);
+        const pondLocalZ = dx * Math.cos(homeRadians) + dz * Math.sin(homeRadians);
+        const pondDistance = Math.hypot(pondLocalX / 4.95, pondLocalZ / 3.95);
+        if (pondDistance < 1.42) {
+          const basinFloor = HOME_CABIN_CONFIG.floorY - .32;
+          const shoreline = HOME_CABIN_CONFIG.floorY - .18;
+          const basinTarget = pondDistance <= .76
+            ? lerp(basinFloor, basinFloor + .04, smoothstep(0, .76, pondDistance))
+            : lerp(basinFloor + .04, shoreline, smoothstep(.76, 1.08, pondDistance));
+          vertexY = lerp(basinTarget, vertexY, smoothstep(1.08, 1.42, pondDistance));
+        }
+      }
+      if (mangroveLagoonCenter && ring >= ISLAND_UNDERWATER_PROFILE.radiusFactors.length) {
+        const lagoonDistance = Math.hypot((vertexX - mangroveLagoonCenter.x) / 8.3, (vertexZ - mangroveLagoonCenter.z) / 6.2);
+        if (lagoonDistance < 1.42) {
+          const basinFloor = location.elevation - .36;
+          const shoreline = location.elevation + .04;
+          const basinTarget = lagoonDistance <= .7
+            ? lerp(basinFloor, basinFloor + .04, smoothstep(0, .7, lagoonDistance))
+            : lerp(basinFloor + .04, shoreline, smoothstep(.7, 1.08, lagoonDistance));
+          vertexY = lerp(basinTarget, vertexY, smoothstep(1.08, 1.42, lagoonDistance));
+        }
+      }
+      vertices.push([vertexX, vertexY, vertexZ]);
+    }
+  }
+  const triangles = [];
+  for (let ring = 0; ring < ringFactors.length - 1; ring += 1) {
+    for (let segment = 0; segment < segments; segment += 1) {
+      const next = (segment + 1) % segments;
+      const localAngle = segment * 360 / segments;
+      const openingDelta = angularDistance(localAngle, location.id === 'cave-fishing-island' ? location.angle : -180);
+      if (location.id === 'cave-fishing-island' && ring >= 2 && openingDelta < 15) continue;
+      const outer = ring * segments + segment;
+      const inner = (ring + 1) * segments + segment;
+      const outerNext = ring * segments + next;
+      const innerNext = (ring + 1) * segments + next;
+      triangles.push([outer, inner, outerNext], [outerNext, inner, innerNext]);
+    }
+  }
+  const centerIndex = vertices.length;
+  vertices.push([
+    location.worldPosition.x,
+    location.id === 'cold-island' ? .96 - .78
+      : location.id === 'normal-fishing-island' ? location.elevation - .36
+        : location.elevation + .18,
+    location.worldPosition.z
+  ]);
+  const finalRingStart = (ringFactors.length - 1) * segments;
+  for (let segment = 0; segment < segments; segment += 1) {
+    const next = (segment + 1) % segments;
+    const localAngle = segment * 360 / segments;
+    if (location.id === 'cave-fishing-island' && angularDistance(localAngle, location.angle) < 15) continue;
+    triangles.push([finalRingStart + segment, centerIndex, finalRingStart + next]);
+  }
+  return { vertices, triangles, ringFactors, segments };
+}
+
 export function createOceanShelfRingRadii(outerRadius = OCEAN_FLOOR_OUTER_RADIUS) {
   const nearLimit = Math.min(270, outerRadius);
   const ringRadii = [TERRAIN_OUTER_RADIUS];
@@ -1630,6 +1726,10 @@ export class MountainWorld extends TestWorld {
       this.buildBluewaterBoat(location, group);
       return;
     }
+    const productionTerrainData = buildOceanIslandTerrainData(location);
+    let vertices = productionTerrainData?.vertices;
+    let triangles = productionTerrainData?.triangles;
+    if (!vertices?.length || !triangles?.length) {
     const segments = 36;
     // End at a real center vertex. The old .035-radius 36-vertex micro-ring produced
     // near-degenerate center triangles; on Basalt Hollow those could stretch into spikes.
@@ -1654,7 +1754,7 @@ export class MountainWorld extends TestWorld {
       : null;
     const homeRadians = degreesToRadians(HOME_CABIN_CONFIG.angle);
     const mangroveLagoonCenter = location.id === 'normal-fishing-island' ? location.worldPosition : null;
-    const vertices = [];
+    vertices = [];
     for (let ring = 0; ring < ringFactors.length; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
         const theta = segment * Math.PI * 2 / segments;
@@ -1706,7 +1806,7 @@ export class MountainWorld extends TestWorld {
         vertices.push([vertexX, vertexY, vertexZ]);
       }
     }
-    const triangles = [];
+    triangles = [];
     for (let ring = 0; ring < ringFactors.length - 1; ring += 1) {
       for (let segment = 0; segment < segments; segment += 1) {
         const next = (segment + 1) % segments;
@@ -1739,6 +1839,7 @@ export class MountainWorld extends TestWorld {
       if (location.id === 'cave-fishing-island'
         && angularDistance(localAngle, location.angle) < 15) continue;
       triangles.push([finalRingStart + segment, centerIndex, finalRingStart + next]);
+    }
     }
     const geometry = new pc.Geometry();
     geometry.positions = [];

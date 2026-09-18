@@ -349,8 +349,10 @@ export class GenericWorldScene {
     this.meshOverlayRoot = new pc.Entity('Mesh Topology Overlay');
     this.meshHoverRoot = new pc.Entity('Mesh Hover Preview');
     this.pickingDebugRoot = new pc.Entity('Picking Target Debug');
+    this.transformGizmoRoot = new pc.Entity('Shared Transform Gizmo');
+    this.cutoutPreviewRoot = new pc.Entity('Cutout Preview');
     this.workspaceRoot = new pc.Entity('Prefab Workspace Reference');
-    for (const child of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot, this.meshHoverRoot, this.pickingDebugRoot]) this.root.addChild(child);
+    for (const child of [this.referenceRoot, this.workspaceRoot, this.waterRoot, this.objectRoot, this.pathRoot, this.collisionRoot, this.meshOverlayRoot, this.meshHoverRoot, this.pickingDebugRoot, this.transformGizmoRoot, this.cutoutPreviewRoot]) this.root.addChild(child);
     this.materials = {
       reference: makeMaterial([.45, .48, .47]),
       referenceGlass: makeMaterial([.46, .61, .7], .72),
@@ -358,6 +360,7 @@ export class GenericWorldScene {
       moving: makeMaterial([.28, .63, .82]),
       water: makeMaterial([.08, .54, .7], .68),
       selected: makeMaterial([1, .7, .08], 1, .08),
+      selectedSecondary: makeMaterial([.98, .88, .25], 1, .045),
       diagnosticA: makeMaterial([.05, .9, 1], 1, .14),
       diagnosticB: makeMaterial([1, .12, .72], 1, .14),
       meshVertex: makeMaterial([1, .83, .12], 1, .15),
@@ -392,6 +395,10 @@ export class GenericWorldScene {
       skyreachFacade: makeMaterial([.27, .31, .34], 1, .03),
       skyreachAccent: makeMaterial([.72, .56, .23], 1, .12)
     };
+    this.materials.gizmoX = makeMaterial([1, .18, .18], 1, .12);
+    this.materials.gizmoY = makeMaterial([.18, 1, .3], 1, .12);
+    this.materials.gizmoZ = makeMaterial([.2, .48, 1], 1, .12);
+    this.materials.cutoutPreview = makeMaterial([.12, .95, 1], .34, .2);
     this.level = null;
     this.world = null;
     this.elapsedSeconds = 0;
@@ -402,6 +409,7 @@ export class GenericWorldScene {
     this.prefabCollisionEntries = [];
     this.prefabMovingEntries = [];
     this.selectedId = null;
+    this.selectedIds = new Set();
     this.diagnosticPair = [];
     this.referenceRecord = null;
     this.collisionMode = 'normal';
@@ -417,6 +425,8 @@ export class GenericWorldScene {
     this.meshHoverKey = '';
     this.pickingTargetsVisible = false;
     this.libraryMaterials = new Map();
+    this.booksVisible = true;
+    this.transformGizmo = { center: null, mode: 'move', handles: [] };
     this.root.enabled = false;
   }
 
@@ -427,6 +437,7 @@ export class GenericWorldScene {
     });
     this.elapsedSeconds = 0;
     this.selectedId = null;
+    this.selectedIds.clear();
     this.libraryMaterials.clear();
     for (const [id, spec] of Object.entries(this.level.librarySceneSource?.materials ?? {})) {
       this.libraryMaterials.set(String(id).toLowerCase(), makeAuthoredMaterial(spec));
@@ -435,6 +446,21 @@ export class GenericWorldScene {
   }
 
   setEnabled(enabled) { this.root.enabled = Boolean(enabled); }
+
+  setSelection(ids = [], activeId = null) {
+    this.selectedIds = new Set([...ids].filter((id) => id != null).map(String));
+    this.selectedId = activeId == null ? [...this.selectedIds].at(-1) ?? null : String(activeId);
+    if (this.selectedId) this.selectedIds.add(this.selectedId);
+    this.applySelectionMaterials();
+    this.applyCollisionMode();
+  }
+
+  setSelected(id) { this.setSelection(id == null ? [] : [id], id); }
+
+  setBooksVisible(visible = true) {
+    this.booksVisible = Boolean(visible);
+    for (const entity of this.root.find((node) => node._editorBook === true)) entity.enabled = this.booksVisible;
+  }
 
   setCollisionDebug(enabled) { this.setCollisionMode(enabled ? 'overlay' : 'normal'); }
 
@@ -451,13 +477,19 @@ export class GenericWorldScene {
   editableTerrainMesh() {
     const terrain = this.level?.terrain;
     const supported = (this.world?.id === 'cave-fishing-island' && terrain?.mode === 'authored-mesh-candidate')
-      || (this.world?.id === 'pirate-island' && terrain?.mode === 'authored-triangle-mesh');
+      || (this.world?.id === 'pirate-island' && terrain?.mode === 'authored-triangle-mesh')
+      || terrain?.mode === 'production-island-terrain';
     return supported && terrain?.positions?.length && terrain?.indices?.length ? terrain : null;
   }
 
   editableBasaltTerrain() { return this.editableTerrainMesh(); }
 
-  terrainMeshId() { return this.world?.id === 'pirate-island' ? '__pirate-authored-terrain' : '__basalt-authored-terrain'; }
+  terrainMeshId() {
+    if (this.world?.id === 'pirate-island') return '__pirate-authored-terrain';
+    if (this.world?.id === 'library-island') return '__library-production-terrain';
+    if (this.level?.terrain?.mode === 'production-island-terrain') return `__${this.world?.id}-production-terrain`;
+    return '__basalt-authored-terrain';
+  }
 
   terrainMeshHit(ray) {
     const mesh = this.editableTerrainMesh();
@@ -480,13 +512,6 @@ export class GenericWorldScene {
   }
 
   clearPrefabWorkspace() { this.setPrefabWorkspace(null); }
-
-  setSelected(id) {
-    this.selectedId = id ? String(id) : null;
-    this.applySelectionMaterials();
-    this.applyEditorVisibility();
-    this.applyCollisionMode();
-  }
 
   setDiagnosticPair(firstId = null, secondId = null) {
     this.diagnosticPair = [firstId, secondId].filter(Boolean).map(String);
@@ -588,9 +613,10 @@ export class GenericWorldScene {
 
   isEditorHidden(id) { return this.editorHiddenIds.has(String(id)); }
 
-  isolateSelection(id = this.selectedId) {
+  isolateSelection(ids = this.selectedIds) {
+    const keep = new Set((typeof ids === 'string' ? [ids] : [...(ids ?? [])]).map(String));
     this.editorHiddenIds.clear();
-    for (const key of this.entities.keys()) if (String(key) !== String(id)) this.editorHiddenIds.add(String(key));
+    for (const key of this.entities.keys()) if (!keep.has(String(key))) this.editorHiddenIds.add(String(key));
     this.applyEditorVisibility();
     this.applyCollisionMode();
   }
@@ -622,7 +648,8 @@ export class GenericWorldScene {
 
   applySelectionMaterials() {
     for (const [id, entity] of this.entities) {
-      const selected = id === this.selectedId;
+      const selected = this.selectedIds.has(String(id));
+      const active = selected && String(id) === String(this.selectedId);
       const diagnosticIndex = this.diagnosticPair.indexOf(String(id));
       const stack = [entity];
       while (stack.length) {
@@ -634,7 +661,8 @@ export class GenericWorldScene {
               : entity.editorKind === 'waypoint' ? this.materials.path
                 : (node.editorKind === 'moving-platform' || entity.editorKind === 'moving-platform')
                   ? this.materials.moving : this.materials.platform);
-          mesh.material = selected ? this.materials.selected
+          mesh.material = active ? this.materials.selected
+            : selected ? this.materials.selectedSecondary
             : diagnosticIndex === 0 ? this.materials.diagnosticA
               : diagnosticIndex === 1 ? this.materials.diagnosticB : base;
         }
@@ -663,11 +691,16 @@ export class GenericWorldScene {
       this.buildPickingTargets();
       return;
     }
-    if (this.world.id === 'skyscraper') this.buildSkyscraperReference(rebuildRevision);
-    else if (this.world.id === 'cave-fishing-island') this.buildCaveReference();
+    if (this.world.id === 'skyscraper') {
+      this.buildSkyscraperReference(rebuildRevision);
+      if (this.level?.terrain?.mode === 'production-island-terrain') this.buildProductionIslandTerrain();
+    } else if (this.world.id === 'cave-fishing-island') {
+      if (this.level?.terrain?.mode === 'production-island-terrain') this.buildProductionIslandTerrain();
+      else this.buildCaveReference();
+    }
     else if (this.world.id === 'pirate-island') this.buildPirateReference();
-    // Library Island's authored objects below are the production scene. Never layer the
-    // retired work-pad/silhouette reference beneath the canonical scene.
+    else if (this.world.id === 'library-island') this.buildLibraryTerrain();
+    else if (this.level?.terrain?.mode === 'production-island-terrain') this.buildProductionIslandTerrain();
     this.buildWaters();
     this.buildObjects();
     this.buildMovingPlatforms();
@@ -678,6 +711,7 @@ export class GenericWorldScene {
     this.applyCollisionMode();
     this.buildMeshOverlay();
     this.buildPickingTargets();
+    this.setBooksVisible(this.booksVisible);
   }
 
   emitEditorStatus(message, detail = {}) {
@@ -835,26 +869,23 @@ export class GenericWorldScene {
     this.emitEditorStatus(`Pirate Island authored terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: 'pirate-island' });
   }
 
-  buildLibraryReference() {
-    const location = SMALL_ISLAND_LOCATIONS.find((item) => item.id === 'veiled-athenaeum');
-    if (!location) return;
-    this.referenceRecord = {
-      id: '__architecture__', name: 'The Veiled Athenaeum — production reference', type: 'architecture-reference',
-      position: { x: 0, y: location.elevation, z: 0 }, collision: 'current procedural island / silhouette reference'
-    };
-    createBox(this.referenceRoot, 'Athenaeum island work pad', { x: 0, y: location.elevation - .18, z: 0 },
-      { x: location.radii.x * 1.8, y: .36, z: location.radii.z * 1.8 }, this.materials.library);
-    createBox(this.referenceRoot, 'Athenaeum obscured foundation', { x: 0, y: location.elevation + .22, z: 0 },
-      { x: 12.8, y: .44, z: 10.2 }, this.materials.reference, { y: 8 });
-    createBox(this.referenceRoot, 'Athenaeum distant silhouette', { x: 0, y: location.elevation + 2.45, z: .3 },
-      { x: 9.2, y: 4.2, z: 6.9 }, this.materials.roomDark, { y: 8 });
-    createBox(this.referenceRoot, 'Athenaeum softened roofline', { x: 0, y: location.elevation + 4.82, z: .3 },
-      { x: 10.6, y: .48, z: 8.1 }, this.materials.roomWood, { x: 2, y: 8, z: -2 });
-    this.referenceCollisionBoxes.push(
-      { center: { x: 0, y: location.elevation - .18, z: 0 }, size: { x: location.radii.x * 1.8, y: .36, z: location.radii.z * 1.8 }, kind: 'island-reference', id: '__athenaeum-island' },
-      { center: { x: 0, y: location.elevation + .22, z: 0 }, size: { x: 12.8, y: .44, z: 10.2 }, kind: 'architecture-reference', id: '__athenaeum-foundation' },
-      { center: { x: 0, y: location.elevation + 2.45, z: .3 }, size: { x: 9.2, y: 4.2, z: 6.9 }, kind: 'architecture-reference', id: '__athenaeum-silhouette' }
-    );
+  buildLibraryTerrain() {
+    const terrain = this.editableTerrainMesh();
+    if (!terrain) {
+      this.emitEditorStatus('Library production island terrain is unavailable.', { state: 'error', worldId: 'library-island' });
+      return;
+    }
+    const entity = this.buildMeshEntity('Library Island production terrain', terrain.positions, terrain.indices, this.materials.library, this.referenceRoot);
+    this.registerSelectable(entity, { id: '__library-production-terrain', kind: 'terrain-mesh', record: terrain, meshPartId: 'full-island' });
+    this.emitEditorStatus(`Library production island terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: 'library-island' });
+  }
+
+  buildProductionIslandTerrain() {
+    const terrain = this.editableTerrainMesh();
+    if (!terrain) return;
+    const entity = this.buildMeshEntity(`${this.world.label} production terrain`, terrain.positions, terrain.indices, this.materials.pirate, this.referenceRoot);
+    this.registerSelectable(entity, { id: this.terrainMeshId(), kind: 'terrain-mesh', record: terrain, meshPartId: 'full-island' });
+    this.emitEditorStatus(`${this.world.label} production island terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: this.world.id });
   }
 
   buildWaterRecord(water) {
@@ -920,6 +951,7 @@ export class GenericWorldScene {
         this.materialForRecord(item), item.transform.rotation,
         { editorKind: kind, editorRecord: item, editorId: item.id });
     }
+    entity._editorBook = item.category === 'books' || /(^|[-_ ])book/i.test(`${item.id || ''} ${item.name || ''}`);
     this.registerSelectable(entity, { id: item.id, kind, record: item });
     return entity;
   }
@@ -974,6 +1006,7 @@ export class GenericWorldScene {
         const entity = createPrimitive(root, child.name || child.id,
           child.metadata?.authoredPrimitive || child.type, child.transform.position, child.size,
           this.materialForRecord(child), child.transform.rotation);
+        entity._editorBook = child.category === 'books' || /(^|[-_ ])book/i.test(`${child.id || ''} ${child.name || ''}`);
         if (child.collision !== false && child.visible !== false) this.prefabCollisionEntries.push({ entity, record: child, instance });
       }
       for (const child of definition.movingPlatforms ?? []) {
@@ -1050,8 +1083,111 @@ export class GenericWorldScene {
     this.objectRoot.enabled = !hideVisuals;
     this.pathRoot.enabled = !hideVisuals;
     for (const entry of this.collisionEntries) {
-      entry.entity.enabled = mode === 'selected' ? entry.id === String(this.selectedId) : mode !== 'normal';
+      entry.entity.enabled = mode === 'selected' ? this.selectedIds.has(String(entry.id)) : mode !== 'normal';
     }
+  }
+
+  entityBounds(id) {
+    const entity = this.entities.get(String(id));
+    if (!entity) return null;
+    entity.syncHierarchy();
+    let bounds = null;
+    for (const component of entity.findComponents?.('render') ?? []) for (const meshInstance of component.meshInstances ?? []) {
+      if (!meshInstance.aabb) continue;
+      if (!bounds) bounds = meshInstance.aabb.clone(); else bounds.add(meshInstance.aabb);
+    }
+    if (!bounds) {
+      const position = entity.getPosition();
+      bounds = new pc.BoundingBox(position.clone(), new pc.Vec3(.25, .25, .25));
+    }
+    return bounds;
+  }
+
+  selectionBounds(ids = this.selectedIds) {
+    let bounds = null;
+    for (const id of ids) {
+      const item = this.entityBounds(id);
+      if (!item) continue;
+      if (!bounds) bounds = item.clone(); else bounds.add(item);
+    }
+    return bounds;
+  }
+
+  worldBounds() {
+    return this.selectionBounds(this.entities.keys());
+  }
+
+  setTransformGizmo(center = null, mode = 'move', visible = true) {
+    destroyChildren(this.transformGizmoRoot);
+    this.transformGizmo = { center: center ? { ...center } : null, mode, handles: [] };
+    this.transformGizmoRoot.enabled = Boolean(visible && center);
+    if (!visible || !center) return;
+    const length = mode === 'rotate' ? 1.7 : 2.4;
+    const thickness = mode === 'scale' ? .2 : .11;
+    const definitions = [
+      ['x', { x: center.x + length / 2, y: center.y, z: center.z }, { x: length, y: thickness, z: thickness }, this.materials.gizmoX],
+      ['y', { x: center.x, y: center.y + length / 2, z: center.z }, { x: thickness, y: length, z: thickness }, this.materials.gizmoY],
+      ['z', { x: center.x, y: center.y, z: center.z + length / 2 }, { x: thickness, y: thickness, z: length }, this.materials.gizmoZ]
+    ];
+    for (const [axis, position, size, material] of definitions) {
+      const entity = createBox(this.transformGizmoRoot, `${mode} ${axis.toUpperCase()} handle`, position, size, material);
+      this.transformGizmo.handles.push({ axis, entity });
+    }
+  }
+
+  pickTransformGizmo(ray) {
+    let best = null;
+    for (const handle of this.transformGizmo.handles ?? []) {
+      handle.entity.syncHierarchy();
+      const component = handle.entity.render;
+      for (const instance of component?.meshInstances ?? []) {
+        const distance = rayAabbDistance(ray.origin, ray.direction, instance.aabb.center, instance.aabb.halfExtents);
+        if (distance != null && (!best || distance < best.distance)) best = { distance, axis: handle.axis, mode: this.transformGizmo.mode };
+      }
+    }
+    return best;
+  }
+
+  setCutoutPreview(record = null, center = null, size = null, thicknessAxis = 'y') {
+    destroyChildren(this.cutoutPreviewRoot);
+    this.cutoutPreviewRoot.enabled = Boolean(record && center && size);
+    if (!record || !center || !size) return;
+    const dimensions = { x: .035, y: .035, z: .035 };
+    for (const axis of ['x', 'y', 'z']) dimensions[axis] = axis === thicknessAxis
+      ? Math.max(.04, finite(record.size?.[axis], .1) + .04)
+      : Math.max(.05, finite(size?.[axis], 1));
+    createBox(this.cutoutPreviewRoot, 'Opening preview', center, dimensions, this.materials.cutoutPreview, record.transform?.rotation ?? {});
+  }
+
+  recordSurfaceHit(id, ray) {
+    const bounds = this.entityBounds(id);
+    if (!bounds) return null;
+    const hit = rayAabbHit(ray.origin, ray.direction, bounds.center, bounds.halfExtents);
+    if (!hit) return null;
+    const point = ray.origin.clone().add(ray.direction.clone().mulScalar(hit.distance));
+    return { ...hit, x: point.x, y: point.y, z: point.z, surfaceId: String(id) };
+  }
+
+  entitiesInScreenRect(cameraEntity, rectangle = {}) {
+    const minX = Math.min(rectangle.x0, rectangle.x1), maxX = Math.max(rectangle.x0, rectangle.x1);
+    const minY = Math.min(rectangle.y0, rectangle.y1), maxY = Math.max(rectangle.y0, rectangle.y1);
+    const result = [];
+    for (const [id, entity] of this.entities) {
+      if (!entity.enabled) continue;
+      const bounds = this.entityBounds(id);
+      if (!bounds) continue;
+      const screen = cameraEntity.camera.worldToScreen(bounds.center);
+      if (screen.z >= 0 && screen.x >= minX && screen.x <= maxX && screen.y >= minY && screen.y <= maxY) {
+        result.push({ id, kind: entity.editorKind, record: entity.editorRecord });
+      }
+    }
+    return result;
+  }
+
+  selectableItems() {
+    return [...this.entities.entries()].map(([id, entity]) => ({
+      id, kind: entity.editorKind, record: entity.editorRecord
+    }));
   }
 
   update(dt) {
@@ -1070,11 +1206,15 @@ export class GenericWorldScene {
   }
 
   pick(ray) {
+    return this.pickAll(ray)[0] ?? null;
+  }
+
+  pickAll(ray) {
     const terrainHit = this.terrainMeshHit(ray);
-    let best = terrainHit ? {
+    const hits = terrainHit ? [{
       distance: terrainHit.distance,
       id: this.terrainMeshId(), kind: 'terrain-mesh', record: this.editableTerrainMesh()
-    } : null;
+    }] : [];
     for (const [id, entity] of this.entities) {
       if (entity.editorKind === 'terrain-mesh') continue; // exact triangle hit above, never a loose terrain AABB proxy
       let entityDistance = null;
@@ -1092,21 +1232,17 @@ export class GenericWorldScene {
         const position = entity.getPosition();
         entityDistance = raySphereDistance(ray.origin, ray.direction, position, .45);
       }
-      if (entityDistance != null && (!best || entityDistance < best.distance)) {
-        best = { distance: entityDistance, id, kind: entity.editorKind, record: entity.editorRecord };
-      }
+      if (entityDistance != null) hits.push({ distance: entityDistance, id, kind: entity.editorKind, record: entity.editorRecord });
     }
     if (this.world?.id === 'skyscraper' && this.referenceRecord) {
       for (const box of this.referenceCollisionBoxes) {
         const distance = rayAabbDistance(ray.origin, ray.direction, box.center, {
           x: box.size.x / 2, y: box.size.y / 2, z: box.size.z / 2
         });
-        if (distance != null && (!best || distance < best.distance)) {
-          best = { distance, id: this.referenceRecord.id, kind: 'architecture-reference', record: this.referenceRecord };
-        }
+        if (distance != null) hits.push({ distance, id: this.referenceRecord.id, kind: 'architecture-reference', record: this.referenceRecord });
       }
     }
-    return best;
+    return hits.sort((left, right) => left.distance - right.distance);
   }
 
   surfaceHit(ray) {
@@ -1169,7 +1305,7 @@ export class GenericWorldScene {
 
   selectedRecord(id) {
     if (id === this.referenceRecord?.id) return this.referenceRecord;
-    if (id === '__basalt-authored-terrain') return this.editableBasaltTerrain();
+    if (String(id) === this.terrainMeshId()) return this.editableTerrainMesh();
     if (String(id).startsWith('__waterpath__:')) return this.entities.get(String(id))?.editorRecord ?? null;
     if (String(id).startsWith('__waypoint__:')) return this.entities.get(String(id))?.editorRecord ?? null;
     if (this.workspaceDefinition) {
