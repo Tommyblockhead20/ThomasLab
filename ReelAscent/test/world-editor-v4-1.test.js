@@ -8,7 +8,7 @@ import { stockLibraryScene } from '../src/world/library-shelf-stocking.js';
 import { SATELLITE_WORLD_LOCATIONS } from '../src/world/world-locations.js';
 import { cutRectangularOpeningInBox, makeBookshelfPrefab } from '../tools/map-editor/architectural-tools.js';
 import { adaptLibrarySceneToEditor, libraryProductionTerrain } from '../tools/map-editor/library-scene-adapter.js';
-import { makeProductionIslandEditorLevel, productionIslandEditorIds } from '../tools/map-editor/production-island-adapter.js';
+import { ensureProductionIslandTerrain, makeProductionIslandEditorLevel, productionIslandEditorIds } from '../tools/map-editor/production-island-adapter.js';
 import {
   duplicateObjectRecords, rangeObjectSelection, selectionPivot,
   transformObjectRecords, updateObjectSelection
@@ -47,6 +47,25 @@ test('v4.1 exposes every physical production island while excluding the virtual 
     assert.ok(level.terrain.positions.length > 100);
     assert.ok(level.terrain.indices.length > 100);
   }
+});
+
+test('v4.1 production island editor includes the cabin, shop, aquarium, and shoreline context', async () => {
+  const home = makeProductionIslandEditorLevel('home-island');
+  const shop = makeProductionIslandEditorLevel('shop-island');
+  const aquarium = makeProductionIslandEditorLevel('aquarium-island');
+  assert.equal(home.prefabs.definitions[0].metadata.sourceBuilder, 'buildHomeCabin');
+  assert.ok(home.prefabs.definitions[0].objects.length >= 35);
+  assert.equal(shop.prefabs.definitions[0].metadata.sourceBuilder, 'buildShopOutpost');
+  assert.ok(shop.prefabs.definitions[0].objects.length >= 12);
+  assert.equal(aquarium.prefabs.definitions[0].metadata.sourceBuilder, 'buildPublicAquarium');
+  assert.ok(aquarium.prefabs.definitions[0].objects.length >= 90);
+  assert.equal(aquarium.prefabs.definitions[0].objects.filter((item) => item.metadata.materialKey === 'water').length, 10);
+  const staleAutosave = { ...home, prefabs: { definitions: [], instances: [] } };
+  ensureProductionIslandTerrain(staleAutosave, 'home-island');
+  assert.equal(staleAutosave.prefabs.instances[0].prefabId, 'PREFAB-PRODUCTION-HEARTHWARD-CABIN');
+  const scene = await source('tools/map-editor/generic-scene.js');
+  assert.match(scene, /buildOceanPreview\(\)/);
+  assert.match(scene, /OCEAN_SURFACE_Y - rootFloorY/);
 });
 
 test('v4.1 Library uses the actual generated island terrain and dense, structurally complete shelves', () => {

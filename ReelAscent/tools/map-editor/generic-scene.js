@@ -1,6 +1,6 @@
 import * as pc from 'playcanvas';
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
-import { SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes } from '../../src/world/mountain-v2.js';
+import { OCEAN_SURFACE_Y, SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes } from '../../src/world/mountain-v2.js';
 import { movingPlatformPose, normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runtime.js';
 import { edgeKey, faceVertices, meshDiagnostics, vertex } from './mesh-authoring.js';
 
@@ -359,6 +359,7 @@ export class GenericWorldScene {
       platform: makeMaterial([.65, .61, .48]),
       moving: makeMaterial([.28, .63, .82]),
       water: makeMaterial([.08, .54, .7], .68),
+      oceanPreview: makeMaterial([.08, .48, .62], .48),
       selected: makeMaterial([1, .7, .08], 1, .08),
       selectedSecondary: makeMaterial([.98, .88, .25], 1, .045),
       diagnosticA: makeMaterial([.05, .9, 1], 1, .14),
@@ -641,7 +642,8 @@ export class GenericWorldScene {
       dark: this.materials.roomDark, plant: this.materials.roomPlant, tile: this.materials.roomTile,
       partition: this.materials.roomPartition, light: this.materials.roomLight, stone: this.materials.roomFloor,
       trim: this.materials.roomAccent, 'casino-felt': this.materials.casinoFelt,
-      'casino-red': this.materials.casinoRed, 'casino-purple': this.materials.casinoPurple
+      'casino-red': this.materials.casinoRed, 'casino-purple': this.materials.casinoPurple,
+      water: this.materials.water
     };
     return map[key] || fallback;
   }
@@ -701,6 +703,7 @@ export class GenericWorldScene {
     else if (this.world.id === 'pirate-island') this.buildPirateReference();
     else if (this.world.id === 'library-island') this.buildLibraryTerrain();
     else if (this.level?.terrain?.mode === 'production-island-terrain') this.buildProductionIslandTerrain();
+    this.buildOceanPreview();
     this.buildWaters();
     this.buildObjects();
     this.buildMovingPlatforms();
@@ -886,6 +889,29 @@ export class GenericWorldScene {
     const entity = this.buildMeshEntity(`${this.world.label} production terrain`, terrain.positions, terrain.indices, this.materials.pirate, this.referenceRoot);
     this.registerSelectable(entity, { id: this.terrainMeshId(), kind: 'terrain-mesh', record: terrain, meshPartId: 'full-island' });
     this.emitEditorStatus(`${this.world.label} production island terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: this.world.id });
+  }
+
+  buildOceanPreview() {
+    const terrain = this.level?.terrain;
+    if (!terrain?.positions?.length || this.world?.id === 'stoneveil-peak') return;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let index = 0; index < terrain.positions.length; index += 3) {
+      minX = Math.min(minX, finite(terrain.positions[index]));
+      maxX = Math.max(maxX, finite(terrain.positions[index]));
+      minZ = Math.min(minZ, finite(terrain.positions[index + 2]));
+      maxZ = Math.max(maxZ, finite(terrain.positions[index + 2]));
+    }
+    if (![minX, maxX, minZ, maxZ].every(Number.isFinite)) return;
+    const centerX = (minX + maxX) * .5;
+    const centerZ = (minZ + maxZ) * .5;
+    const halfX = Math.max(8, (maxX - minX) * .5);
+    const halfZ = Math.max(8, (maxZ - minZ) * .5);
+    const margin = Math.max(10, Math.min(24, Math.max(halfX, halfZ) * .14));
+    const rootFloorY = finite(terrain.metadata?.rootFloorY, 0);
+    const ocean = createPrimitive(this.referenceRoot, 'Editor ocean waterline preview', 'cylinder',
+      { x: centerX, y: OCEAN_SURFACE_Y - rootFloorY - .035, z: centerZ },
+      { x: (halfX + margin) * 2, y: .07, z: (halfZ + margin) * 2 }, this.materials.oceanPreview);
+    ocean.editorOceanPreview = true;
   }
 
   buildWaterRecord(water) {
