@@ -6,8 +6,13 @@ import {
 } from '../world/world-locations.js';
 
 export class BoatTravelMenu {
-  constructor(onTravel) {
+  constructor(onTravel, {
+    getDestinationAccess = () => ({ state: 'available', revealed: true, playable: true }),
+    ownsBoat = () => true
+  } = {}) {
     this.onTravel = onTravel;
+    this.getDestinationAccess = getDestinationAccess;
+    this.ownsBoat = ownsBoat;
     this.screen = document.querySelector('#boat-travel');
     this.map = document.querySelector('#boat-travel-map');
     this.title = document.querySelector('#boat-travel-selection');
@@ -44,6 +49,23 @@ export class BoatTravelMenu {
     this.render();
   }
 
+  isCourtesyFerry(id) {
+    return (this.currentId === 'home-island' && id === 'shop-island')
+      || (this.currentId === 'shop-island' && id === 'home-island');
+  }
+
+  markerAccess(location) {
+    const access = this.getDestinationAccess(location.id) ?? {};
+    const boatAllowed = this.ownsBoat() || this.isCourtesyFerry(location.id);
+    return {
+      ...access,
+      playable: access.playable !== false && boatAllowed,
+      reason: access.playable === false
+        ? access.reason
+        : boatAllowed ? '' : 'Purchase the $2000 Trail Boat at Outfitter\'s Reach.'
+    };
+  }
+
   render() {
     if (!this.map) return;
     this.map.replaceChildren(...WORLD_LOCATIONS.map((location) => {
@@ -51,7 +73,9 @@ export class BoatTravelMenu {
       button.type = 'button';
       button.dataset.travelDestination = location.id;
       button.className = `boat-map-island boat-map-${location.type}`;
-      button.disabled = location.destination?.enabled === false;
+      const access = this.markerAccess(location);
+      button.disabled = !access.playable;
+      button.classList.add(`is-${access.state ?? 'available'}`);
       const mapped = compressWorldMapPosition(location.worldPosition);
       const x = 50 + (mapped.x - WORLD_CENTER.x) / WORLD_MAP_DISPLAY_RADIUS * 42;
       const y = 50 + (mapped.z - WORLD_CENTER.z) / WORLD_MAP_DISPLAY_RADIUS * 42;
@@ -71,19 +95,17 @@ export class BoatTravelMenu {
         footprint.dataset.theme = location.type;
       }
       const label = document.createElement('b');
-      label.textContent = location.displayName;
+      label.textContent = access.revealed === false ? 'Uncharted Waters' : location.displayName;
       button.append(footprint, label);
-      const lockMessage = location.destination?.enabled === false && !location.destination.concealDetails
-        ? location.destination.lockMessage || 'This destination is not open yet.'
-        : '';
+      const lockMessage = access.reason || '';
       if (lockMessage) {
         const lock = document.createElement('small');
         lock.className = 'boat-map-lock';
-        lock.textContent = `LOCKED • ${lockMessage}`;
+        lock.textContent = `${access.state === 'known-unavailable' ? 'UNAVAILABLE' : 'LOCKED'} • ${lockMessage}`;
         button.appendChild(lock);
         button.setAttribute('aria-description', lockMessage);
       }
-      button.title = lockMessage ? `${location.displayName} — ${lockMessage}` : location.displayName;
+      button.title = lockMessage ? `${access.revealed === false ? 'Uncharted Waters' : location.displayName} — ${lockMessage}` : location.displayName;
       return button;
     }));
   }
@@ -95,15 +117,15 @@ export class BoatTravelMenu {
     this.selectedId = null;
     this.travelInProgress = false;
     this.isOpen = true;
+    this.render();
     this.screen.hidden = false;
     document.body.classList.add('boat-travel-open');
     this.title.textContent = 'Choose a destination on the chart';
     this.confirmButton.disabled = true;
     for (const marker of this.map?.querySelectorAll('[data-travel-destination]') ?? []) {
-      const location = WORLD_LOCATIONS.find((entry) => entry.id === marker.dataset.travelDestination);
       const isCurrent = marker.dataset.travelDestination === currentId;
       marker.classList.toggle('is-current', isCurrent);
-      marker.disabled = isCurrent || location?.destination?.enabled === false;
+      marker.disabled = isCurrent || marker.disabled;
       marker.classList.remove('is-selected');
     }
     this.closeButton?.focus({ preventScroll: true });
@@ -111,7 +133,7 @@ export class BoatTravelMenu {
 
   select(id) {
     const location = WORLD_LOCATIONS.find((entry) => entry.id === id);
-    if (!location || id === this.currentId || location.destination?.enabled === false || this.travelInProgress) return false;
+    if (!location || id === this.currentId || !this.markerAccess(location).playable || this.travelInProgress) return false;
     this.selectedId = id;
     this.title.textContent = location.displayName;
     this.confirmButton.disabled = false;
@@ -124,7 +146,7 @@ export class BoatTravelMenu {
   async travel() {
     if (!this.selectedId || !this.onTravel || this.travelInProgress) return;
     const destination = WORLD_LOCATIONS.find((entry) => entry.id === this.selectedId);
-    if (!destination || destination.id === this.currentId || destination.destination?.enabled === false) return;
+    if (!destination || destination.id === this.currentId || !this.markerAccess(destination).playable) return;
     this.travelInProgress = true;
     this.confirmButton.disabled = true;
     this.closeButton.disabled = true;

@@ -239,10 +239,16 @@ function addFishingWater(world, root, water) {
   zone.waterType = water.waterType ?? 'pond';
   zone.theme = water.theme ?? 'fernwood';
   zone.authoredFishIds = Array.isArray(water.fishIds) ? [...water.fishIds] : [];
+  // Athenaeum water records are curated closed ecology pools. This prevents the normal
+  // freshwater compatibility resolver from reintroducing ordinary animals.
+  zone.allowedFishIds = Array.isArray(water.allowedFishIds)
+    ? [...water.allowedFishIds]
+    : water.mythicalOnly === true ? [...zone.authoredFishIds] : null;
   if (Array.isArray(water.ecologyThemes)) zone.ecologyThemes = [...water.ecologyThemes];
   zone.probabilityGroup = water.probabilityGroup ?? water.id;
   zone.cave = Boolean(water.cave);
   zone.physicalZone = water.label;
+  zone.mythicalOnly = water.mythicalOnly === true;
   const authored = attachZoneEcology(zone);
   world.fishingZones.push(authored);
   return authored;

@@ -3,9 +3,18 @@ import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
 import { OCEAN_SURFACE_Y, SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes } from '../../src/world/mountain-v2.js';
 import { movingPlatformPose, normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runtime.js';
 import { edgeKey, faceVertices, meshDiagnostics, vertex } from './mesh-authoring.js';
+import { attachEditorSignText, supportsEditableSignText } from './sign-text.js';
 
 const clone = (value) => value == null ? value : structuredClone(value);
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+export function effectiveSmoothStrength(displayedStrength) {
+  const displayed = Math.max(.25, Math.min(6, finite(displayedStrength, 1)));
+  // Requested response curve: .25 behaves like the old .75, while 6 behaves like
+  // the old 24. The factor ramps smoothly from 3x to 4x between those endpoints.
+  const factor = 3 + (displayed - .25) / 5.75;
+  return displayed * factor;
+}
 
 export function rayTriangleMeshHit(mesh, origin, direction) {
   if (!mesh?.positions?.length || !mesh?.indices?.length) return null;
@@ -112,7 +121,7 @@ export function sculptTriangleMesh(mesh, hit, mode, radius, strength) {
     }
   }
   const source = p.slice();
-  const amount = Number(strength) || 1;
+  const amount = mode === 'smooth' ? effectiveSmoothStrength(strength) : (Number(strength) || 1);
   let changed = 0;
   for (const [index, distance] of distances) {
     const t = Math.max(0, 1 - distance / maxDistance);
@@ -177,7 +186,14 @@ function makeAuthoredMaterial(spec = {}) {
 
 function destroyChildren(root) {
   for (const child of [...root.children]) {
-    for (const mesh of child._editorOwnedMeshes ?? []) { try { mesh.destroy(); } catch {} }
+    const stack = [child];
+    while (stack.length) {
+      const node = stack.pop();
+      stack.push(...(node.children ?? []));
+      for (const mesh of node._editorOwnedMeshes ?? []) { try { mesh.destroy(); } catch {} }
+      for (const material of node._editorOwnedSignMaterials ?? []) { try { material.destroy(); } catch {} }
+      for (const texture of node._editorOwnedSignTextures ?? []) { try { texture.destroy(); } catch {} }
+    }
     child.destroy();
   }
 }
@@ -390,6 +406,15 @@ export class GenericWorldScene {
       roomTile: makeMaterial([.47, .56, .55]),
       roomPartition: makeMaterial([.54, .57, .56]),
       roomLight: makeMaterial([.95, .88, .56], 1, .35),
+      assetWoodLight: makeMaterial([.58, .38, .20]),
+      assetWoodDark: makeMaterial([.23, .13, .08]),
+      assetStoneDark: makeMaterial([.20, .24, .25]),
+      assetBrass: makeMaterial([.72, .52, .16], 1, .08),
+      assetBookGreen: makeMaterial([.16, .40, .27]),
+      assetBookRed: makeMaterial([.50, .16, .14]),
+      assetBookBlue: makeMaterial([.14, .30, .52]),
+      assetWarmGlow: makeMaterial([1, .72, .24], 1, .42),
+      assetRope: makeMaterial([.42, .30, .17]),
       casinoFelt: makeMaterial([.08, .36, .22]),
       casinoRed: makeMaterial([.44, .08, .09]),
       casinoPurple: makeMaterial([.31, .12, .45], 1, .08),
@@ -643,7 +668,12 @@ export class GenericWorldScene {
       partition: this.materials.roomPartition, light: this.materials.roomLight, stone: this.materials.roomFloor,
       trim: this.materials.roomAccent, 'casino-felt': this.materials.casinoFelt,
       'casino-red': this.materials.casinoRed, 'casino-purple': this.materials.casinoPurple,
-      water: this.materials.water
+      water: this.materials.water,
+      woodlight: this.materials.assetWoodLight, wooddark: this.materials.assetWoodDark,
+      stonedark: this.materials.assetStoneDark, brass: this.materials.assetBrass,
+      bookgreen: this.materials.assetBookGreen, bookred: this.materials.assetBookRed,
+      bookblue: this.materials.assetBookBlue, warmglow: this.materials.assetWarmGlow,
+      rope: this.materials.assetRope
     };
     return map[key] || fallback;
   }
@@ -942,6 +972,7 @@ export class GenericWorldScene {
       entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
       entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
       entity.setLocalScale(Math.max(.1, finite(radii.x, 4) * 2), .07, Math.max(.1, finite(radii.z, 4) * 2));
+      entity.setLocalEulerAngles(finite(water.rotation?.x), finite(water.rotation?.y), finite(water.rotation?.z));
     }
     entity.editorKind = this.workspaceDefinition ? 'prefab-child-water' : 'water-v2';
     entity.editorRecord = water;
@@ -977,6 +1008,7 @@ export class GenericWorldScene {
         this.materialForRecord(item), item.transform.rotation,
         { editorKind: kind, editorRecord: item, editorId: item.id });
     }
+    if (supportsEditableSignText(item)) attachEditorSignText(this.app.graphicsDevice, entity, item);
     entity._editorBook = item.category === 'books' || /(^|[-_ ])book/i.test(`${item.id || ''} ${item.name || ''}`);
     this.registerSelectable(entity, { id: item.id, kind, record: item });
     return entity;
@@ -1032,6 +1064,7 @@ export class GenericWorldScene {
         const entity = createPrimitive(root, child.name || child.id,
           child.metadata?.authoredPrimitive || child.type, child.transform.position, child.size,
           this.materialForRecord(child), child.transform.rotation);
+        if (supportsEditableSignText(child)) attachEditorSignText(this.app.graphicsDevice, entity, child);
         entity._editorBook = child.category === 'books' || /(^|[-_ ])book/i.test(`${child.id || ''} ${child.name || ''}`);
         if (child.collision !== false && child.visible !== false) this.prefabCollisionEntries.push({ entity, record: child, instance });
       }
@@ -1284,6 +1317,20 @@ export class GenericWorldScene {
       if (hit && (!best || hit.distance < best.distance)) {
         const point = ray.origin.clone().add(ray.direction.clone().mulScalar(hit.distance));
         best = { distance: hit.distance, x: point.x, y: point.y, z: point.z, kind: box.kind, normal: hit.normal, surfaceId: box.id ?? null };
+      }
+    }
+    // Authored objects and linked assets are valid placement surfaces too. This makes
+    // click-to-place useful for tables, roofs, platforms, and other editor geometry
+    // instead of silently falling through to the terrain/zero plane beneath them.
+    for (const [id, entity] of this.entities) {
+      if (!['world-object', 'prefab-instance', 'room', 'moving-platform'].includes(entity.editorKind)) continue;
+      if (!entity.enabled || this.editorHiddenIds.has(String(id))) continue;
+      const bounds = this.entityBounds(id);
+      if (!bounds) continue;
+      const hit = rayAabbHit(ray.origin, ray.direction, bounds.center, bounds.halfExtents);
+      if (hit && (!best || hit.distance < best.distance)) {
+        const point = ray.origin.clone().add(ray.direction.clone().mulScalar(hit.distance));
+        best = { ...hit, x: point.x, y: point.y, z: point.z, kind: 'authored-object', surfaceId: String(id) };
       }
     }
     // A fallback editing plane keeps empty/minimal scenes placeable.

@@ -2975,6 +2975,12 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .boat-map-island.is-current { box-shadow: 0 0 0 3px #fff5b6; }
 .boat-map-island.is-selected { outline: 3px solid #f2bd45; outline-offset: 1px; }
 .boat-map-island:disabled { opacity: .78; }
+.boat-map-island.is-locked-cloud { filter: grayscale(.35); background: #aab7b1 !important; border-color: #dde5df !important; box-shadow: 0 0 18px 9px rgba(232, 239, 235, .8); }
+.boat-map-island.is-locked-cloud .boat-map-footprint { opacity: .18; }
+.boat-map-island.is-known-unavailable { filter: grayscale(1); opacity: .62; }
+.map-island-locked-cloud :is(ellipse, polygon, .map-open-water-boat) { opacity: .16; filter: grayscale(1); }
+.map-island-locked-cloud text { fill: #66736d; }
+.map-island-known-unavailable { filter: grayscale(1); opacity: .58; }
 .boat-map-lock { display: block; max-width: 8.5rem; color: #f5dda0; font-size: .42rem; line-height: 1.25; }
 
 .map-islands :is(ellipse, polygon) { fill: #6f9958; stroke: #2d5c45; stroke-width: 1.4; }

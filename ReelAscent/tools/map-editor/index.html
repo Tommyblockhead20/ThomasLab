@@ -34,16 +34,21 @@
       </div>
       <div class="top-actions">
         <button id="undo" title="Ctrl+Z">Undo</button>
-        <button id="redo" title="Ctrl+Y">Redo</button>
-        <button id="checkpoint" title="Store a browser-local safety checkpoint before a risky edit">Checkpoint</button>
-        <button id="restore-checkpoint" title="Restore your latest manual safety checkpoint">Restore Checkpoint</button>
-        <button id="reload-project-patch" title="Reload the current world data from the dev server">Reload Project Data</button>
-        <button id="recover-browser-autosave" title="Explicitly load the latest Stoneveil IndexedDB autosave, including one from a different project terrain revision">Recover Browser Autosave</button>
-        <button id="open-patch">Open Level / Patch</button>
-        <button id="import-snapshot">Import Runtime Snapshot</button>
-        <button id="bake-snapshot" disabled>Bake Rocks Into Editor</button>
-        <button id="freeze-core" title="Convert the current finished heightfield into a true editable 3D triangle mesh">Freeze Core to 3D Mesh</button>
-        <button id="export-world-v2" title="Export a schema-v2 World Editor level without replacing the Stoneveil production patch">Export World V2</button>
+        <button id="redo" title="Ctrl+Y / Ctrl+Shift+Z">Redo</button>
+        <details class="action-menu">
+          <summary>Project</summary>
+          <div class="action-menu-popover">
+            <button id="checkpoint" title="Store a browser-local safety checkpoint before a risky edit">Checkpoint</button>
+            <button id="restore-checkpoint" title="Restore your latest manual safety checkpoint">Restore Checkpoint</button>
+            <button id="reload-project-patch" title="Reload the current world data from the dev server">Reload Project Data</button>
+            <button id="recover-browser-autosave" title="Explicitly load the latest Stoneveil IndexedDB autosave, including one from a different project terrain revision">Recover Browser Autosave</button>
+            <button id="open-patch">Open Level / Patch</button>
+            <button id="import-snapshot">Import Runtime Snapshot</button>
+            <button id="bake-snapshot" disabled>Bake Rocks Into Editor</button>
+            <button id="freeze-core" title="Convert the current finished heightfield into a true editable 3D triangle mesh">Freeze Core to 3D Mesh</button>
+            <button id="export-world-v2" title="Export a schema-v2 World Editor level without replacing the Stoneveil production patch">Export World V2</button>
+          </div>
+        </details>
         <button id="save-patch" class="primary">Save</button>
         <input id="patch-file" type="file" accept="application/json,.json" hidden />
         <input id="snapshot-file" type="file" accept="application/json,.json" hidden />
@@ -60,9 +65,10 @@
           <button type="button" data-authoring-mode="water">Water</button>
           <button type="button" data-authoring-mode="path">Path</button>
         </div>
+        <div id="authoring-mode-help" class="compact-status workflow-help">Select and place complete objects. Terrain, topology, and water controls stay in their own modes.</div>
       </section>
-      <section>
-        <h2>Tool</h2>
+      <section id="tool-section">
+        <h2 id="tool-section-heading">Object Tools</h2>
         <div id="tool-grid" class="tool-grid">
           <button data-tool="select" class="active">Select</button>
           <button data-tool="raise">Raise</button>
@@ -204,7 +210,7 @@
           <label>Asset search <input id="v3-asset-search" type="search" placeholder="Shelf, chair, fireplace, stair…" autocomplete="off" /></label>
           <label>Categorized asset <select id="v3-asset-template"></select></label>
           <div id="v3-asset-description" class="compact-status hint"></div>
-          <div class="row-actions"><button id="place-v3-asset" type="button">Place Linked Asset</button></div>
+          <div class="row-actions"><button id="place-v3-asset" type="button">Place Asset</button></div>
           <details><summary>Stair Generator</summary>
             <div class="field-grid two">
               <label>Rise <input id="stair-rise" type="number" step="0.1" value="3" /></label>
@@ -287,25 +293,29 @@
       <canvas id="editor-canvas"></canvas>
       <div id="view-toolbar">
         <button data-view="perspective" class="active">Perspective</button>
-        <button data-view="top">Top</button>
-        <button data-view="north">North Side</button>
-        <button data-view="west">West Side</button>
         <button id="orbit-view-surface" title="Set a stable orbit pivot from the viewport center or nearby surface">Orbit Around View / Surface</button>
         <button id="frame-selected" title="Frame every selected object (F)">Frame Selected</button>
         <button id="frame-world" title="Frame all visible authoring geometry">Frame World</button>
         <button id="walkthrough-toggle" title="First-person terrain playtest using the game's player capsule, gravity, jump and slope settings">Walkthrough</button>
-        <label><input id="show-waters" type="checkbox" checked /> Waters</label>
-        <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
-        <label id="slope-toggle-wrap" title="Classify the actual authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
-        <label class="toolbar-select" title="Inspect the geometry the player actually collides with">Collision <select id="collision-mode"><option value="normal">Normal</option><option value="overlay">Visual + Collision</option><option value="collision-only">Collision Only</option><option value="selected">Selected Collision</option></select></label>
-        <label title="Visualize the registered viewport picking bounds for authorable objects"><input id="show-picking-targets" type="checkbox" /> Picking targets</label>
-        <label id="hide-library-books-wrap" title="Debug shelf frames and boards without books"><input id="hide-library-books" type="checkbox" /> Hide Books</label>
-        <label id="skyscraper-interior-wrap" title="Hide the imported exterior shell while authoring rooms inside the tower"><input id="skyscraper-interior-mode" type="checkbox" /> Interior cutaway</label>
-        <label class="walkthrough-persistent" title="Editor-only ambient light floor. Keeps dark cave geometry readable without changing the saved map or production lighting." style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-          Min brightness <output id="minimum-brightness-out">55%</output>
-          <input id="minimum-brightness" type="range" min="35" max="85" step="5" value="55" style="width:100px;" />
-        </label>
-        <label id="existing-rocks-label" title="Import a runtime snapshot once, or bake it into the editor patch so it persists"><input id="show-snapshot-rocks" type="checkbox" checked disabled /> Existing rocks (import snapshot)</label>
+        <details class="toolbar-menu"><summary>Views</summary><div class="toolbar-menu-popover">
+          <button data-view="top">Top</button>
+          <button data-view="north">North Side</button>
+          <button data-view="west">West Side</button>
+        </div></details>
+        <details class="toolbar-menu"><summary>Overlays</summary><div class="toolbar-menu-popover">
+          <label><input id="show-waters" type="checkbox" checked /> Waters</label>
+          <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
+          <label id="slope-toggle-wrap" title="Classify the actual authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
+          <label class="toolbar-select" title="Inspect the geometry the player actually collides with">Collision <select id="collision-mode"><option value="normal">Normal</option><option value="overlay">Visual + Collision</option><option value="collision-only">Collision Only</option><option value="selected">Selected Collision</option></select></label>
+          <label title="Visualize the registered viewport picking bounds for authorable objects"><input id="show-picking-targets" type="checkbox" /> Picking targets</label>
+          <label id="hide-library-books-wrap" title="Debug shelf frames and boards without books"><input id="hide-library-books" type="checkbox" /> Hide Books</label>
+          <label id="skyscraper-interior-wrap" title="Hide the imported exterior shell while authoring rooms inside the tower"><input id="skyscraper-interior-mode" type="checkbox" /> Interior cutaway</label>
+          <label class="walkthrough-persistent" title="Editor-only ambient light floor. Keeps dark cave geometry readable without changing the saved map or production lighting.">
+            Min brightness <output id="minimum-brightness-out">55%</output>
+            <input id="minimum-brightness" type="range" min="35" max="85" step="5" value="55" />
+          </label>
+          <label id="existing-rocks-label" title="Import a runtime snapshot once, or bake it into the editor patch so it persists"><input id="show-snapshot-rocks" type="checkbox" checked disabled /> Existing rocks (import snapshot)</label>
+        </div></details>
       </div>
       <div id="box-selection-preview" hidden></div>
       <div id="prefab-workspace-banner" hidden><strong id="prefab-workspace-name">Prefab Workspace</strong><span>Local origin is (0,0,0). Child transforms are local.</span><button id="prefab-workspace-return" type="button">Return to World</button></div>
@@ -370,7 +380,7 @@
         </div>
       </section>
 
-      <section>
+      <section id="summary-section">
         <h2 id="summary-heading">Scene Summary</h2>
         <dl id="summary"></dl>
         <div id="source-policy-status" class="source-policy-status"></div>
@@ -390,7 +400,7 @@
         <div id="zfight-results" class="diagnostic-results hint">Run a scan to inspect authored geometry.</div>
       </section>
 
-      <section>
+      <section id="camera-section">
         <h2>Camera</h2>
         <label>Move speed <output id="camera-move-value">22%</output><input id="camera-move-speed" type="range" min="10" max="150" step="1" value="22" /></label>
         <label>Wheel zoom <output id="camera-zoom-value">24%</output><input id="camera-zoom-speed" type="range" min="5" max="150" step="1" value="24" /></label>

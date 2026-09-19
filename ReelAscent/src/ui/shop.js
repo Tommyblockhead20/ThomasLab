@@ -1,5 +1,5 @@
 import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
-import { MAP_ITEMS } from '../world/world-locations.js';
+import { BOAT_SHOP_ITEM, MAP_ITEMS } from '../world/world-locations.js';
 import { SHOP_COSMETICS } from '../progression/cosmetics.js';
 import { INVENTORY_SORT_OPTIONS } from './inventory.js';
 import { orderAndFilterSpecimens, specimenFilterOptions } from '../progression/specimen-order.js';
@@ -65,22 +65,6 @@ export class ShopMenu {
         this.render(true);
         return;
       }
-      const oldManSale = event.target.closest('[data-old-man-sell]');
-      if (oldManSale) {
-        const state = this.progression.getSnapshot();
-        const specimenId = oldManSale.dataset.oldManSell;
-        const specimen = [...state.inventory, ...state.aquarium]
-          .find((entry) => entry.specimenId === specimenId);
-        if (!specimen) return;
-        const amount = Math.max(0, Number(specimen.value) || 0) * 2;
-        if (!globalThis.confirm?.(`Sell ${specimen.name} to the Old Man for today's 2× price of $${amount}?`)) return;
-        const result = this.progression.sellOldManDailySpecimen(specimenId);
-        this.status.textContent = result.ok
-          ? `The Old Man bought ${result.specimen.name} for $${result.amount}. Today's 2× sale is used.`
-          : result.reason;
-        this.render(true);
-        return;
-      }
       const specimen = event.target.closest('[data-shop-sell]');
       if (specimen) {
         const result = this.progression.sellInventorySpecimen(specimen.dataset.shopSell);
@@ -92,6 +76,13 @@ export class ShopMenu {
       if (worldItem) {
         const result = this.progression.purchaseWorldItem(worldItem.dataset.worldShop);
         this.status.textContent = result.ok ? `${result.item.name} added to Inventory.` : result.reason;
+        this.render(true);
+        return;
+      }
+      const boat = event.target.closest('[data-boat-shop]');
+      if (boat) {
+        const result = this.progression.purchaseBoat();
+        this.status.textContent = result.ok ? `${result.item.name} purchased for this save.` : result.reason;
         this.render(true);
         return;
       }
@@ -161,16 +152,16 @@ export class ShopMenu {
   updateModeHeading() {
     const selling = this.activeMode === 'sell';
     if (this.eyebrow) this.eyebrow.textContent = selling
-      ? "OUTFITTER'S REACH • THE OLD MAN"
+      ? "OUTFITTER'S REACH • FISH MARKET"
       : "OUTFITTER'S REACH • GEAR COUNTER";
     if (this.title) this.title.textContent = selling
-      ? 'The Old Man & Fish Market'
+      ? 'Fish Market'
       : 'Outfitter';
     if (this.tabs) this.tabs.hidden = selling;
   }
 
   tabStatus() {
-    if (this.activeMode === 'sell') return 'Choose one owned specimen for the daily 2× offer, or use ordinary carried-catch sales.';
+    if (this.activeMode === 'sell') return 'Sell carried catches at the ordinary market price.';
     if (this.activeMode === 'cosmetics') return 'Purchase ordinary Outfitter cosmetics for this save slot.';
     if (this.activeMode === 'climbing') return 'Purchase maps and traversal gear, then equip one item in each category.';
     return 'Purchase fishing gear, then equip one item in each category.';
@@ -186,8 +177,8 @@ export class ShopMenu {
     }
     if (this.activeMode === 'sell') this.content.innerHTML = this.renderSales(state);
     else if (this.activeMode === 'cosmetics') this.content.innerHTML = this.renderCosmetics(state);
-    else if (this.activeMode === 'climbing') this.content.innerHTML = `${this.renderWorldItems(state)}${this.renderEquipment(state, CLIMBING_CATEGORIES)}`;
-    else this.content.innerHTML = this.renderEquipment(state, FISHING_CATEGORIES);
+    else if (this.activeMode === 'climbing') this.content.innerHTML = `${this.renderBoat(state)}${this.renderWorldItems(state)}${this.renderEquipment(state, CLIMBING_CATEGORIES)}`;
+    else this.content.innerHTML = `${this.renderBoat(state)}${this.renderEquipment(state, FISHING_CATEGORIES)}`;
     this.renderedRevision = this.progression.revision;
   }
 
@@ -219,6 +210,12 @@ export class ShopMenu {
     return `<section class="shop-category"><h3>MAPS</h3><div class="shop-card-row">${cards}</div></section>`;
   }
 
+  renderBoat() {
+    const owned = this.progression.ownsBoat();
+    const card = `<article class="shop-card ${owned ? 'is-equipped' : ''}"><div><strong>${BOAT_SHOP_ITEM.name}</strong><small>${owned ? 'OWNED' : `$${BOAT_SHOP_ITEM.price}`}</small></div><p>${BOAT_SHOP_ITEM.description}</p><button type="button" data-boat-shop ${owned || !this.progression.canAfford(BOAT_SHOP_ITEM.price) ? 'disabled' : ''}>${owned ? 'READY TO SAIL' : `BUY $${BOAT_SHOP_ITEM.price}`}</button></article>`;
+    return `<section class="shop-category"><h3>BOAT</h3><div class="shop-card-row">${card}</div></section>`;
+  }
+
   renderCosmetics(state) {
     const owned = new Set(state.ownedCosmetics ?? []);
     const cards = SHOP_COSMETICS.map((cosmetic) => {
@@ -237,16 +234,7 @@ export class ShopMenu {
       `<article class="shop-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${escapeHtml(specimen.rarity)}</small></div><p>${specimen.length.toFixed(1)} in • ${specimen.weight.toFixed(2)} lb</p><button type="button" data-shop-sell="${escapeHtml(specimen.specimenId)}">SELL $${specimen.value}</button></article>`
     )).join('');
     const filter = filterChoices.length ? `<label class="inventory-sort seller-sort">${this.sellerSort === 'species' ? 'SPECIES' : 'LOCATION'} <select data-seller-filter aria-label="Filter sellable specimens"><option value="">All</option>${filterChoices.map(([id, label]) => `<option value="${escapeHtml(id)}" ${id === this.sellerFilter ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></label>` : '';
-    const daily = this.progression.getOldManDailySaleStatus();
-    const aquariumIds = new Set(state.aquarium.map((specimen) => specimen.specimenId));
-    const owned = orderAndFilterSpecimens([...state.inventory, ...state.aquarium], this.sellerSort, this.sellerFilter);
-    const dailyCards = daily.available ? owned.map((specimen) => (
-      `<article class="shop-card old-man-sale-card"><div><strong>${escapeHtml(specimen.name)}${specimen.shiny ? ' ✦' : ''}</strong><small>${aquariumIds.has(specimen.specimenId) ? 'AQUARIUM' : 'INVENTORY'} • NORMAL $${specimen.value}</small></div><p>${specimen.length.toFixed(1)} in • ${specimen.weight.toFixed(2)} lb</p><button type="button" data-old-man-sell="${escapeHtml(specimen.specimenId)}">SELL 2× • $${specimen.value * 2}</button></article>`
-    )).join('') : '';
-    const dailyMessage = daily.available
-      ? (dailyCards || '<p class="shop-empty">You do not own an eligible specimen yet.</p>')
-      : '<p class="shop-empty">TODAY\'S 2× SALE IS USED • Come back after your next local calendar-day reset.</p>';
-    return `<section class="shop-category old-man-daily"><div class="shop-category-heading"><h3>OLD MAN'S DAILY 2× OFFER</h3><small>ONE OWNED SPECIMEN • ONCE PER CALENDAR DAY • THIS SAVE ONLY</small></div><div class="shop-card-row">${dailyMessage}</div></section><section class="shop-category"><div class="shop-category-heading"><h3>ORDINARY CARRIED-CATCH SALES</h3><button type="button" data-shop-sell-all ${state.inventory.length ? '' : 'disabled'}>SELL ALL ${state.inventory.length} • $${total}</button></div><label class="inventory-sort seller-sort">SORT <select data-seller-sort aria-label="Sort sellable specimens">${options}</select></label>${filter}<div class="shop-card-row">${cards || '<p class="shop-empty">No matching specimens to sell.</p>'}</div></section>`;
+    return `<section class="shop-category"><div class="shop-category-heading"><h3>CARRIED-CATCH SALES</h3><button type="button" data-shop-sell-all ${state.inventory.length ? '' : 'disabled'}>SELL ALL ${state.inventory.length} • $${total}</button></div><label class="inventory-sort seller-sort">SORT <select data-seller-sort aria-label="Sort sellable specimens">${options}</select></label>${filter}<div class="shop-card-row">${cards || '<p class="shop-empty">No matching specimens to sell.</p>'}</div></section>`;
   }
 
   destroy() {

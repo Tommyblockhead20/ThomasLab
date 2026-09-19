@@ -7,7 +7,10 @@ import SCENE from '../src/world/library-island-v2.scene.json' with { type: 'json
 import { stockLibraryScene } from '../src/world/library-shelf-stocking.js';
 import { SATELLITE_WORLD_LOCATIONS } from '../src/world/world-locations.js';
 import { cutRectangularOpeningInBox, makeBookshelfPrefab } from '../tools/map-editor/architectural-tools.js';
+import { assetsForWorld } from '../tools/map-editor/asset-library-v3.js';
 import { adaptLibrarySceneToEditor, libraryProductionTerrain } from '../tools/map-editor/library-scene-adapter.js';
+import { effectiveSmoothStrength } from '../tools/map-editor/generic-scene.js';
+import { historyCommandForKey } from '../tools/map-editor/history-shortcuts.js';
 import { ensureProductionIslandTerrain, makeProductionIslandEditorLevel, productionIslandEditorIds } from '../tools/map-editor/production-island-adapter.js';
 import {
   duplicateObjectRecords, rangeObjectSelection, selectionPivot,
@@ -43,7 +46,7 @@ test('v4.1 exposes every physical production island while excluding the virtual 
   assert.equal(represented.has('bluewater-reach'), false);
   for (const id of productionIslandEditorIds()) {
     const level = makeProductionIslandEditorLevel(id);
-    assert.equal(level.terrain.mode, 'production-island-terrain');
+    assert.equal(level.terrain.mode, id === 'cave-fishing-island' ? 'authored-triangle-mesh' : 'production-island-terrain');
     assert.ok(level.terrain.positions.length > 100);
     assert.ok(level.terrain.indices.length > 100);
   }
@@ -53,19 +56,64 @@ test('v4.1 production island editor includes the cabin, shop, aquarium, and shor
   const home = makeProductionIslandEditorLevel('home-island');
   const shop = makeProductionIslandEditorLevel('shop-island');
   const aquarium = makeProductionIslandEditorLevel('aquarium-island');
-  assert.equal(home.prefabs.definitions[0].metadata.sourceBuilder, 'buildHomeCabin');
-  assert.ok(home.prefabs.definitions[0].objects.length >= 35);
-  assert.equal(shop.prefabs.definitions[0].metadata.sourceBuilder, 'buildShopOutpost');
-  assert.ok(shop.prefabs.definitions[0].objects.length >= 12);
-  assert.equal(aquarium.prefabs.definitions[0].metadata.sourceBuilder, 'buildPublicAquarium');
-  assert.ok(aquarium.prefabs.definitions[0].objects.length >= 90);
-  assert.equal(aquarium.prefabs.definitions[0].objects.filter((item) => item.metadata.materialKey === 'water').length, 10);
-  const staleAutosave = { ...home, prefabs: { definitions: [], instances: [] } };
+  const homeParts = home.objects.filter((entry) => entry.metadata?.sourceBuilder === 'buildHomeCabin');
+  const shopParts = shop.objects.filter((entry) => entry.metadata?.sourceBuilder === 'buildShopOutpost');
+  const aquariumParts = aquarium.objects.filter((entry) => entry.metadata?.sourceBuilder === 'buildPublicAquarium');
+  assert.equal(home.prefabs.definitions.length, 0);
+  assert.equal(home.prefabs.instances.length, 0);
+  assert.ok(homeParts.length >= 140);
+  assert.equal(home.waters.find((entry) => entry.identity === 'hearthward-pond')?.identity, 'hearthward-pond');
+  assert.equal(home.objects.filter((item) => /Hearthward cozy tree/.test(item.name)).length, 18);
+  assert.equal(home.objects.filter((item) => /dock pile/.test(item.name)).length, 4);
+  assert.equal(homeParts.filter((item) => item.metadata?.benchId === 'hearthward-pond-bench').length, 4);
+  assert.equal(homeParts.filter((item) => item.metadata?.editableSign).length, 1);
+  assert.equal(shop.prefabs.definitions.length, 0);
+  assert.equal(shop.prefabs.instances.length, 0);
+  assert.ok(shopParts.length >= 60);
+  assert.ok(shopParts.some((item) => item.name === 'Outfitter clerk body'));
+  assert.ok(shopParts.some((item) => item.name === 'Old Man fish buyer body'));
+  assert.ok(shopParts.some((item) => item.name === 'Fish Market sardine display'));
+  assert.equal(shop.objects.filter((item) => item.metadata?.benchId === 'shop-island-shore-bench').length, 4);
+  assert.deepEqual(shopParts.filter((item) => item.metadata?.editableSign).map((item) => item.metadata.signText).sort(), ["BUY GEAR", "OUTFITTER'S REACH", "SELL CATCHES"]);
+  assert.equal(shopParts.some((item) => /sign letter/i.test(item.name)), false);
+  assert.equal(aquarium.prefabs.definitions.length, 0);
+  assert.equal(aquarium.prefabs.instances.length, 0);
+  assert.ok(aquariumParts.length >= 90);
+  assert.equal(aquariumParts.filter((item) => item.metadata.materialKey === 'water').length, 10);
+  assert.equal(aquariumParts.filter((item) => item.metadata?.editableSign).length, 1);
+  assert.equal(aquarium.objects.filter((item) => item.metadata?.benchId === 'aquarium-island-shore-bench').length, 4);
+  assert.equal(aquarium.objects.filter((item) => String(item.metadata?.benchId || '').startsWith('aquarium-visitor-bench-')).length, 18);
+  assert.equal(aquarium.objects.filter((item) => /Aquarium garden flower/.test(item.name)).length, 18);
+  for (const entry of [...homeParts, ...shopParts, ...aquariumParts]) {
+    for (const axis of ['x', 'y', 'z']) {
+      assert.ok(Number.isFinite(entry.transform.position[axis]), `${entry.id} has a finite ${axis} position`);
+      assert.ok(Number.isFinite(entry.transform.rotation[axis]), `${entry.id} has a finite ${axis} rotation`);
+    }
+  }
+  const staleAutosave = structuredClone(home);
+  staleAutosave.objects = staleAutosave.objects.filter((entry) => entry.metadata?.sourceBuilder !== 'buildHomeCabin');
+  staleAutosave.objects.push({ ...item('USER-AUTHORED-OBJECT'), name: 'User authored object', metadata: {} });
+  staleAutosave.prefabs = {
+    definitions: [{ id: 'PREFAB-PRODUCTION-HEARTHWARD-CABIN', metadata: { productionReference: true }, objects: [] }],
+    instances: [{ id: 'PREFAB-PRODUCTION-HEARTHWARD-CABIN-INSTANCE', prefabId: 'PREFAB-PRODUCTION-HEARTHWARD-CABIN', metadata: { productionReference: true } }]
+  };
   ensureProductionIslandTerrain(staleAutosave, 'home-island');
-  assert.equal(staleAutosave.prefabs.instances[0].prefabId, 'PREFAB-PRODUCTION-HEARTHWARD-CABIN');
+  assert.equal(staleAutosave.prefabs.instances.length, 0);
+  assert.equal(staleAutosave.prefabs.definitions.length, 0);
+  assert.ok(staleAutosave.objects.filter((entry) => entry.metadata?.sourceBuilder === 'buildHomeCabin').length >= 140);
+  assert.ok(staleAutosave.objects.some((entry) => entry.id === 'USER-AUTHORED-OBJECT'));
+  const editablePart = staleAutosave.objects.find((entry) => entry.metadata?.sourceBuilder === 'buildHomeCabin');
+  editablePart.transform.position.x = 123;
+  ensureProductionIslandTerrain(staleAutosave, 'home-island');
+  assert.equal(staleAutosave.objects.find((entry) => entry.id === editablePart.id).transform.position.x, 123);
+  const oldMan = assetsForWorld('cave-fishing-island').find((asset) => asset.id === 'old-man-fisher-npc-v4');
+  assert.ok(oldMan);
+  assert.ok(oldMan.definition.objects.length >= 20);
+  assert.ok(oldMan.definition.objects.some((item) => item.metadata?.npcRole === 'old-man-fisher'));
   const scene = await source('tools/map-editor/generic-scene.js');
   assert.match(scene, /buildOceanPreview\(\)/);
   assert.match(scene, /OCEAN_SURFACE_Y - rootFloorY/);
+  assert.match(scene, /attachEditorSignText/);
 });
 
 test('v4.1 Library uses the actual generated island terrain and dense, structurally complete shelves', () => {
@@ -106,7 +154,50 @@ test('v4.1 UI exposes orbit, frame, multi-select, pivot, book, and placed-cutout
   assert.match(main, /entitiesInScreenRect/);
   assert.match(main, /objectPickCycle/);
   assert.match(main, /cancelRectangularOpening/);
+  assert.match(main, /appendEditableSignTextField/);
+  assert.match(main, /commitV3AssetPlacement\(surface\)/);
+  assert.match(main, /assetDefinitionFloor/);
+  assert.match(main, /items\.length > 20/);
+  assert.match(html, /class="action-menu"/);
+  assert.match(html, /class="toolbar-menu"/);
+  assert.doesNotMatch(main, /canvas\.addEventListener\('dblclick'/);
   assert.match(scene, /setTransformGizmo/);
   assert.match(scene, /setCutoutPreview/);
   assert.equal(createHash('sha256').update(patch).digest('hex').toUpperCase(), '815674C382C711CF9DEF2D4FF07AC7DCC205B0E472DAA67A284B23516474E5DD');
+});
+
+test('v4.1 portable assets remain findable and smoothing uses the requested stronger response curve', () => {
+  const homeAssets = assetsForWorld('home-island');
+  for (const id of ['library-chair-v4', 'old-man-fisher-npc-v4', 'basalt-natural-ledge-v3', 'pirate-watch-scaffold-v3']) {
+    assert.ok(homeAssets.some((asset) => asset.id === id), `${id} should be available from every generic-world asset browser`);
+  }
+  assert.equal(effectiveSmoothStrength(.25), .75);
+  assert.equal(effectiveSmoothStrength(6), 24);
+});
+
+test('v4.1 terrain history shortcuts preserve both common redo bindings', () => {
+  assert.equal(historyCommandForKey({ key: 'z', ctrlKey: true }), 'undo');
+  assert.equal(historyCommandForKey({ key: 'Z', metaKey: true, shiftKey: true }), 'redo');
+  assert.equal(historyCommandForKey({ key: 'y', ctrlKey: true }), 'redo');
+  assert.equal(historyCommandForKey({ key: 'z', shiftKey: true }), null);
+});
+
+test('v4.1 production seating mirrors every active island bench and its runtime-facing yaw', () => {
+  const expected = {
+    'shop-island': { parts: 4, yaw: 235, target: 'ocean' },
+    'aquarium-island': { parts: 4, yaw: 175, target: 'ocean' },
+    'cave-fishing-island': { parts: 0, yaw: 120, target: 'ocean' },
+    'normal-fishing-island': { parts: 4, yaw: -60, target: 'ocean' },
+    'cold-island': { parts: 4, yaw: -180, target: 'pond' }
+  };
+  for (const [worldId, expectation] of Object.entries(expected)) {
+    const level = makeProductionIslandEditorLevel(worldId);
+    const parts = level.objects.filter((entry) => entry.metadata?.benchId === `${worldId}-shore-bench`);
+    assert.equal(parts.length, expectation.parts, `${worldId} should expose all four shore-bench parts`);
+    assert.ok(parts.every((entry) => Math.abs(entry.metadata.facingYaw - expectation.yaw) < 1e-8));
+    assert.ok(parts.every((entry) => entry.metadata.facesToward === expectation.target));
+    assert.ok(parts.every((entry) => Number.isFinite(entry.transform.position.y)));
+  }
+  const mangrove = makeProductionIslandEditorLevel('normal-fishing-island');
+  assert.equal(mangrove.objects.filter((entry) => entry.metadata?.benchId === 'mangrove-lagoon-fishing-log').length, 3);
 });

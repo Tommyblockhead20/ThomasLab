@@ -27,7 +27,7 @@ import {
   wrapLegacyStoneveilPatch,
   unwrapLegacyStoneveilPatch
 } from './world-level-format.js';
-import { GenericWorldScene, sculptTriangleMesh } from './generic-scene.js';
+import { effectiveSmoothStrength, GenericWorldScene, sculptTriangleMesh } from './generic-scene.js';
 import { SlopeOverlay, slopeOverlayLegend } from './slope-overlay.js';
 import { validateWorldLevel } from './validation.js';
 import {
@@ -41,8 +41,11 @@ import { movingPlatformPose } from '../../src/world/world-editor-v2-runtime.js';
 import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinition, makeRoomComponentDefinition } from './room-library.js';
 import { PIRATE_ASSET_LIBRARY, getPirateAsset, makePirateAssetDefinition } from './pirate-library.js';
 import { ensurePirateIslandTerrain } from './pirate-terrain.js';
-import { ensureProductionIslandTerrain, makeProductionIslandEditorLevel } from './production-island-adapter.js';
+import { ensureProductionIslandTerrain, makeCleanCaveEditorLevel, makeProductionIslandEditorLevel } from './production-island-adapter.js';
 import { assetsForWorld, getV3Asset } from './asset-library-v3.js';
+import { attachEditorSignText, editableSignText, supportsEditableSignText } from './sign-text.js';
+import { historyCommandForKey } from './history-shortcuts.js';
+import { recordActionSnapshot, redoActionSnapshot, undoActionSnapshot } from './action-history.js';
 import {
   boundaryLoops,
   bridgeEdgeChains,
@@ -145,6 +148,7 @@ let transformGizmoMode = 'move';
 let groupGizmoDrag = null;
 let selectionPointer = null;
 let cutoutState = null;
+let assetPlacementState = null;
 let idCounter = Date.now() % 1000000;
 let draggingBrush = false;
 let lastBrushPoint = null;
@@ -157,6 +161,8 @@ const terrainRenderState = { entity: null, mesh: null, vertexCapacity: 0, indexC
 let caveConnectStart = null;
 let activeWorldId = (() => {
   try {
+    const linkedWorld = new URLSearchParams(location.search).get('world');
+    if (WORLD_EDITOR_WORLDS.some((world) => world.id === linkedWorld)) return linkedWorld;
     const saved = localStorage.getItem(WORLD_V2_ACTIVE_KEY);
     return WORLD_EDITOR_WORLDS.some((world) => world.id === saved) ? saved : 'stoneveil-peak';
   } catch { return 'stoneveil-peak'; }
@@ -1639,7 +1645,8 @@ function createPlacedEntity(item, isSelected = false) {
   } else if (item.type === 'plant') {
     buildPlantPreview(root, item.plantKind, material);
   } else {
-    buildDecorPreview(root, item.decorKind, material);
+    const signSurface = buildDecorPreview(root, item.decorKind, material);
+    if (signSurface && supportsEditableSignText(item)) attachEditorSignText(app.graphicsDevice, signSurface, item);
   }
   return root;
 }
@@ -1687,13 +1694,14 @@ function buildDecorPreview(root, kind) {
     addPrimitive(root, 'cylinder', materials.decor, [0, .45, 0], [.5, 2.5, .5], [0, 0, 90]);
   } else if (kind === 'sign') {
     addPrimitive(root, 'cylinder', materials.trunk, [0, .9, 0], [.12, 1.8, .12]);
-    addPrimitive(root, 'box', materials.decor, [0, 1.55, 0], [1.25, .5, .1]);
+    return addPrimitive(root, 'box', materials.decor, [0, 1.55, 0], [1.25, .5, .1]);
   } else if (kind === 'lantern') {
     addPrimitive(root, 'cylinder', materials.trunk, [0, 1, 0], [.1, 2, .1]);
     addPrimitive(root, 'sphere', materials.selected, [0, 2.0, 0], [.24, .28, .24]);
   } else {
     addPrimitive(root, 'box', materials.decor, [0, .5, 0], [1, 1, 1]);
   }
+  return null;
 }
 
 function addPrimitive(parent, type, material, position = [0, 0, 0], scale = [1, 1, 1], rotation = [0, 0, 0]) {
@@ -1750,6 +1758,10 @@ function releaseEditorOwnedMeshes(entity, seen = new Set()) {
     try { mesh.destroy(); } catch {}
   }
   entity._editorOwnedMeshes = null;
+  for (const material of entity._editorOwnedSignMaterials ?? []) { try { material.destroy(); } catch {} }
+  for (const texture of entity._editorOwnedSignTextures ?? []) { try { texture.destroy(); } catch {} }
+  entity._editorOwnedSignMaterials = null;
+  entity._editorOwnedSignTextures = null;
 }
 
 function destroyChildren(root) {
@@ -1849,10 +1861,9 @@ function hydrateCachedBasaltProductionTerrain(level) {
 }
 
 function ensureBasaltEditorTerrain(level, world) {
-  const hydrated = hydrateCachedBasaltProductionTerrain(level);
-  return hydrated?.terrain?.mode === 'authored-mesh-candidate'
-    ? hydrated
-    : ensureProductionIslandTerrain(hydrated, world);
+  // v23 intentionally retires the captured procedural cave shell. Existing v23 edits are
+  // preserved, while every older/bad Cave autosave is replaced once by the clean baseline.
+  return level?.metadata?.cleanCaveBaselineV23 === true ? level : makeCleanCaveEditorLevel(world);
 }
 
 async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
@@ -1902,9 +1913,7 @@ function saveGenericHistory() {
   const level = activeGenericLevel();
   if (!level) return;
   const stack = genericHistoryFor();
-  stack.push(JSON.stringify(genericStoredPayload(level)));
-  if (stack.length > 120) stack.shift();
-  genericFutures.set(activeWorldId, []);
+  recordActionSnapshot(stack, genericFutureFor(), JSON.stringify(genericStoredPayload(level)));
 }
 
 function commitGeneric(mutator, { rebuild = true, recordHistory = true } = {}) {
@@ -2019,6 +2028,7 @@ function definitionForSelectedInstance() {
 
 async function switchWorld(worldId, { keepCamera = false } = {}) {
   if (prefabWorkspace.active) exitPrefabWorkspace({ restore: false });
+  if (assetPlacementState) cancelV3AssetPlacement();
   const world = getWorldEditorWorld(worldId);
   if (walkthroughState.active) exitWalkthrough();
   activeWorldId = world.id;
@@ -2104,9 +2114,10 @@ function restoreHistoryPayload(payload) {
 function undo() {
   if (!isStoneveilWorld()) {
     const stack = genericHistoryFor();
-    if (!stack.length) return;
-    genericFutureFor().push(JSON.stringify(genericStoredPayload()));
-    replaceActiveGenericLevel(JSON.parse(stack.pop()), { persist: true });
+    const futureStack = genericFutureFor();
+    const previous = undoActionSnapshot(stack, futureStack, JSON.stringify(genericStoredPayload()));
+    if (previous === null) return;
+    replaceActiveGenericLevel(JSON.parse(previous), { persist: true });
     rebuildAll();
     return;
   }
@@ -2123,9 +2134,10 @@ function undo() {
 function redo() {
   if (!isStoneveilWorld()) {
     const stack = genericFutureFor();
-    if (!stack.length) return;
-    genericHistoryFor().push(JSON.stringify(genericStoredPayload()));
-    replaceActiveGenericLevel(JSON.parse(stack.pop()), { persist: true });
+    const historyStack = genericHistoryFor();
+    const next = redoActionSnapshot(historyStack, stack, JSON.stringify(genericStoredPayload()));
+    if (next === null) return;
+    replaceActiveGenericLevel(JSON.parse(next), { persist: true });
     rebuildAll();
     return;
   }
@@ -2757,7 +2769,7 @@ function smoothBakedMesh(hit, radius, strength) {
   const source = brush.positions.slice();
   // The common brush slider is in a meter-ish range for sculpting. Convert it to a safe
   // smoothing blend rather than interpreting it as meters. Default 2 => ~16% smoothing.
-  const baseBlend = clamp(Number(strength) * .08, .02, .55);
+  const baseBlend = clamp(effectiveSmoothStrength(strength) * .08, .02, .55);
   let changed = 0;
   for (const [index, distance, localRadius] of brush.affected) {
     const neighbors = [...(brush.adjacency[index] || [])];
@@ -3173,14 +3185,62 @@ function updateMeshAuthoringUi() {
 }
 
 function setAuthoringMode(mode = 'object') {
-  authoringMode = ['object', 'mesh', 'sculpt', 'water', 'path'].includes(mode) ? mode : 'object';
+  const world = activeWorld();
+  const availableModes = {
+    object: worldHasCapability(world.id, 'objects') || worldHasCapability(world.id, 'rocks') || worldHasCapability(world.id, 'decor') || worldHasCapability(world.id, 'parkour'),
+    mesh: isStoneveilWorld() ? isMeshMode() : Boolean(genericScene?.editableTerrainMesh?.()),
+    sculpt: worldHasCapability(world.id, 'terrain'),
+    water: worldHasCapability(world.id, 'water'),
+    path: worldHasCapability(world.id, 'water')
+  };
+  for (const button of $$('[data-authoring-mode]')) button.hidden = !availableModes[button.dataset.authoringMode];
+  const requested = ['object', 'mesh', 'sculpt', 'water', 'path'].includes(mode) ? mode : 'object';
+  authoringMode = availableModes[requested] ? requested : (Object.keys(availableModes).find((key) => availableModes[key]) || 'object');
   for (const button of $$('[data-authoring-mode]')) button.classList.toggle('active', button.dataset.authoringMode === authoringMode);
   for (const panel of $$('[data-mode-panel]')) panel.hidden = panel.dataset.modePanel !== authoringMode;
   if ($('#mesh-authoring-section')) $('#mesh-authoring-section').hidden = !(authoringMode === 'mesh' && Boolean(genericScene?.editableTerrainMesh?.()));
   if ($('#water-path-section')) $('#water-path-section').hidden = authoringMode !== 'path';
-  if ($('#library-tools-section')) $('#library-tools-section').hidden = !['library-island', 'cave-fishing-island', 'pirate-island'].includes(activeWorldId);
+  if ($('#library-tools-section')) $('#library-tools-section').hidden = isStoneveilWorld() || !['object', 'mesh'].includes(authoringMode);
+  if ($('#brush-section')) $('#brush-section').hidden = authoringMode !== 'sculpt' || !worldHasCapability(world.id, 'terrain');
+  if ($('#mesh-mode-section')) $('#mesh-mode-section').hidden = !isStoneveilWorld() || !['mesh', 'sculpt'].includes(authoringMode);
+  for (const id of ['rock-palette-section', 'plant-palette-section', 'decor-palette-section']) {
+    const element = $(`#${id}`);
+    if (element) element.hidden = !isStoneveilWorld() || authoringMode !== 'object';
+  }
+  if ($('#generic-palette-section')) $('#generic-palette-section').hidden = authoringMode !== 'object'
+    || !(worldHasCapability(world.id, 'parkour') || worldHasCapability(world.id, 'objects') || worldHasCapability(world.id, 'prefabs') || worldHasCapability(world.id, 'rooms'));
+  if ($('#cave-migration-section')) $('#cave-migration-section').hidden = world.id !== 'cave-fishing-island' || !['mesh', 'sculpt'].includes(authoringMode);
+  if ($('#pirate-asset-library-section')) $('#pirate-asset-library-section').hidden = world.id !== 'pirate-island' || authoringMode !== 'object';
+  if ($('#skyscraper-room-library-section')) $('#skyscraper-room-library-section').hidden = world.id !== 'skyscraper' || authoringMode !== 'object';
+  const toolModes = {
+    select: ['object', 'mesh', 'sculpt', 'water', 'path'],
+    raise: ['sculpt'], lower: ['sculpt'], smooth: ['sculpt'], indent: ['sculpt'], 'pull-core': ['sculpt'], 'connect-cave': ['sculpt'],
+    rock: ['object'], plant: ['object'], decor: ['object'], object: ['object'], platform: ['object'], 'moving-platform': ['object'],
+    'move-water': ['water']
+  };
+  const capabilityByTool = {
+    raise: 'terrain', lower: 'terrain', smooth: 'terrain', indent: 'terrain', 'pull-core': 'terrain', 'connect-cave': 'terrain',
+    rock: 'rocks', plant: 'vegetation', decor: 'decor', 'move-water': 'water',
+    object: 'objects', platform: 'parkour', 'moving-platform': 'moving-platforms'
+  };
+  for (const button of $$('#tool-grid button')) {
+    const capability = capabilityByTool[button.dataset.tool];
+    const supported = !capability || worldHasCapability(world.id, capability);
+    button.hidden = !supported || !(toolModes[button.dataset.tool] ?? ['object']).includes(authoringMode);
+  }
+  const modeCopy = {
+    object: ['Object Tools', 'Select, place, and edit complete scene objects. Asset, prefab, and structure controls are grouped below.'],
+    mesh: ['Mesh Tools', 'Select terrain vertices, edges, and faces. Topology and opening tools are shown below.'],
+    sculpt: ['Terrain Sculpt', 'Choose one brush, then edit terrain in the viewport. Each stroke is one undoable step.'],
+    water: ['Water Tools', 'Select water volumes or use Move Water. Path-node editing has its own mode.'],
+    path: ['Water Path', 'Select a path water, then use the compact path controls below.']
+  }[authoringMode];
+  if ($('#tool-section-heading')) $('#tool-section-heading').textContent = modeCopy[0];
+  if ($('#authoring-mode-help')) $('#authoring-mode-help').textContent = modeCopy[1];
   if (authoringMode === 'sculpt' && !['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) tool = 'raise';
-  if (authoringMode === 'mesh') tool = 'select';
+  if (['mesh', 'path'].includes(authoringMode)) tool = 'select';
+  if (authoringMode === 'water' && tool !== 'move-water') tool = 'select';
+  if (authoringMode === 'object' && toolModes[tool] && !toolModes[tool].includes('object')) tool = 'select';
   $$('#tool-grid button').forEach((button) => button.classList.toggle('active', button.dataset.tool === tool));
   updateMeshAuthoringUi();
 }
@@ -3353,15 +3413,15 @@ function applyGenericToolAt(event) {
       changed = sculptTriangleMesh(draft.terrain, hit, tool, radius, strength);
       draft.terrain.editedAt = new Date().toISOString();
       draft.sourcePolicy.terrain = draft.terrain.mode === 'authored-mesh-candidate' ? 'authored-candidate' : 'authored';
-    });
+    }, { recordHistory: !activeBrushTransaction });
     if (changed) {
       if (activeWorldId === 'cave-fishing-island') {
         genericScene.setBasaltReferenceMode('authored');
         if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value = 'authored';
       }
-      setStatus(activeWorldId === 'pirate-island'
-        ? `Pirate Island ${tool}: edited ${changed} connected terrain vertices.`
-        : `Basalt ${tool}: edited ${changed} connected mesh vertices. Production still uses the procedural reference until you explicitly promote it later.`);
+      setStatus(activeWorldId === 'cave-fishing-island'
+        ? `Cave Island ${tool}: edited ${changed} connected terrain vertices.`
+        : `${activeWorld().label} ${tool}: edited ${changed} connected terrain vertices.`);
     }
     return;
   }
@@ -3636,7 +3696,8 @@ function applyToolAt(event, continuous = false) {
       id: nextId('EDITOR-DECOR'), type: 'decor', name: $('#decor-kind').selectedOptions[0].textContent,
       decorKind: $('#decor-kind').value, anchorMode: isMeshMode() ? 'world' : 'terrain', heightOffset: 0,
       position: { x: hit.x, y: hit.y, z: hit.z }, rotation: { x: 0, y: Math.random() * 360, z: 0 },
-      scale: { x: 1, y: 1, z: 1 }
+      scale: { x: 1, y: 1, z: 1 },
+      ...($('#decor-kind').value === 'sign' ? { metadata: { editableSign: true, signText: 'TRAIL' } } : {})
     };
     commit(() => patch.placedObjects.push(item), { placed: true });
   }
@@ -3669,7 +3730,7 @@ function syncWorldUi() {
   if ($('#cave-migration-section')) $('#cave-migration-section').hidden = world.id !== 'cave-fishing-island';
   if ($('#skyscraper-room-library-section')) $('#skyscraper-room-library-section').hidden = world.id !== 'skyscraper';
   if ($('#pirate-asset-library-section')) $('#pirate-asset-library-section').hidden = world.id !== 'pirate-island';
-  if ($('#library-tools-section')) $('#library-tools-section').hidden = !['library-island', 'cave-fishing-island', 'pirate-island'].includes(world.id);
+  if ($('#library-tools-section')) $('#library-tools-section').hidden = stoneveil;
   if ($('#skyscraper-interior-wrap')) $('#skyscraper-interior-wrap').hidden = world.id !== 'skyscraper';
   if ($('#hide-library-books-wrap')) $('#hide-library-books-wrap').hidden = world.id !== 'library-island';
   if ($('#create-prefab-foundation')) $('#create-prefab-foundation').hidden = !worldHasCapability(world.id, 'prefabs');
@@ -3756,6 +3817,14 @@ function renderGenericSelection() {
     nameWrap.appendChild(nameInput);
     fields.appendChild(nameWrap);
   }
+
+  if (supportsEditableSignText(record)) appendEditableSignTextField(fields, record, (value) => {
+    mutateSelectedGenericRecord((item) => {
+      item.metadata ??= {};
+      item.metadata.editableSign = true;
+      item.metadata.signText = value;
+    });
+  });
 
   if (selected.kind === 'architecture-reference') {
     const note = document.createElement('p');
@@ -4157,6 +4226,17 @@ function renderOutliner() {
         }));
         if (items.length) groups.push([category, items]);
       }
+    } else if (level?.metadata?.productionIslandAdapter) {
+      const sourceObjects = level?.objects ?? [];
+      const categories = [...new Set(sourceObjects.map((item) => item.category || 'Objects'))].sort((a, b) => a.localeCompare(b));
+      for (const category of categories) {
+        const items = sourceObjects.filter((item) => (item.category || 'Objects') === category).map((item) => ({
+          id:item.id, name:item.name||item.id, kind:'world-object', type:item.type||'object',
+          renameable:true, deletable:true, hideable:true
+        }));
+        if (items.length) groups.push([category, items]);
+      }
+      groups.push(['Moving Platforms', (level?.movingPlatforms ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'moving-platform',type:'moving-platform',renameable:true,deletable:true,hideable:true }))]);
     } else {
       groups.push(['Objects', objects]);
       groups.push(['Moving Platforms', (level?.movingPlatforms ?? []).map((item) => ({ id:item.id,name:item.name||item.id,kind:'moving-platform',type:'moving-platform',renameable:true,deletable:true,hideable:true }))]);
@@ -4174,7 +4254,7 @@ function renderOutliner() {
     const items = sourceItems.filter((item) => !filter || `${item.name} ${item.id} ${item.type} ${item.route || ''}`.toLowerCase().includes(filter));
     if (!items.length && filter) continue;
     const groupKey = `${activeWorldId}:${prefabWorkspace.active ? prefabWorkspace.definitionId : 'world'}:${name}`;
-    const collapsed = Boolean(prefs[groupKey]);
+    const collapsed = Object.hasOwn(prefs, groupKey) ? Boolean(prefs[groupKey]) : items.length > 20;
     const row = document.createElement('div');
     row.className = `outliner-group-row${collapsed ? ' collapsed' : ''}`;
     const toggle = document.createElement('button');
@@ -4443,7 +4523,29 @@ function renderSelection() {
     ], onObjectField));
     $('#duplicate-selected').disabled = selected.kind !== 'placed';
     $('#hide-selected').disabled = false;
+    if (selected.kind === 'placed' && supportsEditableSignText(record)) appendEditableSignTextField(fields, record, (value) => {
+      commit(() => {
+        const item = patch.placedObjects.find((candidate) => candidate.id === selected.id);
+        if (!item) return;
+        item.metadata ??= {};
+        item.metadata.editableSign = true;
+        item.metadata.signText = value;
+      }, { placed: true });
+    });
   }
+}
+
+function appendEditableSignTextField(parent, record, onCommit) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'inspector-name';
+  wrapper.textContent = 'Sign text';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 48;
+  input.value = editableSignText(record);
+  input.addEventListener('change', () => onCommit(String(input.value || '').trim().slice(0, 48) || 'SIGN'));
+  wrapper.appendChild(input);
+  parent.appendChild(wrapper);
 }
 
 function fieldGrid(defs, handler) {
@@ -5192,6 +5294,7 @@ function setupResizableRightPanel() {
 
 function setupCollapsibleSections() {
   const prefs = loadJsonPreference(COLLAPSE_PREFS_KEY, {});
+  const initiallyCollapsed = new Set(['summary-section', 'validation-section', 'geometry-diagnostics-section', 'camera-section']);
   const sections = [...document.querySelectorAll('#left-panel > section, #right-panel > section')];
   sections.forEach((section, index) => {
     const heading = section.querySelector(':scope > h2');
@@ -5199,7 +5302,8 @@ function setupCollapsibleSections() {
     const key = section.id || `${section.closest('aside')?.id || 'panel'}:${index}:${heading.textContent.trim().split('?')[0].trim()}`;
     section.classList.add('collapsible');
     section.dataset.collapseKey = key;
-    if (prefs[key]) section.classList.add('collapsed');
+    const collapsed = Object.hasOwn(prefs, key) ? Boolean(prefs[key]) : initiallyCollapsed.has(section.id);
+    if (collapsed) section.classList.add('collapsed');
     heading.addEventListener('click', (event) => {
       if (event.target.closest('button, input, select')) return;
       section.classList.toggle('collapsed');
@@ -5331,13 +5435,53 @@ function populateV3AssetUi() {
   const asset = getV3Asset(select.value);
   if ($('#v3-asset-description')) $('#v3-asset-description').textContent = asset?.description || 'No v3 assets are registered for this world.';
   if ($('#place-v3-asset')) $('#place-v3-asset').disabled = !asset;
+  syncV3AssetPlacementUi();
+}
+
+function syncV3AssetPlacementUi() {
+  const button = $('#place-v3-asset');
+  if (!button) return;
+  const armed = Boolean(assetPlacementState && assetPlacementState.worldId === activeWorldId);
+  button.classList.toggle('active', armed);
+  button.textContent = armed ? 'Cancel Asset Placement' : 'Place Asset';
+}
+
+function cancelV3AssetPlacement(message = '') {
+  assetPlacementState = null;
+  syncV3AssetPlacementUi();
+  if (message) setStatus(message);
+}
+
+function assetDefinitionFloor(definition) {
+  let floor = Infinity;
+  for (const item of definition?.objects ?? []) {
+    const y = Number(item.transform?.position?.y) || 0;
+    const halfHeight = Math.abs(Number(item.size?.y) || 0) * .5;
+    floor = Math.min(floor, y - halfHeight);
+  }
+  return Number.isFinite(floor) ? floor : 0;
 }
 
 function placeV3Asset() {
   if (isStoneveilWorld()) return;
   const level = activeGenericLevel();
   const asset = getV3Asset($('#v3-asset-template')?.value);
-  if (!level || !asset || !asset.worlds.includes(activeWorldId)) return;
+  if (!level || !asset) return;
+  if (assetPlacementState?.worldId === activeWorldId && assetPlacementState.assetId === asset.id) {
+    cancelV3AssetPlacement('Asset placement cancelled.');
+    return;
+  }
+  assetPlacementState = { assetId: asset.id, worldId: activeWorldId };
+  syncV3AssetPlacementUi();
+  setStatus(`${asset.name} ready. Click the terrain or another placement surface to put it there; Esc cancels.`);
+}
+
+function commitV3AssetPlacement(surface) {
+  const placement = assetPlacementState;
+  if (!placement || placement.worldId !== activeWorldId) return false;
+  const level = activeGenericLevel();
+  const asset = getV3Asset(placement.assetId);
+  if (!level || !asset || !surface) return false;
   const definition = clone(asset.definition);
   if (activeWorldId === 'library-island') {
     definition.metadata = {
@@ -5349,9 +5493,11 @@ function placeV3Asset() {
     };
   }
   const id = nextStableId(level, 'V3-ASSET');
+  const clicked = maybeSnapPosition({ x: surface.x, y: surface.y, z: surface.z });
+  const position = { ...clicked, y: clicked.y - assetDefinitionFloor(definition) };
   const instance = {
     id, name: `${asset.name} ${id.split('-').at(-1)}`, prefabId: definition.id, linked: true,
-    transform: { position: maybeSnapPosition({ x: cameraState.target.x, y: cameraState.target.y, z: cameraState.target.z }), rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+    transform: { position, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
     metadata: activeWorldId === 'library-island'
       ? { librarySourceKind: 'prefab-instance', librarySourceId: id, librarySourceIndex: -1, v3AssetId: asset.id }
       : { v3AssetId: asset.id }
@@ -5361,9 +5507,12 @@ function placeV3Asset() {
     draft.prefabs.instances.push(instance);
   });
   selected = { kind: 'prefab-instance', id };
+  selectedItems = [{ ...selected }];
   genericScene.setSelected(id);
-  focusSelectedObject();
-  setStatus(`Placed linked v3 asset: ${asset.name}.`);
+  assetPlacementState = null;
+  renderUi();
+  setStatus(`Placed ${asset.name} at the clicked surface. It is selected and listed under Prefab Instances; use Edit Source Prefab to edit its individual parts.`);
+  return true;
 }
 
 function cutSelectedRectangularOpening() {
@@ -5735,7 +5884,7 @@ function setupV21Ui() {
   populateRoomLibraryUi();
   $('#pirate-asset-template')?.addEventListener('change', populatePirateAssetUi);
   $('#place-pirate-asset')?.addEventListener('click', placePirateAsset);
-  $('#v3-asset-template')?.addEventListener('change', populateV3AssetUi);
+  $('#v3-asset-template')?.addEventListener('change', () => { if (assetPlacementState) cancelV3AssetPlacement(); populateV3AssetUi(); });
   $('#v3-asset-search')?.addEventListener('input', populateV3AssetUi);
   $('#place-v3-asset')?.addEventListener('click', placeV3Asset);
   $('#cut-rectangular-opening')?.addEventListener('click', cutSelectedRectangularOpening);
@@ -6075,9 +6224,6 @@ let orbiting = false;
 let panning = false;
 let previousPointer = null;
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-canvas.addEventListener('dblclick', (event) => {
-  if (!walkthroughState.active) orbitPivotFromPointer(event, { showMarker: true });
-});
 canvas.addEventListener('pointerdown', (event) => {
   if (walkthroughState.active) {
     event.preventDefault();
@@ -6093,6 +6239,15 @@ canvas.addEventListener('pointerdown', (event) => {
     return;
   }
   if (event.button !== 0) return;
+  if (!isStoneveilWorld() && assetPlacementState) {
+    const surface = genericScene.surfaceHit(pointerRay(event));
+    if (!surface) {
+      setStatus('No terrain or placement surface is under the cursor. Asset placement is still active; click a visible surface or press Esc.');
+      return;
+    }
+    commitV3AssetPlacement(surface);
+    return;
+  }
   if (!isStoneveilWorld() && !cutoutState) {
     const gizmoHit = genericScene.pickTransformGizmo(pointerRay(event));
     if (gizmoHit && beginGroupGizmoDrag(event, gizmoHit)) return;
@@ -6110,13 +6265,16 @@ canvas.addEventListener('pointerdown', (event) => {
     selectionPointer = { x0: event.clientX, y0: event.clientY, x1: event.clientX, y1: event.clientY, event };
     return;
   }
-  const caveMeshSculptClick = Boolean(!isStoneveilWorld() && genericScene.editableTerrainMesh())
+  const genericMeshSculpt = Boolean(!isStoneveilWorld() && genericScene.editableTerrainMesh())
     && ['authored-mesh-candidate', 'authored-triangle-mesh', 'production-island-terrain'].includes(activeGenericLevel()?.terrain?.mode)
     && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool);
-  const meshSculptClick = (isMeshMode() && ['raise', 'lower', 'smooth', 'indent', 'pull-core', 'connect-cave'].includes(tool)) || caveMeshSculptClick;
-  draggingBrush = !meshSculptClick && ['raise', 'lower', 'indent', 'pull-core', 'plant'].includes(tool);
+  const stoneveilSculpt = isStoneveilWorld()
+    && ['raise', 'lower', 'smooth', 'indent', 'pull-core', 'plant'].includes(tool);
+  draggingBrush = genericMeshSculpt || stoneveilSculpt;
   activeBrushTransaction = draggingBrush;
-  if (activeBrushTransaction) saveHistory();
+  if (activeBrushTransaction) {
+    if (isStoneveilWorld()) saveHistory(); else saveGenericHistory();
+  }
   lastBrushPoint = null;
   applyToolAt(event, false);
 });
@@ -6421,8 +6579,12 @@ window.addEventListener('keydown', (event) => {
     return;
   }
   const key = event.key.toLowerCase();
-  if ((event.ctrlKey || event.metaKey) && key === 'z') { event.preventDefault(); undo(); return; }
-  if ((event.ctrlKey || event.metaKey) && key === 'y') { event.preventDefault(); redo(); return; }
+  const historyCommand = historyCommandForKey(event);
+  if (historyCommand) {
+    event.preventDefault();
+    if (historyCommand === 'redo') redo(); else undo();
+    return;
+  }
   if ((event.ctrlKey || event.metaKey) && key === 'd') { event.preventDefault(); duplicateSelected(); return; }
   if (event.key === 'Delete' || event.key === 'Backspace') {
     if (typingInField()) return;
@@ -6439,6 +6601,11 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && cutoutState) {
     cancelRectangularOpening();
     setStatus('Cut Rectangle cancelled; the surface was not changed.');
+    event.preventDefault();
+    return;
+  }
+  if (event.key === 'Escape' && assetPlacementState) {
+    cancelV3AssetPlacement('Asset placement cancelled.');
     event.preventDefault();
     return;
   }

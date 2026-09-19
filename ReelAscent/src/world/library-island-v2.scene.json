@@ -3334,11 +3334,17 @@
         "sunwash"
       ],
       "depth": "shallow",
+      "mythicalOnly": true,
       "fishIds": [
-        "peaklight-koi",
-        "golden-shiner",
-        "bluegill",
-        "rainbow-trout"
+        "water-sprite",
+        "starfall-minnow",
+        "naiad",
+        "undine",
+        "kappa",
+        "selkie",
+        "abaia",
+        "bunyip",
+        "summit-water-dragon"
       ],
       "modifiers": {
         "biteRate": 0.96,
@@ -3368,11 +3374,17 @@
         "blackstone"
       ],
       "depth": "shallow",
+      "mythicalOnly": true,
       "fishIds": [
-        "peaklight-koi",
-        "brook-trout",
-        "cutthroat-trout",
-        "starfall-minnow"
+        "water-sprite",
+        "starfall-minnow",
+        "naiad",
+        "nokken",
+        "taniwha",
+        "qallupilluk",
+        "rimefin-wisp",
+        "frost-wyrm",
+        "lernaean_hydra"
       ],
       "modifiers": {
         "biteRate": 0.93,
@@ -3403,11 +3415,19 @@
       ],
       "cave": true,
       "depth": "shallow",
+      "mythicalOnly": true,
       "fishIds": [
         "whisper-eel",
         "starfall-minnow",
-        "stone-loach",
-        "cave-tetra"
+        "kelpie",
+        "nokken",
+        "kappa",
+        "undine",
+        "abaia",
+        "bunyip",
+        "leviathan",
+        "jormungandr",
+        "moonwake-squid"
       ],
       "modifiers": {
         "biteRate": 0.88,

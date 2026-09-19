@@ -35,7 +35,7 @@ export const WORLD_EDITOR_WORLDS = Object.freeze([
     capabilities: ['select', 'terrain', 'objects', 'water', 'prefabs', 'rooms', 'walkthrough', 'collision-debug']
   }),
   Object.freeze({
-    id: 'normal-fishing-island', label: 'MANGROVE CAY', runtimeLocationId: 'normal-fishing-island',
+    id: 'normal-fishing-island', label: 'MANGROVE ISLAND', runtimeLocationId: 'normal-fishing-island',
     dataUrl: null, kind: 'production-island',
     capabilities: ['select', 'terrain', 'objects', 'water', 'walkthrough', 'collision-debug']
   }),

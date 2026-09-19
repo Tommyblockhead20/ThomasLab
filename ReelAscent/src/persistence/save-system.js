@@ -3,8 +3,9 @@ import { canonicalSpeciesId, resolveSpecies } from '../fishing/fish-data.js';
 import { isBetterCatch } from './best-catch.js';
 import { LEGACY_CATCH_REWARD_BY_SPECIES } from '../progression/cosmetics.js';
 import { getCatchValue } from '../progression/economy.js';
+import { normalizeDestinationProgression, refreshDestinationProgression } from '../progression/destination-progression.js';
 
-export const SAVE_SCHEMA_VERSION = 15;
+export const SAVE_SCHEMA_VERSION = 16;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -51,6 +52,8 @@ export function defaultSave() {
       biomesFished: [],
       destinationsVisited: []
     },
+    destinationProgression: { unlocked: [] },
+    boat: { owned: false, purchasedAt: 0, grandfathered: false },
     worldMilestones: [],
     runHistory: [],
     progression: defaultProgressionState()
@@ -177,6 +180,12 @@ export function normalizeSave(value = {}) {
     biomesFished: cleanIds(badgeSource.biomesFished, 100),
     destinationsVisited: cleanIds(badgeSource.destinationsVisited, 100)
   };
+  normalized.destinationProgression = normalizeDestinationProgression(value.destinationProgression, normalized);
+  normalized.boat = {
+    owned: value.boat?.owned === true,
+    purchasedAt: Math.max(0, finiteNumber(value.boat?.purchasedAt)),
+    grandfathered: value.boat?.grandfathered === true
+  };
   normalized.worldMilestones = cleanIds(value.worldMilestones, 100);
   normalized.runHistory = Array.isArray(value.runHistory)
     ? value.runHistory.slice(0, 12).filter((entry) => entry && typeof entry === 'object').map((entry) => ({
@@ -284,6 +293,15 @@ const MIGRATIONS = Object.freeze({
     return {
       ...value, version: 15,
       progression: { ...value.progression, ownedCosmetics: [...owned] }
+    };
+  },
+  15: (value) => {
+    const grandfathered = Math.max(0, Math.floor(finiteNumber(value.lifetime?.boatTrips))) > 0;
+    return {
+      ...value,
+      version: 16,
+      destinationProgression: value.destinationProgression ?? { unlocked: [] },
+      boat: value.boat ?? { owned: grandfathered, purchasedAt: 0, grandfathered }
     };
   }
 });
@@ -456,6 +474,7 @@ export class SaveSystem {
     // otherwise a cached subsystem can replace the destination payload before reload completes.
     if (this.reloadTransitionActive) return true;
     try {
+      refreshDestinationProgression(this.data);
       const slot = this.slotStore.slots.find((entry) => entry.id === this.activeSlotId);
       if (!slot) throw new Error('Active slot unavailable');
       const now = Date.now();

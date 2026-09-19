@@ -181,7 +181,7 @@ export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
     theme: 'rocky-cave', functions: ['cave-fishing']
   }),
   islandLocation({
-    id: 'normal-fishing-island', displayName: 'Mangrove Cay', type: 'fishing-island',
+    id: 'normal-fishing-island', displayName: 'Mangrove Island', type: 'fishing-island',
     angle: 330, radius: 1460, radii: { x: 19, z: 16 }, elevation: .66,
     theme: 'warm-mangrove-lagoon', functions: ['outdoor-fishing']
   }),
@@ -251,6 +251,11 @@ export const MAP_ITEMS = Object.freeze([
 ]);
 
 export const MAP_ITEM_BY_ID = new Map(MAP_ITEMS.map((item) => [item.id, item]));
+
+export const BOAT_SHOP_ITEM = Object.freeze({
+  id: 'travel-boat', name: 'Trail Boat', price: 2000,
+  description: 'Your own boat for unlocked island and open-water travel. Ownership belongs to this save.'
+});
 
 export function getWorldLocation(id) {
   return WORLD_LOCATION_BY_ID.get(id) ?? null;

@@ -16,7 +16,7 @@ import { normalizeProgressionState } from './progression-save.js';
 import { orderAndFilterSpecimens } from './specimen-order.js';
 import { serializeProgress, validateProgressImport } from './progress-transfer.js';
 import { normalizeAppearance } from '../player/appearance.js';
-import { MAP_ITEM_BY_ID, MAP_ITEMS } from '../world/world-locations.js';
+import { BOAT_SHOP_ITEM, MAP_ITEM_BY_ID, MAP_ITEMS } from '../world/world-locations.js';
 import { COSMETIC_BY_ID, cosmeticUnlocked } from './cosmetics.js';
 
 const copy = (value) => JSON.parse(JSON.stringify(value));
@@ -422,6 +422,16 @@ export class ProgressionSystem {
     return { ok: true, item };
   }
 
+  purchaseBoat() {
+    if (this.saveSystem.data.boat?.owned) return { ok: false, reason: `${BOAT_SHOP_ITEM.name} already owned` };
+    if (!this.spend(BOAT_SHOP_ITEM.price)) return { ok: false, reason: `Need $${BOAT_SHOP_ITEM.price}` };
+    this.saveSystem.data.boat = { owned: true, purchasedAt: Date.now(), grandfathered: false };
+    this.commit();
+    return { ok: true, item: BOAT_SHOP_ITEM };
+  }
+
+  ownsBoat() { return this.saveSystem.data.boat?.owned === true; }
+
   ownsWorldItem(itemId) {
     return this.state.ownedItems.includes(itemId);
   }
@@ -440,8 +450,9 @@ export class ProgressionSystem {
     const purchasableWorldItems = MAP_ITEMS.filter((item) => item.price > 0);
     const purchased = purchasableEquipment.filter((item) => this.state.ownedEquipment.includes(item.id)).length
       + purchasableWorldItems.filter((item) => this.state.ownedItems.includes(item.id)).length
-      + Math.max(0, this.state.aquariumTankCount - 1);
-    const total = purchasableEquipment.length + purchasableWorldItems.length + AQUARIUM_TANK_UPGRADES.length - 1;
+      + Math.max(0, this.state.aquariumTankCount - 1)
+      + Number(this.ownsBoat());
+    const total = purchasableEquipment.length + purchasableWorldItems.length + AQUARIUM_TANK_UPGRADES.length;
     return { purchased, total, percent: total ? purchased / total * 100 : 100 };
   }
 

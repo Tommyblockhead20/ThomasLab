@@ -13,7 +13,8 @@ export class MountainMapMenu {
     getLocalPlayer = () => null,
     getRemotePlayers = () => [],
     getHeldItemId = () => null,
-    getCurrentLocationId = () => 'main-mountain'
+    getCurrentLocationId = () => 'main-mountain',
+    getDestinationAccess = () => ({ state: 'available', revealed: true, playable: true })
   } = {}) {
     this.screen = document.querySelector('#mountain-map');
     this.closeButton = document.querySelector('#close-mountain-map');
@@ -28,6 +29,7 @@ export class MountainMapMenu {
     this.getRemotePlayers = getRemotePlayers;
     this.getHeldItemId = getHeldItemId;
     this.getCurrentLocationId = getCurrentLocationId;
+    this.getDestinationAccess = getDestinationAccess;
     this.mode = 'paper';
     this.lastGpsRender = 0;
     this.lastMinimapRender = 0;
@@ -160,8 +162,9 @@ export class MountainMapMenu {
 
     const islandGroup = this.createSvg('g', { class: 'map-islands' });
     for (const location of this.mapData.locations.filter((entry) => entry.type !== 'main-island')) {
+      const access = this.getDestinationAccess(location.id) ?? {};
       const point = this.project(location.position);
-      const marker = this.createSvg('g', { class: `map-island map-island-${location.type}` });
+      const marker = this.createSvg('g', { class: `map-island map-island-${location.type} map-island-${access.state ?? 'available'}` });
       const footprint = location.type === 'open-water-boat'
         ? this.createSvg('g', {
             class: 'map-open-water-boat',
@@ -185,8 +188,9 @@ export class MountainMapMenu {
         this.createSvg('text', {
           x: point.x.toFixed(1),
           y: (point.y - (location.type === 'open-water-boat' ? 16 : Math.max(13, location.radii.z * scale * 2.2 + 4))).toFixed(1)
-        }, location.label)
+        }, access.revealed === false ? 'Uncharted Waters' : location.label)
       );
+      marker.prepend(this.createSvg('title', {}, access.reason ? `${access.revealed === false ? 'Uncharted Waters' : location.label} — ${access.reason}` : location.label));
       islandGroup.appendChild(marker);
     }
     svg.appendChild(islandGroup);
@@ -482,8 +486,9 @@ export class MountainMapMenu {
     this.closeButton?.focus({ preventScroll: true });
     requestAnimationFrame(() => {
       if (!this.isOpen) return;
-      this.renderGpsPlayers();
-      this.renderLegend();
+      // Destination discovery is per-save and can change while this menu is closed.
+      // Rebuild only after the shell is visible so opening remains instant.
+      this.renderMap();
     });
   }
 

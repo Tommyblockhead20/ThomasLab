@@ -2,6 +2,7 @@ import { normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runti
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
 import { buildOceanIslandTerrainData } from '../../src/world/mountain-v2.js';
 import { stockLibraryScene } from '../../src/world/library-shelf-stocking.js';
+import { subdivideFaces } from './mesh-authoring.js';
 
 export const LIBRARY_SCENE_SCHEMA = 'reel-ascent-authored-scene-v2';
 export const LIBRARY_WORLD_ID = 'library-island';
@@ -33,6 +34,20 @@ export function isLibraryAuthoredScene(value) {
 export function librarySceneLocalToEditor(value) { return objectVector(value); }
 export function libraryEditorToSceneLocal(value) { return arrayVector(value); }
 
+export function refineLibraryTerrain(terrain) {
+  if (!terrain?.positions?.length || !terrain?.indices?.length) return terrain;
+  if (terrain.metadata?.refinement === 'two topology-preserving midpoint subdivision passes') return clone(terrain);
+  let refined = { ...clone(terrain), positions: [...terrain.positions], indices: [...terrain.indices] };
+  for (let pass = 0; pass < 2; pass += 1) {
+    refined = subdivideFaces(refined, Array.from({ length: refined.indices.length / 3 }, (_, index) => index));
+  }
+  refined.revision = Math.max(0, Number(terrain.revision) || 0);
+  delete refined.editedAt;
+  refined.parts = [{ name: 'refined island terrain / coastline / submerged apron', firstVertex: 0, vertexCount: refined.positions.length / 3, firstTriangle: 0, triangleCount: refined.indices.length / 3 }];
+  refined.metadata = { ...terrain.metadata, refinement: 'two topology-preserving midpoint subdivision passes' };
+  return refined;
+}
+
 export function libraryProductionTerrain() {
   const location = SMALL_ISLAND_LOCATIONS.find((item) => item.id === 'veiled-athenaeum');
   if (!location) return null;
@@ -47,13 +62,16 @@ export function libraryProductionTerrain() {
     const dz = worldZ - location.worldPosition.z;
     positions.push(dx * cos - dz * sin, worldY - floorY, dx * sin + dz * cos);
   }
+  // Two midpoint passes preserve the exact generated surface while taking the island from
+  // coarse multi-metre faces to a mesh that responds locally to a ~1 m sculpt brush.
+  const refined = refineLibraryTerrain({ positions, indices: source.triangles.flat(), metadata: {} });
   return {
     mode: 'production-island-terrain', format: 'triangle-mesh-v1', coordinateSpace: 'library-root-local',
-    positions, indices: source.triangles.flat(),
-    parts: [{ name: 'full island terrain / coastline / submerged apron', firstVertex: 0, vertexCount: source.vertices.length, firstTriangle: 0, triangleCount: source.triangles.length }],
+    positions: refined.positions, indices: refined.indices, revision: 0,
+    parts: [{ name: 'refined island terrain / coastline / submerged apron', firstVertex: 0, vertexCount: refined.positions.length / 3, firstTriangle: 0, triangleCount: refined.indices.length / 3 }],
     metadata: {
       source: 'buildOceanIslandTerrainData(veiled-athenaeum)', productionAuthoritative: true,
-      locationId: location.id, rootFloorY: floorY, rootYawDegrees: 90 - location.angle
+      ...refined.metadata, locationId: location.id, rootFloorY: floorY, rootYawDegrees: 90 - location.angle
     }
   };
 }
@@ -396,7 +414,7 @@ export function normalizeLibraryEditorPayload(payload) {
     const normalized = normalizeWorldEditorLevel(payload);
     const adapted = adaptLibrarySceneToEditor(serializeLibrarySceneFromEditor(normalized));
     if (normalized.terrain?.mode === 'production-island-terrain' && normalized.terrain?.positions?.length) {
-      adapted.terrain = clone(normalized.terrain);
+      adapted.terrain = refineLibraryTerrain(normalized.terrain);
     }
     return adapted;
   }

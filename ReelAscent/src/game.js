@@ -41,6 +41,7 @@ import { OceanSharkHazard } from './world/ocean-shark-hazard.js';
 import { SongFeedbackDashboard } from './ui/song-feedback-dashboard.js';
 import { markStartup } from './debug/startup-timings.js';
 import { GamepadController } from './input/gamepad-controller.js';
+import { getDestinationAccess } from './progression/destination-progression.js';
 
 export class Game {
   static async create(canvas, onProgress = () => {}) {
@@ -181,9 +182,13 @@ export class Game {
           position: remote.globalPosition ?? remote.lastSample
         })),
       getHeldItemId: () => this.progression.getHeldWorldItemId(),
-      getCurrentLocationId: () => this.currentLocationId
+      getCurrentLocationId: () => this.currentLocationId,
+      getDestinationAccess: (locationId) => getDestinationAccess(this.saveSystem.data, locationId)
     });
-    this.boatTravel = new BoatTravelMenu((destinationId) => this.travelByBoat(destinationId));
+    this.boatTravel = new BoatTravelMenu((destinationId) => this.travelByBoat(destinationId), {
+      getDestinationAccess: (locationId) => getDestinationAccess(this.saveSystem.data, locationId),
+      ownsBoat: () => this.progression.ownsBoat()
+    });
     this.onOpenBoat = (event) => this.boatTravel.open(event.detail?.currentLocationId);
     window.addEventListener('reel-ascent:open-boat', this.onOpenBoat);
     this.emoteMenu = new EmoteMenu(
@@ -661,6 +666,19 @@ export class Game {
 
   setCurrentLocation(locationId, coordinateSpace = 'global-world') {
     if (!locationId) return this.currentLocationId;
+    const requestedAccess = getDestinationAccess(this.saveSystem.data, locationId);
+    if (!requestedAccess.playable) {
+      const safe = this.world.getHomeArrival?.();
+      if (safe?.position) {
+        this.fishing?.cancel?.();
+        this.player?.clearBenchSeat?.();
+        this.player?.teleport?.(safe.position, safe.facingYaw);
+        this.camera?.setYaw?.(safe.facingYaw);
+        locationId = safe.locationId ?? 'home-island';
+        coordinateSpace = safe.coordinateSpace ?? 'global-world';
+        this.hud?.showToast?.('That destination is unavailable. Returned safely to Hearthward Isle.');
+      }
+    }
     this.currentLocationId = locationId;
     this.currentCoordinateSpace = coordinateSpace || 'global-world';
     this.world.setActiveLocation?.(locationId);
@@ -855,6 +873,13 @@ export class Game {
   }
 
   travelByBoat(destinationId) {
+    const access = getDestinationAccess(this.saveSystem.data, destinationId);
+    const courtesyFerry = (this.currentLocationId === 'home-island' && destinationId === 'shop-island')
+      || (this.currentLocationId === 'shop-island' && destinationId === 'home-island');
+    if (!access.playable || (!this.progression.ownsBoat() && !courtesyFerry)) {
+      this.hud.showToast?.(access.reason || 'Purchase the Trail Boat before sailing there.');
+      return false;
+    }
     const arrival = this.world.chooseTravelArrival(destinationId);
     if (!arrival || arrival.safe === false) return false;
     if (this.fishing.active) this.fishing.cancel();

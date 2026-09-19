@@ -188,6 +188,29 @@ export const WORLD_EDITOR_V3_ASSETS = Object.freeze([
   fire('athenaeum-fireplace-v3', 'Athenaeum Fireplace', false),
   fire('athenaeum-monumental-fireplace-v3', 'Monumental Athenaeum Fireplace', true),
   ...LIBRARY_FURNITURE,
+  assembly('old-man-fisher-npc-v4', 'Old Man Fisher NPC', ['cave-fishing-island', 'shop-island'], 'Characters / NPCs', 'A complete placeable old fisherman with weathered clothes, beard, hat, tackle satchel, and fishing rod. Intended for the cave or shop without hard-wiring his position.', [
+    part('left-boot', { x: -.25, y: .16, z: 0 }, { x: .34, y: .32, z: .48 }, 'dark'),
+    part('right-boot', { x: .25, y: .16, z: 0 }, { x: .34, y: .32, z: .48 }, 'dark'),
+    part('left-leg', { x: -.23, y: .68, z: .04 }, { x: .34, y: .78, z: .36 }, 'fabric'),
+    part('right-leg', { x: .23, y: .68, z: .04 }, { x: .34, y: .78, z: .36 }, 'fabric'),
+    part('weathered-coat', { x: 0, y: 1.42, z: 0 }, { x: 1.02, y: 1.18, z: .58 }, 'water', { metadata: { npcRole: 'old-man-fisher' } }),
+    part('coat-collar', { x: 0, y: 1.92, z: -.24 }, { x: .72, y: .18, z: .16 }, 'fixture', { rotation: { x: 12, y: 0, z: 0 }, collision: false }),
+    part('left-arm', { x: -.62, y: 1.45, z: 0 }, { x: .28, y: 1.05, z: .3 }, 'water', { rotation: { x: 0, y: 0, z: -8 }, collision: false }),
+    part('right-arm', { x: .62, y: 1.45, z: -.05 }, { x: .28, y: 1.05, z: .3 }, 'water', { rotation: { x: 0, y: 0, z: 12 }, collision: false }),
+    part('head', { x: 0, y: 2.28, z: 0 }, { x: .68, y: .72, z: .64 }, 'accent', { type: 'sphere', collision: false }),
+    part('nose', { x: 0, y: 2.25, z: -.36 }, { x: .14, y: .18, z: .16 }, 'accent', { type: 'sphere', collision: false }),
+    part('left-eye', { x: -.14, y: 2.38, z: -.31 }, { x: .07, y: .08, z: .06 }, 'dark', { type: 'sphere', collision: false }),
+    part('right-eye', { x: .14, y: 2.38, z: -.31 }, { x: .07, y: .08, z: .06 }, 'dark', { type: 'sphere', collision: false }),
+    part('beard-center', { x: 0, y: 2.02, z: -.3 }, { x: .48, y: .56, z: .22 }, 'fixture', { type: 'sphere', collision: false }),
+    part('beard-left', { x: -.2, y: 2.08, z: -.27 }, { x: .3, y: .42, z: .2 }, 'fixture', { type: 'sphere', collision: false }),
+    part('beard-right', { x: .2, y: 2.08, z: -.27 }, { x: .3, y: .42, z: .2 }, 'fixture', { type: 'sphere', collision: false }),
+    part('hat-brim', { x: 0, y: 2.62, z: 0 }, { x: 1.02, y: .1, z: .84 }, 'dark', { collision: false }),
+    part('hat-crown', { x: 0, y: 2.83, z: .03 }, { x: .66, y: .42, z: .62 }, 'dark', { collision: false }),
+    part('tackle-satchel', { x: -.58, y: 1.12, z: .22 }, { x: .42, y: .68, z: .3 }, 'wood', { rotation: { x: 0, y: 0, z: -6 }, collision: false }),
+    part('satchel-strap', { x: -.22, y: 1.58, z: -.31 }, { x: .1, y: 1.35, z: .08 }, 'wood', { rotation: { x: 0, y: 0, z: -28 }, collision: false }),
+    part('fishing-rod', { x: .88, y: 1.72, z: .02 }, { x: .08, y: 3.2, z: .08 }, 'wood', { type: 'cylinder', rotation: { x: 0, y: 0, z: 12 }, collision: false }),
+    part('rod-handle', { x: .57, y: .65, z: .02 }, { x: .13, y: .72, z: .13 }, 'dark', { type: 'cylinder', rotation: { x: 0, y: 0, z: 12 }, collision: false })
+  ]),
   assembly('basalt-natural-ledge-v3', 'Basalt Natural Ledge', ['cave-fishing-island'], 'Basalt / Traversal', 'Three irregular overlapping basalt forms for a climbable rest ledge.', [
     part('ledge-core', { x: 0, y: 0, z: 0 }, { x: 6.2, y: .8, z: 3.4 }, 'stoneDark', { type: 'sphere' }),
     part('ledge-left', { x: -2.1, y: -.25, z: .35 }, { x: 2.8, y: 1.5, z: 2.6 }, 'stone'),
@@ -222,5 +245,13 @@ export const WORLD_EDITOR_V3_ASSETS = Object.freeze([
   ])
 ]);
 
-export function assetsForWorld(worldId) { return WORLD_EDITOR_V3_ASSETS.filter((asset) => asset.worlds.includes(worldId)); }
+// The `worlds` list is a recommendation/tag, not an artificial editor lock. A level
+// designer may need a bench, lamp, NPC, rock assembly, or shelf on any island. Keeping
+// the complete catalog visible also prevents useful assets from appearing to be missing
+// merely because the author switched world tabs.
+export function assetsForWorld(worldId) {
+  const recommended = WORLD_EDITOR_V3_ASSETS.filter((asset) => asset.worlds.includes(worldId));
+  const portable = WORLD_EDITOR_V3_ASSETS.filter((asset) => !asset.worlds.includes(worldId));
+  return [...recommended, ...portable];
+}
 export function getV3Asset(id) { return WORLD_EDITOR_V3_ASSETS.find((asset) => asset.id === id) || null; }
