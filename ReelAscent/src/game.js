@@ -122,7 +122,7 @@ export class Game {
     this.storageWarningShown = false;
     this.hud = new Hud(this.saveSystem.multiplayerPlayerId);
     this.progression = new ProgressionSystem(this.saveSystem);
-    this.tutorials = new TutorialSystem(this.saveSystem, this.hud);
+    this.tutorials = new TutorialSystem(this.saveSystem, this.hud, () => this.player?.input?.activeInputDevice ?? 'keyboard');
     this.world.updateHomeProgress?.(this.saveSystem.getSnapshot());
     this.world.updateAquariumResidents?.(this.saveSystem.getSnapshot());
     this.lastHomeProgressRevision = this.saveSystem.revision;
@@ -485,6 +485,9 @@ export class Game {
       this.lastHomeProgressRevision = this.saveSystem.revision;
     }
     // Keep networking/UI alive for this client, but do not advance the local world clock.
+    this.world.setSharedTimeSeconds?.(this.multiplayer.state === 'in_room'
+      ? this.multiplayer.room.getSharedTimeSeconds()
+      : null);
     if (!localGameplayPaused) this.world.update(dt);
     const multiplayerPlayerState = this.player.getState();
     this.benchPopulationRefresh -= dt;
@@ -874,10 +877,8 @@ export class Game {
 
   travelByBoat(destinationId) {
     const access = getDestinationAccess(this.saveSystem.data, destinationId);
-    const courtesyFerry = (this.currentLocationId === 'home-island' && destinationId === 'shop-island')
-      || (this.currentLocationId === 'shop-island' && destinationId === 'home-island');
-    if (!access.playable || (!this.progression.ownsBoat() && !courtesyFerry)) {
-      this.hud.showToast?.(access.reason || 'Purchase the Trail Boat before sailing there.');
+    if (!access.playable) {
+      this.hud.showToast?.(access.reason || 'That destination is not currently available.');
       return false;
     }
     const arrival = this.world.chooseTravelArrival(destinationId);

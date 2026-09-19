@@ -63,6 +63,7 @@ export class Room {
 
   stateFor(session) {
     return {
+      serverTime: Date.now(),
       roomCode: this.code,
       runSeed: this.runSeed,
       capacity: this.capacity,

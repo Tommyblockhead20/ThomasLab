@@ -128,21 +128,46 @@ export class GamepadController {
       if (dialog) this.navigateDialog(dialog, pad, rising);
     } else if (this.game.fishing.resultActive) {
       this.releaseGameplay(input);
+      if (this.game.hud.canSelectSongDownvoteReason?.(this.game.fishing.lastSongFeedback)) {
+        const reasonButtons = [...document.querySelectorAll('#song-downvote-reason button:not([disabled])')];
+        const focused = reasonButtons.indexOf(document.activeElement);
+        if ((rising(BUTTON.UP) || rising(BUTTON.DOWN)) && reasonButtons.length) {
+          const step = rising(BUTTON.DOWN) ? 1 : -1;
+          const start = focused >= 0 ? focused : (step > 0 ? -1 : 0);
+          reasonButtons[(start + step + reasonButtons.length) % reasonButtons.length]?.focus();
+        } else if (rising(BUTTON.A) && reasonButtons.length) {
+          const button = focused >= 0 ? reasonButtons[focused] : reasonButtons[0];
+          const reason = button?.dataset.songDownvoteReason;
+          if (reason === 'skip') this.game.hud.dismissSongDownvoteReason?.();
+          else if (reason) this.game.performFishingResultAction('downvote-reason', 'trigger', reason);
+        }
+      } else {
       for (const [indexText, action] of Object.entries(RESULT)) {
         const index = Number(indexText);
         if (rising(index)) this.game.performFishingResultAction(action, action === 'recast' ? 'start' : 'trigger', 'gamepad');
       }
+      }
     } else {
-      input.gamepadAxes = { x: gamepadAxis(pad.axes?.[0]), z: -gamepadAxis(pad.axes?.[1]) };
+      const fallbackDirection = (index) => down(index) && !boundActionForButton(index);
+      const dpadX = Number(fallbackDirection(BUTTON.RIGHT)) - Number(fallbackDirection(BUTTON.LEFT));
+      const dpadZ = Number(fallbackDirection(BUTTON.UP)) - Number(fallbackDirection(BUTTON.DOWN));
+      input.gamepadAxes = {
+        x: Math.max(-1, Math.min(1, gamepadAxis(pad.axes?.[0]) + dpadX)),
+        z: Math.max(-1, Math.min(1, -gamepadAxis(pad.axes?.[1]) + dpadZ))
+      };
       const actionDown = (action) => Number.isInteger(this.bindings[action]) && down(this.bindings[action]);
       const actionRising = (action) => Number.isInteger(this.bindings[action]) && rising(this.bindings[action]);
       input.gamepadSprintHeld = actionDown('sprint');
       input.gamepadSlideHeld = actionDown('slide');
       input.gamepadGripHeld = actionDown('grip');
       if (!input.gamepadGripHeld && !input.rawGripHeld) input.gripInteractionSuppressed = false;
-      input.gamepadCastHeld = down(BUTTON.RT) && this.game.fishing.active && !input.rhythmCapture;
-      if (input.gamepadCastHeld && rising(BUTTON.RT)) input.fishingCastPressed = true;
-      if (falling(BUTTON.RT)) input.fishingCastReleased = true;
+      const dpadCast = this.game.fishing.active && !boundActionForButton(BUTTON.UP) && down(BUTTON.UP);
+      input.gamepadCastHeld = (down(BUTTON.RT) || dpadCast) && this.game.fishing.active && !input.rhythmCapture;
+      if (input.gamepadCastHeld && (rising(BUTTON.RT) || rising(BUTTON.UP))) input.fishingCastPressed = true;
+      if (falling(BUTTON.RT) || falling(BUTTON.UP)) input.fishingCastReleased = true;
+      if (this.game.fishing.active && !input.rhythmCapture && !boundActionForButton(BUTTON.DOWN) && rising(BUTTON.DOWN)) {
+        input.fishingHookPressed = true;
+      }
       if (actionRising('jump')) {
         if (this.game.fishing.active && !input.rhythmCapture) input.fishingHookPressed = true;
         else if (!input.rhythmCapture) input.jumpQueued = true;

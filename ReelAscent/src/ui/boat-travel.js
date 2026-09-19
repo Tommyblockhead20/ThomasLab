@@ -49,21 +49,8 @@ export class BoatTravelMenu {
     this.render();
   }
 
-  isCourtesyFerry(id) {
-    return (this.currentId === 'home-island' && id === 'shop-island')
-      || (this.currentId === 'shop-island' && id === 'home-island');
-  }
-
   markerAccess(location) {
-    const access = this.getDestinationAccess(location.id) ?? {};
-    const boatAllowed = this.ownsBoat() || this.isCourtesyFerry(location.id);
-    return {
-      ...access,
-      playable: access.playable !== false && boatAllowed,
-      reason: access.playable === false
-        ? access.reason
-        : boatAllowed ? '' : 'Purchase the $2000 Trail Boat at Outfitter\'s Reach.'
-    };
+    return this.getDestinationAccess(location.id) ?? {};
   }
 
   render() {
@@ -97,11 +84,23 @@ export class BoatTravelMenu {
       const label = document.createElement('b');
       label.textContent = access.revealed === false ? 'Uncharted Waters' : location.displayName;
       button.append(footprint, label);
+      if (access.state === 'locked-cloud') {
+        const clouds = document.createElement('span');
+        clouds.className = 'boat-map-clouds';
+        clouds.setAttribute('aria-hidden', 'true');
+        for (let index = 0; index < 8; index += 1) clouds.appendChild(document.createElement('i'));
+        button.appendChild(clouds);
+      } else if (access.state === 'known-unavailable') {
+        const construction = document.createElement('span');
+        construction.className = 'boat-map-construction';
+        construction.textContent = '⚠ UNDER CONSTRUCTION';
+        button.appendChild(construction);
+      }
       const lockMessage = access.reason || '';
       if (lockMessage) {
         const lock = document.createElement('small');
         lock.className = 'boat-map-lock';
-        lock.textContent = `${access.state === 'known-unavailable' ? 'UNAVAILABLE' : 'LOCKED'} • ${lockMessage}`;
+        lock.textContent = `${access.state === 'known-unavailable' ? 'UNDER CONSTRUCTION' : 'LOCKED'} • ${lockMessage}`;
         button.appendChild(lock);
         button.setAttribute('aria-description', lockMessage);
       }

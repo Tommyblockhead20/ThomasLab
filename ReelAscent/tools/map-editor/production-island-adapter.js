@@ -9,6 +9,7 @@ import {
   triangleSurfaceHeightAt
 } from '../../src/world/mountain-v2.js';
 import { normalizeWorldEditorLevel } from './world-level-format.js';
+import { BASALT_HOLLOW_TERRAIN_SOURCE, buildCleanBasaltTerrainLocal } from '../../src/world/cave-island-v23.js';
 
 const ISLAND_EDITOR_IDS = Object.freeze([
   'home-island', 'shop-island', 'aquarium-island', 'cave-fishing-island',
@@ -18,44 +19,12 @@ const ISLAND_EDITOR_IDS = Object.freeze([
 export function productionIslandEditorIds() { return [...ISLAND_EDITOR_IDS]; }
 
 function cleanCaveEditorTerrain() {
-  const columns = 33;
-  const rows = 29;
-  const width = 48;
-  const depth = 40;
-  const positions = [];
-  const indices = [];
-  for (let row = 0; row < rows; row += 1) {
-    const z = -depth / 2 + row / (rows - 1) * depth;
-    for (let column = 0; column < columns; column += 1) {
-      const x = -width / 2 + column / (columns - 1) * width;
-      const edge = Math.hypot(x / 24, z / 20);
-      const basin = Math.hypot(x / 5.15, z / 4.25);
-      const irregular = Math.sin(x * .42) * .12 + Math.cos(z * .37) * .1 + Math.sin((x + z) * .21) * .08;
-      let y = 1.02 + irregular;
-      if (basin < 1) y = -.95 + irregular * .12;
-      else if (basin < 1.42) {
-        const t = (basin - 1) / .42;
-        y = -.95 + (1.02 + irregular + .95) * (t * t * (3 - 2 * t));
-      }
-      if (edge > .82) {
-        const t = Math.min(1, (edge - .82) / .18);
-        y += (-1.35 - y) * (t * t * (3 - 2 * t));
-      }
-      positions.push(x, y, z);
-    }
-  }
-  for (let row = 0; row < rows - 1; row += 1) for (let column = 0; column < columns - 1; column += 1) {
-    const a = row * columns + column;
-    const b = a + 1;
-    const c = a + columns;
-    const d = c + 1;
-    indices.push(a, c, b, b, c, d);
-  }
+  const { positions, indices, parts } = buildCleanBasaltTerrainLocal();
   return {
     mode: 'authored-triangle-mesh', format: 'triangle-mesh-v1', coordinateSpace: 'island-local',
     positions, indices,
-    parts: [{ name: 'clean editable cave-island landmass', firstVertex: 0, vertexCount: positions.length / 3, firstTriangle: 0, triangleCount: indices.length / 3 }],
-    metadata: { source: 'v23-clean-cave-editor-baseline', productionAuthoritative: false, oceanSurfaceY: OCEAN_SURFACE_Y }
+    parts,
+    metadata: { source: BASALT_HOLLOW_TERRAIN_SOURCE, productionAuthoritative: true, oceanSurfaceY: OCEAN_SURFACE_Y }
   };
 }
 
@@ -78,7 +47,7 @@ export function makeCleanCaveEditorLevel(worldOrId = 'cave-fishing-island') {
     metadata: {
       cleanCaveBaselineV23: true, coordinateSpace: 'cave-island-local',
       globalOrigin: { ...location.worldPosition },
-      note: 'Clean fine-grained Cave Island authoring baseline. Runtime Cave access remains separately unavailable.'
+      note: 'Shared fine-grained Basalt terrain used by production and editor. Runtime destination access remains unavailable.'
     }
   }, { worldId, displayName: 'Cave Fishing Island / Basalt Grotto', runtimeLocationId: location.id });
 }
@@ -255,7 +224,7 @@ function shopDefinition() {
     add(`${prefix} nose`, { x: localX, y: 2.18, z: -.54 }, { x: .09, y: .14, z: .09 }, 'accent', {}, false);
   };
   addNpc('Outfitter clerk', -2.2, 'fabric', 'accent');
-  addNpc('Old Man fish buyer', 2.2, 'water', 'dark');
+  addNpc('Fish Market buyer', 2.2, 'water', 'dark');
   add('OUTFITTER BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, 'accent', {}, false);
   Object.assign(objects.at(-1).metadata, { editableSign: true, signText: 'BUY GEAR' });
   add('FISH MARKET SELL CATCHES counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, 'water', {}, false);
@@ -295,7 +264,7 @@ function shopDefinition() {
   return {
     id: 'PREFAB-PRODUCTION-OUTFITTER-SHOP', name: "Outfitter's Reach Shop — complete production reference", kind: 'building', version: 3,
     objects, movingPlatforms: [], waters: [],
-    metadata: { productionReference: true, sourceBuilder: 'buildShopOutpost', completeProductionReference: true, includesNpcs: ['Outfitter clerk', 'Old Man fish buyer'] }
+    metadata: { productionReference: true, sourceBuilder: 'buildShopOutpost', completeProductionReference: true, includesNpcs: ['Outfitter clerk', 'Fish Market buyer'] }
   };
 }
 

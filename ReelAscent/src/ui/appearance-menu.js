@@ -254,6 +254,8 @@ export class AppearanceMenu {
         slider.step = '1';
         slider.value = String(selectedIndex);
         slider.dataset.appearanceSkinSlider = 'true';
+        slider.className = 'appearance-tone-slider';
+        slider.style.setProperty('--skin-tone-gradient', `linear-gradient(90deg, ${group.options.map((entry) => colorCss(entry.color)).join(', ')})`);
         slider.setAttribute('aria-label', `Skin tone ${selectedIndex + 1} of ${group.options.length}`);
         const strip = document.createElement('div');
         strip.className = 'appearance-tone-strip';

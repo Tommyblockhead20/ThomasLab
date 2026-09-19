@@ -4,6 +4,7 @@ import CAVE_FISHING_WORLD_EDITOR_LEVEL from './world-editor-levels/cave-fishing-
 import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from './world-editor-v2-runtime.js';
 import { buildVeiledAthenaeumV2 } from './library-island-v2.js';
 import { updateVeiledAthenaeumRides } from './library-island-v2.js';
+import { buildCleanBasaltTerrainWorld } from './cave-island-v23.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
 import {
@@ -680,6 +681,7 @@ export function oceanFloorHeightAt(radius, shorelineY = -.32) {
 // Keeping the topology in one function prevents the editor from drifting back to a flat
 // proxy pad while production renders the real coastline, submerged apron, and island top.
 export function buildOceanIslandTerrainData(location) {
+  if (location.id === 'cave-fishing-island') return buildCleanBasaltTerrainWorld(location);
   const segments = 36;
   const topRingFactors = location.id === 'home-island' ? [.84, .68, .52, .36, .2]
     : location.id === 'normal-fishing-island' ? [.84, .68, .52, .36, .2]
@@ -2424,6 +2426,10 @@ export class MountainWorld extends TestWorld {
     updateVeiledAthenaeumRides(this, dt);
   }
 
+  setSharedTimeSeconds(value = null) {
+    this.sharedTimeSeconds = Number.isFinite(Number(value)) ? Number(value) : null;
+  }
+
   getSurfaceMotion(collider) {
     return collider ? this.movingSurfaceMotion.get(collider.handle) ?? null : null;
   }
@@ -2548,7 +2554,7 @@ export class MountainWorld extends TestWorld {
         { x: .09, y: .14, z: .09 }, this.materials.cabinWarm, {}, false);
     };
     buildNpc('Outfitter clerk', -2.2, this.materials.cabinFabric, this.materials.cabinWarm);
-    buildNpc('Old Man fish buyer', 2.2, this.materials.deepWater, this.materials.deepRock);
+    buildNpc('Fish Market buyer', 2.2, this.materials.deepWater, this.materials.deepRock);
     box('OUTFITTER BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.cabinWarm, {}, false);
     box('FISH MARKET SELL CATCHES counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.shallowWater, {}, false);
     const glyphs = {
@@ -6628,9 +6634,11 @@ export class MountainWorld extends TestWorld {
 
     if (location.summit) return;
     if (location.cave) {
-      // The frozen Stoneveil core already owns every main-mountain cave surface.
-      // Offshore Basalt Grotto is outside that authored mesh and keeps its island shell.
-      if (shouldBuildLegacyCaveShell(location, this.authoredStoneveilCoreActive)) {
+      // Stoneveil caves remain owned by the frozen authored core. Basalt Hollow's clean
+      // replacement is already the shared production/editor landmass and must never be
+      // overlaid by the retired legacy tunnel shell.
+      if (location.offshore !== 'cave-fishing-island'
+        && shouldBuildLegacyCaveShell(location, this.authoredStoneveilCoreActive)) {
         this.buildCaveInteriorShell(location);
       }
       return;

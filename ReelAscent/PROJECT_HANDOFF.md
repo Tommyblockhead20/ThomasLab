@@ -1,3 +1,46 @@
+# REEL ASCENT v23.1 — WORLD PARITY / DESTINATION / CONTROLLER CORRECTNESS
+
+Status (2026-09-19): v23.1 is implemented on the current V4.1/v23 tree. This section supersedes v23's boat and Cave-editor-only descriptions. The active game version is `v23.1`; tracked frontend `dist/` is regenerated from source.
+
+## World Editor ↔ production parity
+
+- **Root cause:** several editor worlds used hand-maintained production-reference adapters while gameplay separately ran procedural builders. Basalt was the largest divergence: the editor's clean 33×29 mesh and runtime's legacy island ring/cut/interior-shell path were different geometry, transforms, and collision sources. Other islands shared terrain but intentionally exposed only edit-relevant deterministic structures, making the remaining omissions hard to distinguish from bugs.
+- **Authoritative strategy:** exact shared data/build logic now feeds both consumers. Stoneveil uses the same frozen `map-editor-patch.json`; Basalt production/editor use `src/world/cave-island-v23.js`; Mangrove and Frosthook use the same production terrain generator; the Athenaeum uses the same scene JSON and production terrain surface; Skyreach uses the same terrain/GLB references. Local editor coordinates are translated once by the location's `globalOrigin`; no compensating per-object offsets were added.
+- **Basalt reset:** gameplay now builds the same clean island, basin, shoreline, and submerged apron as the editor. The legacy outer ring/cut and `buildCaveInteriorShell()` are not called for Basalt. The canonical `basalt-grotto` water/destination identity remains unchanged and normal travel remains unavailable. Its level metadata now explicitly names the shared builder instead of the deleted legacy shell path.
+- **Island audit:** Stoneveil is shared exact authority; Basalt is shared exact authority; Mangrove and Frosthook share exact landmass/terrain with only minor runtime shoreline/snow dressing omitted; Athenaeum shares scene/waters/surface, with editor-only topology refinement and individual books versus production batches; Skyreach shares terrain and GLB reference but remains future gameplay; Pirate remains an editor-only future scene and has no production destination/gameplay.
+- **Diagnostic:** `tools/map-editor/world-parity.js` and the active-world summary report production/editor sources, parity status, terrain vertices/triangles, objects, waters, prefab instances, production-only/editor-only categories, and origin policy. Editor helpers, transient particles/interactions, production book batching, and minor deterministic dressing are the remaining intentional differences.
+- The authoritative Stoneveil patch was not edited; its current repository SHA-256 is `39225556C1969CAB4F4CA51A40C158A07CCB2A816EB7356A7694D8007515159C`.
+
+## Bluewater boat and destination presentation
+
+- The **Bluewater Boat** still costs **$2,000**, is per-save, and unlocks **Bluewater Reach only**. Ordinary destinations require only their normal progression unlock and never boat ownership; the obsolete global boat gate/courtesy-ferry architecture was removed.
+- Save schema is 17. Migration no longer interprets prior ordinary `boatTrips` as ownership. A real post-feature purchase survives through explicit `owned + purchasedAt`; accidental v23 free ownership with no purchase timestamp is revoked. New and pre-feature saves must buy the boat.
+- The access resolver remains authoritative for UI and travel. Locked destinations use dense irregular layered cloud puffs that obscure the opaque island and show the OR requirement. Revealed but unavailable Cave and known Skyreach remain opaque and show hazard-stripe/construction iconography plus **UNDER CONSTRUCTION**. Playable destinations render normally.
+
+## Controller and active prompts
+
+- Settings controller capture now accepts standard supported buttons/triggers/D-pad/stick clicks, persists globally, drives gameplay, and resolves conflicts by swapping the displaced action instead of silently refusing capture. Analog movement/camera remain fixed.
+- D-pad direction joins the left stick for movement and existing focus navigation. Fishing additionally accepts D-pad Up/RT for cast, D-pad Down/A for hook, all four D-pad result actions, and D-pad reason navigation with A confirmation. Existing controller alternatives remain.
+- Controller rhythm chords use a controller-only **200 ms** rolling accumulation window, allowing Up+Down and three-direction chords to be rolled on hardware that cannot hold opposite D-pad directions. Keyboard simultaneous/chord behavior retains its existing 75 ms window; single notes are unchanged.
+- HUD contextual controls, fishing/bite/result/reason prompts, ordinary control hints, common modal close keycaps, home interactions, and tutorials now switch by the most recent meaningful input and display live bindings. Analog input must exceed the existing 0.35 threshold, so minor drift does not seize prompts.
+
+## Appearance, Lazy River, Library ecology, and Old Man
+
+- Skin Tone remains one compatible ID-backed slider, but its track now visibly contains the exact saved palette with tick marks, current swatch/readout, and an outlined thumb. Appearance persistence and multiplayer payload shape are unchanged.
+- Multiplayer rooms now publish additive `serverTime`; clients smooth a server-clock offset. Athenaeum tubes derive stable positions from shared absolute time, fixed route/index phase, and fixed speed, so join-in-progress computes the current position without per-frame network traffic. Rider transforms continue through normal player snapshots. Reverse paths now flip their tangent, so the player faces actual motion instead of backward.
+- `library-ecology-validation.js` enforces an explicit reasoned mythical whitelist. `npm run validate:library` reports each water/species/rarity/reason/reserved flag/probability. Grand Canal, Atrium Basin, and Hidden Archive Pool are distinct, nonempty, 100% mythical/fantasy, contain no `futureReserved` entries, and each normalize to 100%.
+- Progression schema is 15 for Old Man state. Each local calendar day/save deterministically selects and persists one currently obtainable species from `saveId + date`; inaccessible-destination-only and reserved species are excluded. Only the first matching Inventory/Aquarium specimen gets exactly 2×, nonmatching specimens are rejected without removal/bonus, and ordinary selling is unchanged. The former shop NPC keeps the generic Fish Market role; **Old Man remains unplaced** and his production UI stays dormant.
+
+## Verification and deployment
+
+- `node --test test/v23-1-focused.test.js test/v23-focused.test.js test/world-editor-v4-1.test.js test/save-system.test.js test/v22-library-island.test.js test/v20-gamepad.test.js`: **38/38 pass**.
+- `npm run validate:library`: **PASS**, with three detailed water reports and no ordinary/reserved leaks.
+- Changed JavaScript syntax checks pass. `npm run build` passes with only the existing PlayCanvas worker-externalization and large-chunk warnings.
+- Frontend must be rebuilt/redeployed for all v23.1 client/world/UI changes. The multiplayer server must also redeploy for the additive `serverTime` room field used by shared Lazy River time; no database/env/protocol migration is required.
+- Manual release checks: compare each audited island editor/runtime in-browser; verify cloud/construction presentation at all thresholds; buy/reload Bluewater Boat on new/pre-feature/purchased saves; rebind conflicting controller actions and reload; test D-pad fishing/voting/menus and rolled 2/3-direction notes; reload/multiplayer-check skin tone; compare river tubes/rider facing with two clients and a late join; test one matching/nonmatching Old Man transaction through a debug harness only.
+
+---
+
 # REEL ASCENT v23 — PROGRESSION / LIBRARY / EDITOR CORRECTNESS PASS
 
 Status (2026-09-18): the v23 priority work is implemented on the current V4.1 tree. The authoritative Stoneveil patch remains untouched. Normal-game progression, boat ownership, Library ecology, migration, Cave editor restart, Library mesh refinement, and chronological editor history were completed before Old Man work.

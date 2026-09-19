@@ -5,7 +5,7 @@ import { LEGACY_CATCH_REWARD_BY_SPECIES } from '../progression/cosmetics.js';
 import { getCatchValue } from '../progression/economy.js';
 import { normalizeDestinationProgression, refreshDestinationProgression } from '../progression/destination-progression.js';
 
-export const SAVE_SCHEMA_VERSION = 16;
+export const SAVE_SCHEMA_VERSION = 17;
 export const SAVE_STORAGE_KEY = 'reel-ascent-save-v1';
 export const SAVE_SLOTS_STORAGE_KEY = 'reel-ascent-save-slots-v1';
 export const MULTIPLAYER_ID_STORAGE_KEY = 'reel-ascent-multiplayer-browser-id-v1';
@@ -296,12 +296,22 @@ const MIGRATIONS = Object.freeze({
     };
   },
   15: (value) => {
-    const grandfathered = Math.max(0, Math.floor(finiteNumber(value.lifetime?.boatTrips))) > 0;
     return {
       ...value,
       version: 16,
       destinationProgression: value.destinationProgression ?? { unlocked: [] },
-      boat: value.boat ?? { owned: grandfathered, purchasedAt: 0, grandfathered }
+      // Ordinary island travel before the purchase feature never proved Bluewater ownership.
+      boat: value.boat ?? { owned: false, purchasedAt: 0, grandfathered: false }
+    };
+  },
+  16: (value) => {
+    const purchasedAt = Math.max(0, finiteNumber(value.boat?.purchasedAt));
+    return {
+      ...value,
+      version: 17,
+      // v23 briefly grandfathered boatTrips with purchasedAt=0. Preserve only an explicit
+      // post-feature purchase, whose purchase path always records a positive timestamp.
+      boat: { owned: value.boat?.owned === true && purchasedAt > 0, purchasedAt, grandfathered: false }
     };
   }
 });

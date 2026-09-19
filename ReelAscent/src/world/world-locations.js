@@ -253,8 +253,8 @@ export const MAP_ITEMS = Object.freeze([
 export const MAP_ITEM_BY_ID = new Map(MAP_ITEMS.map((item) => [item.id, item]));
 
 export const BOAT_SHOP_ITEM = Object.freeze({
-  id: 'travel-boat', name: 'Trail Boat', price: 2000,
-  description: 'Your own boat for unlocked island and open-water travel. Ownership belongs to this save.'
+  id: 'travel-boat', name: 'Bluewater Boat', price: 2000,
+  description: 'An offshore fishing boat that unlocks Bluewater Reach. Ordinary unlocked island travel remains free.'
 });
 
 export function getWorldLocation(id) {

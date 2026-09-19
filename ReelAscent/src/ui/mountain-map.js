@@ -190,6 +190,18 @@ export class MountainMapMenu {
           y: (point.y - (location.type === 'open-water-boat' ? 16 : Math.max(13, location.radii.z * scale * 2.2 + 4))).toFixed(1)
         }, access.revealed === false ? 'Uncharted Waters' : location.label)
       );
+      if (access.state === 'locked-cloud') {
+        const cloud = this.createSvg('g', { class: 'map-cloud-shroud', transform: `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})` });
+        [[-11,-2,8],[-5,-7,9],[3,-6,8],[10,-1,8],[-4,2,11],[6,3,10]].forEach(([cx, cy, r]) => {
+          cloud.appendChild(this.createSvg('circle', { cx, cy, r }));
+        });
+        marker.appendChild(cloud);
+      } else if (access.state === 'known-unavailable') {
+        marker.appendChild(this.createSvg('g', {
+          class: 'map-construction-marker',
+          transform: `translate(${point.x.toFixed(1)} ${(point.y + 12).toFixed(1)})`
+        }, '⚠ UNDER CONSTRUCTION'));
+      }
       marker.prepend(this.createSvg('title', {}, access.reason ? `${access.revealed === false ? 'Uncharted Waters' : location.label} — ${access.reason}` : location.label));
       islandGroup.appendChild(marker);
     }

@@ -90,10 +90,11 @@ export function waterPathPose(input, distanceOrProgress = 0, { normalized = fals
     remaining -= segment.length;
   }
   const t = Math.max(0, Math.min(1, remaining / current.length));
+  const directionSign = path.direction < 0 ? -1 : 1;
   const tangent = {
-    x: (current.b.x - current.a.x) / current.length,
-    y: (current.b.y - current.a.y) / current.length,
-    z: (current.b.z - current.a.z) / current.length
+    x: (current.b.x - current.a.x) / current.length * directionSign,
+    y: (current.b.y - current.a.y) / current.length * directionSign,
+    z: (current.b.z - current.a.z) / current.length * directionSign
   };
   return {
     position: {

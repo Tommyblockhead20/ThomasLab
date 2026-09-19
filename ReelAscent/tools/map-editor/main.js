@@ -42,6 +42,7 @@ import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinit
 import { PIRATE_ASSET_LIBRARY, getPirateAsset, makePirateAssetDefinition } from './pirate-library.js';
 import { ensurePirateIslandTerrain } from './pirate-terrain.js';
 import { ensureProductionIslandTerrain, makeCleanCaveEditorLevel, makeProductionIslandEditorLevel } from './production-island-adapter.js';
+import { buildWorldParityDiagnostic } from './world-parity.js';
 import { assetsForWorld, getV3Asset } from './asset-library-v3.js';
 import { attachEditorSignText, editableSignText, supportsEditableSignText } from './sign-text.js';
 import { historyCommandForKey } from './history-shortcuts.js';
@@ -4690,6 +4691,7 @@ function onObjectField(event) {
 function renderSummary() {
   if (!isStoneveilWorld()) {
     const level = activeGenericLevel();
+    const parity = buildWorldParityDiagnostic(activeWorld(), level);
     const rows = [
       ['Schema', level?.schema ?? '—'],
       ['World ID', level?.worldId ?? activeWorldId],
@@ -4700,7 +4702,14 @@ function renderSummary() {
       ['Prefab instances', level?.prefabs?.instances?.length ?? 0],
       ['Rooms', level?.rooms?.length ?? 0],
       ['Terrain source', level?.sourcePolicy?.terrain ?? '—'],
-      ['Architecture source', level?.sourcePolicy?.architecture ?? '—']
+      ['Architecture source', level?.sourcePolicy?.architecture ?? '—'],
+      ['Parity status', parity.status],
+      ['Production source', parity.productionSource],
+      ['Editor source', parity.editorSource],
+      ['Terrain vertices / triangles', `${parity.terrainVertices.toLocaleString()} / ${parity.terrainTriangles.toLocaleString()}`],
+      ['Production-only', parity.productionOnly.join(', ') || 'None'],
+      ['Editor-only', parity.editorOnly.join(', ') || 'None'],
+      ['Root / origin', `${parity.origin}${parity.globalOrigin ? ` • (${parity.globalOrigin.x}, ${parity.globalOrigin.y}, ${parity.globalOrigin.z})` : ''}`]
     ];
     $('#summary').innerHTML = rows.map(([key, value]) => `<dt>${key}</dt><dd>${value}</dd>`).join('');
     return;
@@ -4720,6 +4729,20 @@ function renderSummary() {
     ['Core mode', isMeshMode() ? `3D mesh (${Math.round(patch.terrain.bakedMesh.positions.length / 3).toLocaleString()} verts)` : 'Heightfield'],
     ['Baked rock snapshot', patch.bakedSnapshot?.rocks?.length || 0]
   ];
+  const parity = buildWorldParityDiagnostic(activeWorld(), {
+    terrain: patch.terrain?.bakedMesh,
+    objects: patch.placedObjects,
+    waters: MOUNTAIN_FISHING_LOCATIONS,
+    metadata: { globalOrigin: { x: 260, y: 0, z: 0 } }
+  });
+  rows.push(
+    ['Parity status', parity.status],
+    ['Production source', parity.productionSource],
+    ['Editor source', parity.editorSource],
+    ['Production-only', parity.productionOnly.join(', ') || 'None'],
+    ['Editor-only', parity.editorOnly.join(', ') || 'None'],
+    ['Root / origin', parity.origin]
+  );
   $('#summary').innerHTML = rows.map(([key, value]) => `<dt>${key}</dt><dd>${value}</dd>`).join('');
 }
 

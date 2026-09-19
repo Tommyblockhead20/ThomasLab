@@ -330,7 +330,7 @@ export class PauseMenu {
     const action = this.awaitingBinding.action;
     const result = setGamepadBinding(action, index, loadGamepadBindings());
     this.status.textContent = result.ok
-      ? `${KEY_BINDING_DEFINITIONS[action].label} → ${formatGamepadBinding(index)}`
+      ? `${KEY_BINDING_DEFINITIONS[action].label} → ${formatGamepadBinding(index)}${result.swappedAction ? ` • swapped with ${KEY_BINDING_DEFINITIONS[result.swappedAction]?.label ?? result.swappedAction}` : ''}`
       : result.reason;
     if (result.ok) this.awaitingBinding = null;
     this.render();

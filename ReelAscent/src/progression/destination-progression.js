@@ -6,7 +6,7 @@ export const DESTINATION_UNLOCK_RULES = Object.freeze({
 });
 
 export const ALWAYS_AVAILABLE_DESTINATIONS = Object.freeze(new Set([
-  'main-mountain', 'home-island', 'shop-island', 'aquarium-island', 'bluewater-reach'
+  'main-mountain', 'home-island', 'shop-island', 'aquarium-island'
 ]));
 
 const cleanIds = (items) => [...new Set((Array.isArray(items) ? items : [])
@@ -50,6 +50,10 @@ export function getDestinationAccess(save = {}, locationId) {
     return Object.freeze({ state: 'known-unavailable', revealed: true, playable: false, boatOwned,
       reason: 'Skyreach is charted, but unavailable in this version.' });
   }
+  if (locationId === 'bluewater-reach' && !boatOwned) {
+    return Object.freeze({ state: 'locked-purchase', revealed: true, playable: false, boatOwned,
+      reason: 'Purchase the $2,000 Bluewater Boat at Outfitter\'s Reach.' });
+  }
   if (ALWAYS_AVAILABLE_DESTINATIONS.has(locationId)) {
     return Object.freeze({ state: 'available', revealed: true, playable: true, boatOwned, reason: '' });
   }
@@ -67,4 +71,3 @@ export function getDestinationAccess(save = {}, locationId) {
   }
   return Object.freeze({ state: 'available', revealed: true, playable: true, boatOwned, reason: '' });
 }
-

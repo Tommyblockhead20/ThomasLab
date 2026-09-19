@@ -6,16 +6,17 @@
   "runtimeLocationId": "cave-fishing-island",
   "updatedAt": null,
   "sourcePolicy": {
-    "terrain": "procedural-reference",
-    "architecture": "procedural-reference",
-    "waters": "hybrid",
+    "terrain": "shared-production-builder",
+    "architecture": "none",
+    "waters": "canonical-runtime",
     "objects": "authored",
     "movingPlatforms": "authored",
     "prefabs": "authored"
   },
   "terrain": {
-    "mode": "procedural-reference",
-    "generator": "buildOceanIsland + buildCaveInteriorShell"
+    "mode": "shared-production-builder",
+    "generator": "buildCleanBasaltTerrainWorld / buildCleanBasaltTerrainLocal",
+    "module": "src/world/cave-island-v23.js"
   },
   "waters": [
     {
@@ -45,6 +46,6 @@
   "rooms": [],
   "metadata": {
     "coordinateSpace": "cave-island-local",
-    "migrationNote": "Terrain is intentionally still a procedural reference in milestone 1; authored objects/water are independent and the format is ready for a later exact geometry bake."
+    "migrationNote": "Production and World Editor use the same clean Basalt Hollow terrain builder. Legacy outer ring cuts and cave shell geometry are not authoritative."
   }
 }

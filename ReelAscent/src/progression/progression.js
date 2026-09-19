@@ -18,6 +18,8 @@ import { serializeProgress, validateProgressImport } from './progress-transfer.j
 import { normalizeAppearance } from '../player/appearance.js';
 import { BOAT_SHOP_ITEM, MAP_ITEM_BY_ID, MAP_ITEMS } from '../world/world-locations.js';
 import { COSMETIC_BY_ID, cosmeticUnlocked } from './cosmetics.js';
+import { FISH_SPECIES, resolveSpecies } from '../fishing/fish-data.js';
+import { getDestinationAccess } from './destination-progression.js';
 
 const copy = (value) => JSON.parse(JSON.stringify(value));
 
@@ -26,6 +28,36 @@ export function localCalendarDayKey(value = Date.now()) {
   if (!Number.isFinite(date.getTime())) return '';
   const pad = (number) => String(number).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+const OLD_MAN_WATERS_BY_DESTINATION = Object.freeze({
+  'cave-fishing-island': Object.freeze(['basalt-grotto']),
+  'cold-island': Object.freeze(['frosthook-lake', 'frosthook-cold-ocean']),
+  'veiled-athenaeum': Object.freeze(['athenaeum-grand-canal', 'athenaeum-atrium-basin', 'athenaeum-hidden-archive-pool'])
+});
+
+function stableDailyIndex(text, length) {
+  let hash = 2166136261;
+  for (const character of String(text)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return length ? (hash >>> 0) % length : -1;
+}
+
+export function oldManObtainableSpecies(save = {}) {
+  const unavailableWaters = new Set();
+  for (const [destinationId, waterIds] of Object.entries(OLD_MAN_WATERS_BY_DESTINATION)) {
+    if (!getDestinationAccess(save, destinationId).playable) waterIds.forEach((id) => unavailableWaters.add(id));
+  }
+  return FISH_SPECIES.filter((species) => {
+    if (species.retired || species.futureReserved) return false;
+    const habitat = species.habitat ?? {};
+    if (habitat.exclusiveWaterId && unavailableWaters.has(habitat.exclusiveWaterId)) return false;
+    const configured = Array.isArray(habitat.waterIds) ? habitat.waterIds : [];
+    if (configured.length && configured.every((id) => unavailableWaters.has(id))) return false;
+    return true;
+  }).sort((left, right) => left.id.localeCompare(right.id));
 }
 
 export class ProgressionSystem {
@@ -117,11 +149,31 @@ export class ProgressionSystem {
 
   getOldManDailySaleStatus(now = Date.now()) {
     const dayKey = localCalendarDayKey(now);
+    let request = this.state.oldManDailyRequest ?? {};
+    if (dayKey && (request.dayKey !== dayKey || !resolveSpecies(request.speciesId))) {
+      const pool = oldManObtainableSpecies(this.saveSystem.data);
+      const index = stableDailyIndex(`${this.saveSystem.data.saveId}:${dayKey}`, pool.length);
+      request = {
+        dayKey,
+        speciesId: index >= 0 ? pool[index].id : '',
+        completed: this.state.oldManDailySaleDate === dayKey
+      };
+      this.state.oldManDailyRequest = request;
+      this.commit();
+    }
+    const requested = resolveSpecies(request.speciesId);
+    const owned = [...this.state.inventory, ...this.state.aquarium]
+      .filter((specimen) => specimen.speciesId === request.speciesId);
     return {
       dayKey,
       lastUsedDate: this.state.oldManDailySaleDate,
-      available: Boolean(dayKey && this.state.oldManDailySaleDate !== dayKey),
-      ownedSpecimenCount: this.state.inventory.length + this.state.aquarium.length
+      available: Boolean(dayKey && request.speciesId && !request.completed && this.state.oldManDailySaleDate !== dayKey),
+      completed: Boolean(request.completed || this.state.oldManDailySaleDate === dayKey),
+      requestedSpeciesId: request.speciesId,
+      requestedSpeciesName: requested?.name ?? request.speciesId,
+      rewardMultiplier: 2,
+      ownedSpecimenCount: owned.length,
+      matchingSpecimenIds: owned.map((specimen) => specimen.specimenId)
     };
   }
 
@@ -131,6 +183,10 @@ export class ProgressionSystem {
     const inventoryIndex = findSpecimenIndex(this.state.inventory, specimenId);
     const aquariumIndex = findSpecimenIndex(this.state.aquarium, specimenId);
     if (inventoryIndex < 0 && aquariumIndex < 0) return { ok: false, reason: 'Owned specimen not found' };
+    const candidate = inventoryIndex >= 0 ? this.state.inventory[inventoryIndex] : this.state.aquarium[aquariumIndex];
+    if (candidate?.speciesId !== status.requestedSpeciesId) {
+      return { ok: false, reason: `Today's request is ${status.requestedSpeciesName}. Nonmatching specimens receive no bonus.` };
+    }
     const [specimen] = inventoryIndex >= 0
       ? this.state.inventory.splice(inventoryIndex, 1)
       : this.state.aquarium.splice(aquariumIndex, 1);
@@ -138,6 +194,7 @@ export class ProgressionSystem {
     const amount = Math.max(0, Math.floor(Number(specimen.value) || 0)) * 2;
     this.state.money += amount;
     this.state.oldManDailySaleDate = status.dayKey;
+    this.state.oldManDailyRequest = { dayKey: status.dayKey, speciesId: status.requestedSpeciesId, completed: true };
     this.refreshAquariumDisplays();
     this.commit();
     if (specimen.provenance?.legitimate !== false) this.saveSystem.recordLegitimateEarnings?.(amount);
@@ -452,7 +509,7 @@ export class ProgressionSystem {
       + purchasableWorldItems.filter((item) => this.state.ownedItems.includes(item.id)).length
       + Math.max(0, this.state.aquariumTankCount - 1)
       + Number(this.ownsBoat());
-    const total = purchasableEquipment.length + purchasableWorldItems.length + AQUARIUM_TANK_UPGRADES.length;
+    const total = purchasableEquipment.length + purchasableWorldItems.length + AQUARIUM_TANK_UPGRADES.length + 1;
     return { purchased, total, percent: total ? purchased / total * 100 : 100 };
   }
 

@@ -1,4 +1,4 @@
-import { formatInputCode, loadKeyBindings } from '../player/movement.js';
+import { formatGamepadBinding, formatInputCode, loadGamepadBindings, loadKeyBindings } from '../player/movement.js';
 
 export const TUTORIAL_COPY = Object.freeze({
   fishing: (bindings) => `FISHING — Press ${formatInputCode(bindings.fish)} near water to cast. When something bites, follow the prompts.`,
@@ -7,10 +7,11 @@ export const TUTORIAL_COPY = Object.freeze({
 });
 
 export class TutorialSystem {
-  constructor(saveSystem, hud) {
+  constructor(saveSystem, hud, getInputDevice = () => 'keyboard') {
     this.saveSystem = saveSystem;
     this.hud = hud;
     this.cooldown = 0;
+    this.getInputDevice = getInputDevice;
   }
 
   update(dt, contextualAction) {
@@ -22,8 +23,13 @@ export class TutorialSystem {
     else if (contextualAction.kind === 'interact'
       && /dock|boat|helm|travel/i.test(`${contextualAction.id} ${contextualAction.label}`)) kind = 'dock';
     if (!kind || this.saveSystem.hasSeenTutorial(kind)) return null;
+    const controller = this.getInputDevice() === 'gamepad';
     const bindings = loadKeyBindings();
-    const message = TUTORIAL_COPY[kind](bindings);
+    const message = kind === 'fishing' && controller
+      ? `FISHING — Press ${formatGamepadBinding(loadGamepadBindings().fish)} near water to cast. Use RT or D-Pad Up to cast and D-Pad Down to hook.`
+      : kind === 'climbing' && controller
+        ? `CLIMBING — Hold ${formatGamepadBinding(loadGamepadBindings().grip)} near rock, then move while gripping to climb.`
+        : TUTORIAL_COPY[kind](bindings);
     if (!this.saveSystem.markTutorialSeen(kind)) return null;
     this.hud.showToast?.(message, 6);
     this.cooldown = 1.25;

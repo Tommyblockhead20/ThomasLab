@@ -36,6 +36,7 @@ export class Hud {
       id, [...document.querySelectorAll(`[data-control-hint="${id}"] kbd, [data-control-key="${id}"]`)]
     ]));
     this.fishingPanel = document.querySelector('#fishing-panel');
+    this.fishingControlHint = document.querySelector('#fishing-panel > small');
     this.fishingZone = document.querySelector('#fishing-zone');
     this.fishingMessage = document.querySelector('#fishing-message');
     this.sessionSummary = document.querySelector('#session-summary');
@@ -64,6 +65,13 @@ export class Hud {
     this.songFeedback = document.querySelector('#song-feedback');
     this.songFeedbackSummary = document.querySelector('#song-feedback-summary');
     this.songDownvoteReason = document.querySelector('#song-downvote-reason');
+    this.songReasonKeyHint = document.querySelector('.reason-key-hint');
+    this.modalPromptKeycaps = Object.fromEntries([
+      'pause-resume', 'close-journal', 'close-inventory', 'close-shop', 'close-aquarium',
+      'close-boat-travel', 'close-appearance', 'close-trail-badges', 'close-mountain-map',
+      'close-emote-menu', 'close-multiplayer'
+    ].map((id) => [id, [...(document.querySelector(`#${id}`)?.querySelectorAll('kbd') ?? [])]]));
+    this.lastFishingControlHint = '';
     this.songVoteStore = new SongVoteStore(null, voterId);
     this.songAggregates = new Map();
     this.resultActionHandler = () => false;
@@ -295,6 +303,43 @@ export class Hud {
     const fishKey = actionLabel('fish', 'KeyF');
     this.fishPrompt.hidden = contextualAction !== 'fish';
     this.fishPrompt.innerHTML = `<kbd>${fishKey}</kbd> — Fish`;
+    const modalPromptLabels = {
+      'pause-resume': [controllerActive ? 'Menu / B' : 'Esc'],
+      'close-journal': [actionLabel('journal', 'KeyJ'), controllerActive ? 'B' : 'Esc'],
+      'close-inventory': [actionLabel('inventory', 'KeyI'), controllerActive ? 'B' : 'Esc'],
+      'close-shop': [controllerActive ? 'B' : 'Esc'],
+      'close-aquarium': [controllerActive ? 'B' : 'Esc'],
+      'close-boat-travel': [controllerActive ? 'B' : 'Esc'],
+      'close-appearance': [controllerActive ? 'B' : 'Esc'],
+      'close-trail-badges': [controllerActive ? 'B' : 'Esc'],
+      'close-mountain-map': [controllerActive ? `${actionLabel('map', 'KeyV')} / B` : 'Esc'],
+      'close-emote-menu': [actionLabel('emotes', 'KeyE'), controllerActive ? 'B' : 'Esc'],
+      'close-multiplayer': [controllerActive ? 'B' : 'Esc']
+    };
+    for (const [id, labels] of Object.entries(modalPromptLabels)) {
+      for (const [index, keycap] of (this.modalPromptKeycaps[id] ?? []).entries()) {
+        keycap.textContent = labels[index] ?? labels.at(-1);
+      }
+    }
+    const fishingControlHint = controllerActive
+      ? `<kbd>D-Pad ↑ / RT</kbd> Charge / cast • <kbd>D-Pad ↓ / A</kbd> Hook • <kbd>${fishKey} / B</kbd> Stop`
+      : `<kbd>${actionLabel('forward', 'KeyW')} / ↑</kbd> Charge / cast • <kbd>${actionLabel('backward', 'KeyS')} / ↓</kbd> Hook • <kbd>${fishKey}</kbd> / <kbd>Esc</kbd> Stop`;
+    if (this.fishingControlHint && fishingControlHint !== this.lastFishingControlHint) {
+      this.fishingControlHint.innerHTML = fishingControlHint;
+      this.lastFishingControlHint = fishingControlHint;
+    }
+    if (this.songReasonKeyHint) this.songReasonKeyHint.textContent = controllerActive
+      ? 'OPTIONAL • D-PAD + A'
+      : 'OPTIONAL • KEYS 1–6';
+    const resultLabels = controllerActive
+      ? { recast: 'D-Pad ↑ / RT', stay: 'D-Pad ↓', down: 'D-Pad ←', up: 'D-Pad →' }
+      : { recast: 'W / ↑', stay: 'S / ↓', down: 'A / ←', up: 'D / →' };
+    for (const [action, label] of Object.entries(resultLabels)) {
+      const keycap = this.fishingResultControls?.querySelector(`[data-fishing-result-action="${action}"] kbd`);
+      if (keycap) keycap.textContent = label;
+    }
+    const biteKeycap = this.bitePrompt?.querySelector('kbd');
+    if (biteKeycap) biteKeycap.textContent = controllerActive ? 'D-Pad ↓ / A' : '↓';
     this.fishingPanel.hidden = playerState.fishing.state === 'inactive'
       || playerState.fishing.state === 'rhythm'
       || playerState.fishing.state === 'caught';

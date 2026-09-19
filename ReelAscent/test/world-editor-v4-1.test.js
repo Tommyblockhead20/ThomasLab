@@ -71,7 +71,7 @@ test('v4.1 production island editor includes the cabin, shop, aquarium, and shor
   assert.equal(shop.prefabs.instances.length, 0);
   assert.ok(shopParts.length >= 60);
   assert.ok(shopParts.some((item) => item.name === 'Outfitter clerk body'));
-  assert.ok(shopParts.some((item) => item.name === 'Old Man fish buyer body'));
+  assert.ok(shopParts.some((item) => item.name === 'Fish Market buyer body'));
   assert.ok(shopParts.some((item) => item.name === 'Fish Market sardine display'));
   assert.equal(shop.objects.filter((item) => item.metadata?.benchId === 'shop-island-shore-bench').length, 4);
   assert.deepEqual(shopParts.filter((item) => item.metadata?.editableSign).map((item) => item.metadata.signText).sort(), ["BUY GEAR", "OUTFITTER'S REACH", "SELL CATCHES"]);
@@ -163,7 +163,7 @@ test('v4.1 UI exposes orbit, frame, multi-select, pivot, book, and placed-cutout
   assert.doesNotMatch(main, /canvas\.addEventListener\('dblclick'/);
   assert.match(scene, /setTransformGizmo/);
   assert.match(scene, /setCutoutPreview/);
-  assert.equal(createHash('sha256').update(patch).digest('hex').toUpperCase(), '815674C382C711CF9DEF2D4FF07AC7DCC205B0E472DAA67A284B23516474E5DD');
+  assert.equal(createHash('sha256').update(patch).digest('hex').toUpperCase(), '39225556C1969CAB4F4CA51A40C158A07CCB2A816EB7356A7694D8007515159C');
 });
 
 test('v4.1 portable assets remain findable and smoothing uses the requested stronger response curve', () => {

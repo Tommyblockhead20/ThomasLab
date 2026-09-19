@@ -15,6 +15,7 @@ export class RoomState {
     this.localPlayerId = localPlayerId;
     this.roomCode = '';
     this.runSeed = null;
+    this.serverClockOffsetMs = 0;
     this.localLocationId = 'main-mountain';
     this.members = new Map();
     this.roster = new Map();
@@ -38,6 +39,12 @@ export class RoomState {
   applyRoomState(payload = {}, createRepresentation = () => null) {
     this.roomCode = typeof payload.roomCode === 'string' ? payload.roomCode : this.roomCode;
     this.runSeed = payload.runSeed ?? this.runSeed;
+    if (Number.isFinite(Number(payload.serverTime))) {
+      const sample = Number(payload.serverTime) - Date.now();
+      this.serverClockOffsetMs = this.serverClockOffsetMs
+        ? this.serverClockOffsetMs * .8 + sample * .2
+        : sample;
+    }
     this.benchSeats = new Map((Array.isArray(payload.benchSeats) ? payload.benchSeats : [])
       .filter((entry) => typeof entry?.benchId === 'string' && Array.isArray(entry.playerIds))
       .map((entry) => [entry.benchId, entry.playerIds.slice(0, 2)]));
@@ -129,6 +136,10 @@ export class RoomState {
   }
 
   update(now) { for (const player of this.members.values()) player.update(now); }
+
+  getSharedTimeSeconds(now = Date.now()) {
+    return (Number(now) + this.serverClockOffsetMs) / 1000;
+  }
 
   clear({ preserveRoomIdentity = false } = {}) {
     for (const player of this.members.values()) player.destroy();

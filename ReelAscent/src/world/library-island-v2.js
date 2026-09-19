@@ -303,8 +303,9 @@ function addLazyRiver(world, root, water, materials, counters, rootYaw) {
 export function updateVeiledAthenaeumRides(world, dt = 0) {
   for (const ride of world.veiledAthenaeumLazyRivers ?? []) {
     ride.elapsed += Math.max(0, Number(dt) || 0);
+    const timeSeconds = Number.isFinite(world.sharedTimeSeconds) ? world.sharedTimeSeconds : ride.elapsed;
     for (const tube of ride.tubes) {
-      const pose = waterPathPose(ride.path, tube.offset + ride.elapsed * ride.path.flowSpeed);
+      const pose = waterPathPose(ride.path, tube.offset + timeSeconds * ride.path.flowSpeed);
       tube.holder.setLocalPosition(pose.position.x, pose.position.y, pose.position.z);
       tube.holder.setLocalEulerAngles(0, pose.yaw, 0);
       const seat = localToWorld(ride.root, [pose.position.x, pose.position.y + .28, pose.position.z]);

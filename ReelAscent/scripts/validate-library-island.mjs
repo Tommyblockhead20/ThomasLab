@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { validateLibraryEcology } from '../src/fishing/library-ecology-validation.js';
 
 const root = process.cwd();
 const scenePath = path.join(root, 'src/world/library-island-v2.scene.json');
@@ -56,6 +57,8 @@ const requiredMarkers = ['athenaeum-arrival','athenaeum-entrance','athenaeum-rea
 const markerIds = new Set((scene.markers ?? []).map((m) => m.id));
 for (const id of requiredMarkers) if (!markerIds.has(id)) fail.push(`missing marker ${id}`);
 if ((scene.waters?.length ?? 0) < 2) fail.push('expected multiple authored waters');
+const ecology = validateLibraryEcology(scene);
+fail.push(...ecology.errors);
 
 const summary = {
   sceneId: scene.sceneId,
@@ -67,6 +70,17 @@ const summary = {
   fishableWaters: scene.waters?.map((w) => w.id) ?? [],
   markers: scene.markers?.length ?? 0,
   benches: scene.benches?.length ?? 0,
+  ecology: ecology.waters.map((water) => ({
+    waterId: water.waterId,
+    candidates: water.candidates.map((candidate) => ({
+      species: candidate.name,
+      rarity: candidate.rarity,
+      mythicalReason: candidate.mythicalReason,
+      futureReserved: candidate.futureReserved,
+      baselineProbability: Number((candidate.baselineProbability * 100).toFixed(3))
+    })),
+    totalProbability: Number((water.totalProbability * 100).toFixed(3))
+  })),
   status: fail.length ? 'FAIL' : 'PASS'
 };
 console.log(JSON.stringify(summary, null, 2));

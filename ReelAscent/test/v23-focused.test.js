@@ -39,14 +39,14 @@ test('v23 destination thresholds are per-save, permanent, and preserve known una
   assert.equal(WORLD_LOCATION_BY_ID.get('normal-fishing-island').displayName, 'Mangrove Island');
 });
 
-test('v23 migration grants a boat only to established saves that used boat travel', () => {
+test('v23.1 migration does not confuse old ordinary travel with a Bluewater purchase', () => {
   const old = defaultSave();
   old.version = 15;
   delete old.boat;
   old.lifetime.boatTrips = 3;
   const migrated = migrate(old);
   assert.equal(migrated.version, SAVE_SCHEMA_VERSION);
-  assert.deepEqual(migrated.boat, { owned: true, purchasedAt: 0, grandfathered: true });
+  assert.deepEqual(migrated.boat, { owned: false, purchasedAt: 0, grandfathered: false });
   assert.equal(defaultSave().boat.owned, false);
 });
 

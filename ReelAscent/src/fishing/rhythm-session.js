@@ -36,6 +36,7 @@ export const RHYTHM_MINIMUM_ACTION_GAP_SECONDS = .08;
 // OS/browser keydown events for one physical chord arrive separately. Multi-note groups
 // briefly collect a lane set so the first arrow cannot be judged as an incomplete chord.
 export const RHYTHM_CHORD_INPUT_WINDOW_SECONDS = .075;
+export const RHYTHM_CONTROLLER_CHORD_INPUT_WINDOW_SECONDS = .2;
 
 // Only these quick-moving species can receive a short tap riff. Riffs replace a small
 // run of existing events rather than expanding the song and therefore preserve each
@@ -528,7 +529,7 @@ export class RhythmSession {
     for (const input of [...inputs].sort((left, right) => left.time - right.time)) {
       const inputTime = Math.max(0, input.time - this.startTime - this.pauseOffset);
       this.flushPendingChordInput(inputTime);
-      this.collectChordInput(input.lane, inputTime);
+      this.collectChordInput(input.lane, inputTime, input.source);
       if (this.result) return this.result;
     }
     this.flushPendingChordInput(this.songTime);
@@ -580,7 +581,7 @@ export class RhythmSession {
     return candidates.sort((left, right) => left.delta - right.delta)[0] ?? null;
   }
 
-  collectChordInput(lane, inputTime) {
+  collectChordInput(lane, inputTime, source = '') {
     const chord = this.chordGroupNear(lane, inputTime);
     if (!chord) {
       this.handleInput(lane, inputTime);
@@ -593,7 +594,10 @@ export class RhythmSession {
         hitTime: chord.hitTime,
         startedAt: inputTime,
         notes: chord.notes,
-        presses: new Map()
+        presses: new Map(),
+        windowSeconds: String(source).startsWith('gamepad:')
+          ? RHYTHM_CONTROLLER_CHORD_INPUT_WINDOW_SECONDS
+          : RHYTHM_CHORD_INPUT_WINDOW_SECONDS
       };
     }
     if (!this.pendingChordInput.presses.has(lane)) this.pendingChordInput.presses.set(lane, inputTime);
@@ -609,7 +613,7 @@ export class RhythmSession {
 
   flushPendingChordInput(now, force = false) {
     const pending = this.pendingChordInput;
-    if (!pending || (!force && now - pending.startedAt < RHYTHM_CHORD_INPUT_WINDOW_SECONDS)) return false;
+    if (!pending || (!force && now - pending.startedAt < (pending.windowSeconds ?? RHYTHM_CHORD_INPUT_WINDOW_SECONDS))) return false;
     this.pendingChordInput = null;
     // Required lanes are processed in chart order, while each lane retains its actual press
     // time. Input event order therefore has no effect on a complete 2/3/4-arrow chord.

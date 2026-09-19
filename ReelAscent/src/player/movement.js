@@ -108,14 +108,16 @@ export function setGamepadBinding(action, index, bindings = loadGamepadBindings(
   if (!Number.isInteger(index) || index < 0 || index >= GAMEPAD_BUTTON_LABELS.length) {
     return { ok: false, reason: 'That controller input is not supported.', bindings };
   }
-  for (const [otherAction, otherIndex] of Object.entries(bindings)) {
-    if (otherAction !== action && otherIndex === index) return {
-      ok: false,
-      reason: `${formatGamepadBinding(index)} is already used by ${KEY_BINDING_DEFINITIONS[otherAction]?.label ?? otherAction}.`,
-      bindings
-    };
-  }
-  return { ok: true, bindings: saveGamepadBindings({ ...bindings, [action]: index }) };
+  const conflict = Object.entries(bindings).find(([otherAction, otherIndex]) => otherAction !== action && otherIndex === index);
+  const next = { ...bindings, [action]: index };
+  // Swapping is less surprising than a capture that appears to do nothing. If the target
+  // button was occupied, its previous action receives this action's old button (or unbinds).
+  if (conflict) next[conflict[0]] = Number.isInteger(bindings[action]) ? bindings[action] : null;
+  return {
+    ok: true,
+    bindings: saveGamepadBindings(next),
+    swappedAction: conflict?.[0] ?? null
+  };
 }
 
 export function setKeyBinding(action, code, bindings = loadKeyBindings()) {
