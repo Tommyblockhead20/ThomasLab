@@ -36,16 +36,62 @@ export function buildCleanBasaltTerrainLocal() {
     const d = c + 1;
     indices.push(a, c, b, b, c, d);
   }
+  // The original replacement was a complete height surface, but it was still an open,
+  // one-sided sheet. Looking under the shoreline (or through transparent water at a grazing
+  // angle) could therefore expose the skybox. Duplicate the perimeter at a buried floor,
+  // stitch real side faces, and cap the bottom so the shared runtime/editor core is watertight.
+  const perimeter = [];
+  for (let column = 0; column < columns; column += 1) perimeter.push(column);
+  for (let row = 1; row < rows; row += 1) perimeter.push(row * columns + columns - 1);
+  for (let column = columns - 2; column >= 0; column -= 1) perimeter.push((rows - 1) * columns + column);
+  for (let row = rows - 2; row > 0; row -= 1) perimeter.push(row * columns);
+  const bottomY = -3.25;
+  const bottomPerimeter = perimeter.map((topId) => {
+    const id = positions.length / 3;
+    positions.push(positions[topId * 3], bottomY, positions[topId * 3 + 2]);
+    return id;
+  });
+  const sideFirstTriangle = indices.length / 3;
+  for (let index = 0; index < perimeter.length; index += 1) {
+    const next = (index + 1) % perimeter.length;
+    const topA = perimeter[index], topB = perimeter[next];
+    const bottomA = bottomPerimeter[index], bottomB = bottomPerimeter[next];
+    indices.push(topA, topB, bottomB, topA, bottomB, bottomA);
+  }
+  const bottomCenter = positions.length / 3;
+  positions.push(0, bottomY, 0);
+  const bottomFirstTriangle = indices.length / 3;
+  for (let index = 0; index < bottomPerimeter.length; index += 1) {
+    const next = (index + 1) % bottomPerimeter.length;
+    indices.push(bottomCenter, bottomPerimeter[index], bottomPerimeter[next]);
+  }
+  const topTriangleCount = (rows - 1) * (columns - 1) * 2;
   return {
     positions,
     indices,
-    parts: [{
-      name: 'shared clean Basalt Hollow landmass',
-      firstVertex: 0,
-      vertexCount: positions.length / 3,
-      firstTriangle: 0,
-      triangleCount: indices.length / 3
-    }]
+    parts: [
+      {
+        name: 'shared clean Basalt Hollow top surface',
+        firstVertex: 0,
+        vertexCount: columns * rows,
+        firstTriangle: 0,
+        triangleCount: topTriangleCount
+      },
+      {
+        name: 'sealed Basalt Hollow shoreline walls',
+        firstVertex: columns * rows,
+        vertexCount: bottomPerimeter.length,
+        firstTriangle: sideFirstTriangle,
+        triangleCount: bottomPerimeter.length * 2
+      },
+      {
+        name: 'sealed Basalt Hollow bottom cap',
+        firstVertex: bottomCenter,
+        vertexCount: 1,
+        firstTriangle: bottomFirstTriangle,
+        triangleCount: bottomPerimeter.length
+      }
+    ]
   };
 }
 

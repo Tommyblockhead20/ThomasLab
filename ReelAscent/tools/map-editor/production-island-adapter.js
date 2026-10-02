@@ -9,7 +9,11 @@ import {
   triangleSurfaceHeightAt
 } from '../../src/world/mountain-v2.js';
 import { normalizeWorldEditorLevel } from './world-level-format.js';
-import { BASALT_HOLLOW_TERRAIN_SOURCE, buildCleanBasaltTerrainLocal } from '../../src/world/cave-island-v23.js';
+import {
+  BASALT_HOLLOW_TERRAIN_SOURCE,
+  buildCleanBasaltTerrainLocal,
+  buildCleanBasaltTerrainWorld
+} from '../../src/world/cave-island-v23.js';
 
 const ISLAND_EDITOR_IDS = Object.freeze([
   'home-island', 'shop-island', 'aquarium-island', 'cave-fishing-island',
@@ -24,13 +28,18 @@ function cleanCaveEditorTerrain() {
     mode: 'authored-triangle-mesh', format: 'triangle-mesh-v1', coordinateSpace: 'island-local',
     positions, indices,
     parts,
-    metadata: { source: BASALT_HOLLOW_TERRAIN_SOURCE, productionAuthoritative: true, oceanSurfaceY: OCEAN_SURFACE_Y }
+    metadata: {
+      source: BASALT_HOLLOW_TERRAIN_SOURCE, productionAuthoritative: true,
+      watertight: true, oceanSurfaceY: OCEAN_SURFACE_Y
+    }
   };
 }
 
 export function makeCleanCaveEditorLevel(worldOrId = 'cave-fishing-island') {
   const location = SMALL_ISLAND_LOCATIONS.find((item) => item.id === 'cave-fishing-island');
   const worldId = typeof worldOrId === 'string' ? worldOrId : worldOrId?.id;
+  const objects = [];
+  addProductionShoreBench(objects, location, buildCleanBasaltTerrainWorld(location));
   return normalizeWorldEditorLevel({
     schema: 2, kind: 'reel-ascent-world-level', worldId,
     displayName: typeof worldOrId === 'string' ? 'Cave Fishing Island / Basalt Grotto' : worldOrId.label,
@@ -43,11 +52,12 @@ export function makeCleanCaveEditorLevel(worldOrId = 'cave-fishing-island') {
       color: '#269eb8', fishingZoneScale: 1, swimmable: false,
       metadata: { canonicalWater: true, stableRuntimeId: 'basalt-grotto' }
     }],
-    objects: [], movingPlatforms: [], prefabs: { definitions: [], instances: [] }, rooms: [],
+    objects, movingPlatforms: [], prefabs: { definitions: [], instances: [] }, rooms: [],
     metadata: {
       cleanCaveBaselineV23: true, coordinateSpace: 'cave-island-local',
+      basaltCoreSealedV231: true,
       globalOrigin: { ...location.worldPosition },
-      note: 'Shared fine-grained Basalt terrain used by production and editor. Runtime destination access remains unavailable.'
+      note: 'Shared watertight Basalt terrain used by production and editor. Runtime destination access remains unavailable.'
     }
   }, { worldId, displayName: 'Cave Fishing Island / Basalt Grotto', runtimeLocationId: location.id });
 }

@@ -5,6 +5,7 @@ import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from '
 import { buildVeiledAthenaeumV2 } from './library-island-v2.js';
 import { updateVeiledAthenaeumRides } from './library-island-v2.js';
 import { buildCleanBasaltTerrainWorld } from './cave-island-v23.js';
+import { attachSignText } from './sign-text-renderer.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
 import {
@@ -2555,34 +2556,12 @@ export class MountainWorld extends TestWorld {
     };
     buildNpc('Outfitter clerk', -2.2, this.materials.cabinFabric, this.materials.cabinWarm);
     buildNpc('Fish Market buyer', 2.2, this.materials.deepWater, this.materials.deepRock);
-    box('OUTFITTER BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.cabinWarm, {}, false);
-    box('FISH MARKET SELL CATCHES counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.shallowWater, {}, false);
-    const glyphs = {
-      A: ['010', '101', '111', '101', '101'], B: ['110', '101', '110', '101', '110'],
-      C: ['111', '100', '100', '100', '111'], E: ['111', '100', '110', '100', '111'],
-      G: ['111', '100', '101', '101', '111'], H: ['101', '101', '111', '101', '101'],
-      L: ['100', '100', '100', '100', '111'], R: ['110', '101', '110', '101', '101'],
-      S: ['111', '100', '111', '001', '111'], T: ['111', '010', '010', '010', '010'],
-      U: ['101', '101', '101', '101', '111'], Y: ['101', '101', '010', '010', '010']
-    };
-    const addSignText = (text, centerX, centerY) => {
-      const cell = .052;
-      const width = [...text].reduce((sum, character) => sum + (character === ' ' ? 2 : 4), -1) * cell;
-      let cursor = centerX - width * .5;
-      for (const character of text) {
-        if (character === ' ') { cursor += cell * 2; continue; }
-        for (const [row, pixels] of (glyphs[character] ?? []).entries()) for (const [column, pixel] of [...pixels].entries()) {
-          if (pixel !== '1') continue;
-          box(`${text} sign letter ${character}-${row}-${column}`, {
-            x: cursor + column * cell, y: centerY + (.104 - row * cell), z: 2.005
-          }, { x: cell * .84, y: cell * .84, z: .025 }, this.materials.caveWall, {}, false);
-        }
-        cursor += cell * 4;
-      }
-    };
-    addSignText('BUY GEAR', -2.2, 1.74);
-    addSignText('SELL CATCHES', 2.2, 1.74);
-    box("Outfitter's Reach hanging sign", { x: 0, y: 3.45, z: 3.62 }, { x: 4.7, y: .78, z: .12 }, this.materials.woodLight, {}, false);
+    const buySign = box('OUTFITTER BUY GEAR counter sign', { x: -2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.cabinWarm, {}, false);
+    const sellSign = box('FISH MARKET SELL CATCHES counter sign', { x: 2.2, y: 1.74, z: 1.94 }, { x: 2.85, y: .58, z: .1 }, this.materials.shallowWater, {}, false);
+    attachSignText(this.app.graphicsDevice, buySign, 'BUY GEAR');
+    attachSignText(this.app.graphicsDevice, sellSign, 'SELL CATCHES');
+    const hangingSign = box("Outfitter's Reach hanging sign", { x: 0, y: 3.45, z: 3.62 }, { x: 4.7, y: .78, z: .12 }, this.materials.woodLight, {}, false);
+    attachSignText(this.app.graphicsDevice, hangingSign, "OUTFITTER'S REACH");
     for (const side of [-1, 1]) {
       box(`Outfitter sign rope ${side}`, { x: side * 1.7, y: 3.9, z: 3.58 }, { x: .06, y: .88, z: .06 }, this.materials.wood, {}, false);
       box(`Outfitter lantern ${side}`, { x: side * 4.45, y: 2.75, z: 2.7 }, { x: .32, y: .58, z: .32 }, this.materials.cabinWarm, {}, false);
@@ -2948,8 +2927,9 @@ export class MountainWorld extends TestWorld {
     }
     this.addCabinBox('Trail cabin hanging lantern', { x: 0, y: 3.1, z: .2 },
       { x: .34, y: .55, z: .34 }, this.materials.cabinWarm, {}, false);
-    this.addCabinBox('Trail cabin Stoneveil Peak sign', { x: -2.15, y: 2.05, z: 5.03 },
+    const cabinSign = this.addCabinBox('Trail cabin Stoneveil Peak sign', { x: -2.15, y: 2.05, z: 5.03 },
       { x: 2.35, y: .7, z: .11 }, this.materials.woodLight, { z: -2 }, false);
+    attachSignText(this.app.graphicsDevice, cabinSign, 'STONEVEIL PEAK');
 
     // Final cozy-detail pass: fascia closes the roof silhouette, shutters frame the facade,
     // and small interior/porch props fill dead space without enlarging the footprint.
@@ -3104,8 +3084,9 @@ export class MountainWorld extends TestWorld {
       { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
     this.addAquariumBox('Glasswater Aquarium rear approach step', { x: 0, y: -.38, z: -config.depth * .5 - 2.2 },
       { x: 13, y: .3, z: 2.2 }, this.materials.cabinTrim);
-    this.addAquariumBox('Glasswater Aquarium collection sign', { x: 0, y: config.waterlineY + 1.15, z: config.depth * .5 + 1.1 },
+    const collectionSign = this.addAquariumBox('Glasswater Aquarium collection sign', { x: 0, y: config.waterlineY + 1.15, z: config.depth * .5 + 1.1 },
       { x: 8.8, y: 1.15, z: .18 }, this.materials.woodLight, {}, false);
+    attachSignText(this.app.graphicsDevice, collectionSign, 'GLASSWATER AQUARIUM');
 
     // A thin packed-earth trail follows the actual generated island profile from the public
     // entrance to the inward end of the dock. It is deliberately inset into the ground and
@@ -3159,8 +3140,9 @@ export class MountainWorld extends TestWorld {
     const signGroundY = pathSurfaceY(pathStartZ + 4.2) - this.publicAquariumFloorY;
     this.addAquariumBox('Glasswater dock path sign post', { x: -2.9, y: signGroundY + 1.05, z: pathStartZ + 4.2 },
       { x: .18, y: 2.1, z: .18 }, this.materials.wood, {}, false);
-    this.addAquariumBox('Glasswater dock path welcome sign', { x: -2.9, y: signGroundY + 1.72, z: pathStartZ + 4.2 },
+    const welcomeSign = this.addAquariumBox('Glasswater dock path welcome sign', { x: -2.9, y: signGroundY + 1.72, z: pathStartZ + 4.2 },
       { x: 2.3, y: .8, z: .16 }, this.materials.woodLight, { y: -4 }, false);
+    attachSignText(this.app.graphicsDevice, welcomeSign, 'AQUARIUM');
 
     // Low garden beds and paths make the expanded grounds feel intentional without adding
     // expensive simulation. They remain outside the exhibit/viewing circulation.

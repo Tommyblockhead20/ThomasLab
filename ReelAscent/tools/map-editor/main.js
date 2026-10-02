@@ -64,6 +64,7 @@ import {
   meshDiagnostics,
   moveSelectedVertices,
   recalculateVertexNormals,
+  sealTerrainMesh,
   selectConnectedFaces,
   shrinkFaceSelection,
   subdivideFaces,
@@ -1864,7 +1865,17 @@ function hydrateCachedBasaltProductionTerrain(level) {
 function ensureBasaltEditorTerrain(level, world) {
   // v23 intentionally retires the captured procedural cave shell. Existing v23 edits are
   // preserved, while every older/bad Cave autosave is replaced once by the clean baseline.
-  return level?.metadata?.cleanCaveBaselineV23 === true ? level : makeCleanCaveEditorLevel(world);
+  if (level?.metadata?.cleanCaveBaselineV23 !== true) return makeCleanCaveEditorLevel(world);
+  if (level.metadata?.basaltCoreSealedV231 === true) return level;
+  const boundaryCount = boundaryLoops(level.terrain).filter((loop) => loop.closed).length;
+  if (boundaryCount) level.terrain = sealTerrainMesh(level.terrain, { bottomY: -3.25 });
+  level.metadata = {
+    ...level.metadata,
+    basaltCoreSealedV231: true,
+    basaltCoreAutoRepairedAt: new Date().toISOString(),
+    basaltCoreAutoRepairedBoundaries: boundaryCount
+  };
+  return level;
 }
 
 async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
@@ -2047,6 +2058,9 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
     slopeOverlay.setEnabled(false);
     if (!genericLevels.has(activeWorldId)) {
       genericLevels.set(activeWorldId, await loadGenericProjectLevel(world, { preferAutosave: true }));
+    }
+    if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.metadata?.basaltCoreAutoRepairedAt) {
+      persistGenericLevel(activeGenericLevel());
     }
     if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate') {
       genericScene.basaltReferenceMode = 'authored';
@@ -3156,7 +3170,7 @@ function updateMeshAuthoringUi() {
     status.textContent = activeWorldId === 'pirate-island'
       ? 'Pirate Island authored terrain is unavailable; reload project data.'
       : 'Load the captured Basalt production mesh to use topology tools.';
-    for (const id of ['#mesh-apply-move','#mesh-create-face','#mesh-delete-faces','#mesh-fill-hole','#mesh-bridge','#mesh-flip-faces','#mesh-flatten','#mesh-inflate','#mesh-deflate','#mesh-subdivide','#mesh-weld','#mesh-merge-nearby','#mesh-recalculate-normals']) {
+    for (const id of ['#mesh-apply-move','#mesh-create-face','#mesh-delete-faces','#mesh-fill-hole','#mesh-seal-terrain','#mesh-bridge','#mesh-flip-faces','#mesh-flatten','#mesh-inflate','#mesh-deflate','#mesh-subdivide','#mesh-weld','#mesh-merge-nearby','#mesh-recalculate-normals']) {
       const button = $(id); if (button) button.disabled = true;
     }
     return;
@@ -3172,6 +3186,10 @@ function updateMeshAuthoringUi() {
   enabled('#mesh-create-face', meshSelection.vertices.size === 3 && !meshSelection.edges.size && !meshSelection.faces.size, 'Select exactly three vertices.');
   enabled('#mesh-delete-faces', meshSelection.faces.size > 0, 'Select one or more faces.');
   enabled('#mesh-fill-hole', selectedVertexCount >= 3, 'Select a closed boundary loop.');
+  const sealButton = $('#mesh-seal-terrain');
+  if (sealButton) sealButton.hidden = activeWorldId !== 'cave-fishing-island';
+  enabled('#mesh-seal-terrain', activeWorldId === 'cave-fishing-island' && report.boundaryEdges.length > 0,
+    report.boundaryEdges.length ? 'Basalt only.' : 'This Basalt core is already watertight.');
   enabled('#mesh-bridge', meshSelection.edges.size >= 2, 'Select two separate edge chains.');
   enabled('#mesh-flip-faces', meshSelection.faces.size > 0, 'Select one or more faces.');
   enabled('#mesh-flatten', selectedVertexCount >= 2, 'Select at least two vertices through any mesh element.');
@@ -6044,6 +6062,15 @@ $('#mesh-fill-hole')?.addEventListener('click', () => {
     ?? (loops.length === 1 ? loops[0] : null);
   if (!loop) return setStatus('Select vertices/edges from one closed boundary loop, then Fill Boundary.');
   mutateBasaltMesh((value) => fillBoundary(value, loop.vertices), `Filled a ${loop.vertices.length - 1}-vertex boundary with real faces.`);
+  meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
+});
+$('#mesh-seal-terrain')?.addEventListener('click', () => {
+  if (activeWorldId !== 'cave-fishing-island') return;
+  const mesh = activeGenericLevel()?.terrain;
+  const loops = boundaryLoops(mesh).filter((loop) => loop.closed).length;
+  if (!loops) return setStatus('Basalt core is already watertight; no repair was needed.');
+  mutateBasaltMesh((value) => sealTerrainMesh(value, { bottomY: -3.25 }),
+    `Sealed ${loops} Basalt boundary loop${loops === 1 ? '' : 's'} and added a buried bottom cap.`);
   meshSelection = makeMeshSelection(); updateMeshAuthoringUi();
 });
 function selectedEdgeChains(edges) {

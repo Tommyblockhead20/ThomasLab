@@ -186,7 +186,7 @@ test('v4.1 production seating mirrors every active island bench and its runtime-
   const expected = {
     'shop-island': { parts: 4, yaw: 235, target: 'ocean' },
     'aquarium-island': { parts: 4, yaw: 175, target: 'ocean' },
-    'cave-fishing-island': { parts: 0, yaw: 120, target: 'ocean' },
+    'cave-fishing-island': { parts: 4, yaw: 120, target: 'ocean' },
     'normal-fishing-island': { parts: 4, yaw: -60, target: 'ocean' },
     'cold-island': { parts: 4, yaw: -180, target: 'pond' }
   };

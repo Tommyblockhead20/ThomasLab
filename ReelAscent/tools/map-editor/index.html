@@ -150,6 +150,8 @@
       <section id="cave-migration-section" hidden>
         <h2>Basalt Terrain <button class="help-dot" type="button" data-tip="Import an exact production-geometry freeze captured by the game. Candidate terrain is comparison-only until explicitly promoted in a later validated migration." aria-label="Basalt migration help">?</button></h2>
         <label>Terrain view <select id="basalt-reference-mode"><option value="procedural">Procedural reference</option><option value="authored">Frozen candidate</option><option value="both" selected>Compare both</option></select></label>
+        <button id="mesh-seal-terrain" type="button" class="primary" title="Closes visible face holes and adds a buried skirt/bottom to an open Basalt core">Seal Basalt Core / Fix Holes</button>
+        <div class="compact-status hint">Use this after terrain edits if the boundary count is above zero or sky is visible through the island.</div>
         <div class="row-actions"><button id="load-basalt-capture" type="button">Load Captured Production Mesh</button><button id="import-basalt-freeze" type="button">Import Freeze JSON</button></div>
         <input id="basalt-freeze-file" type="file" accept="application/json,.json" hidden />
         <div id="basalt-freeze-status" class="compact-status hint">No frozen candidate imported.</div>

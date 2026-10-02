@@ -419,7 +419,26 @@ export class GenericWorldScene {
       casinoRed: makeMaterial([.44, .08, .09]),
       casinoPurple: makeMaterial([.31, .12, .45], 1, .08),
       skyreachFacade: makeMaterial([.27, .31, .34], 1, .03),
-      skyreachAccent: makeMaterial([.72, .56, .23], 1, .12)
+      skyreachAccent: makeMaterial([.72, .56, .23], 1, .12),
+      // Exact production palette counterparts used by the direct island adapters. These
+      // must not fall through to the generic room/pirate colors or the editor communicates
+      // the wrong material separation for cabins, benches, tanks, and terrain.
+      productionSand: makeMaterial([.78, .7, .51]),
+      productionDeepRock: makeMaterial([.5, .52, .51]),
+      productionWood: makeMaterial([.46, .29, .16]),
+      productionWoodLight: makeMaterial([.64, .43, .23]),
+      productionShallowWater: makeMaterial([.27, .69, .7], .66),
+      productionCabinWall: makeMaterial([.43, .25, .13]),
+      productionCabinTrim: makeMaterial([.72, .56, .34]),
+      productionCabinRoof: makeMaterial([.19, .24, .23]),
+      productionCabinGlass: makeMaterial([.35, .68, .72], .42),
+      productionCabinFabric: makeMaterial([.66, .24, .18]),
+      productionCabinWarm: makeMaterial([.91, .67, .24], 1, .08),
+      productionIslandGrass: makeMaterial([.36, .53, .31]),
+      productionIslandRock: makeMaterial([.47, .48, .45]),
+      productionSnow: makeMaterial([.9, .92, .89]),
+      productionStone: makeMaterial([.58, .53, .43]),
+      productionPlant: makeMaterial([.34, .48, .26])
     };
     this.materials.gizmoX = makeMaterial([1, .18, .18], 1, .12);
     this.materials.gizmoY = makeMaterial([.18, 1, .3], 1, .12);
@@ -660,6 +679,24 @@ export class GenericWorldScene {
   materialForRecord(record, fallback = this.materials.platform) {
     const key = String(record?.metadata?.materialKey || '').toLowerCase();
     if (this.libraryMaterials.has(key)) return this.libraryMaterials.get(key);
+    if (record?.metadata?.productionReference) {
+      const production = {
+        wall: this.materials.productionCabinWall,
+        wood: this.materials.productionWoodLight,
+        trim: this.materials.productionCabinTrim,
+        dark: this.materials.productionCabinRoof,
+        glass: this.materials.productionCabinGlass,
+        fabric: this.materials.productionCabinFabric,
+        accent: this.materials.productionCabinWarm,
+        fixture: this.materials.productionSnow,
+        light: this.materials.productionCabinWarm,
+        stone: this.materials.productionStone,
+        metal: this.materials.productionDeepRock,
+        water: this.materials.productionShallowWater,
+        plant: this.materials.productionPlant
+      };
+      if (production[key]) return production[key];
+    }
     const map = {
       wall: this.materials.roomWall, ceiling: this.materials.roomCeiling, floor: this.materials.roomFloor,
       wood: this.materials.roomWood, metal: this.materials.roomMetal, glass: this.materials.roomGlass,
@@ -908,7 +945,7 @@ export class GenericWorldScene {
       this.emitEditorStatus('Library production island terrain is unavailable.', { state: 'error', worldId: 'library-island' });
       return;
     }
-    const entity = this.buildMeshEntity('Library Island production terrain', terrain.positions, terrain.indices, this.materials.library, this.referenceRoot);
+    const entity = this.buildMeshEntity('Library Island production terrain', terrain.positions, terrain.indices, this.materials.productionIslandGrass, this.referenceRoot);
     this.registerSelectable(entity, { id: '__library-production-terrain', kind: 'terrain-mesh', record: terrain, meshPartId: 'full-island' });
     this.emitEditorStatus(`Library production island terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: 'library-island' });
   }
@@ -916,7 +953,10 @@ export class GenericWorldScene {
   buildProductionIslandTerrain() {
     const terrain = this.editableTerrainMesh();
     if (!terrain) return;
-    const entity = this.buildMeshEntity(`${this.world.label} production terrain`, terrain.positions, terrain.indices, this.materials.pirate, this.referenceRoot);
+    const material = this.world.id === 'cold-island' ? this.materials.productionSnow
+      : this.world.id === 'cave-fishing-island' ? this.materials.productionIslandRock
+        : this.materials.productionIslandGrass;
+    const entity = this.buildMeshEntity(`${this.world.label} production terrain`, terrain.positions, terrain.indices, material, this.referenceRoot);
     this.registerSelectable(entity, { id: this.terrainMeshId(), kind: 'terrain-mesh', record: terrain, meshPartId: 'full-island' });
     this.emitEditorStatus(`${this.world.label} production island terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: this.world.id });
   }

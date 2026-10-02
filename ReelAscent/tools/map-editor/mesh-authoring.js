@@ -256,17 +256,115 @@ export function fillBoundary(meshInput, loopInput) {
   let loop = [...loopInput].map(Number);
   if (loop[0] === loop.at(-1)) loop = loop.slice(0, -1);
   if (loop.length < 3) throw new Error('Fill Hole requires a boundary loop with at least three vertices.');
-  if (loop.length === 3) return createFace(mesh, loop);
+  // Boundary discovery is undirected, so orient the new fan to agree with the existing
+  // neighboring surface. Otherwise a successfully filled hole can still look empty because
+  // its new triangles are back-face culled from the playable side.
+  const topology = meshTopology(mesh);
+  const adjacentNormal = [0, 0, 0];
+  for (let index = 0; index < loop.length; index += 1) {
+    const faces = topology.edgeFaces.get(edgeKey(loop[index], loop[(index + 1) % loop.length])) ?? [];
+    for (const face of faces) {
+      const normal = triangleMetrics(mesh, face).normal;
+      adjacentNormal[0] += normal[0]; adjacentNormal[1] += normal[1]; adjacentNormal[2] += normal[2];
+    }
+  }
   const center = [0, 0, 0];
   for (const id of loop) {
     const point = vertex(mesh, id);
     center[0] += point[0]; center[1] += point[1]; center[2] += point[2];
   }
   center[0] /= loop.length; center[1] /= loop.length; center[2] /= loop.length;
+  const polygonNormal = [0, 0, 0];
+  for (let index = 0; index < loop.length; index += 1) {
+    const current = vertex(mesh, loop[index]);
+    const next = vertex(mesh, loop[(index + 1) % loop.length]);
+    const a = [current[0] - center[0], current[1] - center[1], current[2] - center[2]];
+    const b = [next[0] - center[0], next[1] - center[1], next[2] - center[2]];
+    polygonNormal[0] += a[1] * b[2] - a[2] * b[1];
+    polygonNormal[1] += a[2] * b[0] - a[0] * b[2];
+    polygonNormal[2] += a[0] * b[1] - a[1] * b[0];
+  }
+  if (polygonNormal[0] * adjacentNormal[0] + polygonNormal[1] * adjacentNormal[1]
+    + polygonNormal[2] * adjacentNormal[2] < 0) loop.reverse();
+  if (loop.length === 3) return createFace(mesh, loop);
   const centerId = mesh.positions.length / 3;
   mesh.positions.push(...center);
   for (let index = 0; index < loop.length; index += 1) {
     mesh.indices.push(loop[index], loop[(index + 1) % loop.length], centerId);
+  }
+  return touch(mesh);
+}
+
+function boundaryLoopLength(mesh, loopInput) {
+  const loop = loopInput[0] === loopInput.at(-1) ? loopInput.slice(0, -1) : [...loopInput];
+  return loop.reduce((total, id, index) => {
+    const a = vertex(mesh, id), b = vertex(mesh, loop[(index + 1) % loop.length]);
+    return total + Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  }, 0);
+}
+
+export function sealTerrainMesh(meshInput, { bottomY = null } = {}) {
+  let mesh = normalizeEditableMesh(meshInput);
+  const loops = boundaryLoops(mesh).filter((loop) => loop.closed);
+  if (!loops.length) return mesh;
+  // A single compact loop on a mesh that already extends well below it is a puncture in an
+  // already-solid terrain volume, not the coastline of an open height sheet. Close that hole
+  // directly; extruding it would make a needless narrow shaft under the damaged face.
+  if (loops.length === 1) {
+    const loop = loops[0];
+    const perimeterLength = boundaryLoopLength(mesh, loop.vertices);
+    const xs = mesh.positions.filter((_, index) => index % 3 === 0);
+    const zs = mesh.positions.filter((_, index) => index % 3 === 2);
+    const footprintPerimeter = 2 * ((Math.max(...xs) - Math.min(...xs)) + (Math.max(...zs) - Math.min(...zs)));
+    if (perimeterLength < footprintPerimeter * .55) return fillBoundary(mesh, loop.vertices);
+  }
+  const exterior = [...loops].sort((left, right) => (
+    boundaryLoopLength(mesh, right.vertices) - boundaryLoopLength(mesh, left.vertices)
+  ))[0];
+  for (const loop of loops) {
+    if (loop !== exterior) mesh = fillBoundary(mesh, loop.vertices);
+  }
+  let perimeter = exterior.vertices[0] === exterior.vertices.at(-1)
+    ? exterior.vertices.slice(0, -1) : [...exterior.vertices];
+  const topology = meshTopology(mesh);
+  const adjacentNormal = [0, 0, 0], polygonNormal = [0, 0, 0], center = [0, 0, 0];
+  for (const id of perimeter) {
+    const point = vertex(mesh, id);
+    center[0] += point[0]; center[1] += point[1]; center[2] += point[2];
+  }
+  center[0] /= perimeter.length; center[1] /= perimeter.length; center[2] /= perimeter.length;
+  for (let index = 0; index < perimeter.length; index += 1) {
+    const current = vertex(mesh, perimeter[index]);
+    const next = vertex(mesh, perimeter[(index + 1) % perimeter.length]);
+    const a = [current[0] - center[0], current[1] - center[1], current[2] - center[2]];
+    const b = [next[0] - center[0], next[1] - center[1], next[2] - center[2]];
+    polygonNormal[0] += a[1] * b[2] - a[2] * b[1];
+    polygonNormal[1] += a[2] * b[0] - a[0] * b[2];
+    polygonNormal[2] += a[0] * b[1] - a[1] * b[0];
+    for (const face of topology.edgeFaces.get(edgeKey(perimeter[index], perimeter[(index + 1) % perimeter.length])) ?? []) {
+      const normal = triangleMetrics(mesh, face).normal;
+      adjacentNormal[0] += normal[0]; adjacentNormal[1] += normal[1]; adjacentNormal[2] += normal[2];
+    }
+  }
+  if (polygonNormal[0] * adjacentNormal[0] + polygonNormal[1] * adjacentNormal[1]
+    + polygonNormal[2] * adjacentNormal[2] < 0) perimeter.reverse();
+  const ys = mesh.positions.filter((_, index) => index % 3 === 1);
+  const floor = Number.isFinite(Number(bottomY)) ? Number(bottomY) : Math.min(...ys) - 1.9;
+  const bottom = perimeter.map((id) => {
+    const point = vertex(mesh, id), nextId = mesh.positions.length / 3;
+    mesh.positions.push(point[0], floor, point[2]);
+    return nextId;
+  });
+  for (let index = 0; index < perimeter.length; index += 1) {
+    const next = (index + 1) % perimeter.length;
+    mesh.indices.push(perimeter[index], bottom[next], perimeter[next]);
+    mesh.indices.push(perimeter[index], bottom[index], bottom[next]);
+  }
+  const bottomCenter = mesh.positions.length / 3;
+  mesh.positions.push(center[0], floor, center[2]);
+  for (let index = 0; index < bottom.length; index += 1) {
+    const next = (index + 1) % bottom.length;
+    mesh.indices.push(bottomCenter, bottom[next], bottom[index]);
   }
   return touch(mesh);
 }

@@ -1,3 +1,17 @@
+# REEL ASCENT v23.1 — BASALT / EDITOR VISUAL-PARITY HOTFIX
+
+Status (2026-09-26): the cave-island core, editor mesh repair, production-reference colors, benches, and physical sign lettering are corrected on the current v23.1 tree. The game version/protocol/save schema are unchanged.
+
+- **Basalt root cause and production fix:** `src/world/cave-island-v23.js` previously generated a complete top grid but left it as a one-sided open sheet. The shoreline had no side walls or bottom, so low/grazing views and transparent water could reveal the skybox below. The shared runtime/editor builder now stitches the entire perimeter to a buried floor and caps the bottom. The resulting core has 1,078 vertices / 2,152 faces with zero boundary, non-manifold, duplicate, thin, or zero-area faces; production render and collision consume the same closed topology.
+- **Existing editor autosaves:** v23 Cave autosaves without the new seal marker are repaired in place rather than discarded: interior boundary loops are filled, the outer coast is skirted/capped, and the repaired autosave is persisted. New Cave levels declare `watertight: true`. A prominent **Seal Basalt Core / Fix Holes** action in the Basalt Terrain panel repeats this repair after later edits; the ordinary Fill Boundary tool now matches adjacent winding so repaired faces do not disappear through back-face culling.
+- **Cave bench/editor parity:** the active four-part Basalt shore bench is restored to the clean Cave editor level and remains individually selectable/terrain-grounded.
+- **Bench direction:** all Veiled Athenaeum bench backrests were offset in the player's forward direction. The offset is now the exact opposite of player forward for every authored yaw, with a focused dot-product regression test. Existing shore, pond, aquarium, and summit bench facing data remains unchanged.
+- **Editor colors:** direct production references now use the production sand, rock, two wood tones, cabin wall/trim/roof/glass/fabric/accent, water, vegetation, snow, and stone palette instead of generic room/pirate fallbacks. Production-island terrain uses the active game's grass/rock/snow family by island.
+- **Why editor signs had text but the game did not:** the editor independently synthesized canvas-text overlays from `editableSign/signText` metadata. Gameplay only built the physical sign boards (apart from the shop's old limited pixel lettering) and never ran or consumed that editor-only renderer. `src/world/sign-text-renderer.js` is now shared by both consumers. The Outfitter counters/hanging sign, Stoneveil cabin sign, and both Glasswater signs create real runtime lettering; the editor delegates to the same renderer.
+- **Verification:** changed JavaScript syntax checks pass. `node --test test/v23-1-focused.test.js test/v23-focused.test.js test/world-editor-v4-1.test.js` passes **24/24**, including closed-mesh diagnostics, a deliberately deleted-face repair, Cave bench parity, and all bench yaws. `npm run build` passes (1,309 modules) with only the existing PlayCanvas worker-externalization and large-chunk warnings; tracked `dist/` is regenerated.
+
+---
+
 # REEL ASCENT v23.1 — WORLD PARITY / DESTINATION / CONTROLLER CORRECTNESS
 
 Status (2026-09-19): v23.1 is implemented on the current V4.1/v23 tree. This section supersedes v23's boat and Cave-editor-only descriptions. The active game version is `v23.1`; tracked frontend `dist/` is regenerated from source.

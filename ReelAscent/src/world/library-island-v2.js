@@ -322,6 +322,16 @@ export function updateVeiledAthenaeumRides(world, dt = 0) {
   }
 }
 
+export function libraryBenchBackPosition(position, facingYaw, distance = .28) {
+  const yaw = (Number(facingYaw) || 0) * Math.PI / 180;
+  // Player/avatar forward is (-sin(yaw), -cos(yaw)); the backrest belongs in the exact
+  // opposite direction. The previous subtraction put it in front of the seated player.
+  return {
+    x: position[0] + Math.sin(yaw) * distance,
+    z: position[2] + Math.cos(yaw) * distance
+  };
+}
+
 function addBench(world, root, bench, materials, counters, rootYaw) {
   const position = finiteVec(bench.position) ? bench.position : [0, .42, 0];
   const yaw = Number(bench.facingYaw) || 0;
@@ -329,11 +339,9 @@ function addBench(world, root, bench, materials, counters, rootYaw) {
     { x: position[0], y: position[1], z: position[2] },
     { x: 2.05, y: .18, z: .5 }, materials.wood, { y: yaw }, true);
   seat.mapObjectId = `LIBRARY-BENCH-${slug(bench.id)}`;
-  const rad = yaw * Math.PI / 180;
-  const backX = position[0] - Math.sin(rad) * .28;
-  const backZ = position[2] - Math.cos(rad) * .28;
+  const backPosition = libraryBenchBackPosition(position, yaw);
   const back = world.addStructureBox(root, `Veiled Athenaeum ${bench.id} back`,
-    { x: backX, y: position[1] + .48, z: backZ },
+    { x: backPosition.x, y: position[1] + .48, z: backPosition.z },
     { x: 2.05, y: .82, z: .18 }, materials.wood, { y: yaw }, true);
   back.mapObjectId = `LIBRARY-BENCH-${slug(bench.id)}-BACK`;
   counters.render += 2;

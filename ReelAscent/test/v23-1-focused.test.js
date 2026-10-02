@@ -9,8 +9,10 @@ import {
   RHYTHM_CONTROLLER_CHORD_INPUT_WINDOW_SECONDS
 } from '../src/fishing/rhythm-session.js';
 import { buildCleanBasaltTerrainLocal, buildCleanBasaltTerrainWorld } from '../src/world/cave-island-v23.js';
+import { libraryBenchBackPosition } from '../src/world/library-island-v2.js';
 import { WORLD_LOCATION_BY_ID } from '../src/world/world-locations.js';
 import { makeCleanCaveEditorLevel } from '../tools/map-editor/production-island-adapter.js';
+import { deleteFaces, meshDiagnostics, sealTerrainMesh } from '../tools/map-editor/mesh-authoring.js';
 import { waterPathPose } from '../tools/map-editor/water-path-tools.js';
 import { validateLibraryEcology } from '../src/fishing/library-ecology-validation.js';
 import { buildWorldParityDiagnostic } from '../tools/map-editor/world-parity.js';
@@ -64,6 +66,42 @@ test('v23.1 Basalt production and editor terrain are the same translated mesh', 
   const diagnostic = buildWorldParityDiagnostic({ id: 'cave-fishing-island' }, editor);
   assert.equal(diagnostic.status, 'shared-authority');
   assert.equal(diagnostic.terrainTriangles, local.indices.length / 3);
+});
+
+test('Basalt terrain is watertight and Seal Basalt Core closes an edited face hole', () => {
+  const terrain = buildCleanBasaltTerrainLocal();
+  const diagnostic = meshDiagnostics(terrain);
+  assert.equal(diagnostic.boundaryEdges.length, 0);
+  assert.equal(diagnostic.nonManifoldEdges.length, 0);
+  assert.equal(diagnostic.zeroAreaFaces.length, 0);
+  const broken = deleteFaces(terrain, [100]);
+  assert.equal(meshDiagnostics(broken).boundaryLoops.length, 1);
+  const repaired = sealTerrainMesh(broken, { bottomY: -3.25 });
+  assert.equal(meshDiagnostics(repaired).boundaryEdges.length, 0);
+  assert.equal(meshDiagnostics(repaired).nonManifoldEdges.length, 0);
+
+  const topVertexCount = 33 * 29;
+  const topFaceCount = 32 * 28 * 2;
+  const oldOpenSheet = deleteFaces({
+    mode: 'authored-triangle-mesh',
+    positions: terrain.positions.slice(0, topVertexCount * 3),
+    indices: terrain.indices.slice(0, topFaceCount * 3)
+  }, [100, 500]);
+  assert.equal(meshDiagnostics(oldOpenSheet).boundaryLoops.length, 3);
+  const migrated = sealTerrainMesh(oldOpenSheet, { bottomY: -3.25 });
+  assert.equal(meshDiagnostics(migrated).boundaryEdges.length, 0);
+  assert.equal(meshDiagnostics(migrated).nonManifoldEdges.length, 0);
+});
+
+test('Athenaeum bench backrests sit behind every player-facing yaw', () => {
+  const seat = [3, .42, -4];
+  for (const yaw of [180, 90, -90, 0]) {
+    const back = libraryBenchBackPosition(seat, yaw);
+    const radians = yaw * Math.PI / 180;
+    const forward = { x: -Math.sin(radians), z: -Math.cos(radians) };
+    const backOffset = { x: back.x - seat[0], z: back.z - seat[2] };
+    assert.ok(backOffset.x * forward.x + backOffset.z * forward.z < 0, `yaw ${yaw}`);
+  }
 });
 
 test('controller binding capture swaps conflicts and controller chord grace is isolated', () => {

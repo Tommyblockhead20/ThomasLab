@@ -103,7 +103,8 @@ test('editor v23 provides a refined Library mesh and clean Cave baseline', () =>
   assert.equal(cave.terrain.mode, 'authored-triangle-mesh');
   assert.ok(cave.terrain.positions.length / 3 >= 900);
   assert.deepEqual(cave.waters.map((water) => water.id), ['basalt-grotto']);
-  assert.equal(cave.objects.length, 0);
+  assert.equal(cave.terrain.metadata.watertight, true);
+  assert.equal(cave.objects.filter((item) => item.metadata?.benchId === 'cave-fishing-island-shore-bench').length, 4);
 });
 
 test('editor action history interleaves terrain and object actions one transaction at a time', () => {
