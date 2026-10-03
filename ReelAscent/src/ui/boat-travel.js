@@ -5,6 +5,14 @@ import {
   compressWorldMapPosition
 } from '../world/world-locations.js';
 
+export const BOAT_MAP_CLOUD_STATES = Object.freeze(new Set([
+  'locked-cloud', 'locked-purchase', 'known-unavailable'
+]));
+
+export function boatMapDestinationUsesClouds(state) {
+  return BOAT_MAP_CLOUD_STATES.has(String(state ?? ''));
+}
+
 export class BoatTravelMenu {
   constructor(onTravel, {
     getDestinationAccess = () => ({ state: 'available', revealed: true, playable: true }),
@@ -84,13 +92,14 @@ export class BoatTravelMenu {
       const label = document.createElement('b');
       label.textContent = access.revealed === false ? 'Uncharted Waters' : location.displayName;
       button.append(footprint, label);
-      if (access.state === 'locked-cloud') {
+      if (boatMapDestinationUsesClouds(access.state)) {
         const clouds = document.createElement('span');
         clouds.className = 'boat-map-clouds';
         clouds.setAttribute('aria-hidden', 'true');
         for (let index = 0; index < 8; index += 1) clouds.appendChild(document.createElement('i'));
         button.appendChild(clouds);
-      } else if (access.state === 'known-unavailable') {
+      }
+      if (access.state === 'known-unavailable') {
         const construction = document.createElement('span');
         construction.className = 'boat-map-construction';
         construction.textContent = '⚠ UNDER CONSTRUCTION';

@@ -14,6 +14,7 @@ import { WORLD_LOCATION_BY_ID } from '../src/world/world-locations.js';
 import { makeCleanCaveEditorLevel } from '../tools/map-editor/production-island-adapter.js';
 import { deleteFaces, meshDiagnostics, sealTerrainMesh } from '../tools/map-editor/mesh-authoring.js';
 import { waterPathPose } from '../tools/map-editor/water-path-tools.js';
+import { boatMapDestinationUsesClouds } from '../src/ui/boat-travel.js';
 import { validateLibraryEcology } from '../src/fishing/library-ecology-validation.js';
 import { buildWorldParityDiagnostic } from '../tools/map-editor/world-parity.js';
 import { Room } from '../server/src/room.js';
@@ -102,6 +103,13 @@ test('Athenaeum bench backrests sit behind every player-facing yaw', () => {
     const backOffset = { x: back.x - seat[0], z: back.z - seat[2] };
     assert.ok(backOffset.x * forward.x + backOffset.z * forward.z < 0, `yaw ${yaw}`);
   }
+});
+
+test('all unavailable boat-map destinations are cloud-shrouded while available islands are clear', () => {
+  for (const state of ['locked-cloud', 'locked-purchase', 'known-unavailable']) {
+    assert.equal(boatMapDestinationUsesClouds(state), true, state);
+  }
+  assert.equal(boatMapDestinationUsesClouds('available'), false);
 });
 
 test('controller binding capture swaps conflicts and controller chord grace is isolated', () => {

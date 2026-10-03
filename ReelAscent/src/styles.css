@@ -2980,11 +2980,12 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .boat-map-open-water-boat .boat-map-footprint { width: 2.8rem; height: 2rem; color: #f5e5ad; font-size: 1.3rem; background: #336e82; border-color: #174858; clip-path: none !important; }
 .boat-map-island.is-current { box-shadow: 0 0 0 3px #fff5b6; }
 .boat-map-island.is-selected { outline: 3px solid #f2bd45; outline-offset: 1px; }
-.boat-map-island:disabled { opacity: .78; }
-.boat-map-island.is-locked-cloud { overflow: visible; background: #667f75 !important; border-color: #dbe8e2 !important; box-shadow: 0 0 20px 10px rgb(225 238 232 / 54%); }
-.boat-map-island.is-locked-cloud .boat-map-footprint { opacity: 1; }
+.boat-travel .boat-map-island:disabled { opacity: 1; }
+.boat-map-island:is(.is-locked-cloud, .is-locked-purchase, .is-known-unavailable) { overflow: visible; background: transparent !important; border: 0 !important; box-shadow: none; }
+.boat-map-island:is(.is-locked-cloud, .is-locked-purchase, .is-known-unavailable) .boat-map-footprint { position: relative; z-index: 1; opacity: 1; }
+.boat-map-island > b { position: relative; z-index: 1; }
 .boat-map-clouds { position: absolute; inset: -1rem; z-index: 3; pointer-events: none; }
-.boat-map-clouds i { position: absolute; width: 2.1rem; height: 1.35rem; background: rgb(234 242 238 / 94%); border-radius: 999px; box-shadow: 0 .18rem .35rem rgb(38 54 49 / 22%); }
+.boat-map-clouds i { position: absolute; width: 2.1rem; height: 1.35rem; background: #eaf2ee; border-radius: 999px; box-shadow: 0 .18rem .35rem rgb(38 54 49 / 22%); opacity: 1; }
 .boat-map-clouds i:nth-child(1) { left: 2%; top: 25%; transform: scale(.8); }
 .boat-map-clouds i:nth-child(2) { left: 22%; top: 4%; transform: scale(1.08); }
 .boat-map-clouds i:nth-child(3) { right: 7%; top: 16%; transform: scale(.92); }
@@ -2993,16 +2994,16 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .boat-map-clouds i:nth-child(6) { right: -2%; bottom: 14%; transform: scale(.88); }
 .boat-map-clouds i:nth-child(7) { left: 38%; top: 29%; transform: scale(1.25); }
 .boat-map-clouds i:nth-child(8) { right: 21%; top: 43%; transform: scale(.78); }
-.boat-map-island > :is(b, .boat-map-lock) { position: relative; z-index: 4; }
-.boat-map-island.is-known-unavailable { opacity: 1; filter: none; background: #6d7768 !important; border-color: #303a31 !important; }
-.boat-map-construction { position: relative; z-index: 4; margin-top: .2rem; padding: .16rem .28rem; color: #201d14; background: repeating-linear-gradient(135deg,#f1bd3d 0 6px,#27251d 6px 12px); border: 1px solid #f6d671; border-radius: .2rem; font-size: .38rem; font-weight: 900; text-shadow: 0 0 2px #fff4c8; }
+.boat-map-lock { position: relative; z-index: 5; opacity: 1; }
+.boat-map-island.is-known-unavailable { opacity: 1; filter: none; }
+.boat-map-construction { position: relative; z-index: 5; margin-top: .2rem; padding: .16rem .28rem; color: #201d14; background: repeating-linear-gradient(135deg,#f1bd3d 0 6px,#27251d 6px 12px); border: 1px solid #f6d671; border-radius: .2rem; font-size: .38rem; font-weight: 900; text-shadow: 0 0 2px #fff4c8; opacity: 1; }
 .map-island-locked-cloud :is(ellipse, polygon, .map-open-water-boat) { opacity: 1; filter: none; }
 .map-island-locked-cloud > text { fill: #53685f; }
 .map-cloud-shroud circle { fill: #edf5f1; fill-opacity: .94; stroke: #c8d8d1; stroke-width: .7; }
 .map-island-known-unavailable { opacity: 1; filter: none; }
 .map-island-known-unavailable :is(ellipse, polygon, .map-open-water-boat) { stroke: #322f24; stroke-width: 2.2; }
 .map-construction-marker { fill: #241f12; stroke: #f2c24e; stroke-width: 3; paint-order: stroke; font-size: 6px; font-weight: 900; text-anchor: middle; }
-.boat-map-island.is-locked-purchase { border-color: #f2bd45 !important; box-shadow: 0 0 0 2px rgb(242 189 69 / 35%); }
+.boat-map-island.is-locked-purchase { background: transparent !important; border: 0 !important; box-shadow: none; }
 .boat-map-lock { display: block; max-width: 8.5rem; color: #f5dda0; font-size: .42rem; line-height: 1.25; }
 
 .map-islands :is(ellipse, polygon) { fill: #6f9958; stroke: #2d5c45; stroke-width: 1.4; }

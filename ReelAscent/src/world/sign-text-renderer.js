@@ -34,16 +34,31 @@ export function attachSignText(device, parent, value, options = {}) {
   material.emissive = new pc.Color(.62, .62, .62);
   material.opacityMap = texture;
   material.alphaTest = .08;
-  material.cull = pc.CULLFACE_NONE;
+  material.cull = pc.CULLFACE_BACK;
   material.gloss = .08;
   material.update();
 
   const label = new pc.Entity(`${parent.name || 'Sign'} text`);
   label._editorBaseMaterial = material;
-  label.addComponent('render', { type: 'box', material, castShadows: false, receiveShadows: false });
+  // A box maps the lettering onto both its front and rear faces. With transparency and a
+  // shallow viewing angle, the rear copy can show through as a second offset word. Use one
+  // forward-facing quad so each physical sign has exactly one layer of lettering.
+  const geometry = new pc.Geometry();
+  geometry.positions = [-.5, -.5, 0, .5, -.5, 0, .5, .5, 0, -.5, .5, 0];
+  geometry.normals = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1];
+  // Match PlayCanvas BoxGeometry's front-face UV orientation so the existing canvas text
+  // remains upright after replacing that box with this single quad.
+  geometry.uvs = [0, 1, 1, 1, 1, 0, 0, 0];
+  geometry.indices = [0, 1, 2, 0, 2, 3];
+  const mesh = pc.Mesh.fromGeometry(device, geometry);
+  label.addComponent('render');
+  label.render.castShadows = false;
+  label.render.receiveShadows = false;
+  label.render.meshInstances = [new pc.MeshInstance(mesh, material, label)];
+  label._editorOwnedMeshes = [mesh];
   parent.addChild(label);
-  label.setLocalPosition(0, 0, options.surfaceOffset ?? .53);
-  label.setLocalScale(options.widthScale ?? .92, options.heightScale ?? .72, .025);
+  label.setLocalPosition(0, 0, options.surfaceOffset ?? .506);
+  label.setLocalScale(options.widthScale ?? .92, options.heightScale ?? .72, 1);
   parent._editorOwnedSignTextures = [...(parent._editorOwnedSignTextures ?? []), texture];
   parent._editorOwnedSignMaterials = [...(parent._editorOwnedSignMaterials ?? []), material];
   return label;
