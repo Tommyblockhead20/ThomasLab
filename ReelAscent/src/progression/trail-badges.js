@@ -36,7 +36,7 @@ export const TRAIL_BADGE_DEFINITIONS = Object.freeze([
   badge('legendary-encounter', 'Legendary Encounter', 'Catch your first Legendary creature.', 'legendary', 1),
   badge('full-kit', 'Full Kit', 'Own an upgraded item in every traversal equipment category.', 'fullKit', 1),
   badge('master-outfitter', 'Master Outfitter', 'Purchase every current gear and map item.', 'allPurchases', 1),
-  badge('world-mapper', 'World Mapper', "Own the Master Naturalist's Atlas.", 'atlas', 1)
+  badge('world-mapper', 'World Mapper', "Own the Master Naturalist's Binder.", 'atlas', 1)
 ]);
 
 const formatNumber = (value) => new Intl.NumberFormat('en-US').format(Math.max(0, Math.floor(value)));

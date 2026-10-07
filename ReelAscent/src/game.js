@@ -431,6 +431,7 @@ export class Game {
     if (this.devUiPreview === 'aquarium') globalThis.setTimeout(() => this.aquariumMenu.open(), 0);
     if (this.devUiPreview === 'appearance') globalThis.setTimeout(() => this.appearanceMenu.open(), 0);
     if (this.devUiPreview === 'song-feedback') globalThis.setTimeout(() => this.songFeedbackDashboard.open(), 0);
+    if (this.devUiPreview === 'boat') globalThis.setTimeout(() => this.boatTravel.open(this.currentLocationId), 0);
     this.ensureDeveloperFishingResultPreview();
   }
 

@@ -105,10 +105,11 @@ test('Athenaeum bench backrests sit behind every player-facing yaw', () => {
   }
 });
 
-test('all unavailable boat-map destinations are cloud-shrouded while available islands are clear', () => {
-  for (const state of ['locked-cloud', 'locked-purchase', 'known-unavailable']) {
+test('hidden and unfinished boat-map destinations use clouds while the visible Bluewater purchase lock stays clear', () => {
+  for (const state of ['locked-cloud', 'known-unavailable']) {
     assert.equal(boatMapDestinationUsesClouds(state), true, state);
   }
+  assert.equal(boatMapDestinationUsesClouds('locked-purchase'), false);
   assert.equal(boatMapDestinationUsesClouds('available'), false);
 });
 

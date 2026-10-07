@@ -6,11 +6,20 @@ import {
 } from '../world/world-locations.js';
 
 export const BOAT_MAP_CLOUD_STATES = Object.freeze(new Set([
-  'locked-cloud', 'locked-purchase', 'known-unavailable'
+  'locked-cloud', 'known-unavailable'
 ]));
 
 export function boatMapDestinationUsesClouds(state) {
   return BOAT_MAP_CLOUD_STATES.has(String(state ?? ''));
+}
+
+export function boatMapLockSummary(access = {}) {
+  const reason = String(access.reason ?? '');
+  if (access.state === 'known-unavailable') return 'CHARTED FOR A FUTURE UPDATE';
+  if (access.state === 'locked-purchase') return 'BUY THE $2,000 BLUEWATER BOAT';
+  const progress = reason.match(/Discover (\d+) Trail Badges or catch (\d+) unique species/i);
+  if (progress) return `${progress[1]} BADGES OR ${progress[2]} SPECIES`;
+  return reason.replace(/[.]$/, '').toUpperCase();
 }
 
 export class BoatTravelMenu {
@@ -63,7 +72,19 @@ export class BoatTravelMenu {
 
   render() {
     if (!this.map) return;
-    this.map.replaceChildren(...WORLD_LOCATIONS.map((location) => {
+    const chartTitle = document.createElement('span');
+    chartTitle.className = 'boat-map-chart-title';
+    chartTitle.textContent = 'STONEVEIL ARCHIPELAGO';
+    chartTitle.setAttribute('aria-hidden', 'true');
+    const compass = document.createElement('span');
+    compass.className = 'boat-map-compass';
+    compass.setAttribute('aria-hidden', 'true');
+    for (const direction of ['N', 'E', 'S', 'W']) {
+      const label = document.createElement('i');
+      label.textContent = direction;
+      compass.appendChild(label);
+    }
+    this.map.replaceChildren(chartTitle, compass, ...WORLD_LOCATIONS.map((location) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.dataset.travelDestination = location.id;
@@ -109,7 +130,9 @@ export class BoatTravelMenu {
       if (lockMessage) {
         const lock = document.createElement('small');
         lock.className = 'boat-map-lock';
-        lock.textContent = `${access.state === 'known-unavailable' ? 'UNDER CONSTRUCTION' : 'LOCKED'} • ${lockMessage}`;
+        lock.textContent = access.state === 'known-unavailable'
+          ? boatMapLockSummary(access)
+          : `${access.state === 'locked-purchase' ? 'PURCHASE' : 'LOCKED'} • ${boatMapLockSummary(access)}`;
         button.appendChild(lock);
         button.setAttribute('aria-description', lockMessage);
       }

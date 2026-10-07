@@ -35,6 +35,11 @@ export function attachSignText(device, parent, value, options = {}) {
   material.opacityMap = texture;
   material.alphaTest = .08;
   material.cull = pc.CULLFACE_BACK;
+  // The lettering is transparent and sits just in front of a solid sign board. Pull its
+  // depth very slightly toward the camera as a second guard against precision flicker on
+  // thin/scaled boards and distant editor views.
+  material.depthBias = -1;
+  material.slopeDepthBias = -1;
   material.gloss = .08;
   material.update();
 
@@ -57,7 +62,10 @@ export function attachSignText(device, parent, value, options = {}) {
   label.render.meshInstances = [new pc.MeshInstance(mesh, material, label)];
   label._editorOwnedMeshes = [mesh];
   parent.addChild(label);
-  label.setLocalPosition(0, 0, options.surfaceOffset ?? .506);
+  // .506 was only fractions of a millimetre away after a thin sign's inherited Z scale,
+  // which was visibly coplanar at ordinary camera distances. This remains visually attached
+  // to the board while leaving a stable depth gap in both production and the editor.
+  label.setLocalPosition(0, 0, options.surfaceOffset ?? .56);
   label.setLocalScale(options.widthScale ?? .92, options.heightScale ?? .72, 1);
   parent._editorOwnedSignTextures = [...(parent._editorOwnedSignTextures ?? []), texture];
   parent._editorOwnedSignMaterials = [...(parent._editorOwnedSignMaterials ?? []), material];

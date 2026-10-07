@@ -25,8 +25,15 @@ import { BASELINE_SPECIES_PROBABILITY_CAPS } from './ecology-config.js';
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
 const GUIDE_RARITY_RANK = Object.freeze({ Legendary: 0, Rare: 1, Uncommon: 2, Common: 3 });
+const BINDER_FIELD_NOTE_PAGES = Object.freeze([
+  Object.freeze({ id: 'common-field-notes', guideMode: 'rarity', guideRarity: 'Common' }),
+  Object.freeze({ id: 'uncommon-field-notes', guideMode: 'rarity', guideRarity: 'Uncommon' }),
+  Object.freeze({ id: 'rare-field-notes', guideMode: 'rarity', guideRarity: 'Rare' }),
+  Object.freeze({ id: 'legendary-field-notes', guideMode: 'rarity', guideRarity: 'Legendary' }),
+  Object.freeze({ id: 'local-secrets-guide', guideMode: 'exclusive' })
+]);
 
-export function selectEcologyGuideEntries(effectiveTable, guideMode, guideRarity, zoneId) {
+export function selectEcologyGuideEntries(effectiveTable, guideMode, guideRarity, zoneId, guidePages = []) {
   const compareLiveOdds = (a, b) => b.probability - a.probability
     || (GUIDE_RARITY_RANK[a.fish.rarity] ?? 99) - (GUIDE_RARITY_RANK[b.fish.rarity] ?? 99)
     || a.fish.name.localeCompare(b.fish.name);
@@ -38,6 +45,13 @@ export function selectEcologyGuideEntries(effectiveTable, guideMode, guideRarity
   if (guideMode === 'exclusive') {
     return sorted.filter((entry) => entry.fish.habitat?.exclusiveWaterId === zoneId);
   }
+  if (guideMode === 'binder') {
+    const selected = guidePages.flatMap((page) => selectEcologyGuideEntries(
+      effectiveTable, page.guideMode, page.guideRarity, zoneId
+    ));
+    return [...new Map(selected.map((entry) => [entry.fish.id, entry])).values()].sort(compareLiveOdds);
+  }
+  // Legacy Atlas saves/builds remain readable if an old item definition reaches this helper.
   const selected = ['Common', 'Uncommon', 'Rare', 'Legendary']
     .flatMap((rarity) => sorted.filter((entry) => entry.fish.rarity === rarity).slice(0, 5));
   selected.push(...sorted.filter((entry) => entry.fish.habitat?.exclusiveWaterId === zoneId));
@@ -3321,6 +3335,7 @@ export class FishingController {
     const guide = this.progression?.getEquippedItem?.('guide');
     const zone = this.zone ?? this.findNearbyZone();
     if (!guide?.guideMode || !zone) return null;
+    const ownedEquipment = new Set(this.progression?.getSnapshot?.().ownedEquipment ?? []);
     const point = this.cast?.landingZone?.id === zone.id ? this.cast.target : zone.center;
     const ecology = getEcologySelection(zone, point);
     const table = getWeightedSpeciesTable(ecology.fishIds, this.getSelectionModifiers(ecology, true, zone));
@@ -3341,12 +3356,18 @@ export class FishingController {
         ? entry.probability * (bobberAcceptance[entry.fish.rarity] ?? 0) / acceptedTotal
         : 0
     }));
-    const entries = selectEcologyGuideEntries(effectiveTable, guide.guideMode, guide.guideRarity, zone.id);
+    const ownedGuidePages = guide.guideMode === 'binder'
+      ? BINDER_FIELD_NOTE_PAGES.filter((page) => ownedEquipment.has(page.id))
+      : [];
+    const entries = selectEcologyGuideEntries(
+      effectiveTable, guide.guideMode, guide.guideRarity, zone.id, ownedGuidePages
+    );
     return {
       guide: guide.name,
       mode: guide.guideMode,
       zone: zone.label,
       bobberMode,
+      showCaughtStatus: ownedEquipment.has('catch-log-pages'),
       entries: entries.map((entry) => ({
         id: entry.fish.id,
         name: entry.fish.name,

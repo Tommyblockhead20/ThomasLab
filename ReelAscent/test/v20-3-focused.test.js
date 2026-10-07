@@ -28,8 +28,8 @@ const session = (id, name) => {
   return result;
 };
 
-test('v20.8 is the active displayed build version', () => {
-  assert.equal(GAME_VERSION, 'v20.8');
+test('the active displayed build version is current', () => {
+  assert.equal(GAME_VERSION, 'v23.1');
 });
 
 test('authored ground query uses upward baked surfaces and ignores downward ceilings', () => {
@@ -94,21 +94,21 @@ test('display names are unique per room, case-insensitively, until reservation r
 test('v20.3 bobbers use exact retention and bounded fixed cadence', () => {
   const ocean = PHYSICAL_WATER_RARITY_PROFILES.ocean;
   assert.deepEqual(getSelectiveBobberSettings('selective').acceptanceByRarity,
-    { Common: .06, Uncommon: .56, Rare: .96, Legendary: 1 });
+    { Common: .42, Uncommon: .58, Rare: .64, Legendary: .68 });
   assert.deepEqual(getSelectiveBobberSettings('trophy').acceptanceByRarity,
-    { Common: 0, Uncommon: .05, Rare: .82, Legendary: 1 });
-  close(sampleBobberBiteDelay(getSelectiveBobberSettings('selective'), 0, { profile: ocean }), 22.5);
-  close(sampleBobberBiteDelay(getSelectiveBobberSettings('trophy'), 1, { profile: ocean }), 144);
+    { Common: .18, Uncommon: .32, Rare: .4, Legendary: .46 });
+  close(sampleBobberBiteDelay(getSelectiveBobberSettings('selective'), 0, { profile: ocean }), 21);
+  close(sampleBobberBiteDelay(getSelectiveBobberSettings('trophy'), 1, { profile: ocean }), 91.5);
   const selective = deriveAcceptedBobberProfile(ocean, 'selective');
-  close(selective.Common, .1145320197044335);
-  close(selective.Uncommon, .3448275862068966);
-  close(selective.Rare, .3251231527093596);
-  close(selective.Legendary, .21551724137931033);
+  close(selective.Common, .5266990291262137);
+  close(selective.Uncommon, .23462783171521034);
+  close(selective.Rare, .1423948220064725);
+  close(selective.Legendary, .09627831715210355);
   const trophy = deriveAcceptedBobberProfile(ocean, 'trophy');
-  close(trophy.Common, 0);
-  close(trophy.Uncommon, .05875440658049354);
-  close(trophy.Rare, .5299647473560517);
-  close(trophy.Legendary, .41128084606345475);
+  close(trophy.Common, .443208895949166);
+  close(trophy.Uncommon, .2541699761715647);
+  close(trophy.Rare, .17474185861795076);
+  close(trophy.Legendary, .1278792692613185);
 });
 
 test('journal cards grow with content and guide odds include equipped bobber filtering', async () => {

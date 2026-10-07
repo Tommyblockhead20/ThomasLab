@@ -55,7 +55,7 @@ export function specimenPreview(specimen) {
 }
 
 const CATEGORY_LABELS = Object.freeze({
-  rod: 'Rod', reel: 'Reel', line: 'Line', lure: 'Lure', bobber: 'Bobber', guide: 'Ecology Guide',
+  rod: 'Rod', reel: 'Reel', line: 'Line', lure: 'Lure / Bait', bobber: 'Bobber', guide: 'Field Notes',
   boots: 'Boots', gloves: 'Gloves', climbingTool: 'Climbing Tool', chalk: 'Chalk Bag', harness: 'Harness / Pack'
 });
 
@@ -244,13 +244,16 @@ export class InventoryMenu {
       `<article class="inventory-card inventory-item-card" data-held="${state.heldItemId === item.id}"><div class="inventory-item-icon">${item.mode === 'gps' ? '⌖' : '⌁'}</div><div><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.description)}</p></div><div class="inventory-item-actions"><button type="button" data-world-map-open="${item.id}">OPEN FULL MAP</button><button type="button" data-world-item-action="${item.id}">${state.heldItemId === item.id ? 'PUT AWAY' : 'EQUIP IN HAND'}</button></div></article>`
     )).join('');
     const equipment = Object.entries(CATEGORY_LABELS).map(([category, label]) => {
-      const owned = EQUIPMENT_CATALOG.filter((item) => item.category === category && state.ownedEquipment.includes(item.id));
+      const owned = EQUIPMENT_CATALOG.filter((item) => item.category === category && !item.passive && state.ownedEquipment.includes(item.id));
       if (!owned.length) return '';
       const equipped = owned.find((item) => item.id === state.equipped[category]) ?? owned[0];
       const options = owned.map((item) => `<option value="${item.id}" ${item.id === equipped.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
       const worn = ['boots', 'gloves', 'chalk', 'harness'].includes(category) ? 'WORN' : 'EQUIPPED';
       return `<section class="inventory-gear-group inventory-equipment-slot"><h3>${label}<small>${worn}</small></h3><label><span>${escapeHtml(equipped.name)}</span><select data-inventory-equip-select="${category}" aria-label="Equip ${escapeHtml(label)}">${options}</select><p>${escapeHtml(equipped.effect)}</p></label></section>`;
     }).join('');
+    const passiveEquipment = EQUIPMENT_CATALOG.filter((item) => item.passive && state.ownedEquipment.includes(item.id))
+      .map((item) => `<article class="inventory-card inventory-item-card"><div class="inventory-item-icon">◉</div><div><strong>${escapeHtml(item.name)}</strong><p>${escapeHtml(item.effect)}</p></div><div class="inventory-item-actions"><button type="button" disabled>ALWAYS ACTIVE</button></div></article>`)
+      .join('');
     const heldSpecimen = (state.inventory ?? []).find((entry) => entry.specimenId === state.heldSpecimenId);
     const heldMap = MAP_ITEM_BY_ID.get(state.heldItemId);
     const equippedHandTool = EQUIPMENT_CATALOG.find((item) => item.usesHand && item.id === state.equipped.climbingTool);
@@ -265,7 +268,7 @@ export class InventoryMenu {
       ? `<button type="button" data-hand-equipment="${equippedHandTool.id}">${heldTool ? 'PUT TOOL AWAY' : 'EQUIP TOOL IN HAND'}</button>`
       : '';
     const hand = `<section class="inventory-gear-group inventory-hand-group"><h3>Hand • exactly one slot</h3><div class="inventory-hand-slot"><strong>${escapeHtml(handLabel)}</strong><small>${escapeHtml(handDetail)}</small>${toolAction}</div></section>`;
-    return `${hand}${maps ? `<section class="inventory-gear-group"><h3>Maps</h3><div class="inventory-gear-row">${maps}</div></section>` : ''}${equipment}`
+    return `${hand}${maps ? `<section class="inventory-gear-group"><h3>Maps</h3><div class="inventory-gear-row">${maps}</div></section>` : ''}${passiveEquipment ? `<section class="inventory-gear-group"><h3>Field Note Add-ons</h3><div class="inventory-gear-row">${passiveEquipment}</div></section>` : ''}${equipment}`
       || "<p class=\"shop-empty\">No gear yet. Visit Outfitter's Reach.</p>";
   }
 

@@ -10,24 +10,24 @@ export const SELECTIVE_BOBBER_SETTINGS = Object.freeze({
   }),
   selective: Object.freeze({
     id: 'selective',
-    targetWaitSeconds: 30,
+    targetWaitSeconds: 28,
     delayVariance: .25,
     acceptanceByRarity: Object.freeze({
-      Common: .06,
-      Uncommon: .56,
-      Rare: .96,
-      Legendary: 1
+      Common: .42,
+      Uncommon: .58,
+      Rare: .64,
+      Legendary: .68
     })
   }),
   trophy: Object.freeze({
     id: 'trophy',
-    targetWaitSeconds: 120,
-    delayVariance: .2,
+    targetWaitSeconds: 75,
+    delayVariance: .22,
     acceptanceByRarity: Object.freeze({
-      Common: 0,
-      Uncommon: .05,
-      Rare: .82,
-      Legendary: 1
+      Common: .18,
+      Uncommon: .32,
+      Rare: .40,
+      Legendary: .46
     })
   })
 });

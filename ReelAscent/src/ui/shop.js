@@ -9,7 +9,7 @@ const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character
 })[character]);
 
 const CATEGORY_LABELS = Object.freeze({
-  rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES', bobber: 'BOBBERS', guide: 'ECOLOGY GUIDES',
+  rod: 'RODS', reel: 'REELS', line: 'LINES', lure: 'LURES & BAIT', bobber: 'BOBBERS', guide: 'FIELD NOTES',
   boots: 'BOOTS', gloves: 'GLOVES', climbingTool: 'CLIMBING TOOLS', chalk: 'CHALK BAGS', harness: 'HARNESSES & PACKS'
 });
 const SHOP_TABS = Object.freeze(['fishing', 'climbing', 'cosmetics']);
@@ -188,7 +188,9 @@ export class ShopMenu {
       const cards = EQUIPMENT_CATALOG.filter((entry) => entry.category === category).map((entry) => {
         const owned = state.ownedEquipment.includes(entry.id);
         const equipped = state.equipped[category] === entry.id;
-        const action = equipped
+        const action = entry.passive && owned
+          ? '<button type="button" disabled>ALWAYS ACTIVE</button>'
+          : equipped
           ? '<button type="button" disabled>EQUIPPED</button>'
           : owned
             ? `<button type="button" data-shop-action="equip" data-item-id="${entry.id}">EQUIP</button>`

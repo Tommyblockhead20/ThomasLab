@@ -51,13 +51,14 @@ test('Atlas caught status uses legitimate per-save Journal history only', () => 
   assert.equal(saves.hasCaughtSpecies('rainbow_trout'), true);
 });
 
-test('Atlas caught marker is after the name and its legend is Atlas-only', async () => {
+test('Catch Log Pages put the caught marker after the name on any equipped Field Note', async () => {
   const [markup, panel] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui/ecology-guide.js', import.meta.url), 'utf8')
   ]);
-  assert.match(markup, /◆ Location exclusive<br>○ Not yet caught/);
-  assert.match(panel, /state\.mode === 'atlas' && !entry\.caught/);
+  assert.match(markup, /ecology-guide-exclusive-legend/);
+  assert.match(panel, /state\.showCaughtStatus && !entry\.caught/);
+  assert.match(panel, /○ Not yet caught/);
   assert.match(panel, /escapeHtml\(entry\.name\).*markers/);
 });
 

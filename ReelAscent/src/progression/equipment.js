@@ -8,31 +8,31 @@ const item = (id, category, name, price, effect, modifiers = {}, metadata = {}) 
 
 export const EQUIPMENT_CATALOG = Object.freeze([
   item('trail-rod', 'rod', 'Trail Rod', 0, 'Balanced starter rod.'),
-  item('precision-tip-rod', 'rod', 'Precision Tip Rod', 900, '12% wider successful timing window; PERFECT stays precise.', { successWindowMultiplier: 1.12 }),
-  item('virtuoso-rod', 'rod', 'Virtuoso Rod', 6000, '11% faster songs; any landed catch is at least GREAT.', { tempoMultiplier: 1.11, minimumSuccessfulQuality: 'GREAT' }),
+  item('precision-tip-rod', 'rod', 'Precision Tip Rod', 900, '20% wider timing window.', { successWindowMultiplier: 1.2 }),
+  item('virtuoso-rod', 'rod', 'Virtuoso Rod', 5000, 'Catches grade GREAT or better; songs play 15% faster.', { tempoMultiplier: 1.15, minimumSuccessfulQuality: 'GREAT' }),
 
   item('creek-reel', 'reel', 'Creek Reel', 0, 'Balanced starter reel.'),
-  item('quickbeat-reel', 'reel', 'Quickbeat Reel', 2500, '20% wider successful window, but songs play 14% faster.', { successWindowMultiplier: 1.2, tempoMultiplier: 1.14 }),
-  item('stillpoint-reel', 'reel', 'Stillpoint Reel', 2500, 'Songs play 14% slower, but the successful window is 18% narrower.', { successWindowMultiplier: .82, tempoMultiplier: .86 }),
+  item('quickbeat-reel', 'reel', 'Quickbeat Reel', 2500, '20% wider timing window; songs play 15% faster.', { successWindowMultiplier: 1.2, tempoMultiplier: 1.15 }),
+  item('stillpoint-reel', 'reel', 'Stillpoint Reel', 2000, 'Songs play 15% slower; timing is 15% tighter.', { successWindowMultiplier: .85, tempoMultiplier: .85 }),
 
   item('standard-line', 'line', 'Standard Line', 0, 'Dependable starter line.'),
-  item('shock-absorb-line', 'line', 'Shock-Absorb Line', 1500, 'Ordinary creatures allow roughly 50% more mistakes.', { mistakeAllowanceMultiplier: 1.5 }),
-  item('trophy-braid', 'line', 'Trophy Braid', 3500, 'Moderately shifts specimen length and body-size rolls upward.', { specimenSizeBias: .12 }),
-  item('braided-lifeline', 'line', 'Braided Lifeline', 7500, 'Ordinary creatures allow roughly twice as many mistakes.', { mistakeAllowanceMultiplier: 2 }),
+  item('shock-absorb-line', 'line', 'Shock-Absorb Line', 1500, 'Allows 50% more mistakes.', { mistakeAllowanceMultiplier: 1.5 }),
+  item('trophy-braid', 'line', 'Trophy Braid', 3500, 'Noticeably favors larger specimens.', { specimenSizeBias: .20 }),
+  item('braided-lifeline', 'line', 'Braided Lifeline', 7000, 'Allows twice as many mistakes.', { mistakeAllowanceMultiplier: 2 }),
 
-  item('plain-spoon', 'lure', 'Plain Spoon', 0, 'Simple starter tackle.'),
-  item('fast-bite-chum', 'lure', 'Fast-Bite Chum', 800, 'Cuts average bite waiting time in half.', { biteDelayMultiplier: .5 }),
-  item('silverflash-spoon', 'lure', 'Silverfish Spoon', 2000, 'Increases the odds of Rare creatures by 20 percentage points.', { rareProbabilityBonus: .20 }),
-  item('oddity-bait', 'lure', 'Oddity Bait', 3000, 'Doubles eligible non-fish creature odds within the chosen rarity.', { nonFishWeightMultiplier: 2 }),
-  item('mythlight-lure', 'lure', 'Mythlight Lure', 10000, 'Increases the odds of Legendary creatures by 10 percentage points.', { legendaryProbabilityBonus: .10 }),
-  item('prism-lure', 'lure', 'Prism Lure', 10000, 'Fishing songs play 20% faster.', { tempoMultiplier: 1.20 }),
+  item('plain-spoon', 'lure', 'Plain Spoon', 0, 'Balanced starter tackle.'),
+  item('fast-bite-chum', 'lure', 'Fast-Bite Chum', 800, 'Bites arrive twice as fast.', { biteDelayMultiplier: .5 }),
+  item('silverflash-spoon', 'lure', 'Silverflash Spoon', 3500, 'Adds 20 percentage points to Rare odds.', { rareProbabilityBonus: .20 }),
+  item('oddity-bait', 'lure', 'Oddity Bait', 3000, 'Doubles eligible non-fish odds.', { nonFishWeightMultiplier: 2 }),
+  item('mythlight-lure', 'lure', 'Mythlight Lure', 10000, 'Adds 10 percentage points to Legendary odds.', { legendaryProbabilityBonus: .10 }),
+  item('prism-lure', 'lure', 'Prism Lure', 7500, 'Triples shiny odds; songs play 20% faster.', { shinyChanceMultiplier: 3, tempoMultiplier: 1.20 }),
 
   item('trail-bobber', 'bobber', 'Trail Bobber', 0, 'Responsive starter float.', {}, { bobberMode: 'standard' }),
   item('selective-drift-bobber', 'bobber', 'Selective Drift Bobber', 1800,
-    'Retains 6% of Common, 56% of Uncommon, 96% of Rare, and 100% of Legendary bites; waits about 30 seconds (±25%).', {},
+    'Waits longer and favors uncommon or rarer bites.', {},
     { bobberMode: 'selective' }),
   item('trophy-sentinel-bobber', 'bobber', 'Trophy Sentinel Bobber', 4500,
-    'Retains 0% of Common, 5% of Uncommon, 82% of Rare, and 100% of Legendary bites; waits about 120 seconds (±20%).', {},
+    'Waits much longer and strongly favors rare trophies.', {},
     { bobberMode: 'trophy' }),
 
   item('common-field-notes', 'guide', 'Common Field Notes', 225, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),
@@ -40,23 +40,24 @@ export const EQUIPMENT_CATALOG = Object.freeze([
   item('rare-field-notes', 'guide', 'Rare Field Notes', 2000, 'Shows the five likeliest Rare creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Rare' }),
   item('legendary-field-notes', 'guide', 'Legendary Field Notes', 5000, 'Shows the five likeliest Legendary creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Legendary' }),
   item('local-secrets-guide', 'guide', 'Local Secrets Guide', 3500, 'Shows every location-exclusive creature and its live chance.', {}, { guideMode: 'exclusive' }),
-  item('master-naturalist-atlas', 'guide', "Master Naturalist's Atlas", 12000, 'Shows each rarity’s top five plus all location exclusives.', {}, { guideMode: 'atlas' }),
+  item('master-naturalist-atlas', 'guide', "Master Naturalist's Binder", 6500, 'Combines every Field Note you own into one view.', {}, { guideMode: 'binder' }),
+  item('catch-log-pages', 'guide', 'Catch Log Pages', 1750, 'Marks uncaught creatures on any equipped Field Note.', {}, { passive: true, showCaughtStatus: true }),
 
   item('trail-boots', 'boots', 'Trail Boots', 0, 'Balanced starter boots.'),
   item('trail-gloves', 'gloves', 'Trail Gloves', 0, 'Balanced starter gloves.'),
   item('trail-kit', 'climbingTool', 'Trail Kit', 0, 'Standard climbing tool with no traversal bonus.'),
   item('empty-chalk-loop', 'chalk', 'Empty Chalk Loop', 0, 'Starter belt loop with no stamina bonus.'),
   item('trail-harness', 'harness', 'Trail Harness', 0, 'Balanced starter harness and pack.'),
-  item('trail-runners', 'boots', 'Trail Runners', 900, 'Sprint speed increases by 15%.', { sprintSpeedMultiplier: 1.15 }),
+  item('trail-runners', 'boots', 'Trail Runners', 1000, 'Sprint speed increases by 20%.', { sprintSpeedMultiplier: 1.2 }),
   // Keep the durable id so existing saves migrate cleanly, but this is the v9 replacement item.
-  item('endurance-belt', 'boots', 'Endurance Boots', 1750, 'Normal sprinting consumes no stamina.', { sprintDrain: 0 }),
+  item('endurance-belt', 'boots', 'Endurance Boots', 3000, 'Normal sprinting uses no stamina.', { sprintDrain: 0 }),
   item('chalk-gloves', 'gloves', 'Climbing Gloves', 2000, 'Climbing and grip stamina costs decrease by 20%.', { gripDrain: .8 }),
   item('climber-chalk', 'chalk', 'Chalk Bag', 5000, 'Climbing and grip stamina costs decrease by 30%.', { gripDrain: .7 }),
-  item('ice-axe', 'climbingTool', 'Ice Axe', 8500, 'Uses the Hand slot. On ice and smooth slippery rock: 25% less climb/grip stamina, reduced slip, and better slide stability.', { iceClimbCostMultiplier: .75, iceSlipMultiplier: .55, iceSlideThresholdMultiplier: 1.08 }, { usesHand: true }),
+  item('ice-axe', 'climbingTool', 'Ice Axe', 8500, 'In Hand: 25% less ice stamina, less slip, and steadier slides.', { iceClimbCostMultiplier: .75, iceSlipMultiplier: .55, iceSlideThresholdMultiplier: 1.08 }, { usesHand: true }),
   item('alpine-harness', 'harness', 'Alpine Harness', 3500, 'Climbing and grip stamina costs decrease by 20%.', { climbCostMultiplier: .8 }),
   item('springstep-boots', 'boots', 'Springstep Boots', 4000, 'Jump impulse increases by 25%.', { jumpImpulseMultiplier: 1.25 }),
   item('summit-vault-boots', 'boots', 'Summit Vault Boots', 12000, 'Jump impulse increases by 50%.', { jumpImpulseMultiplier: 1.5 }),
-  item('ultralight-kit', 'harness', 'Ultralight Harness', 10000, 'All normal traversal stamina costs use a centralized 0.60 multiplier.', { staminaCostMultiplier: .6 })
+  item('ultralight-kit', 'harness', 'Ultralight Harness', 10000, 'All traversal stamina costs decrease by 40%.', { staminaCostMultiplier: .6 })
 ]);
 
 export const EQUIPMENT_BY_ID = new Map(EQUIPMENT_CATALOG.map((entry) => [entry.id, entry]));
@@ -110,6 +111,7 @@ export class EquipmentManager {
     const state = this.getState();
     const selected = EQUIPMENT_BY_ID.get(itemId);
     if (!selected || !state.ownedEquipment.includes(itemId)) return { ok: false, reason: 'Item not owned' };
+    if (selected.passive) return { ok: false, reason: `${selected.name} is always active once owned` };
     const previous = EQUIPMENT_BY_ID.get(state.equipped[selected.category]);
     state.equipped[selected.category] = itemId;
     if (previous?.usesHand && state.heldItemId === previous.id) state.heldItemId = null;
@@ -127,6 +129,7 @@ export class EquipmentManager {
       const equipped = EQUIPMENT_BY_ID.get(state.equipped[category]);
       if (!equipped || equipped.category !== category) state.equipped[category] = itemId;
     }
-    if (state.equipped.guide && !EQUIPMENT_BY_ID.has(state.equipped.guide)) delete state.equipped.guide;
+    const guide = EQUIPMENT_BY_ID.get(state.equipped.guide);
+    if (state.equipped.guide && (!guide || guide.category !== 'guide' || guide.passive)) delete state.equipped.guide;
   }
 }

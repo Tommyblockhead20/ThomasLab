@@ -10,7 +10,7 @@ import {
   normalizeAquariumTankDisplays
 } from './aquarium.js';
 
-export const PROGRESSION_SCHEMA_VERSION = 15;
+export const PROGRESSION_SCHEMA_VERSION = 16;
 export const HAND_EQUIPMENT_IDS = Object.freeze(['ice-axe']);
 export const STARTER_EQUIPMENT_IDS = Object.freeze([
   'trail-rod',
@@ -162,6 +162,15 @@ export function normalizeProgressionState(value = {}) {
     if (appearance[key] !== 'none' && COSMETIC_BY_ID.has(appearance[key])) ownedCosmetics.add(appearance[key]);
   }
   const owned = new Set(Array.isArray(value.ownedEquipment) ? value.ownedEquipment.filter((id) => typeof id === 'string') : []);
+  // The former Atlas was a standalone all-in-one guide with caught markers. Grandfather its
+  // complete page set exactly once so an existing paid-for Atlas never loses information when
+  // it becomes the new Binder. Newly purchased binders on schema 16 combine only pages owned.
+  if (Math.max(0, Math.floor(finite(value.schemaVersion))) < 16 && owned.has('master-naturalist-atlas')) {
+    for (const id of [
+      'common-field-notes', 'uncommon-field-notes', 'rare-field-notes',
+      'legendary-field-notes', 'local-secrets-guide', 'catch-log-pages'
+    ]) owned.add(id);
+  }
   STARTER_EQUIPMENT_IDS.forEach((id) => owned.add(id));
   const inventory = normalizeSpecimenList(value.inventory, persistedPlayerId);
   const legacyAquarium = Array.isArray(value.aquarium) ? value.aquarium : value.specimens;
@@ -200,7 +209,8 @@ export function normalizeProgressionState(value = {}) {
     equipped.climbingTool = DEFAULT_EQUIPPED.climbingTool;
     equipped.chalk = 'climber-chalk';
   }
-  if (typeof value.equipped?.guide === 'string' && owned.has(value.equipped.guide)) equipped.guide = value.equipped.guide;
+  if (typeof value.equipped?.guide === 'string' && value.equipped.guide !== 'catch-log-pages'
+    && owned.has(value.equipped.guide)) equipped.guide = value.equipped.guide;
   const validWorldItems = new Set(MAP_ITEMS.map((item) => item.id));
   const ownedItems = [...new Set(
     (Array.isArray(value.ownedItems) ? value.ownedItems : [])

@@ -8,8 +8,8 @@ import {
   SUPPORTED_CREATURE_ARCHETYPES
 } from '../src/fishing/creature-presentation.js';
 import { FishingZone } from '../src/fishing/fishing-zone.js';
-import { getRarityProfile, PHYSICAL_WATER_RARITY_PROFILES } from '../src/fishing/rarity-selection.js';
-import { SELECTIVE_BOBBER_SETTINGS, sampleBobberBiteDelay } from '../src/fishing/selective-bobbers.js';
+import { PHYSICAL_WATER_RARITY_PROFILES } from '../src/fishing/rarity-selection.js';
+import { deriveAcceptedBobberProfile, SELECTIVE_BOBBER_SETTINGS, sampleBobberBiteDelay } from '../src/fishing/selective-bobbers.js';
 import { AVATAR_ATTACHMENT_OVERLAP_EPSILON, validateAvatarAttachmentSpec } from '../src/player/character-model.js';
 import { EQUIPMENT_BY_ID } from '../src/progression/equipment.js';
 import { BLUEWATER_SIDE_SEAT_CONFIG, MAIN_ISLAND_DOCK_CONFIG } from '../src/world/mountain-v2.js';
@@ -96,8 +96,8 @@ test('selective bobbers are accessible and only modestly tilt catch quality', ()
     sampleBobberBiteDelay(SELECTIVE_BOBBER_SETTINGS.trophy, 1)
   ], [58.5, 91.5]);
   const normal = PHYSICAL_WATER_RARITY_PROFILES.ocean;
-  const selective = getRarityProfile({ rarityProfile: normal, bobberAcceptanceByRarity: SELECTIVE_BOBBER_SETTINGS.selective.acceptanceByRarity });
-  const trophy = getRarityProfile({ rarityProfile: normal, bobberAcceptanceByRarity: SELECTIVE_BOBBER_SETTINGS.trophy.acceptanceByRarity });
+  const selective = deriveAcceptedBobberProfile(normal, 'selective');
+  const trophy = deriveAcceptedBobberProfile(normal, 'trophy');
   assert.ok(selective.Common < normal.Common && trophy.Common < selective.Common);
   assert.ok(selective.Rare + selective.Legendary < .27);
   assert.ok(trophy.Rare + trophy.Legendary < .34);
