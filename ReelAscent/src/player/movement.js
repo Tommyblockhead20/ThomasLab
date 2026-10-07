@@ -321,7 +321,7 @@ export class PlayerInput {
       if (event.code === 'KeyN' && !event.repeat && isCheatsEnabled()) {
         this.debugFishQueued = 'easy';
       }
-      if (event.code === 'F10' && !event.repeat && isCheatsEnabled()) {
+      if (event.code === 'F10' && event.shiftKey && !event.repeat && isCheatsEnabled()) {
         this.debugFishQueued = 'hard';
       }
       this.held.add(event.code);

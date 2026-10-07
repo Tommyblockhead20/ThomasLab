@@ -30,6 +30,7 @@ select { width: 100%; }
 .brand { display: flex; gap: 11px; align-items: baseline; letter-spacing: .04em; }
 .brand strong { color: var(--accent); }
 .brand span { color: var(--muted); font-size: 12px; }
+.brand .source-indicator { color: var(--accent2); border: 1px solid #5c6540; border-radius: 999px; padding: 3px 7px; white-space: nowrap; cursor: help; }
 .top-actions { display: flex; gap: 6px; align-items:center; }
 .panel { overflow-y: auto; background: var(--panel); padding: 10px; }
 #left-panel { border-right: 1px solid var(--line); }

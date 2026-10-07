@@ -33,11 +33,11 @@ const PROFILES = Object.freeze({
   }),
   'library-island': Object.freeze({
     production: 'library-island-v2.scene.json + buildOceanIslandTerrainData(veiled-athenaeum)',
-    editor: 'same scene JSON + topology-only refined copy of the same terrain surface',
+    editor: 'same scene JSON + topology-refined terrain editing copy (terrain edits are not part of scene JSON export)',
     productionOnly: ['batched shelf books', 'fishing/ride interaction helpers'],
     editorOnly: ['individual editable book records', 'terrain authoring topology'],
     origin: 'scene local root at world-locations.js Veiled Athenaeum origin',
-    status: 'shared-authority'
+    status: 'shared-terrain'
   }),
   skyscraper: Object.freeze({
     production: 'world-locations.js Skyreach terrain + empire-state-building GLB',

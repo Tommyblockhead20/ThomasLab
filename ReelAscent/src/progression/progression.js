@@ -17,7 +17,7 @@ import { orderAndFilterSpecimens } from './specimen-order.js';
 import { serializeProgress, validateProgressImport } from './progress-transfer.js';
 import { normalizeAppearance } from '../player/appearance.js';
 import { BOAT_SHOP_ITEM, MAP_ITEM_BY_ID, MAP_ITEMS } from '../world/world-locations.js';
-import { COSMETIC_BY_ID, cosmeticUnlocked } from './cosmetics.js';
+import { COSMETIC_BY_ID, COSMETIC_CATALOG, cosmeticUnlocked } from './cosmetics.js';
 import { FISH_SPECIES, resolveSpecies } from '../fishing/fish-data.js';
 import { getDestinationAccess } from './destination-progression.js';
 
@@ -488,6 +488,25 @@ export class ProgressionSystem {
   }
 
   ownsBoat() { return this.saveSystem.data.boat?.owned === true; }
+
+  debugUnlockAllItems() {
+    // Explicit cheat-gated current-save grant. Do not synthesize purchases, catches,
+    // discoveries, currency earned, or badge events from these debug unlocks.
+    this.state.ownedEquipment = [...new Set([
+      ...this.state.ownedEquipment, ...EQUIPMENT_CATALOG.map((item) => item.id)
+    ])];
+    this.state.ownedItems = [...new Set([
+      ...this.state.ownedItems, ...MAP_ITEMS.map((item) => item.id)
+    ])];
+    this.state.ownedCosmetics = [...new Set([
+      ...this.state.ownedCosmetics, ...COSMETIC_CATALOG.map((item) => item.id)
+    ])];
+    if (!this.ownsBoat()) {
+      // Save normalization requires a nonzero timestamp for owned boats.
+      this.saveSystem.data.boat = { owned: true, purchasedAt: Date.now(), grandfathered: false };
+    }
+    this.commit();
+  }
 
   ownsWorldItem(itemId) {
     return this.state.ownedItems.includes(itemId);

@@ -362,6 +362,17 @@ export class Game {
         this.recordStatEvent('debug-money', { amount: 1000 }, false);
         this.hud.showToast?.(`+$1,000 • $${money}`);
         this.inventory.update();
+        return;
+      }
+      if (event.code === 'F10' && !event.shiftKey) {
+        event.preventDefault();
+        this.progression.debugUnlockAllItems();
+        this.hud.showToast?.('DEBUG • All items unlocked on this save', 3);
+        this.inventory.update();
+        this.appearanceMenu.update();
+        this.shopMenu.update();
+        this.mapMenu.update();
+        return;
       }
     };
     window.addEventListener('resize', this.onResize);

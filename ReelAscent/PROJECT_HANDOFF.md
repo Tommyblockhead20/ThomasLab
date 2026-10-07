@@ -1,3 +1,17 @@
+# REEL ASCENT — WORLD EDITOR / SUMMIT / DEBUG FOLLOW-UP (2026-10-06)
+
+- **Editor parity is source-specific, not a 1:1 gameplay clone.** Stoneveil reads the authored patch; Basalt now renders the same clean watertight terrain builder as gameplay. Other island editors share terrain generators and selected production references but omit runtime dressing/interactions. The Athenaeum uses the same scene JSON but refines its terrain topology for sculpting; its scene export does not yet promote terrain edits into gameplay. Skyreach references the same GLB. A small source badge in the editor header identifies the current world's relationship and gives details on hover.
+- **Basalt mismatch/spikes:** the editor previously rendered an obsolete open placeholder/cached multipart capture instead of its shared clean terrain; the cached capture could include intersecting shell pieces and spikes. The editor now draws only its current terrain, labels any local mesh that differs from the game core, and offers **Restore Current Game Mesh** with Undo. The game no longer publishes the obsolete browser capture. Existing editor autosaves are left intact; restoration is explicit.
+- **Library Undo:** history/checkpoints/autosave now store the full editor level, including terrain; the production scene-only serialization is used only for its export. One Undo no longer reconstructs the original terrain and erases sculpting.
+- **Benches:** click any multi-part bench to select the whole bench for shared transforms; Alt-click keeps individual-part editing. The Athenaeum editor bench backrest is now behind the player, matching gameplay. Benches remain separate authored parts for direct mesh/leg adjustment; other bench orientations were not globally rewritten.
+- **New shape:** Place Object/Platform offers a closed triangular wedge/prism with matching game render, static triangle-mesh collision, and editor walkthrough collision.
+- **Summit:** the generated top infill now matches the baked crown rim's 180 vertices, two-degree spacing, and exact 8 m radius, eliminating the old 72-segment wavy seam.
+- **Skyreach materials:** the game and editor no longer replace imported GLB materials with flat facade colors, and editor selection restores each original material. The current GLB has three materials but **no embedded image textures**; fully textured Blender appearance still requires a texture-bearing GLB export and appropriate UVs.
+- **Cheats:** after the existing F1 cheat enable, F10 grants all current-save equipment, world items, cosmetics, and boat without fabricating catches/earnings. Shift+F10 retains the hard debug fish shortcut.
+- **Validation:** current focused editor/progression tests pass, including a new terrain/history/shape/F10 regression file. The full legacy suite includes many stale version assertions and is not wholly green. Rebuild tracked `dist/` after source edits.
+
+---
+
 # REEL ASCENT v23.1 — BASALT / EDITOR VISUAL-PARITY HOTFIX
 
 Status (2026-10-02): the cave-island core, editor mesh repair, production-reference colors, benches, physical sign lettering, travel chart, Outfitter audit, and Field Note Binder follow-up are corrected on the current v23.1 tree. The game version, multiplayer protocol, and outer save schema are unchanged; nested progression schema is now 16 for the safe Binder migration described below.

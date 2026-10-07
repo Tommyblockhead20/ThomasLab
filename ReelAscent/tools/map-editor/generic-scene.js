@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import { TRIANGLE_PRISM_POSITIONS, TRIANGLE_PRISM_INDICES } from '../../src/world/triangle-prism.js';
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
 import { OCEAN_SURFACE_Y, SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes } from '../../src/world/mountain-v2.js';
 import { movingPlatformPose, normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runtime.js';
@@ -278,6 +279,24 @@ function createSphere(parent, name, position, radius, material) {
 }
 
 function createPrimitive(parent, name, type, position, size, material, rotation = {}, record = null) {
+  if (type === 'triangle-prism') {
+    const geometry = new pc.Geometry();
+    geometry.positions = [...TRIANGLE_PRISM_POSITIONS];
+    geometry.indices = [...TRIANGLE_PRISM_INDICES];
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(parent._app.graphicsDevice, geometry);
+    const entity = new pc.Entity(name);
+    entity._editorOwnedMeshes = [mesh];
+    entity._editorBaseMaterial = material;
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+    parent.addChild(entity);
+    entity.setLocalPosition(position.x, position.y, position.z);
+    entity.setLocalScale(size.x, size.y, size.z);
+    entity.setLocalEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+    if (record) Object.assign(entity, record);
+    return entity;
+  }
   const primitive = ['box', 'sphere', 'cylinder', 'cone', 'capsule'].includes(type) ? type : 'box';
   if (primitive === 'box') return createBox(parent, name, position, size, material, rotation, record);
   const entity = new pc.Entity(name);
@@ -311,45 +330,10 @@ function libraryBenchCollisionBoxes(item) {
   return [
     { center: { ...p }, size: { x: 2.05, y: .18, z: .5 }, rotation: { x: 0, y: yaw, z: 0 } },
     {
-      center: { x: p.x - Math.sin(rad) * .28, y: p.y + .48, z: p.z - Math.cos(rad) * .28 },
+      center: { x: p.x + Math.sin(rad) * .28, y: p.y + .48, z: p.z + Math.cos(rad) * .28 },
       size: { x: 2.05, y: .82, z: .18 }, rotation: { x: 0, y: yaw, z: 0 }
     }
   ];
-}
-
-function caveReferenceMesh(location) {
-  // Milestone-1 reference: keep the current island footprint and the same open-mouth concept
-  // visible without claiming that this is an authored replacement for buildOceanIsland().
-  const segments = 48;
-  const rings = [1.18, 1, .68, .2];
-  const heights = [-1.55, -.08, location.elevation + .06, location.elevation + .18];
-  const positions = [];
-  const indices = [];
-  for (let ring = 0; ring < rings.length; ring += 1) {
-    for (let segment = 0; segment < segments; segment += 1) {
-      const theta = segment / segments * Math.PI * 2;
-      positions.push(
-        Math.cos(theta) * location.radii.x * rings[ring],
-        heights[ring],
-        Math.sin(theta) * location.radii.z * rings[ring]
-      );
-    }
-  }
-  for (let ring = 0; ring < rings.length - 1; ring += 1) {
-    for (let segment = 0; segment < segments; segment += 1) {
-      const next = (segment + 1) % segments;
-      const centerDegrees = segment / segments * 360;
-      const delta = Math.abs(centerDegrees - location.angle) % 360;
-      const mouthDelta = Math.min(delta, 360 - delta);
-      if (ring >= 1 && mouthDelta < 16) continue;
-      const a = ring * segments + segment;
-      const b = ring * segments + next;
-      const c = (ring + 1) * segments + segment;
-      const d = (ring + 1) * segments + next;
-      indices.push(a, c, b, b, c, d);
-    }
-  }
-  return { positions, indices };
 }
 
 export class GenericWorldScene {
@@ -460,7 +444,7 @@ export class GenericWorldScene {
     this.collisionMode = 'normal';
     this.collisionEntries = [];
     this.workspaceDefinition = null;
-    this.basaltReferenceMode = 'both';
+    this.basaltReferenceMode = 'authored';
     // The exterior must be visible when the level first opens. Interior authors can
     // explicitly enable cutaway after selecting/placing an interior room.
     this.skyscraperInteriorMode = false;
@@ -521,7 +505,7 @@ export class GenericWorldScene {
 
   editableTerrainMesh() {
     const terrain = this.level?.terrain;
-    const supported = (this.world?.id === 'cave-fishing-island' && terrain?.mode === 'authored-mesh-candidate')
+    const supported = (this.world?.id === 'cave-fishing-island' && ['authored-mesh-candidate', 'authored-triangle-mesh'].includes(terrain?.mode))
       || (this.world?.id === 'pirate-island' && terrain?.mode === 'authored-triangle-mesh')
       || terrain?.mode === 'production-island-terrain';
     return supported && terrain?.positions?.length && terrain?.indices?.length ? terrain : null;
@@ -725,7 +709,7 @@ export class GenericWorldScene {
         const node = stack.pop();
         stack.push(...(node.children ?? []));
         for (const mesh of node.render?.meshInstances ?? []) {
-          const base = node._editorBaseMaterial
+          const base = mesh._editorBaseMaterial || node._editorBaseMaterial
             || (entity.editorKind === 'water-v2' ? this.materials.water
               : entity.editorKind === 'waypoint' ? this.materials.path
                 : (node.editorKind === 'moving-platform' || entity.editorKind === 'moving-platform')
@@ -841,10 +825,11 @@ export class GenericWorldScene {
       }
       for (const component of renderComponents) {
         for (const meshInstance of component.meshInstances ?? []) {
-          const sourceName = String(meshInstance.material?.name || '').toLowerCase();
-          meshInstance.material = sourceName.includes('light') ? this.materials.skyreachAccent : this.materials.skyreachFacade;
+          meshInstance._editorBaseMaterial = meshInstance.material;
         }
       }
+      // Preserve the GLB's facade, window, and emissive-light materials. Replacing them
+      // with two flat editor colors erased the only surface detail in this asset.
       const placement = new pc.Entity('ESB reference — SonnySee CC BY 3.0');
       placement.addChild(imported);
       this.referenceRoot.addChild(placement);
@@ -885,24 +870,13 @@ export class GenericWorldScene {
   }
 
   buildCaveReference() {
-    const location = SMALL_ISLAND_LOCATIONS.find((item) => item.id === 'cave-fishing-island');
-    if (!location) return;
-    const candidate = this.level?.terrain?.mode === 'authored-mesh-candidate' ? this.level.terrain : null;
-    if (this.basaltReferenceMode !== 'authored') {
-      const data = caveReferenceMesh(location);
-      this.buildMeshEntity('Basalt Hollow procedural reference', data.positions, data.indices, this.materials.reference, this.referenceRoot);
-    }
-    if (candidate?.positions?.length && candidate?.indices?.length && this.basaltReferenceMode !== 'procedural') {
-      const entity = this.buildMeshEntity('Basalt Hollow frozen production candidate', candidate.positions, candidate.indices, this.materials.referenceGlass, this.referenceRoot);
-      this.registerSelectable(entity, { id: '__basalt-authored-terrain', kind: 'terrain-mesh', record: candidate });
-    }
-    // Until candidate promotion, walkthrough collision intentionally remains the conservative
-    // procedural reference. The candidate is visual comparison data, not a silent production switch.
-    this.referenceCollisionBoxes.push({
-      center: { x: 0, y: location.elevation - .05, z: 0 },
-      size: { x: location.radii.x * 1.75, y: .3, z: location.radii.z * 1.75 },
-      kind: 'island-reference', id: '__basalt-reference-floor'
-    });
+    const terrain = this.editableTerrainMesh();
+    if (!terrain) return;
+    // The former comparison view drew an obsolete open procedural shell over the current
+    // watertight game core. Its overlapping triangles looked like holes and long spikes.
+    const entity = this.buildMeshEntity('Basalt Hollow current editor terrain', terrain.positions,
+      terrain.indices, this.materials.productionIslandRock, this.referenceRoot);
+    this.registerSelectable(entity, { id: '__basalt-authored-terrain', kind: 'terrain-mesh', record: terrain });
   }
 
   buildMeshEntity(name, positions, indices, material, parent) {
@@ -1034,7 +1008,7 @@ export class GenericWorldScene {
       entity.setLocalEulerAngles(0, item.transform.rotation.y ?? 0, 0);
       const material = this.materialForRecord(item);
       createBox(entity, `${item.name} seat`, { x: 0, y: 0, z: 0 }, { x: 2.05, y: .18, z: .5 }, material);
-      createBox(entity, `${item.name} back`, { x: 0, y: .48, z: -.28 }, { x: 2.05, y: .82, z: .18 }, material);
+      createBox(entity, `${item.name} back`, { x: 0, y: .48, z: .28 }, { x: 2.05, y: .82, z: .18 }, material);
       this.objectRoot.addChild(entity);
       Object.assign(entity, { editorKind: kind, editorRecord: item, editorId: item.id });
     } else if (sourceKind === 'light' || sourceKind === 'marker') {
@@ -1388,6 +1362,7 @@ export class GenericWorldScene {
     const boxes = this.referenceCollisionBoxes.map((box) => ({ ...clone(box), moving: false }));
     for (const item of this.level.objects ?? []) {
       if (item.visible === false || item.collision === false) continue;
+      if (item.type === 'triangle-prism' || item.metadata?.authoredPrimitive === 'triangle-prism') continue;
       if (item.metadata?.librarySourceKind === 'bench') {
         for (const [index, box] of libraryBenchCollisionBoxes(item).entries()) {
           boxes.push({ ...box, id: `${item.id}/${index ? 'back' : 'seat'}`, moving: false });
@@ -1401,6 +1376,7 @@ export class GenericWorldScene {
       boxes.push({ center: movingPlatformPose(item, this.elapsedSeconds), size: clone(item.size), rotation: clone(item.transform.rotation), id: item.id, moving: true, definition: item });
     }
     for (const entry of this.prefabCollisionEntries) {
+      if (entry.record?.type === 'triangle-prism' || entry.record?.metadata?.authoredPrimitive === 'triangle-prism') continue;
       entry.entity.syncHierarchy();
       const position = entry.entity.getPosition();
       const scale = entry.entity.getScale();
@@ -1414,6 +1390,22 @@ export class GenericWorldScene {
       });
     }
     return boxes;
+  }
+
+  getWalkthroughPrisms() {
+    const result = [];
+    for (const item of this.level.objects ?? []) {
+      if (item.visible === false || item.collision === false
+        || (item.type !== 'triangle-prism' && item.metadata?.authoredPrimitive !== 'triangle-prism')) continue;
+      const entity = this.entities.get(String(item.id));
+      if (entity) result.push(entity);
+    }
+    for (const entry of this.prefabCollisionEntries) {
+      if (entry.record?.type === 'triangle-prism' || entry.record?.metadata?.authoredPrimitive === 'triangle-prism') {
+        result.push(entry.entity);
+      }
+    }
+    return result;
   }
 
   selectedRecord(id) {

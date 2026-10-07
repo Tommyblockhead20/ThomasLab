@@ -42,7 +42,9 @@ import { SKYSCRAPER_ROOM_LIBRARY, getRoomLibraryTemplate, makeRoomLibraryDefinit
 import { PIRATE_ASSET_LIBRARY, getPirateAsset, makePirateAssetDefinition } from './pirate-library.js';
 import { ensurePirateIslandTerrain } from './pirate-terrain.js';
 import { ensureProductionIslandTerrain, makeCleanCaveEditorLevel, makeProductionIslandEditorLevel } from './production-island-adapter.js';
-import { buildWorldParityDiagnostic } from './world-parity.js';
+import { buildCleanBasaltTerrainLocal } from '../../src/world/cave-island-v23.js';
+import { TRIANGLE_PRISM_POSITIONS, TRIANGLE_PRISM_INDICES } from '../../src/world/triangle-prism.js';
+import { buildWorldParityDiagnostic, worldParityProfile } from './world-parity.js';
 import { assetsForWorld, getV3Asset } from './asset-library-v3.js';
 import { attachEditorSignText, editableSignText, supportsEditableSignText } from './sign-text.js';
 import { historyCommandForKey } from './history-shortcuts.js';
@@ -227,6 +229,28 @@ function setObjectSelection(target, mode = 'replace') {
   selectedItems = updateObjectSelection(currentObjectSelection(), target, mode);
   selected = selectedItems.at(-1) ?? null;
   if (selected?.kind === 'water-path-node') selectedWaterPathNode = Number(selected.id.split(':').at(-1));
+  syncGenericSelectionVisuals();
+}
+
+function setBenchSelection(target, { individual = false, toggle = false } = {}) {
+  const record = target && genericScene?.selectedRecord(target.id);
+  const benchId = !individual && record?.metadata?.benchId;
+  if (!benchId || !['world-object', 'prefab-child-object'].includes(target.kind)) {
+    setObjectSelection(target, toggle ? 'toggle' : 'replace');
+    return;
+  }
+  const owner = prefabWorkspace.active ? activePrefabDefinition(activeGenericLevel()) : activeGenericLevel();
+  const parts = (owner?.objects ?? []).filter((item) => item.metadata?.benchId === benchId);
+  if (parts.length < 2) {
+    setObjectSelection(target, toggle ? 'toggle' : 'replace');
+    return;
+  }
+  if (!toggle) selectedItems = [];
+  const kind = target.kind;
+  for (const part of parts) {
+    selectedItems = updateObjectSelection(selectedItems, { kind, id: part.id }, toggle ? 'toggle' : 'add');
+  }
+  selected = selectedItems.find((item) => item.id === target.id) ?? selectedItems.at(-1) ?? null;
   syncGenericSelectionVisuals();
 }
 
@@ -663,6 +687,27 @@ function buildWalkthroughPhysics(RAPIER, eyePosition) {
     ).setFriction(1).setRestitution(0);
     terrainCollider = world.createCollider(terrainDesc);
   } else {
+    const terrain = genericScene.editableTerrainMesh();
+    if (terrain?.positions?.length && terrain?.indices?.length) {
+      terrainCollider = world.createCollider(RAPIER.ColliderDesc.trimesh(
+        Float32Array.from(terrain.positions), Uint32Array.from(terrain.indices)
+      ).setFriction(1).setRestitution(0));
+    }
+    for (const entity of genericScene.getWalkthroughPrisms()) {
+      entity.syncHierarchy();
+      const matrix = entity.getWorldTransform();
+      const point = new pc.Vec3();
+      const positions = [];
+      for (let index = 0; index < TRIANGLE_PRISM_POSITIONS.length; index += 3) {
+        matrix.transformPoint(new pc.Vec3(
+          TRIANGLE_PRISM_POSITIONS[index], TRIANGLE_PRISM_POSITIONS[index + 1], TRIANGLE_PRISM_POSITIONS[index + 2]
+        ), point);
+        positions.push(point.x, point.y, point.z);
+      }
+      world.createCollider(RAPIER.ColliderDesc.trimesh(
+        Float32Array.from(positions), Uint32Array.from(TRIANGLE_PRISM_INDICES)
+      ).setFriction(1).setRestitution(0));
+    }
     for (const box of genericScene.getWalkthroughBoxes()) {
       const size = box.size ?? { x: 1, y: 1, z: 1 };
       const rotation = box.rotation ?? { x: 0, y: 0, z: 0 };
@@ -1783,9 +1828,13 @@ function nextId(prefix) {
 }
 
 function isLibraryWorld(worldId = activeWorldId) { return worldId === 'library-island'; }
+let sharedBasaltTerrain = null;
 
 function genericStoredPayload(level = activeGenericLevel(), worldId = activeWorldId) {
-  return isLibraryWorld(worldId) ? serializeLibrarySceneFromEditor(level) : level;
+  // Editor history, checkpoints, and autosaves must retain the editable terrain mesh.
+  // The production Athenaeum scene format contains architecture but no terrain vertices;
+  // serializing it here made one Undo reconstruct the original island and erase sculpting.
+  return level;
 }
 
 function loadGenericAutosave(worldId) {
@@ -1844,24 +1893,6 @@ function ensurePirateStarterComposition(level) {
   return level;
 }
 
-function hydrateCachedBasaltProductionTerrain(level) {
-  if (!level || level.worldId !== 'cave-fishing-island' || level.terrain?.mode === 'authored-mesh-candidate') return level;
-  try {
-    const freeze = JSON.parse(localStorage.getItem('reel-ascent:world-editor-v2:basalt-production-freeze') || 'null');
-    if (!freeze?.positions?.length || !freeze?.indices?.length || freeze.positions.length % 3 || freeze.indices.length % 3) return level;
-    const vertexCount = freeze.positions.length / 3;
-    if (!freeze.indices.every((index) => Number.isInteger(Number(index)) && Number(index) >= 0 && Number(index) < vertexCount)) return level;
-    level.terrain = {
-      mode: 'authored-mesh-candidate', format: freeze.format || 'triangle-mesh-v1', coordinateSpace: 'island-local',
-      positions: freeze.positions.map(Number), indices: freeze.indices.map(Number),
-      source: 'actual-production-capture', capturedAt: freeze.capturedAt,
-      parts: structuredClone(freeze.parts || []), metadata: structuredClone(freeze.metadata || {})
-    };
-    level.sourcePolicy = { ...level.sourcePolicy, terrain: 'authored-candidate' };
-    return level;
-  } catch { return level; }
-}
-
 function ensureBasaltEditorTerrain(level, world) {
   // v23 intentionally retires the captured procedural cave shell. Existing v23 edits are
   // preserved, while every older/bad Cave autosave is replaced once by the clean baseline.
@@ -1887,7 +1918,7 @@ async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
         ? ensureProductionIslandTerrain(autosave, world)
         : world.id === 'cave-fishing-island'
           ? ensureBasaltEditorTerrain(autosave, world)
-          : hydrateCachedBasaltProductionTerrain(autosave);
+          : autosave;
   }
   if (world.kind === 'production-island') return makeProductionIslandEditorLevel(world);
   const response = await fetch(world.dataUrl, { cache: 'no-store' });
@@ -1903,7 +1934,7 @@ async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
       ? ensureProductionIslandTerrain(level, world)
       : world.id === 'cave-fishing-island'
         ? ensureBasaltEditorTerrain(level, world)
-        : hydrateCachedBasaltProductionTerrain(level);
+    : level;
 }
 
 function persistGenericLevel(level = activeGenericLevel()) {
@@ -2062,10 +2093,7 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
     if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.metadata?.basaltCoreAutoRepairedAt) {
       persistGenericLevel(activeGenericLevel());
     }
-    if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate') {
-      genericScene.basaltReferenceMode = 'authored';
-      if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value = 'authored';
-    }
+    if (activeWorldId === 'cave-fishing-island') genericScene.basaltReferenceMode = 'authored';
     genericScene.setWorld(world, activeGenericLevel());
     genericScene.setEnabled(true);
     genericScene.setCollisionMode(currentCollisionMode());
@@ -2073,8 +2101,8 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
   if (!keepCamera) setWorldCameraDefaults(activeWorldId);
   syncWorldUi();
   rebuildAll();
-  if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.terrain?.mode !== 'authored-mesh-candidate') {
-    setStatus('Basalt production mesh unavailable. Open the normal game once to publish the exact multi-part freeze, then use Load Captured Production Mesh. The visible procedural reference is not production-authoritative.');
+  if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate') {
+    setStatus('Legacy Basalt candidate loaded. It may contain the obsolete spiky shell; use Restore Current Game Mesh to return to the shared watertight core.');
   } else setStatus(`${world.label} loaded. ${isStoneveilWorld() ? 'Legacy authored Stoneveil patch remains the production-safe source.' : 'Edits autosave independently for this world.'}`);
 }
 
@@ -3169,7 +3197,7 @@ function updateMeshAuthoringUi() {
   if (!mesh) {
     status.textContent = activeWorldId === 'pirate-island'
       ? 'Pirate Island authored terrain is unavailable; reload project data.'
-      : 'Load the captured Basalt production mesh to use topology tools.';
+      : 'No editable terrain mesh is loaded.';
     for (const id of ['#mesh-apply-move','#mesh-create-face','#mesh-delete-faces','#mesh-fill-hole','#mesh-seal-terrain','#mesh-bridge','#mesh-flip-faces','#mesh-flatten','#mesh-inflate','#mesh-deflate','#mesh-subdivide','#mesh-weld','#mesh-merge-nearby','#mesh-recalculate-normals']) {
       const button = $(id); if (button) button.disabled = true;
     }
@@ -3304,7 +3332,7 @@ function selectBasaltMeshElement(event, ray) {
 function mutateBasaltMesh(operation, successMessage) {
   const current = activeGenericLevel()?.terrain;
   if (!['authored-mesh-candidate', 'authored-triangle-mesh', 'production-island-terrain'].includes(current?.mode)) {
-    setStatus(activeWorldId === 'pirate-island' ? 'Reload the Pirate Island authored terrain first.' : 'Load the captured Basalt production mesh first.');
+    setStatus(`Reload ${activeWorld().label} project terrain first.`);
     return;
   }
   const originalMode = current.mode;
@@ -3413,7 +3441,7 @@ function applyGenericToolAt(event) {
       hit = hits[objectPickCycle.index];
     } else objectPickCycle = { signature: '', index: 0 };
     const target = hit ? { kind: hit.kind, id: String(hit.id), record: hit.record } : null;
-    setObjectSelection(target, event.shiftKey || event.ctrlKey || event.metaKey ? 'toggle' : 'replace');
+    setBenchSelection(target, { individual: event.altKey, toggle: event.shiftKey || event.ctrlKey || event.metaKey });
     renderUi();
     updateWaterPathUi();
     return;
@@ -3421,7 +3449,7 @@ function applyGenericToolAt(event) {
   if (genericScene.editableTerrainMesh() && ['raise', 'lower', 'smooth', 'indent', 'pull-core'].includes(tool)) {
     const hit = genericScene.terrainMeshHit(ray);
     if (!hit) {
-      setStatus(activeWorldId === 'pirate-island' ? 'Pirate Island terrain is unavailable; reload project data.' : 'Load the captured Basalt production mesh first, then sculpt the frozen candidate.');
+      setStatus(`${activeWorld().label} terrain is unavailable; reload project data.`);
       return;
     }
     const radius = Number($('#brush-radius')?.value) || 4;
@@ -3503,11 +3531,12 @@ function applyGenericToolAt(event) {
   const targetObjects = definition?.objects ?? level.objects;
   const targetMoving = definition?.movingPlatforms ?? level.movingPlatforms;
   if (tool === 'object' || tool === 'platform') {
+    const shape = $('#object-shape')?.value === 'triangle-prism' ? 'triangle-prism' : 'box';
     const prefix = tool === 'platform' ? 'PARKOUR' : 'OBJECT';
     const category = tool === 'platform' ? 'parkour' : 'decor';
     const id = definition ? nextPrefabChildId(definition, prefix) : nextStableId(level, prefix);
     const item = {
-      id, name: `${tool === 'platform' ? 'Parkour Platform' : 'World Object'} ${id.split('-').at(-1)}`, type: 'box', category,
+      id, name: `${shape === 'triangle-prism' ? 'Triangle Wedge' : tool === 'platform' ? 'Parkour Platform' : 'World Object'} ${id.split('-').at(-1)}`, type: shape, category,
       transform: { position, rotation: { x: 0, y: yaw, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
       size, collision: true, climbMaterial, visible: true,
       metadata: activeWorldId === 'skyscraper' && !prefabWorkspace.active
@@ -3515,7 +3544,7 @@ function applyGenericToolAt(event) {
         : isLibraryWorld()
           ? {
               librarySourceKind: definition ? 'prefab-part' : 'part', librarySourceId: id,
-              librarySourceHadId: true, materialKey: 'stone', materialRole: 'stone', authoredPrimitive: 'box'
+              librarySourceHadId: true, materialKey: 'stone', materialRole: 'stone', authoredPrimitive: shape
             }
           : {}
     };
@@ -3736,6 +3765,17 @@ function rebuildSelectionHelper() {
 
 function syncWorldUi() {
   const world = activeWorld();
+  const parity = worldParityProfile(world.id);
+  const parityLabel = $('#world-source-indicator');
+  if (parityLabel) {
+    parityLabel.textContent = ({
+      'shared-authority': 'Shared source',
+      'shared-terrain': 'Shared terrain',
+      'shared-reference': 'Shared reference',
+      'editor-only-future': 'Editor only'
+    })[parity.status] || 'Editor reference';
+    parityLabel.title = `Game: ${parity.production}\nEditor: ${parity.editor}\n${parity.origin}\nEditor changes are local until saved and integrated into game data.`;
+  }
   const selector = $('#world-selector');
   if (selector && selector.value !== world.id) selector.value = world.id;
   const stoneveil = isStoneveilWorld();
@@ -3755,8 +3795,15 @@ function syncWorldUi() {
   if ($('#create-prefab-foundation')) $('#create-prefab-foundation').hidden = !worldHasCapability(world.id, 'prefabs');
   if ($('#create-room-foundation')) $('#create-room-foundation').hidden = !worldHasCapability(world.id, 'rooms');
   if (world.id === 'cave-fishing-island' && $('#basalt-freeze-status')) {
-    const candidate=activeGenericLevel()?.terrain?.mode === 'authored-mesh-candidate' ? activeGenericLevel().terrain : null;
-    $('#basalt-freeze-status').textContent=candidate ? `Candidate: ${Math.floor((candidate.positions?.length||0)/3).toLocaleString()} verts / ${Math.floor((candidate.indices?.length||0)/3).toLocaleString()} triangles · comparison only.` : 'No frozen candidate imported.';
+    const terrain = activeGenericLevel()?.terrain;
+    const clean = sharedBasaltTerrain ??= buildCleanBasaltTerrainLocal();
+    const sameCore = terrain?.mode === 'authored-triangle-mesh'
+      && terrain.positions?.length === clean.positions.length && terrain.indices?.length === clean.indices.length
+      && terrain.positions.every((value, index) => Math.abs(value - clean.positions[index]) < 1e-6)
+      && terrain.indices.every((value, index) => value === clean.indices[index]);
+    $('#basalt-freeze-status').textContent = sameCore
+      ? `Matches current game core: ${Math.floor(terrain.positions.length / 3).toLocaleString()} vertices. Editor edits remain local until exported and integrated.`
+      : `Local terrain differs from the current game core (${Math.floor((terrain?.positions?.length || 0) / 3).toLocaleString()} vertices). It may be an older spiky capture or an intentional edit. Restore Current Game Mesh replaces it; Undo can bring it back this session.`;
   }
   $('#xray-core').closest('label').hidden = !stoneveil;
   $('#slope-toggle-wrap').hidden = !stoneveil;
@@ -5145,7 +5192,8 @@ function returnToHeightfield() {
 }
 
 async function savePatch() {
-  const data = isStoneveilWorld() ? patch : genericStoredPayload();
+  const data = isStoneveilWorld() ? patch : isLibraryWorld()
+    ? serializeLibrarySceneFromEditor(activeGenericLevel()) : genericStoredPayload();
   if (!data) return;
   data.updatedAt = new Date().toISOString();
   if (!isStoneveilWorld()) persistGenericLevel(activeGenericLevel());
@@ -5746,46 +5794,18 @@ function createTestRoom() {
 
 
 
-function importBasaltFreezeObject(raw, sourceLabel = 'production-freeze-import') {
-  if (activeWorldId !== 'cave-fishing-island') return;
-  const mesh = raw.terrain?.positions && raw.terrain?.indices ? raw.terrain : raw;
-  if (!Array.isArray(mesh.positions) || !Array.isArray(mesh.indices) || mesh.positions.length < 9 || mesh.indices.length < 3 || mesh.positions.length % 3 || mesh.indices.length % 3) {
-    throw new Error('Basalt freeze must contain triangle-mesh positions[] and indices[] arrays.');
-  }
-  if (!mesh.positions.every((v)=>Number.isFinite(Number(v))) || !mesh.indices.every((v)=>Number.isInteger(Number(v)) && Number(v)>=0)) {
-    throw new Error('Basalt freeze contains invalid/non-finite mesh values.');
-  }
-  const vertexCount=mesh.positions.length/3;
-  if (mesh.indices.some((index)=>index>=vertexCount)) throw new Error('Basalt freeze contains an out-of-range triangle index.');
-  let positions=mesh.positions.map(Number);
-  const coordinateSpace=String(mesh.coordinateSpace || raw.coordinateSpace || 'island-local');
-  const origin=mesh.origin || raw.origin || raw.worldOrigin || null;
-  if (coordinateSpace === 'world' && origin && Number.isFinite(Number(origin.x)) && Number.isFinite(Number(origin.z))) {
-    positions=positions.slice();
-    for(let i=0;i<positions.length;i+=3){ positions[i]-=Number(origin.x); positions[i+2]-=Number(origin.z); }
-  } else if (coordinateSpace === 'world') {
-    throw new Error('World-space Basalt freeze needs origin/worldOrigin so the editor can preserve the island-local authored frame.');
-  }
-  commitGeneric((draft)=>{
-    draft.terrain={ mode:'authored-mesh-candidate', format:mesh.format || 'triangle-mesh-v1', coordinateSpace:'island-local', positions, indices:mesh.indices.map(Number), source:sourceLabel, capturedAt:mesh.capturedAt || raw.capturedAt || new Date().toISOString(), parts: structuredClone(mesh.parts || raw.parts || []), metadata:{ ...(mesh.metadata||{}), originalCoordinateSpace:coordinateSpace } };
-    draft.sourcePolicy.terrain='authored-candidate';
-  });
-  genericScene.setBasaltReferenceMode('authored');
-  if ($('#basalt-reference-mode')) $('#basalt-reference-mode').value='authored';
-  const status=$('#basalt-freeze-status');
-  if(status) status.textContent=`Editable candidate: ${vertexCount.toLocaleString()} verts / ${(mesh.indices.length/3).toLocaleString()} triangles. Production still uses procedural terrain.`;
-  setStatus('Basalt production freeze loaded as an editable authored candidate. Raise/Lower/Smooth/Indent/Pull now edit the island/cave mesh itself; production is not switched yet.');
-}
-
 function loadCapturedBasaltFreeze() {
-  const raw = localStorage.getItem('reel-ascent:world-editor-v2:basalt-production-freeze');
-  if (!raw) throw new Error('No captured Basalt production mesh is cached yet. Open the normal game once with this update, then return to the editor and click this again.');
-  importBasaltFreezeObject(JSON.parse(raw), 'actual-production-capture');
-}
-
-async function importBasaltFreezeFile(file) {
   if (activeWorldId !== 'cave-fishing-island') return;
-  importBasaltFreezeObject(JSON.parse(await file.text()), 'production-freeze-file');
+  // The captured-cache key refers to a retired multi-part shell. Restore the same
+  // data-only core that the current game builds; Undo retains the prior editor mesh.
+  commitGeneric((draft) => {
+    draft.terrain = makeCleanCaveEditorLevel().terrain;
+    draft.sourcePolicy.terrain = 'authored';
+    draft.metadata.cleanCaveBaselineV23 = true;
+    draft.metadata.basaltCoreSealedV231 = true;
+  });
+  meshSelection = makeMeshSelection();
+  setStatus('Restored the exact shared Basalt game core. The previous editor mesh remains available through Undo until this tab closes.');
 }
 
 function renameSelectedRecord() {
@@ -5978,14 +5998,7 @@ function setupV21Ui() {
     for (const id of ['#group-delta-x','#group-delta-y','#group-delta-z']) if ($(id)) $(id).value = scaleMode ? '1' : '0';
     syncGenericSelectionVisuals();
   });
-  $('#basalt-reference-mode')?.addEventListener('change', (event) => genericScene.setBasaltReferenceMode(event.target.value));
   $('#load-basalt-capture')?.addEventListener('click', () => { try { loadCapturedBasaltFreeze(); } catch (error) { setStatus(error.message); } });
-  $('#import-basalt-freeze')?.addEventListener('click', () => $('#basalt-freeze-file')?.click());
-  $('#basalt-freeze-file')?.addEventListener('change', (event) => {
-    const file=event.target.files?.[0];
-    if(file) importBasaltFreezeFile(file).catch((error)=>setStatus(error.message));
-    event.target.value='';
-  });
 }
 
 // UI wiring
@@ -6002,7 +6015,7 @@ $$('#tool-grid button').forEach((button) => button.addEventListener('click', () 
   if (tool === 'connect-cave') caveConnectStart = null;
   rebuildSelectionHelper();
   $$('#tool-grid button').forEach((b) => b.classList.toggle('active', b === button));
-  if (activeWorldId === 'cave-fishing-island' && ['raise','lower','smooth','indent','pull-core'].includes(tool)) setStatus('Basalt terrain brush: this edits the frozen production candidate mesh itself. Load the captured production mesh first; production remains procedural until later promotion.');
+  if (activeWorldId === 'cave-fishing-island' && ['raise','lower','smooth','indent','pull-core'].includes(tool)) setStatus('Basalt terrain brush edits the visible shared-core copy. Save World Level to export edits; the game keeps its current source mesh until integration.');
   else if (tool === 'indent' && isMeshMode()) setStatus('3D Indent: use a small brush and push the actual mesh inward. Repeat on the recessed back wall to extend a cave.');
   else if (tool === 'pull-core') setStatus(isMeshMode() ? 'Pull Core Out: pull the true mesh outward along its surface normal.' : 'Freeze Core to 3D Mesh first.');
   else if (tool === 'raise' && isMeshMode()) setStatus('3D Raise: moves the connected surface straight upward, not outward along its normal.');

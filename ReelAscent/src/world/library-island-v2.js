@@ -5,6 +5,7 @@ import { PLAYER_FOOT_OFFSET } from '../config.js';
 import { attachZoneEcology, ECOLOGY_TARGETS } from '../fishing/fish-ecology.js';
 import { FishingZone } from '../fishing/fishing-zone.js';
 import { normalizeWaterPath, waterPathPose } from '../../tools/map-editor/water-path-tools.js';
+import { TRIANGLE_PRISM_POSITIONS, TRIANGLE_PRISM_INDICES } from './triangle-prism.js';
 
 const finiteVec = (value, length = 3) => Array.isArray(value)
   && value.length >= length
@@ -76,6 +77,36 @@ function addScenePrimitive(world, parent, id, name, type, position, size, materi
   return entity;
 }
 
+function addTriangleScenePart(world, parent, id, name, position, size, material, rotation, solid) {
+  const geometry = new pc.Geometry();
+  geometry.positions = [...TRIANGLE_PRISM_POSITIONS];
+  geometry.indices = [...TRIANGLE_PRISM_INDICES];
+  geometry.calculateNormals();
+  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, geometry);
+  const entity = new pc.Entity(name);
+  entity.addComponent('render');
+  entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
+  parent.addChild(entity);
+  entity.setLocalPosition(...position);
+  entity.setLocalEulerAngles(...rotation);
+  entity.setLocalScale(...size);
+  entity.syncHierarchy();
+  entity.mapObjectId = id;
+  if (solid) {
+    const point = new pc.Vec3();
+    const matrix = entity.getWorldTransform();
+    const vertices = [];
+    for (let index = 0; index < TRIANGLE_PRISM_POSITIONS.length; index += 3) {
+      matrix.transformPoint(new pc.Vec3(...TRIANGLE_PRISM_POSITIONS.slice(index, index + 3)), point);
+      vertices.push(point.x, point.y, point.z);
+    }
+    entity.physicsCollider = world.physicsWorld.createCollider(world.RAPIER.ColliderDesc.trimesh(
+      Float32Array.from(vertices), Uint32Array.from(TRIANGLE_PRISM_INDICES)
+    ).setFriction(.9).setRestitution(0));
+  }
+  return entity;
+}
+
 function addPart(world, parent, part, materials, stablePrefix, instanceScale = [1, 1, 1], counters) {
   const rawPosition = finiteVec(part.position) ? part.position : [0, 0, 0];
   const rawSize = finiteVec(part.size) ? part.size : [1, 1, 1];
@@ -92,6 +123,9 @@ function addPart(world, parent, part, materials, stablePrefix, instanceScale = [
       { x: size[0], y: size[1], z: size[2] }, material,
       { x: rotation[0] ?? 0, y: rotation[1] ?? 0, z: rotation[2] ?? 0 }, part.solid !== false);
     entity.mapObjectId = partId;
+  } else if (part.type === 'triangle-prism') {
+    entity = addTriangleScenePart(world, parent, partId, name,
+      position, size, material, rotation, part.solid !== false);
   } else {
     const primitiveType = ['sphere', 'cylinder', 'cone', 'capsule'].includes(part.type) ? part.type : 'sphere';
     entity = addScenePrimitive(world, parent, partId, name, primitiveType,

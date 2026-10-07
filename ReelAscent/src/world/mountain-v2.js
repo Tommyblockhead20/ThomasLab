@@ -1525,7 +1525,6 @@ export class MountainWorld extends TestWorld {
     this.rockSupportAudit = this.auditSolidRockSupport();
     markStartup('world:rock-support-audit');
     this.buildFishingLocations();
-    this.publishBasaltProductionFreeze();
     markStartup('world:fishing-waters');
     this.indexMapDebugObjects();
     markStartup('world:debug-id-index');
@@ -1703,21 +1702,8 @@ export class MountainWorld extends TestWorld {
     this.buildTarget.addChild(group);
     this.locationLoadGroups.set(location.id, group);
     if (location.id === 'cave-fishing-island') {
-      this.basaltProductionFreeze = {
-        schema: 1,
-        kind: 'reel-ascent-basalt-production-freeze',
-        format: 'triangle-mesh-v1',
-        coordinateSpace: 'island-local',
-        origin: { x: location.worldPosition.x, y: 0, z: location.worldPosition.z },
-        positions: [],
-        indices: [],
-        parts: [],
-        capturedAt: new Date().toISOString()
-      };
-      // World Editor V2 authored objects use a stable island-local coordinate frame while the
-      // legacy island mesh itself is still generated in world coordinates. This bridge lets
-      // Basalt accumulate authored props/platforms now without claiming the approximate editor
-      // reference mesh is production-authoritative terrain.
+      // Authored objects use island-local coordinates. The shared clean terrain builder
+      // emits world-space vertices in production, so this root applies the island origin.
       const authoredRoot = new pc.Entity('Basalt Hollow World Editor V2 authored root');
       authoredRoot.setLocalPosition(location.worldPosition.x, 0, location.worldPosition.z);
       group.addChild(authoredRoot);
@@ -1871,60 +1857,12 @@ export class MountainWorld extends TestWorld {
     );
     this.islandEntities.set(location.id, entity);
     this.islandTerrainSurfaces.set(location.id, { vertices, triangles });
-    if (location.id === 'cave-fishing-island') {
-      this.appendBasaltProductionFreezePart('island-core', vertices, triangles);
-    }
     const previousTarget = this.buildTarget;
     this.buildTarget = group;
     this.decorateOceanIsland(location);
     this.buildTarget = previousTarget;
   }
 
-
-  appendBasaltProductionFreezePart(name, vertices, triangles) {
-    const freeze = this.basaltProductionFreeze;
-    if (!freeze || !Array.isArray(vertices) || !Array.isArray(triangles)) return;
-    const origin = freeze.origin ?? { x: 0, y: 0, z: 0 };
-    const base = freeze.positions.length / 3;
-    for (const vertex of vertices) {
-      freeze.positions.push(
-        Number(vertex[0]) - Number(origin.x || 0),
-        Number(vertex[1]) - Number(origin.y || 0),
-        Number(vertex[2]) - Number(origin.z || 0)
-      );
-    }
-    const triangleStart = freeze.indices.length / 3;
-    for (const triangle of triangles) {
-      freeze.indices.push(base + triangle[0], base + triangle[1], base + triangle[2]);
-    }
-    freeze.parts.push({
-      name: String(name || `part-${freeze.parts.length + 1}`),
-      firstVertex: base,
-      vertexCount: vertices.length,
-      firstTriangle: triangleStart,
-      triangleCount: triangles.length
-    });
-  }
-
-  publishBasaltProductionFreeze() {
-    const freeze = this.basaltProductionFreeze;
-    if (!freeze?.positions?.length || !freeze?.indices?.length) return;
-    freeze.capturedAt = new Date().toISOString();
-    freeze.metadata = {
-      source: 'actual-production-build',
-      includes: freeze.parts.map((part) => part.name),
-      vertexCount: freeze.positions.length / 3,
-      triangleCount: freeze.indices.length / 3
-    };
-    try {
-      localStorage.setItem('reel-ascent:world-editor-v2:basalt-production-freeze', JSON.stringify(freeze));
-    } catch (error) {
-      console.warn('[reel-ascent] Basalt production freeze could not be cached for the editor.', error);
-    }
-    if (typeof window !== 'undefined') {
-      window.__reelAscentBasaltProductionFreeze = freeze;
-    }
-  }
 
   addWorldEditorPrefabWater(parentRoot, instance, water) {
     if (!parentRoot || !water?.position || !water?.radii) return null;
@@ -2388,12 +2326,8 @@ export class MountainWorld extends TestWorld {
       for (const component of sourceBuilding.findComponents?.('render') ?? []) {
         component.castShadows = true;
         component.receiveShadows = true;
-        for (const meshInstance of component.meshInstances ?? []) {
-          const sourceName = String(meshInstance.material?.name || '').toLowerCase();
-          meshInstance.material = sourceName.includes('light')
-            ? this.materials.skyreachAccent
-            : this.materials.skyreachFacade;
-        }
+        // Keep the materials supplied by the GLB. The prior facade/accent replacement
+        // erased the authored window and emissive-light material separation.
       }
       visual.syncHierarchy();
 
@@ -5296,7 +5230,10 @@ export class MountainWorld extends TestWorld {
     // A subdivided shell lets the same proven aperture filter cut a localized Crown cave
     // mouth. The old two-triangle-tall wedges would have removed an entire face from base
     // to summit for one opening.
-    const segments = 72;
+    // The baked Crown terminates at exactly 180 rim vertices (2° spacing, radius 8 m).
+    // Match that boundary when generating the top. The old 72-point, wavy rim left
+    // visible wedges and unsupported slits between the authored wall and summit basin.
+    const segments = this.authoredStoneveilCoreActive ? 180 : 72;
     const sideRings = 13;
     const vertices = [];
     const sideRingStarts = [];
@@ -5307,7 +5244,8 @@ export class MountainWorld extends TestWorld {
         const angle = index * 360 / segments;
         const radians = degreesToRadians(angle);
         const baseRadius = CROWN_BASE_RADIUS * (1 + Math.sin(degreesToRadians(angle * 3 + 17)) * .035);
-        const summitRadius = CROWN_TOP_RADIUS * (1 + Math.sin(degreesToRadians(angle * 4 - 11)) * .035);
+        const summitRadius = this.authoredStoneveilCoreActive ? CROWN_TOP_RADIUS
+          : CROWN_TOP_RADIUS * (1 + Math.sin(degreesToRadians(angle * 4 - 11)) * .035);
         const radius = lerp(baseRadius, summitRadius, t);
         const bottomY = this.terrainY(angle, baseRadius) - 2.2;
         vertices.push([
@@ -6108,9 +6046,6 @@ export class MountainWorld extends TestWorld {
     // construction is deleted, not disabled or pushed deeper into the mountain.
     const addCaveMesh = (name, vertices, triangles, material, friction = .92) => {
       if (!vertices.length || !triangles.length) return null;
-      if (location.offshore === 'cave-fishing-island') {
-        this.appendBasaltProductionFreezePart(name, vertices, triangles);
-      }
       const geometry = new pc.Geometry();
       geometry.positions = [];
       geometry.indices = [];

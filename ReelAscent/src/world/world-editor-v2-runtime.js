@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import { TRIANGLE_PRISM_POSITIONS, TRIANGLE_PRISM_INDICES } from './triangle-prism.js';
 
 export const WORLD_EDITOR_LEVEL_SCHEMA = 2;
 export const WORLD_EDITOR_LEVEL_KIND = 'reel-ascent-world-level';
@@ -317,6 +318,39 @@ function registerClimb(world, entity, climbMaterial, label) {
 
 function addStaticObject(world, root, item) {
   if (item.visible === false) return null;
+  if (item.type === 'triangle-prism' || item.metadata?.authoredPrimitive === 'triangle-prism') {
+    const geometry = new pc.Geometry();
+    geometry.positions = [...TRIANGLE_PRISM_POSITIONS];
+    geometry.indices = [...TRIANGLE_PRISM_INDICES];
+    geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, geometry);
+    const entity = new pc.Entity(`WorldEditor ${item.name}`);
+    entity.addComponent('render');
+    entity.render.meshInstances = [new pc.MeshInstance(mesh, materialForObject(world, item), entity)];
+    root.addChild(entity);
+    entity.setLocalPosition(item.transform.position.x, item.transform.position.y, item.transform.position.z);
+    entity.setLocalEulerAngles(item.transform.rotation.x, item.transform.rotation.y, item.transform.rotation.z);
+    entity.setLocalScale(item.size.x, item.size.y, item.size.z);
+    entity.syncHierarchy();
+    if (item.collision) {
+      const matrix = entity.getWorldTransform();
+      const point = new pc.Vec3();
+      const worldPositions = [];
+      for (let index = 0; index < TRIANGLE_PRISM_POSITIONS.length; index += 3) {
+        matrix.transformPoint(new pc.Vec3(
+          TRIANGLE_PRISM_POSITIONS[index], TRIANGLE_PRISM_POSITIONS[index + 1], TRIANGLE_PRISM_POSITIONS[index + 2]
+        ), point);
+        worldPositions.push(point.x, point.y, point.z);
+      }
+      entity.physicsCollider = world.physicsWorld.createCollider(world.RAPIER.ColliderDesc.trimesh(
+        Float32Array.from(worldPositions), Uint32Array.from(TRIANGLE_PRISM_INDICES)
+      ).setFriction(.94).setRestitution(0));
+    }
+    entity.worldEditorId = item.id;
+    entity.worldEditorRecord = item;
+    registerClimb(world, entity, item.climbMaterial, item.name);
+    return entity;
+  }
   const rootScale = root.getScale?.() ?? { x: 1, y: 1, z: 1 };
   const colliderSize = {
     x: item.size.x * Math.abs(rootScale.x || 1),
