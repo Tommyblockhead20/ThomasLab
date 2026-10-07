@@ -72,6 +72,12 @@ test('v4.1 production island editor includes the cabin, shop, aquarium, and shor
   assert.ok(shopParts.length >= 60);
   assert.ok(shopParts.some((item) => item.name === 'Outfitter clerk body'));
   assert.ok(shopParts.some((item) => item.name === 'Fish Market buyer body'));
+  assert.equal(shopParts.filter((item) => item.metadata?.npcId === 'shop-outfitter-clerk').length, 8);
+  assert.equal(shopParts.filter((item) => item.metadata?.npcId === 'shop-fish-market-buyer').length, 8);
+  const oldShop = structuredClone(shop);
+  for (const npc of oldShop.objects.filter((item) => item.metadata?.npcId)) delete npc.metadata.npcId;
+  ensureProductionIslandTerrain(oldShop, 'shop-island');
+  assert.equal(oldShop.objects.filter((item) => item.metadata?.npcId === 'shop-outfitter-clerk').length, 8);
   assert.ok(shopParts.some((item) => item.name === 'Fish Market sardine display'));
   assert.equal(shop.objects.filter((item) => item.metadata?.benchId === 'shop-island-shore-bench').length, 4);
   assert.deepEqual(shopParts.filter((item) => item.metadata?.editableSign).map((item) => item.metadata.signText).sort(), ["BUY GEAR", "OUTFITTER'S REACH", "SELL CATCHES"]);
@@ -80,10 +86,15 @@ test('v4.1 production island editor includes the cabin, shop, aquarium, and shor
   assert.equal(aquarium.prefabs.instances.length, 0);
   assert.ok(aquariumParts.length >= 90);
   assert.equal(aquariumParts.filter((item) => item.metadata.materialKey === 'water').length, 10);
-  assert.equal(aquariumParts.filter((item) => item.metadata?.editableSign).length, 1);
+  assert.equal(aquariumParts.filter((item) => item.metadata?.editableSign).length, 2);
   assert.equal(aquarium.objects.filter((item) => item.metadata?.benchId === 'aquarium-island-shore-bench').length, 4);
   assert.equal(aquarium.objects.filter((item) => String(item.metadata?.benchId || '').startsWith('aquarium-visitor-bench-')).length, 18);
   assert.equal(aquarium.objects.filter((item) => /Aquarium garden flower/.test(item.name)).length, 18);
+  assert.equal(aquariumParts.filter((item) => /warm gallery light/.test(item.name)).length, 9);
+  assert.equal(aquariumParts.filter((item) => /garden planting/.test(item.name)).length, 14);
+  assert.equal(aquariumParts.filter((item) => /packed dock path \d+/.test(item.name)).length, 22);
+  assert.equal(aquariumParts.filter((item) => /path edging plant/.test(item.name)).length, 8);
+  assert.equal(aquariumParts.filter((item) => /Aquarium Tank \d+ \/ Habitat stone/.test(item.name)).length, 60);
   for (const entry of [...homeParts, ...shopParts, ...aquariumParts]) {
     for (const axis of ['x', 'y', 'z']) {
       assert.ok(Number.isFinite(entry.transform.position[axis]), `${entry.id} has a finite ${axis} position`);
@@ -187,7 +198,7 @@ test('v4.1 production seating mirrors every active island bench and its runtime-
     'shop-island': { parts: 4, yaw: 235, target: 'ocean' },
     'aquarium-island': { parts: 4, yaw: 175, target: 'ocean' },
     'cave-fishing-island': { parts: 4, yaw: 120, target: 'ocean' },
-    'normal-fishing-island': { parts: 4, yaw: -60, target: 'ocean' },
+    'normal-fishing-island': { parts: 4, yaw: -240, target: 'pond' },
     'cold-island': { parts: 4, yaw: -180, target: 'pond' }
   };
   for (const [worldId, expectation] of Object.entries(expected)) {
@@ -197,7 +208,52 @@ test('v4.1 production seating mirrors every active island bench and its runtime-
     assert.ok(parts.every((entry) => Math.abs(entry.metadata.facingYaw - expectation.yaw) < 1e-8));
     assert.ok(parts.every((entry) => entry.metadata.facesToward === expectation.target));
     assert.ok(parts.every((entry) => Number.isFinite(entry.transform.position.y)));
+    const seat = parts.find((entry) => entry.name.endsWith('seat'));
+    const back = parts.find((entry) => entry.name.endsWith('back'));
+    const yaw = expectation.yaw * Math.PI / 180;
+    const forward = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
+    const backOffset = {
+      x: back.transform.position.x - seat.transform.position.x,
+      z: back.transform.position.z - seat.transform.position.z
+    };
+    assert.ok(backOffset.x * forward.x + backOffset.z * forward.z < -.1,
+      `${worldId} backrest should be behind the seated player's forward direction`);
   }
   const mangrove = makeProductionIslandEditorLevel('normal-fishing-island');
   assert.equal(mangrove.objects.filter((entry) => entry.metadata?.benchId === 'mangrove-lagoon-fishing-log').length, 3);
+  const oldMangrove = structuredClone(mangrove);
+  const oldBench = oldMangrove.objects.filter((entry) => entry.metadata?.benchId === 'normal-fishing-island-shore-bench');
+  const oldSeat = oldBench.find((entry) => entry.name.endsWith('seat'));
+  const oldBack = oldBench.find((entry) => entry.name.endsWith('back'));
+  const oldOffset = { x: oldBack.transform.position.x - oldSeat.transform.position.x,
+    z: oldBack.transform.position.z - oldSeat.transform.position.z };
+  oldSeat.transform.position.x += 2;
+  oldBack.transform.position.x += 2;
+  for (const part of oldBench) { part.metadata.facesToward = 'ocean'; part.metadata.facingYaw += 180; part.transform.rotation.y += 180; }
+  ensureProductionIslandTerrain(oldMangrove, 'normal-fishing-island');
+  assert.equal(oldBench.every((entry) => entry.metadata.facesToward === 'pond'), true);
+  assert.equal(oldSeat.transform.position.x, mangrove.objects.find((entry) => entry.id === oldSeat.id).transform.position.x + 2);
+  assert.ok(Math.abs((oldBack.transform.position.x - oldSeat.transform.position.x) + oldOffset.x) < 1e-8);
+  assert.ok(Math.abs((oldBack.transform.position.z - oldSeat.transform.position.z) + oldOffset.z) < 1e-8);
+  const migratedBack = { ...oldBack.transform.position };
+  ensureProductionIslandTerrain(oldMangrove, 'normal-fishing-island');
+  assert.deepEqual(oldBack.transform.position, migratedBack);
+  assert.equal(mangrove.objects.filter((entry) => /Mangrove Cay mangrove .* climbable trunk/.test(entry.name)).length, 20);
+  assert.equal(mangrove.objects.filter((entry) => /Mangrove Lagoon reed/.test(entry.name)).length, 34);
+  assert.equal(mangrove.objects.filter((entry) => /Mangrove Cay tropical fern/.test(entry.name)).length, 96);
+  const frosthook = makeProductionIslandEditorLevel('cold-island');
+  assert.equal(frosthook.objects.filter((entry) => /Frosthook ice formation/.test(entry.name)).length, 12);
+  assert.equal(frosthook.objects.filter((entry) => /Frosthook shoreline ice floe/.test(entry.name)).length, 18);
+  assert.equal(frosthook.objects.filter((entry) => /Frosthook offshore slush plate/.test(entry.name)).length, 36);
+});
+
+test('v4.2 Skyreach building asset embeds the source UV facade texture', async () => {
+  const glb = await readFile(new URL('../public/assets/models/empire-state-building.glb', import.meta.url));
+  assert.equal(glb.toString('ascii', 0, 4), 'glTF');
+  const jsonLength = glb.readUInt32LE(12);
+  const gltf = JSON.parse(glb.toString('utf8', 20, 20 + jsonLength));
+  assert.ok(gltf.images?.length >= 1);
+  assert.ok(gltf.textures?.length >= 1);
+  assert.ok(gltf.materials?.some((material) => material.pbrMetallicRoughness?.baseColorTexture));
+  assert.ok(gltf.meshes?.some((mesh) => mesh.primitives?.some((primitive) => primitive.attributes?.TEXCOORD_0 !== undefined)));
 });

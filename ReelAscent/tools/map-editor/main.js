@@ -232,15 +232,15 @@ function setObjectSelection(target, mode = 'replace') {
   syncGenericSelectionVisuals();
 }
 
-function setBenchSelection(target, { individual = false, toggle = false } = {}) {
+function setGroupedSelection(target, { individual = false, toggle = false } = {}) {
   const record = target && genericScene?.selectedRecord(target.id);
-  const benchId = !individual && record?.metadata?.benchId;
-  if (!benchId || !['world-object', 'prefab-child-object'].includes(target.kind)) {
+  const groupId = !individual && (record?.metadata?.benchId || record?.metadata?.npcId);
+  if (!groupId || !['world-object', 'prefab-child-object'].includes(target.kind)) {
     setObjectSelection(target, toggle ? 'toggle' : 'replace');
     return;
   }
   const owner = prefabWorkspace.active ? activePrefabDefinition(activeGenericLevel()) : activeGenericLevel();
-  const parts = (owner?.objects ?? []).filter((item) => item.metadata?.benchId === benchId);
+  const parts = (owner?.objects ?? []).filter((item) => (item.metadata?.benchId || item.metadata?.npcId) === groupId);
   if (parts.length < 2) {
     setObjectSelection(target, toggle ? 'toggle' : 'replace');
     return;
@@ -3441,7 +3441,7 @@ function applyGenericToolAt(event) {
       hit = hits[objectPickCycle.index];
     } else objectPickCycle = { signature: '', index: 0 };
     const target = hit ? { kind: hit.kind, id: String(hit.id), record: hit.record } : null;
-    setBenchSelection(target, { individual: event.altKey, toggle: event.shiftKey || event.ctrlKey || event.metaKey });
+    setGroupedSelection(target, { individual: event.altKey, toggle: event.shiftKey || event.ctrlKey || event.metaKey });
     renderUi();
     updateWaterPathUi();
     return;
@@ -4351,7 +4351,7 @@ function renderOutliner() {
           if (!isStoneveilWorld() && event.shiftKey && outlinerSelectionAnchor) {
             setObjectSelectionRange(orderedSelectable, target, { additive: event.ctrlKey || event.metaKey });
           } else if (!isStoneveilWorld()) {
-            setObjectSelection(target, event.ctrlKey || event.metaKey ? 'toggle' : 'replace');
+            setGroupedSelection(target, { individual: event.altKey, toggle: event.ctrlKey || event.metaKey });
           } else selected=target;
           outlinerSelectionAnchor = item.id;
         }
@@ -6838,8 +6838,8 @@ async function initializeWorldEditorV2() {
     await switchWorld(activeWorldId, { keepCamera: activeWorldId === 'stoneveil-peak' });
     if (isStoneveilWorld()) {
       setStatus(compatibleRecoveryApplied
-        ? 'World Editor V4.1 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
-        : 'World Editor V4.1 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
+        ? 'World Editor V4.2 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
+        : 'World Editor V4.2 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
     }
   } catch (error) {
     console.error(error);

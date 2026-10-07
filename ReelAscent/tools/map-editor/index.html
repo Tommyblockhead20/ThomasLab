@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark" />
-  <title>Reel Ascent — World Editor V4.1</title>
+  <title>Reel Ascent — World Editor V4.2</title>
   <link rel="stylesheet" href="./editor.css" />
   <style>
     #walkthrough-hud {
@@ -29,7 +29,7 @@
     <header id="topbar">
       <div class="brand">
         <strong>REEL ASCENT</strong>
-        <span>WORLD EDITOR V4</span>
+        <span>WORLD EDITOR V4.2</span>
         <select id="world-selector" aria-label="World / scene"></select>
         <span id="world-source-indicator" class="source-indicator" title="The editor shows shared terrain or references; not every runtime detail is editable here.">Source</span>
       </div>
@@ -242,7 +242,7 @@
 
       <section id="generic-palette-section" hidden>
         <h2>Parkour / Object</h2>
-        <div class="compact-help">Click a bench part to select the whole bench. Alt-click picks one part.</div>
+        <div class="compact-help">Click a bench or NPC part to select its whole group. Alt-click picks one part.</div>
         <label>Object shape
           <select id="object-shape"><option value="box">Box</option><option value="triangle-prism">Triangle / wedge</option></select>
         </label>
@@ -298,10 +298,12 @@
       <canvas id="editor-canvas"></canvas>
       <div id="view-toolbar">
         <button data-view="perspective" class="active">Perspective</button>
-        <button id="orbit-view-surface" title="Set a stable orbit pivot from the viewport center or nearby surface">Orbit Around View / Surface</button>
-        <button id="frame-selected" title="Frame every selected object (F)">Frame Selected</button>
-        <button id="frame-world" title="Frame all visible authoring geometry">Frame World</button>
         <button id="walkthrough-toggle" title="First-person terrain playtest using the game's player capsule, gravity, jump and slope settings">Walkthrough</button>
+        <details class="toolbar-menu"><summary>Camera</summary><div class="toolbar-menu-popover">
+          <button id="orbit-view-surface" title="Set a stable orbit pivot from the viewport center or nearby surface">Orbit Around View / Surface</button>
+          <button id="frame-selected" title="Frame every selected object (F)">Frame Selected</button>
+          <button id="frame-world" title="Frame all visible authoring geometry">Frame World</button>
+        </div></details>
         <details class="toolbar-menu"><summary>Views</summary><div class="toolbar-menu-popover">
           <button data-view="top">Top</button>
           <button data-view="north">North Side</button>
@@ -309,8 +311,6 @@
         </div></details>
         <details class="toolbar-menu"><summary>Overlays</summary><div class="toolbar-menu-popover">
           <label><input id="show-waters" type="checkbox" checked /> Waters</label>
-          <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
-          <label id="slope-toggle-wrap" title="Classify the actual authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
           <label class="toolbar-select" title="Inspect the geometry the player actually collides with">Collision <select id="collision-mode"><option value="normal">Normal</option><option value="overlay">Visual + Collision</option><option value="collision-only">Collision Only</option><option value="selected">Selected Collision</option></select></label>
           <label title="Visualize the registered viewport picking bounds for authorable objects"><input id="show-picking-targets" type="checkbox" /> Picking targets</label>
           <label id="hide-library-books-wrap" title="Debug shelf frames and boards without books"><input id="hide-library-books" type="checkbox" /> Hide Books</label>
@@ -320,6 +320,10 @@
             <input id="minimum-brightness" type="range" min="35" max="85" step="5" value="55" />
           </label>
           <label id="existing-rocks-label" title="Import a runtime snapshot once, or bake it into the editor patch so it persists"><input id="show-snapshot-rocks" type="checkbox" checked disabled /> Existing rocks (import snapshot)</label>
+        </div></details>
+        <details class="toolbar-menu"><summary>Terrain diagnostics</summary><div class="toolbar-menu-popover">
+          <label title="Temporarily ghost the Stoneveil core and highlight cave waters"><input id="xray-core" type="checkbox" /> X-Ray Core</label>
+          <label id="slope-toggle-wrap" title="Classify authored Stoneveil triangles using live player movement thresholds"><input id="show-slope" type="checkbox" /> Slope diagnostic</label>
         </div></details>
       </div>
       <div id="box-selection-preview" hidden></div>

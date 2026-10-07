@@ -1,104 +1,44 @@
-"""Build the optional normalized fallback GLB; v17.5 uses the direct artist export."""
+"""Export the UV-textured building from the original packed Blender source.
 
-from pathlib import Path
+Run with Blender 2.83+:
+  blender -b third_party/empire-state-building/empire-state-building.blend \
+    --python scripts/export-empire-state-building.py -- OUTPUT.glb
+
+The original .blend is read-only; this changes only the in-memory shader graph so
+glTF can carry its image texture. The original Blender Mix Shader/Invert graph is
+not directly expressible as a glTF material.
+"""
 
 import bpy
+import sys
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_PATH = REPO_ROOT / "third_party" / "empire-state-building" / "empire-state-building-normalized-fallback.glb"
-
-
-def configure_principled_material(material, base_color, roughness, metallic, emission):
-    material.use_nodes = True
-    material.diffuse_color = (*base_color, 1.0)
-    material.blend_method = "OPAQUE"
-    material.use_screen_refraction = False
-    if hasattr(material, "show_transparent_back"):
-        material.show_transparent_back = False
-
-    # Rebuild the tiny node graph instead of mutating the source graph: the supplied
-    # materials contain additional emission nodes that otherwise keep winning export.
-    material.node_tree.nodes.clear()
-    output = material.node_tree.nodes.new("ShaderNodeOutputMaterial")
-    principled = material.node_tree.nodes.new("ShaderNodeBsdfPrincipled")
-    material.node_tree.links.new(principled.outputs["BSDF"], output.inputs["Surface"])
-    values = {
-        "Base Color": (*base_color, 1.0),
-        "Roughness": roughness,
-        "Metallic": metallic,
-        "Emission": (*emission, 1.0),
-        "Alpha": 1.0,
-    }
-    for name, value in values.items():
-        socket = principled.inputs.get(name)
-        if socket is not None:
-            socket.default_value = value
-
+output = sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv else None
+if not output:
+    raise RuntimeError("Provide an output .glb path after --")
 
 building = bpy.data.objects.get("ESB")
-if building is None:
-    raise RuntimeError("The supplied Blender file does not contain the expected ESB object")
+facade = bpy.data.images.get("UV_ESB_DAY.png")
+if building is None or facade is None or not facade.packed_file:
+    raise RuntimeError("The Blender source must contain ESB and its packed UV_ESB_DAY.png image")
+if not building.data.uv_layers:
+    raise RuntimeError("ESB has no UV map; exporting a texture would not be meaningful")
 
-# The source's two materials exported with no PBR base color and near-white emissive
-# output, which made the entire facade render as a washed-out ghost in PlayCanvas.
-windows = bpy.data.materials.get("windows")
-light = bpy.data.materials.get("light")
-if windows is None or light is None:
-    raise RuntimeError("The supplied ESB materials were not found")
+windows = bpy.data.materials["windows"]
+windows.use_nodes = True
+nodes = windows.node_tree.nodes
+nodes.clear()
+links = windows.node_tree.links
+output_node = nodes.new("ShaderNodeOutputMaterial")
+shader = nodes.new("ShaderNodeBsdfPrincipled")
+shader.inputs["Roughness"].default_value = 0.88
+texture = nodes.new("ShaderNodeTexImage")
+texture.image = facade
+links.new(texture.outputs["Color"], shader.inputs["Base Color"])
+links.new(shader.outputs["BSDF"], output_node.inputs["Surface"])
 
-# Bake the source object's non-uniform scale and offset into the complete original
-# mesh before export. PlayCanvas applies runtime scale to the instantiated root; leaving
-# Blender's transform on that same root meant runtime placement overwrote it, shrinking,
-# widening, and offsetting the actual architecture.
 bpy.ops.object.select_all(action="DESELECT")
 building.select_set(True)
 bpy.context.view_layer.objects.active = building
-bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-
-# Normalize the asset pivot from the complete mesh bounds: footprint center at X/Y zero,
-# lowest source vertex at Z zero. No vertices or faces are removed or simplified.
-minimum = [min(vertex.co[axis] for vertex in building.data.vertices) for axis in range(3)]
-maximum = [max(vertex.co[axis] for vertex in building.data.vertices) for axis in range(3)]
-center_x = (minimum[0] + maximum[0]) * 0.5
-center_y = (minimum[1] + maximum[1]) * 0.5
-base_z = minimum[2]
-for vertex in building.data.vertices:
-    vertex.co.x -= center_x
-    vertex.co.y -= center_y
-    vertex.co.z -= base_z
-building.data.update()
-
-configure_principled_material(
-    windows,
-    base_color=(0.25, 0.29, 0.31),
-    roughness=0.72,
-    metallic=0.06,
-    emission=(0.0, 0.0, 0.0),
-)
-configure_principled_material(
-    light,
-    base_color=(0.56, 0.44, 0.13),
-    roughness=0.48,
-    metallic=0.18,
-    emission=(0.035, 0.025, 0.004),
-)
-
-OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-bpy.ops.export_scene.gltf(
-    filepath=str(OUTPUT_PATH),
-    export_format="GLB",
-    use_selection=True,
-    export_apply=True,
-    export_materials=True,
-    export_texcoords=True,
-    export_normals=True,
-    export_colors=True,
-)
-dimensions = building.dimensions
-print(
-    "[reel-ascent] source-detail audit: "
-    f"{len(building.data.vertices)} vertices, {len(building.data.polygons)} polygons, "
-    f"bounds {dimensions.x:.6f} x {dimensions.y:.6f} x {dimensions.z:.6f}"
-)
-print(f"[reel-ascent] exported opaque Empire State Building to {OUTPUT_PATH}")
+bpy.ops.export_scene.gltf(filepath=output, export_format="GLB", use_selection=True)
+print("EXPORTED_TEXTURED_ESB", output, facade.name, tuple(facade.size))

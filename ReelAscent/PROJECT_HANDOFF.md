@@ -1,3 +1,14 @@
+# REEL ASCENT — WORLD EDITOR V4.2 / ISLAND DETAIL / SKYREACH TEXTURE FOLLOW-UP (2026-10-06)
+
+- **NPC editing:** the Outfitter clerk and Fish Market buyer now select/transform as whole assemblies from either the viewport or outliner; Alt-click selects an individual body part. Existing Old Man Fisher prefab instances were already single selectable assemblies.
+- **Bench direction:** the Mangrove inner-bank bench was configured to face the outer sea despite being on the lagoon side. Both game and editor now face it inward, and existing editor autosaves with the old direction are rotated in place without losing a moved bench. All five shore bench backrests are regression-checked against the seated facing direction.
+- **Missing island detail:** Mangrove's 20 climbable trees/root fans, reeds, ferns, logs, and ground cover; Frosthook's ice formations/floes/slush plates; and Glasswater's gallery lights, information boards, paths, gardens, and tank habitat detail are now represented by deterministic editor references. Glasswater tank occupancy and fish remain save-dependent game state, not static editor objects. These adapters still do not claim perfect 1:1 runtime interaction/lighting parity.
+- **Editor controls:** Camera orbit/frame actions are grouped in Camera; X-Ray Core and Slope Diagnostic are in Terrain diagnostics, not Overlays. The page title, brand, and startup status identify World Editor V4.2; game version is unchanged.
+- **Blender texture correction:** the supplied `.blend` *does* contain packed images and an ESB UV map. The previous direct GLB had zero embedded images/textures because Blender's Mix Shader/Invert material graph was not exported as a glTF base-color texture. `scripts/export-empire-state-building.py` now converts that in memory to a UV-textured Principled material; the game/editor GLB embeds `UV_ESB_DAY.png`. Source Blender file remains unchanged. The old night/mask shader effect is not reproduced, but the facade/window day artwork is present. The ESB node transform/geometry is preserved.
+- **Validation:** 20 focused editor/world tests pass; frontend build passes and tracked `dist/` is regenerated. Legacy `world-editor-v2-structure.test.js` has two pre-existing stale assertions (Stoneveil patch hash and removed Basalt production freeze behavior).
+
+---
+
 # REEL ASCENT — WORLD EDITOR / SUMMIT / DEBUG FOLLOW-UP (2026-10-06)
 
 - **Editor parity is source-specific, not a 1:1 gameplay clone.** Stoneveil reads the authored patch; Basalt now renders the same clean watertight terrain builder as gameplay. Other island editors share terrain generators and selected production references but omit runtime dressing/interactions. The Athenaeum uses the same scene JSON but refines its terrain topology for sculpting; its scene export does not yet promote terrain edits into gameplay. Skyreach references the same GLB. A small source badge in the editor header identifies the current world's relationship and gives details on hover.
@@ -6,7 +17,7 @@
 - **Benches:** click any multi-part bench to select the whole bench for shared transforms; Alt-click keeps individual-part editing. The Athenaeum editor bench backrest is now behind the player, matching gameplay. Benches remain separate authored parts for direct mesh/leg adjustment; other bench orientations were not globally rewritten.
 - **New shape:** Place Object/Platform offers a closed triangular wedge/prism with matching game render, static triangle-mesh collision, and editor walkthrough collision.
 - **Summit:** the generated top infill now matches the baked crown rim's 180 vertices, two-degree spacing, and exact 8 m radius, eliminating the old 72-segment wavy seam.
-- **Skyreach materials:** the game and editor no longer replace imported GLB materials with flat facade colors, and editor selection restores each original material. The current GLB has three materials but **no embedded image textures**; fully textured Blender appearance still requires a texture-bearing GLB export and appropriate UVs.
+- **Skyreach materials at that point:** the game and editor stopped replacing imported GLB materials with flat colors. The then-current GLB had no embedded textures; the V4.2 follow-up above corrects this from the packed Blender UV image.
 - **Cheats:** after the existing F1 cheat enable, F10 grants all current-save equipment, world items, cosmetics, and boat without fabricating catches/earnings. Shift+F10 retains the hard debug fish shortcut.
 - **Validation:** current focused editor/progression tests pass, including a new terrain/history/shape/F10 regression file. The full legacy suite includes many stale version assertions and is not wholly green. Rebuild tracked `dist/` after source edits.
 

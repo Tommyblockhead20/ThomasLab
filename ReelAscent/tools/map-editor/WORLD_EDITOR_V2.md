@@ -1,4 +1,4 @@
-# REEL ASCENT WORLD EDITOR V4
+# REEL ASCENT WORLD EDITOR V4.2
 
 ## V4 repair / integration pass
 
@@ -196,6 +196,8 @@ The current starter interiors are deliberately low-poly authored level geometry,
 Room/component material intent is stored as metadata and previewed with differentiated editor materials. The runtime bridge maps those material roles onto existing world materials when an exported Skyscraper level JSON is installed.
 
 ### Library Island / Veiled Athenaeum
+
+V4.2 adds grouped selection for production NPCs, corrects the Mangrove lagoon bench direction in gameplay and existing editor autosaves, and includes more deterministic Mangrove, Frosthook, and Glasswater scene detail. Camera commands are in the Camera menu; slope and core X-ray are under Terrain diagnostics. The supplied Skyreach Blender file had packed UV images; the current game/editor GLB now includes its day facade texture. The dynamic Aquarium fish/tank occupancy still follows save state and is not a static editor reference.
 
 `Library Island / Veiled Athenaeum` has independent state, autosave, generic objects/water/prefabs/rooms, walkthrough, collision inspection, and the exact production-generated island/coast/submerged-apron triangle mesh transformed into Athenaeum-local space. It is selectable and available to Mesh/Sculpt tools; no square work-pad substitute is created. Production architecture remains sourced from `library-island-v2.scene.json`.
 

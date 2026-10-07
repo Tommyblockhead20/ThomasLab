@@ -225,6 +225,7 @@ function shopDefinition() {
   add('Outfitter gear counter', { x: -2.2, y: .85, z: 1.4 }, { x: 3.35, y: 1.7, z: 1 }, 'trim');
   add('Fishmonger sales counter', { x: 2.2, y: .85, z: 1.4 }, { x: 3.35, y: 1.7, z: 1 }, 'wood');
   const addNpc = (prefix, localX, coatMaterial, hatMaterial) => {
+    const firstPart = objects.length;
     add(`${prefix} boots`, { x: localX, y: .28, z: -.9 }, { x: .72, y: .55, z: .55 }, 'dark', {}, false);
     add(`${prefix} body`, { x: localX, y: 1.22, z: -.9 }, { x: 1.05, y: 1.45, z: .65 }, coatMaterial, {}, false);
     add(`${prefix} head`, { x: localX, y: 2.25, z: -.9 }, { x: .68, y: .68, z: .62 }, 'accent', {}, false);
@@ -232,6 +233,10 @@ function shopDefinition() {
     add(`${prefix} hat crown`, { x: localX, y: 2.82, z: -.92 }, { x: .67, y: .34, z: .58 }, hatMaterial, {}, false);
     for (const side of [-1, 1]) add(`${prefix} eye ${side}`, { x: localX + side * .15, y: 2.32, z: -.575 }, { x: .075, y: .09, z: .045 }, 'dark', {}, false);
     add(`${prefix} nose`, { x: localX, y: 2.18, z: -.54 }, { x: .09, y: .14, z: .09 }, 'accent', {}, false);
+    for (const part of objects.slice(firstPart)) {
+      part.category = "Outfitter's Reach / NPCs";
+      Object.assign(part.metadata, { npcId: `shop-${prefix.toLowerCase().replaceAll(' ', '-')}`, componentName: prefix });
+    }
   };
   addNpc('Outfitter clerk', -2.2, 'fabric', 'accent');
   addNpc('Fish Market buyer', 2.2, 'water', 'dark');
@@ -330,6 +335,87 @@ function aquariumDefinition() {
       }
     }
   }
+  // Keep the original object IDs stable for existing editor saves. New production
+  // references use their own prefix and mirror the static gallery/tank details.
+  const detail = (name, position, size, material, rotation = {}, category = 'Glasswater Aquarium / Details', type = 'box') =>
+    addBox(objects, 'AQUARIUM-DETAIL', name, position, size, material, rotation, false, category, type);
+  for (let rib = -4; rib <= 4; rib += 1) detail(`Glasswater Aquarium warm gallery light ${rib + 5}`,
+    { x: rib * config.width / 10, y: config.waterlineY + 2.4, z: 0 }, { x: 1.05, y: .12, z: .28 }, 'light');
+  for (const x of [-config.width * .29, 0, config.width * .29]) {
+    detail(`Glasswater Aquarium information board ${x}`, { x, y: 1.55, z: 0 }, { x: 3.1, y: 1.65, z: .16 }, 'dark');
+    detail(`Glasswater Aquarium information face ${x}`, { x, y: 1.58, z: .1 }, { x: 2.7, y: 1.28, z: .06 }, 'accent');
+  }
+  for (const side of [-1, 1]) {
+    detail(`Glasswater ${side < 0 ? 'west' : 'east'} garden bed`,
+      { x: side * (config.width * .5 + 2.4), y: .18, z: 0 },
+      { x: 3.2, y: .36, z: config.depth - 4 }, 'stone');
+    for (let index = 0; index < 7; index += 1) detail(
+      `Glasswater ${side < 0 ? 'west' : 'east'} garden planting ${index + 1}`,
+      { x: side * (config.width * .5 + 2.4), y: .75, z: -15 + index * 5 },
+      { x: .35 + (index % 2) * .18, y: 1.1 + (index % 3) * .22, z: .35 },
+      'plant', { z: side * (6 + index) });
+  }
+  const aquariumLocation = SMALL_ISLAND_LOCATIONS.find((entry) => entry.id === 'aquarium-island');
+  const dockArrival = aquariumLocation?.dock?.arrivalPosition;
+  const dockDistance = dockArrival
+    ? Math.hypot(dockArrival.x - aquariumLocation.worldPosition.x, dockArrival.z - aquariumLocation.worldPosition.z)
+    : config.depth * .5 + 32;
+  const pathStartZ = config.depth * .5 + 3.4;
+  const pathEndZ = Math.max(pathStartZ + 12, dockDistance - 1.4);
+  const shorelineDistance = dockDistance + 3.1;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp01 = (value) => Math.max(0, Math.min(1, value));
+  const pathSurfaceY = (z) => {
+    const footprint = z / Math.max(1, shorelineDistance);
+    return footprint <= .68
+      ? lerp(aquariumLocation.elevation + .13, aquariumLocation.elevation + .06,
+        clamp01((footprint - .2) / .48))
+      : lerp(aquariumLocation.elevation + .06, OCEAN_SURFACE_Y - .16,
+        clamp01((footprint - .68) / .32));
+  };
+  const segmentLength = (pathEndZ - pathStartZ) / 21 + .18;
+  for (let index = 0; index < 22; index += 1) {
+    const pathZ = lerp(pathStartZ, pathEndZ, index / 21);
+    detail(`Glasswater packed dock path ${index + 1}`,
+      { x: Math.sin(index * 1.31) * .08, y: pathSurfaceY(pathZ) - config.floorY - .015, z: pathZ },
+      { x: 4.1 + index % 3 * .12, y: .04, z: segmentLength }, 'sand',
+      { y: index % 2 ? 1.2 : -1.2 });
+  }
+  for (const side of [-1, 1]) for (let index = 0; index < 4; index += 1) {
+    const pathZ = lerp(pathStartZ + 2, pathStartZ + (pathEndZ - pathStartZ) * .42, index / 3);
+    const height = .7 + index % 2 * .22;
+    detail(`Glasswater path edging plant ${side < 0 ? 'west' : 'east'} ${index + 1}`,
+      { x: side * (2.15 + index % 2 * .22), y: pathSurfaceY(pathZ) - config.floorY + height * .5, z: pathZ },
+      { x: .42 + index % 3 * .08, y: height, z: .42 }, 'plant',
+      { z: side * (5 + index * 2) }, 'cone');
+  }
+  const signY = pathSurfaceY(pathStartZ + 4.2) - config.floorY;
+  detail('Glasswater dock path sign post', { x: -2.9, y: signY + 1.05, z: pathStartZ + 4.2 },
+    { x: .18, y: 2.1, z: .18 }, 'wood');
+  detail('Glasswater dock path welcome sign', { x: -2.9, y: signY + 1.72, z: pathStartZ + 4.2 },
+    { x: 2.3, y: .8, z: .16 }, 'wood', { y: -4 });
+  Object.assign(objects.at(-1).metadata, { editableSign: true, signText: 'AQUARIUM' });
+  for (let index = 0; index < 10; index += 1) {
+    const centerX = (index % 5 - 2) * config.tankSpacingX;
+    const centerZ = Math.floor(index / 5) === 0 ? -config.tankRowZ : config.tankRowZ;
+    const category = `Aquarium Tank ${index + 1} / Habitat`;
+    const at = (x, y, z) => ({ x: centerX + x, y, z: centerZ + z });
+    detail(`${category} sand substrate`, at(0, config.waterFloorY, 0),
+      { x: config.tankWidth, y: .25, z: config.tankDepth }, 'sand', {}, category);
+    for (const side of [-1, 1]) detail(`${category} ${side < 0 ? 'left' : 'right'} structural frame`,
+      at(side * config.tankWidth * .5, glassCenterY, 0),
+      { x: .38, y: config.tankHeight + .55, z: .38 }, 'trim', {}, category);
+    for (let decor = 0; decor < 6; decor += 1) {
+      const decorX = -config.tankWidth * .31 + (decor % 3) * config.tankWidth * .31;
+      const decorZ = -4.7 + Math.floor(decor / 3) * 9.4;
+      detail(`${category} stone ${decor + 1}`, at(decorX, config.waterFloorY + .28, decorZ),
+        { x: 1.25 + (decor % 2) * .4, y: .58 + (decor % 3) * .18, z: 1.05 },
+        'stone', { x: decor * 7, y: decor * 29, z: decor % 2 ? 8 : -6 }, category);
+      detail(`${category} plant ${decor + 1}`, at(decorX + .7, config.waterFloorY + .85, decorZ - .35),
+        { x: .2, y: 1.55 + (decor % 3) * .38, z: .2 },
+        'plant', { z: decor % 2 ? 12 : -12 }, category, 'cone');
+    }
+  }
   return { id: 'PREFAB-PRODUCTION-GLASSWATER-AQUARIUM', name: 'Glasswater Aquarium — production reference', kind: 'building', version: 1, objects, movingPlatforms: [], waters: [], metadata: { productionReference: true, sourceBuilder: 'buildPublicAquarium', includesAllTankSlots: true } };
 }
 
@@ -391,7 +477,7 @@ const SHORE_BENCHES = Object.freeze({
   'shop-island': Object.freeze({ radial: 7.6, tangent: 8.8, towardCenter: false }),
   'aquarium-island': Object.freeze({ radial: 56, tangent: 24, towardCenter: false }),
   'cave-fishing-island': Object.freeze({ radial: 6.2, tangent: 8.3, towardCenter: false }),
-  'normal-fishing-island': Object.freeze({ radial: -9.4, tangent: -1.4, towardCenter: false }),
+  'normal-fishing-island': Object.freeze({ radial: -9.4, tangent: -1.4, towardCenter: true }),
   'cold-island': Object.freeze({ radial: 8.6, tangent: 1.8, towardCenter: true })
 });
 
@@ -501,6 +587,88 @@ function productionLandscapeReferences(location, data) {
   }
   addProductionShoreBench(objects, location, data);
   addMangroveFishingLog(objects, location);
+  // Add references after legacy objects so existing saved bench/log IDs do not shift.
+  // These are deterministic counterparts of decorateOceanIsland in mountain-v2.js.
+  const groundY = location.elevation + .18;
+  const detail = (prefix, name, position, size, material, rotation = {}, type = 'box', collision = false) =>
+    addBox(objects, prefix, name, position, size, material, rotation, collision,
+      `${location.displayName} Landscaping`, type);
+  if (location.id === 'normal-fishing-island') {
+    for (let index = 0; index < 20; index += 1) {
+      const theta = (index * 18 + 14) * Math.PI / 180;
+      const x = Math.cos(theta) * (11.1 + index % 3 * 1.15);
+      const z = Math.sin(theta) * (8.1 + index % 2 * 1.05);
+      const size = .68 + index % 3 * .08;
+      detail('MANGROVE-DETAIL', `Mangrove Cay mangrove ${index + 1} climbable trunk`,
+        { x, y: groundY + 1.3 * size, z }, { x: .58 * size, y: 2.6 * size, z: .58 * size },
+        'wood', {}, 'cylinder', true);
+      detail('MANGROVE-DETAIL', `Mangrove Cay mangrove ${index + 1} crown`,
+        { x, y: groundY + 3.45 * size, z }, { x: 2.1 * size, y: 1.7 * size, z: 2.1 * size },
+        'plant', {}, 'sphere');
+      for (const side of [-1, 1]) detail('MANGROVE-DETAIL', `Mangrove Cay root ${index + 1}-${side}`,
+        { x: x + Math.cos(theta + side * .75) * .6, y: groundY + .34, z: z + Math.sin(theta + side * .75) * .6 },
+        { x: .11, y: 1.25, z: .11 }, 'wood', { x: side * 20, y: index * 36, z: side * 48 }, 'cylinder');
+    }
+    for (let index = 0; index < 34; index += 1) {
+      const theta = index * Math.PI * 2 / 34;
+      detail('MANGROVE-DETAIL', `Mangrove Lagoon reed ${index + 1}`,
+        { x: Math.cos(theta) * 8.8, y: groundY + .33, z: Math.sin(theta) * 6.65 },
+        { x: .12, y: .95 + index % 4 * .16, z: .12 }, index % 3 ? 'plant' : 'dry-grass',
+        { z: index % 2 ? 5 : -5 }, 'cone');
+    }
+    for (let index = 0; index < 48; index += 1) {
+      const theta = (index * 137.5 + 9) * Math.PI / 180;
+      const distance = Math.max(9.25, 4.8 + index % 7 * 1.25);
+      const x = Math.cos(theta) * distance;
+      const z = Math.sin(theta) * distance * .76;
+      for (const side of [-1, 1]) detail('MANGROVE-DETAIL', `Mangrove Cay tropical fern ${index + 1}-${side}`,
+        { x: x + side * .22, y: groundY + .28, z },
+        { x: .36, y: .58 + index % 3 * .09, z: .11 }, index % 3 ? 'plant' : 'plant-dark',
+        { y: index * 31, z: side * 62 }, 'cone');
+    }
+    for (let index = 0; index < 6; index += 1) {
+      const theta = (index * 61 + 27) * Math.PI / 180;
+      detail('MANGROVE-DETAIL', `Mangrove Cay fallen jungle log ${index + 1}`,
+        { x: Math.cos(theta) * (7 + index % 3 * 2.1), y: groundY + .22,
+          z: Math.sin(theta) * (5.5 + index % 2 * 2) },
+        { x: .34, y: 3.1 + index % 2, z: .34 }, 'wood',
+        { x: 90, y: index * 37, z: 8 - index * 2 }, 'cylinder');
+    }
+    for (let index = 0; index < 18; index += 1) {
+      const theta = (index * 47 + 5) * Math.PI / 180;
+      detail('MANGROVE-DETAIL', `Mangrove Cay lush ground-cover mound ${index + 1}`,
+        { x: Math.cos(theta) * (9.2 + index % 5 * 1.05), y: groundY,
+          z: Math.sin(theta) * (6.8 + index % 4 * .72) },
+        { x: .85 + index % 3 * .18, y: .28, z: .7 }, index % 2 ? 'plant-dark' : 'plant', {}, 'sphere');
+    }
+  } else if (location.id === 'cold-island') {
+    for (let index = 0; index < 12; index += 1) {
+      const theta = (index * 29 + 8) * Math.PI / 180;
+      detail('FROSTHOOK-DETAIL', `Frosthook ice formation ${index + 1}`,
+        { x: Math.cos(theta) * (8 + index % 4 * 2), y: groundY + 1.15 + index % 3 * .35,
+          z: Math.sin(theta) * (7 + index % 3 * 2) },
+        { x: .65 + index % 3 * .22, y: 2.3 + index % 4 * .7, z: .65 },
+        'ice', { z: index % 2 ? 8 : -9 }, 'cone');
+    }
+    for (let index = 0; index < 18; index += 1) {
+      const theta = (index * 41 + 12) * Math.PI / 180;
+      const radius = 25 + index % 5 * 3.5;
+      detail('FROSTHOOK-DETAIL', `Frosthook shoreline ice floe ${index + 1}`,
+        { x: Math.cos(theta) * radius, y: OCEAN_SURFACE_Y + .08,
+          z: Math.sin(theta) * radius * .88 },
+        { x: 1.2 + index % 4 * .45, y: .11 + index % 2 * .04, z: .8 + index % 3 * .35 },
+        index % 3 ? 'ice' : 'snow', { y: index * 29, z: index % 2 ? 3 : -3 }, 'sphere');
+    }
+    for (let index = 0; index < 36; index += 1) {
+      const theta = (index * 137.5 + 6) * Math.PI / 180;
+      const radius = 38 + index % 9 * 13.5;
+      detail('FROSTHOOK-DETAIL', `Frosthook offshore slush plate ${index + 1}`,
+        { x: Math.cos(theta) * radius, y: OCEAN_SURFACE_Y + .035,
+          z: Math.sin(theta) * radius * .86 },
+        { x: 1.8 + index % 5 * .72, y: .035 + index % 2 * .012, z: .75 + index % 4 * .42 },
+        index % 5 === 0 ? 'snow' : 'ice', { y: index * 47, z: index % 2 ? 1.5 : -1.5 }, 'sphere');
+    }
+  }
   return objects;
 }
 
@@ -562,7 +730,7 @@ export function makeProductionIslandEditorLevel(worldOrId) {
     prefabs: { definitions: [], instances: [] }, rooms: [],
     metadata: {
       productionIslandAdapter: true, theme: location.theme, functions: [...location.functions],
-      globalOrigin: { ...location.worldPosition }, note: 'Terrain is exact production generator output. Procedural decorations remain runtime references until authored adapters are added.'
+      globalOrigin: { ...location.worldPosition }, note: 'Terrain is exact production generator output. Static island details have editor references; dynamic interactions and save-dependent aquarium occupants remain runtime-owned.'
     }
   }, { worldId, displayName: typeof worldOrId === 'string' ? location.displayName : (worldOrId?.label || location.displayName), runtimeLocationId: location.id });
 }
@@ -583,6 +751,30 @@ export function ensureProductionIslandTerrain(level, worldOrId) {
   for (const item of productionObjects) {
     const index = level.objects.findIndex((entry) => entry.id === item.id);
     if (index < 0) level.objects.push(item);
+    else if (item.metadata?.npcId) {
+      // Preserve edited NPC transforms but teach pre-V4.2 autosaves their assembly identity.
+      Object.assign(level.objects[index].metadata ??= {}, {
+        npcId: item.metadata.npcId, componentName: item.metadata.componentName
+      });
+      level.objects[index].category = item.category;
+    }
+  }
+  // Migrate the formerly reversed inner-bank bench in existing browser autosaves.
+  // Rotate in place rather than replacing the saved assembly, preserving a moved bench.
+  if (generated.runtimeLocationId === 'normal-fishing-island') {
+    const benchId = 'normal-fishing-island-shore-bench';
+    const parts = level.objects.filter((entry) => entry.metadata?.benchId === benchId);
+    const seat = parts.find((entry) => entry.name.endsWith('seat'));
+    const back = parts.find((entry) => entry.name.endsWith('back'));
+    if (seat && back && parts.some((entry) => entry.metadata?.facesToward === 'ocean')) {
+      back.transform.position.x = 2 * seat.transform.position.x - back.transform.position.x;
+      back.transform.position.z = 2 * seat.transform.position.z - back.transform.position.z;
+      for (const part of parts) {
+        part.transform.rotation.y -= 180;
+        part.metadata.facingYaw -= 180;
+        part.metadata.facesToward = 'pond';
+      }
+    }
   }
   level.prefabs ??= { definitions: [], instances: [] };
   const generatedProductionIds = new Set(productionObjects.map((item) => item.id));

@@ -2205,7 +2205,8 @@ export class MountainWorld extends TestWorld {
       // Near the ocean-facing landscaped edge, clear of the 104 m Aquarium footprint.
       'aquarium-island': { radial: 56, tangent: 24, towardCenter: false },
       'cave-fishing-island': { radial: 6.2, tangent: 8.3, towardCenter: false },
-      'normal-fishing-island': { radial: -9.4, tangent: -1.4, towardCenter: false },
+      // The bench is on the inner lagoon bank; face the lagoon, not the outer sea.
+      'normal-fishing-island': { radial: -9.4, tangent: -1.4, towardCenter: true },
       'cold-island': { radial: 8.6, tangent: 1.8, towardCenter: true }
     }[location.id];
     if (islandBench) this.buildAuthoredIslandBench(location, islandBench);
@@ -2308,9 +2309,8 @@ export class MountainWorld extends TestWorld {
         console.warn('[reel-ascent] The direct Skyreach GLB did not contain its authored ESB node.');
         return;
       }
-      // The artist's direct export also contains a Blender camera, sun, and 60×60 preview
-      // plane. Keep the ESB node and all of its authored mesh primitives/materials intact,
-      // while excluding only that unrelated presentation plane from the game world.
+      // Older artist exports included a preview plane, camera, and sun. The current
+      // texture-bearing export selects only ESB; retain this guard for older assets.
       const previewPlane = imported.findByName?.('Plane');
       if (previewPlane && previewPlane !== sourceBuilding) previewPlane.enabled = false;
 

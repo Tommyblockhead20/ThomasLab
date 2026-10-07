@@ -421,6 +421,9 @@ export class GenericWorldScene {
       productionIslandGrass: makeMaterial([.36, .53, .31]),
       productionIslandRock: makeMaterial([.47, .48, .45]),
       productionSnow: makeMaterial([.9, .92, .89]),
+      productionIce: makeMaterial([.67, .86, .91]),
+      productionDryGrass: makeMaterial([.68, .59, .3]),
+      productionShrubDark: makeMaterial([.17, .35, .22]),
       productionStone: makeMaterial([.58, .53, .43]),
       productionPlant: makeMaterial([.34, .48, .26])
     };
@@ -675,6 +678,11 @@ export class GenericWorldScene {
         fixture: this.materials.productionSnow,
         light: this.materials.productionCabinWarm,
         stone: this.materials.productionStone,
+        sand: this.materials.productionSand,
+        ice: this.materials.productionIce,
+        snow: this.materials.productionSnow,
+        'dry-grass': this.materials.productionDryGrass,
+        'plant-dark': this.materials.productionShrubDark,
         metal: this.materials.productionDeepRock,
         water: this.materials.productionShallowWater,
         plant: this.materials.productionPlant
