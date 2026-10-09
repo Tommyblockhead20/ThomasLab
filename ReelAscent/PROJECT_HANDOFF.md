@@ -1,3 +1,12 @@
+# REEL ASCENT — SHARED SATELLITE LANDSCAPE SOURCE FOLLOW-UP (2026-10-09)
+
+- **One static placement recipe:** `src/world/island-landscape-spec.js` now supplies deterministic tree, crate, flower, cave-rock, Mangrove foliage/log, and Frosthook ice descriptors to both `MountainWorld.decorateOceanIsland` and the editor's production-island adapter. The game still creates its own render/physics entities from those descriptors; the editor creates selectable references from the same positions, sizes, materials, and primitive choices. Cave rocks remain a marked editor sphere approximation of the game's fractured boulder mesh, not exact visual/collision parity.
+- **Island autosaves:** the production-island autosave load path now runs reference reconciliation (it previously skipped it), adding newly represented objects without discarding edited terrain or object transforms. Existing clean Basalt editor levels also receive the newly shared cave rocks once, without replacing their terrain. Only untouched aquarium flower references with the old twice-too-large dimensions are resized to game dimensions; manually resized flowers are preserved. The editor's object-size normalization now permits thin .035 m Frosthook slush plates rather than silently expanding them to .05 m.
+- **Remaining parity work:** cabin/shop/aquarium structure recipes and some game interactions are still separately implemented. The editor's exported browser JSON is not automatically consumed by production, and most main-mountain procedural rocks/trees have not been moved to this shared descriptor pipeline. Thus this is a concrete first unification layer, not a claim that all locations or saved edits are 1:1. Save-dependent aquarium fish remain runtime-owned.
+- **Validation:** 27 focused editor/world tests pass; `npm run build` passes and tracked `dist/` is regenerated. The broad legacy `npm test` still reports failures, including pre-existing stale Stoneveil patch-hash and obsolete Basalt-freeze assertions (see earlier sections), so it is not a clean all-suite signal.
+
+---
+
 # REEL ASCENT — WORLD EDITOR V4.2 / ISLAND DETAIL / SKYREACH TEXTURE FOLLOW-UP (2026-10-06)
 
 - **NPC editing:** the Outfitter clerk and Fish Market buyer now select/transform as whole assemblies from either the viewport or outliner; Alt-click selects an individual body part. Existing Old Man Fisher prefab instances were already single selectable assemblies.

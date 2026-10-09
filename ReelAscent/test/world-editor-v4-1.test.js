@@ -4,8 +4,10 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import SCENE from '../src/world/library-island-v2.scene.json' with { type: 'json' };
+import { islandLandscapeSpec } from '../src/world/island-landscape-spec.js';
+import { OCEAN_SURFACE_Y } from '../src/world/mountain-v2.js';
 import { stockLibraryScene } from '../src/world/library-shelf-stocking.js';
-import { SATELLITE_WORLD_LOCATIONS } from '../src/world/world-locations.js';
+import { SATELLITE_WORLD_LOCATIONS, SMALL_ISLAND_LOCATIONS } from '../src/world/world-locations.js';
 import { cutRectangularOpeningInBox, makeBookshelfPrefab } from '../tools/map-editor/architectural-tools.js';
 import { assetsForWorld } from '../tools/map-editor/asset-library-v3.js';
 import { adaptLibrarySceneToEditor, libraryProductionTerrain } from '../tools/map-editor/library-scene-adapter.js';
@@ -52,6 +54,41 @@ test('v4.1 exposes every physical production island while excluding the virtual 
   }
 });
 
+test('island landscape objects come from the same deterministic scene specification as gameplay', () => {
+  for (const id of ['home-island', 'shop-island', 'aquarium-island', 'cave-fishing-island', 'normal-fishing-island', 'cold-island']) {
+    const location = SMALL_ISLAND_LOCATIONS.find((candidate) => candidate.id === id);
+    const expected = islandLandscapeSpec(location, { oceanSurfaceY: OCEAN_SURFACE_Y });
+    const level = makeProductionIslandEditorLevel(id);
+    const actual = level.objects.filter((entry) => entry.metadata?.sharedIslandLandscape);
+    assert.equal(actual.length, expected.length, `${id} object count`);
+    for (const [index, descriptor] of expected.entries()) {
+      const reference = actual[index];
+      assert.equal(reference.name, descriptor.name);
+      assert.deepEqual(reference.transform.position, descriptor.position);
+      assert.deepEqual(reference.size, descriptor.size);
+      assert.equal(reference.metadata.materialKey, descriptor.materialKey);
+      assert.equal(reference.metadata.authoredPrimitive,
+        descriptor.primitive === 'mountain-boulder' ? 'sphere' : descriptor.primitive);
+      assert.equal(reference.collision, descriptor.collision);
+    }
+  }
+});
+
+test('production island autosave repair keeps edits and corrects only untouched oversized aquarium flowers', () => {
+  const level = makeProductionIslandEditorLevel('aquarium-island');
+  const flowers = level.objects.filter((entry) => entry.name.startsWith('Aquarium garden flower '));
+  const original = structuredClone(flowers[0].transform.position);
+  flowers[0].size = { x: .44, y: .64, z: .44 };
+  flowers[0].metadata.materialKey = 'accent';
+  flowers[1].size = { x: .7, y: .9, z: .7 };
+  flowers[0].transform.position.x += 2;
+  ensureProductionIslandTerrain(level, 'aquarium-island');
+  assert.deepEqual(flowers[0].size, { x: .22, y: .32, z: .22 });
+  assert.equal(flowers[0].transform.position.x, original.x + 2);
+  assert.equal(flowers[0].metadata.materialKey, 'flowers');
+  assert.deepEqual(flowers[1].size, { x: .7, y: .9, z: .7 });
+});
+
 test('v4.1 production island editor includes the cabin, shop, aquarium, and shoreline context', async () => {
   const home = makeProductionIslandEditorLevel('home-island');
   const shop = makeProductionIslandEditorLevel('shop-island');
@@ -63,7 +100,7 @@ test('v4.1 production island editor includes the cabin, shop, aquarium, and shor
   assert.equal(home.prefabs.instances.length, 0);
   assert.ok(homeParts.length >= 140);
   assert.equal(home.waters.find((entry) => entry.identity === 'hearthward-pond')?.identity, 'hearthward-pond');
-  assert.equal(home.objects.filter((item) => /Hearthward cozy tree/.test(item.name)).length, 18);
+  assert.equal(home.objects.filter((item) => /Hearthward Isle cozy tree/.test(item.name)).length, 18);
   assert.equal(home.objects.filter((item) => /dock pile/.test(item.name)).length, 4);
   assert.equal(homeParts.filter((item) => item.metadata?.benchId === 'hearthward-pond-bench').length, 4);
   assert.equal(homeParts.filter((item) => item.metadata?.editableSign).length, 1);

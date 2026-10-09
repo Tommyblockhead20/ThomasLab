@@ -1,4 +1,5 @@
 import { Quat, Vec3 } from 'playcanvas';
+import { islandLandscapeSpec } from '../../src/world/island-landscape-spec.js';
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
 import {
   buildOceanIslandTerrainData,
@@ -40,6 +41,15 @@ export function makeCleanCaveEditorLevel(worldOrId = 'cave-fishing-island') {
   const worldId = typeof worldOrId === 'string' ? worldOrId : worldOrId?.id;
   const objects = [];
   addProductionShoreBench(objects, location, buildCleanBasaltTerrainWorld(location));
+  for (const item of islandLandscapeSpec(location, { oceanSurfaceY: OCEAN_SURFACE_Y })) {
+    addBox(objects, 'BASALT-LANDSCAPE', item.name, item.position, item.size,
+      item.materialKey, item.rotation, item.collision, item.category,
+      item.primitive === 'mountain-boulder' ? 'sphere' : item.primitive);
+    Object.assign(objects.at(-1).metadata, {
+      sharedIslandLandscape: true, sharedLandscapeName: item.name,
+      visualApproximation: item.primitive === 'mountain-boulder'
+    });
+  }
   return normalizeWorldEditorLevel({
     schema: 2, kind: 'reel-ascent-world-level', worldId,
     displayName: typeof worldOrId === 'string' ? 'Cave Fishing Island / Basalt Grotto' : worldOrId.label,
@@ -56,6 +66,7 @@ export function makeCleanCaveEditorLevel(worldOrId = 'cave-fishing-island') {
     metadata: {
       cleanCaveBaselineV23: true, coordinateSpace: 'cave-island-local',
       basaltCoreSealedV231: true,
+      sharedCaveLandscapeV1: true,
       globalOrigin: { ...location.worldPosition },
       note: 'Shared watertight Basalt terrain used by production and editor. Runtime destination access remains unavailable.'
     }
@@ -547,128 +558,27 @@ function addMangroveFishingLog(objects, location) {
 
 function productionLandscapeReferences(location, data) {
   const objects = [];
-  if (location.id === 'home-island') {
-    const angle = HOME_CABIN_CONFIG.angle * Math.PI / 180;
-    const localToIsland = (localX, localZ) => ({
-      x: Math.sin(angle) * localX + Math.cos(angle) * localZ,
-      z: -Math.cos(angle) * localX + Math.sin(angle) * localZ
+  const spec = islandLandscapeSpec(location, { oceanSurfaceY: OCEAN_SURFACE_Y });
+  const prefix = {
+    'home-island': 'HOME-LANDSCAPE', 'shop-island': 'SHOP-LANDSCAPE',
+    'aquarium-island': 'AQUARIUM-LANDSCAPE', 'normal-fishing-island': 'MANGROVE-DETAIL',
+    'cold-island': 'FROSTHOOK-DETAIL'
+  }[location.id];
+  const append = (item) => {
+    addBox(objects, prefix, item.name, item.position, item.size, item.materialKey,
+      item.rotation, item.collision, item.category,
+      item.primitive === 'mountain-boulder' ? 'sphere' : item.primitive);
+    Object.assign(objects.at(-1).metadata, {
+      sharedIslandLandscape: true, sharedLandscapeName: item.name,
+      climbable: item.climbable, castShadows: item.castShadows,
+      visualApproximation: item.primitive === 'mountain-boulder'
     });
-    const pond = localToIsland(7.8, 8.25);
-    for (let index = 0; index < 9; index += 1) {
-      const theta = (index * 41 + 14) * Math.PI / 180;
-      let x = Math.cos(theta) * (10 + index % 3 * 2.2);
-      let z = Math.sin(theta) * (7 + index % 2 * 2.4);
-      const pondDistance = Math.hypot(x - pond.x, z - pond.z);
-      if (pondDistance < 6.2) {
-        const scale = 6.2 / Math.max(.01, pondDistance);
-        x = pond.x + (x - pond.x) * scale;
-        z = pond.z + (z - pond.z) * scale;
-      }
-      const size = .55 + index % 3 * .1;
-      addBox(objects, 'HOME-LANDSCAPE', `Hearthward cozy tree ${index + 1} climbable trunk`,
-        { x, y: location.elevation + .18 + 1.3 * size, z }, { x: .58 * size, y: 2.6 * size, z: .58 * size },
-        'wood', {}, true, 'Hearthward Landscaping', 'cylinder');
-      addBox(objects, 'HOME-LANDSCAPE', `Hearthward cozy tree ${index + 1} crown`,
-        { x, y: location.elevation + .18 + 3.45 * size, z },
-        { x: 2.1 * size, y: (index % 2 ? 1.7 : 3.4) * size, z: 2.1 * size },
-        'plant', {}, false, 'Hearthward Landscaping', index % 2 ? 'sphere' : 'cone');
-    }
-  } else if (location.id === 'shop-island') {
-    for (let index = 0; index < 6; index += 1) addBox(objects, 'SHOP-LANDSCAPE', `Shop cargo crate ${index + 1}`,
-      { x: -8 + (index % 3) * 2.1, y: location.elevation + .66, z: -4 + Math.floor(index / 3) * 2 },
-      { x: 1.45, y: .95, z: 1.45 }, 'wood', { y: index * 11 }, true, "Outfitter's Reach Landscaping");
-  } else if (location.id === 'aquarium-island') {
-    for (let index = 0; index < 18; index += 1) {
-      const theta = index * Math.PI * 2 / 18;
-      addBox(objects, 'AQUARIUM-LANDSCAPE', `Aquarium garden flower ${index + 1}`,
-        { x: Math.cos(theta) * 16, y: location.elevation + .42, z: Math.sin(theta) * 11 },
-        { x: .44, y: .64, z: .44 }, index % 2 ? 'accent' : 'plant', {}, false, 'Glasswater Landscaping', 'sphere');
-    }
-  }
+  };
+  // Preserve existing generated IDs around the previously authored bench/log records.
+  if (['home-island', 'shop-island', 'aquarium-island'].includes(location.id)) for (const item of spec) append(item);
   addProductionShoreBench(objects, location, data);
   addMangroveFishingLog(objects, location);
-  // Add references after legacy objects so existing saved bench/log IDs do not shift.
-  // These are deterministic counterparts of decorateOceanIsland in mountain-v2.js.
-  const groundY = location.elevation + .18;
-  const detail = (prefix, name, position, size, material, rotation = {}, type = 'box', collision = false) =>
-    addBox(objects, prefix, name, position, size, material, rotation, collision,
-      `${location.displayName} Landscaping`, type);
-  if (location.id === 'normal-fishing-island') {
-    for (let index = 0; index < 20; index += 1) {
-      const theta = (index * 18 + 14) * Math.PI / 180;
-      const x = Math.cos(theta) * (11.1 + index % 3 * 1.15);
-      const z = Math.sin(theta) * (8.1 + index % 2 * 1.05);
-      const size = .68 + index % 3 * .08;
-      detail('MANGROVE-DETAIL', `Mangrove Cay mangrove ${index + 1} climbable trunk`,
-        { x, y: groundY + 1.3 * size, z }, { x: .58 * size, y: 2.6 * size, z: .58 * size },
-        'wood', {}, 'cylinder', true);
-      detail('MANGROVE-DETAIL', `Mangrove Cay mangrove ${index + 1} crown`,
-        { x, y: groundY + 3.45 * size, z }, { x: 2.1 * size, y: 1.7 * size, z: 2.1 * size },
-        'plant', {}, 'sphere');
-      for (const side of [-1, 1]) detail('MANGROVE-DETAIL', `Mangrove Cay root ${index + 1}-${side}`,
-        { x: x + Math.cos(theta + side * .75) * .6, y: groundY + .34, z: z + Math.sin(theta + side * .75) * .6 },
-        { x: .11, y: 1.25, z: .11 }, 'wood', { x: side * 20, y: index * 36, z: side * 48 }, 'cylinder');
-    }
-    for (let index = 0; index < 34; index += 1) {
-      const theta = index * Math.PI * 2 / 34;
-      detail('MANGROVE-DETAIL', `Mangrove Lagoon reed ${index + 1}`,
-        { x: Math.cos(theta) * 8.8, y: groundY + .33, z: Math.sin(theta) * 6.65 },
-        { x: .12, y: .95 + index % 4 * .16, z: .12 }, index % 3 ? 'plant' : 'dry-grass',
-        { z: index % 2 ? 5 : -5 }, 'cone');
-    }
-    for (let index = 0; index < 48; index += 1) {
-      const theta = (index * 137.5 + 9) * Math.PI / 180;
-      const distance = Math.max(9.25, 4.8 + index % 7 * 1.25);
-      const x = Math.cos(theta) * distance;
-      const z = Math.sin(theta) * distance * .76;
-      for (const side of [-1, 1]) detail('MANGROVE-DETAIL', `Mangrove Cay tropical fern ${index + 1}-${side}`,
-        { x: x + side * .22, y: groundY + .28, z },
-        { x: .36, y: .58 + index % 3 * .09, z: .11 }, index % 3 ? 'plant' : 'plant-dark',
-        { y: index * 31, z: side * 62 }, 'cone');
-    }
-    for (let index = 0; index < 6; index += 1) {
-      const theta = (index * 61 + 27) * Math.PI / 180;
-      detail('MANGROVE-DETAIL', `Mangrove Cay fallen jungle log ${index + 1}`,
-        { x: Math.cos(theta) * (7 + index % 3 * 2.1), y: groundY + .22,
-          z: Math.sin(theta) * (5.5 + index % 2 * 2) },
-        { x: .34, y: 3.1 + index % 2, z: .34 }, 'wood',
-        { x: 90, y: index * 37, z: 8 - index * 2 }, 'cylinder');
-    }
-    for (let index = 0; index < 18; index += 1) {
-      const theta = (index * 47 + 5) * Math.PI / 180;
-      detail('MANGROVE-DETAIL', `Mangrove Cay lush ground-cover mound ${index + 1}`,
-        { x: Math.cos(theta) * (9.2 + index % 5 * 1.05), y: groundY,
-          z: Math.sin(theta) * (6.8 + index % 4 * .72) },
-        { x: .85 + index % 3 * .18, y: .28, z: .7 }, index % 2 ? 'plant-dark' : 'plant', {}, 'sphere');
-    }
-  } else if (location.id === 'cold-island') {
-    for (let index = 0; index < 12; index += 1) {
-      const theta = (index * 29 + 8) * Math.PI / 180;
-      detail('FROSTHOOK-DETAIL', `Frosthook ice formation ${index + 1}`,
-        { x: Math.cos(theta) * (8 + index % 4 * 2), y: groundY + 1.15 + index % 3 * .35,
-          z: Math.sin(theta) * (7 + index % 3 * 2) },
-        { x: .65 + index % 3 * .22, y: 2.3 + index % 4 * .7, z: .65 },
-        'ice', { z: index % 2 ? 8 : -9 }, 'cone');
-    }
-    for (let index = 0; index < 18; index += 1) {
-      const theta = (index * 41 + 12) * Math.PI / 180;
-      const radius = 25 + index % 5 * 3.5;
-      detail('FROSTHOOK-DETAIL', `Frosthook shoreline ice floe ${index + 1}`,
-        { x: Math.cos(theta) * radius, y: OCEAN_SURFACE_Y + .08,
-          z: Math.sin(theta) * radius * .88 },
-        { x: 1.2 + index % 4 * .45, y: .11 + index % 2 * .04, z: .8 + index % 3 * .35 },
-        index % 3 ? 'ice' : 'snow', { y: index * 29, z: index % 2 ? 3 : -3 }, 'sphere');
-    }
-    for (let index = 0; index < 36; index += 1) {
-      const theta = (index * 137.5 + 6) * Math.PI / 180;
-      const radius = 38 + index % 9 * 13.5;
-      detail('FROSTHOOK-DETAIL', `Frosthook offshore slush plate ${index + 1}`,
-        { x: Math.cos(theta) * radius, y: OCEAN_SURFACE_Y + .035,
-          z: Math.sin(theta) * radius * .86 },
-        { x: 1.8 + index % 5 * .72, y: .035 + index % 2 * .012, z: .75 + index % 4 * .42 },
-        index % 5 === 0 ? 'snow' : 'ice', { y: index * 47, z: index % 2 ? 1.5 : -1.5 }, 'sphere');
-    }
-  }
+  if (['normal-fishing-island', 'cold-island'].includes(location.id)) for (const item of spec) append(item);
   return objects;
 }
 
@@ -751,6 +661,23 @@ export function ensureProductionIslandTerrain(level, worldOrId) {
   for (const item of productionObjects) {
     const index = level.objects.findIndex((entry) => entry.id === item.id);
     if (index < 0) level.objects.push(item);
+    else if (item.metadata?.sharedIslandLandscape) {
+      const existing = level.objects[index];
+      Object.assign(existing.metadata ??= {}, {
+        sharedIslandLandscape: true,
+        sharedLandscapeName: item.name,
+        climbable: item.metadata.climbable,
+        castShadows: item.metadata.castShadows,
+        visualApproximation: item.metadata.visualApproximation
+      });
+      // The former editor-only flower references were twice the production size.
+      // Update only that exact untouched baseline; keep user-resized flowers intact.
+      if (item.name.startsWith('Aquarium garden flower ')
+        && existing.size?.x === .44 && existing.size?.y === .64 && existing.size?.z === .44) {
+        existing.size = { ...item.size };
+        existing.metadata.materialKey = item.metadata.materialKey;
+      }
+    }
     else if (item.metadata?.npcId) {
       // Preserve edited NPC transforms but teach pre-V4.2 autosaves their assembly identity.
       Object.assign(level.objects[index].metadata ??= {}, {

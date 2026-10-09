@@ -5,6 +5,7 @@ import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from '
 import { buildVeiledAthenaeumV2 } from './library-island-v2.js';
 import { updateVeiledAthenaeumRides } from './library-island-v2.js';
 import { buildCleanBasaltTerrainWorld } from './cave-island-v23.js';
+import { islandLandscapeSpec } from './island-landscape-spec.js';
 import { attachSignText } from './sign-text-renderer.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
@@ -2036,53 +2037,35 @@ export class MountainWorld extends TestWorld {
     this.buildTarget = previousTarget;
   }
 
+  addIslandLandscape(location) {
+    const origin = location.worldPosition;
+    for (const item of islandLandscapeSpec(location, { oceanSurfaceY: OCEAN_SURFACE_Y })) {
+      const position = { x: origin.x + item.position.x, y: item.position.y, z: origin.z + item.position.z };
+      const material = this.materials[item.materialKey];
+      if (!material) throw new Error(`Missing island landscape material: ${item.materialKey}`);
+      let entity;
+      if (item.primitive === 'mountain-boulder') {
+        entity = this.addMountainBoulder(item.name, position, item.size, material,
+          { ensureCoreContact: false, supportKind: 'satellite-island' });
+      } else if (item.primitive === 'box') {
+        entity = this.addBox(item.name, position, item.size, material, item.rotation, item.collision);
+      } else if (item.primitive === 'cylinder') {
+        entity = this.addCylinder(item.name, position, item.size, material, item.rotation, item.collision);
+      } else {
+        entity = this.createPrimitive(item.name, item.primitive, position, item.size, material,
+          item.rotation, { castShadows: item.castShadows });
+      }
+      if (item.climbable) this.registerClimbSurface(entity, entity.physicsCollider, 'rough', `${item.name.replace(/ climbable trunk$/, '')} trunk`);
+      if (entity?.render && !item.castShadows) entity.render.castShadows = false;
+    }
+  }
+
   decorateOceanIsland(location) {
     const { x, z } = location.worldPosition;
-    const y = location.elevation + .18;
     if (location.id === SKYREACH_TOWER_CONFIG.locationId) {
       this.buildSkyreachFoundation(location);
-    } else if (location.id === 'home-island') {
-      const pondCenter = radialPoint(HOME_CABIN_CONFIG.angle, HOME_CABIN_CONFIG.radius + 8.25,
-        location.elevation, -7.8);
-      for (let index = 0; index < 9; index += 1) {
-        const theta = (index * 41 + 14) * Math.PI / 180;
-        let treeX = x + Math.cos(theta) * (10 + index % 3 * 2.2);
-        let treeZ = z + Math.sin(theta) * (7 + index % 2 * 2.4);
-        // The old deterministic ring happened to put one trunk through the new pond.
-        // Move any future conflicting candidate radially outward instead of special-casing
-        // one tree index, so pond edits cannot silently regrow it in the water.
-        const pondDistance = Math.hypot(treeX - pondCenter.x, treeZ - pondCenter.z);
-        if (pondDistance < 6.2) {
-          const scale = 6.2 / Math.max(.01, pondDistance);
-          treeX = pondCenter.x + (treeX - pondCenter.x) * scale;
-          treeZ = pondCenter.z + (treeZ - pondCenter.z) * scale;
-        }
-        this.addIslandTree(`${location.displayName} cozy tree ${index + 1}`,
-          treeX, treeZ, y,
-          .55 + index % 3 * .1, index % 2 ? 'broadleaf' : 'conifer');
-      }
-    } else if (location.id === 'shop-island') {
-      for (let index = 0; index < 6; index += 1) this.addBox(`Shop cargo crate ${index + 1}`,
-        { x: x - 8 + (index % 3) * 2.1, y: y + .48, z: z - 4 + Math.floor(index / 3) * 2 },
-        { x: 1.45, y: .95, z: 1.45 }, this.materials.wood, { y: index * 11 });
-    } else if (location.id === 'aquarium-island') {
-      for (let index = 0; index < 18; index += 1) {
-        const theta = index * Math.PI * 2 / 18;
-        this.createPrimitive(`Aquarium garden flower ${index + 1}`, 'sphere',
-          { x: x + Math.cos(theta) * 16, y: y + .24, z: z + Math.sin(theta) * 11 },
-          { x: .22, y: .32, z: .22 }, index % 2 ? this.materials.flowerPink : this.materials.flowers,
-          {}, { castShadows: false });
-      }
-    } else if (location.id === 'cave-fishing-island') {
-      for (let index = 0; index < 11; index += 1) {
-        const theta = (index * 31 + 40) * Math.PI / 180;
-        const decorationAngle = ((index * 31 + 40) % 360 + 360) % 360;
-        if (angularDistance(decorationAngle, location.angle) < 27) continue;
-        this.addMountainBoulder(`Cave island natural rock ${index + 1}`,
-          { x: x + Math.cos(theta) * (8 + index % 4 * 2), y: y + .55, z: z + Math.sin(theta) * (6 + index % 3 * 1.7) },
-          { x: 1.5 + index % 3 * .5, y: 1.1 + index % 4 * .55, z: 1.6 }, this.materials.islandRock,
-          { ensureCoreContact: false, supportKind: 'satellite-island' });
-      }
+    } else if (['home-island', 'shop-island', 'aquarium-island', 'cave-fishing-island'].includes(location.id)) {
+      this.addIslandLandscape(location);
     } else if (location.id === 'normal-fishing-island') {
       // Mangrove Cay is a warm, muddy lagoon biome rather than another generic grass
       // island. The broadleaf trunks are registered climb surfaces; root fans are low,
@@ -2090,52 +2073,7 @@ export class MountainWorld extends TestWorld {
       // The lagoon is carved into the island terrain itself in buildOceanIsland. There is no
       // separate mud disc here: the former overlapping cylinder was the source of shoreline
       // depth fighting and could never produce a readable sloped bank.
-      for (let index = 0; index < 20; index += 1) {
-        const theta = (index * 18 + 14) * Math.PI / 180;
-        const treeX = x + Math.cos(theta) * (11.1 + index % 3 * 1.15);
-        const treeZ = z + Math.sin(theta) * (8.1 + index % 2 * 1.05);
-        const size = .68 + index % 3 * .08;
-        this.addIslandTree(`Mangrove Cay mangrove ${index + 1}`, treeX, treeZ, y, size, 'broadleaf');
-        for (const side of [-1, 1]) this.addCylinder(`Mangrove Cay root ${index + 1}-${side}`,
-          { x: treeX + Math.cos(theta + side * .75) * .6, y: y + .34, z: treeZ + Math.sin(theta + side * .75) * .6 },
-          { x: .11, y: 1.25, z: .11 }, this.materials.wood,
-          { x: side * 20, y: index * 36, z: side * 48 }, false);
-      }
-      for (let index = 0; index < 34; index += 1) {
-        const theta = index * Math.PI * 2 / 34;
-        this.createPrimitive(`Mangrove Lagoon reed ${index + 1}`, 'cone',
-          { x: x + Math.cos(theta) * 8.8, y: y + .33, z: z + Math.sin(theta) * 6.65 },
-          { x: .12, y: .95 + index % 4 * .16, z: .12 }, index % 3 ? this.materials.shrubLight : this.materials.dryGrass,
-          { z: index % 2 ? 5 : -5 }, { castShadows: false });
-      }
-      for (let index = 0; index < 48; index += 1) {
-        const theta = (index * 137.5 + 9) * Math.PI / 180;
-        const distance = Math.max(9.25, 4.8 + index % 7 * 1.25);
-        const groundX = x + Math.cos(theta) * distance;
-        const groundZ = z + Math.sin(theta) * distance * .76;
-        for (const side of [-1, 1]) this.createPrimitive(`Mangrove Cay tropical fern ${index + 1}-${side}`,
-          'cone', { x: groundX + side * .22, y: y + .28, z: groundZ },
-          { x: .36, y: .58 + index % 3 * .09, z: .11 },
-          index % 3 ? this.materials.shrubLight : this.materials.shrubDark,
-          { x: 0, y: index * 31, z: side * 62 }, { castShadows: false });
-      }
-      for (let index = 0; index < 6; index += 1) {
-        const theta = (index * 61 + 27) * Math.PI / 180;
-        this.addCylinder(`Mangrove Cay fallen jungle log ${index + 1}`, {
-          x: x + Math.cos(theta) * (7 + index % 3 * 2.1), y: y + .22,
-          z: z + Math.sin(theta) * (5.5 + index % 2 * 2)
-        }, { x: .34, y: 3.1 + index % 2, z: .34 }, this.materials.wood,
-        { x: 90, y: index * 37, z: 8 - index * 2 }, false);
-      }
-      for (let index = 0; index < 18; index += 1) {
-        const theta = (index * 47 + 5) * Math.PI / 180;
-        this.createPrimitive(`Mangrove Cay lush ground-cover mound ${index + 1}`, 'sphere', {
-          x: x + Math.cos(theta) * (9.2 + index % 5 * 1.05), y,
-          z: z + Math.sin(theta) * (6.8 + index % 4 * .72)
-        }, { x: .85 + index % 3 * .18, y: .28, z: .7 },
-        index % 2 ? this.materials.shrubDark : this.materials.shrubLight,
-        {}, { castShadows: false });
-      }
+      this.addIslandLandscape(location);
       const logX = x + 9.25;
       const logZ = z;
       const logCenterY = location.elevation + .32;
@@ -2159,40 +2097,7 @@ export class MountainWorld extends TestWorld {
         x, y: OCEAN_SURFACE_Y - .58, z
       }, { x: 225, z: 195 }, this.materials.coldOceanBed);
       coldShelf.render.castShadows = false;
-      for (let index = 0; index < 12; index += 1) {
-        const theta = (index * 29 + 8) * Math.PI / 180;
-        this.createPrimitive(`Frosthook ice formation ${index + 1}`, 'cone',
-          { x: x + Math.cos(theta) * (8 + index % 4 * 2), y: y + 1.15 + index % 3 * .35, z: z + Math.sin(theta) * (7 + index % 3 * 2) },
-          { x: .65 + index % 3 * .22, y: 2.3 + index % 4 * .7, z: .65 }, this.materials.solidIce,
-          { z: index % 2 ? 8 : -9 });
-      }
-      for (let index = 0; index < 18; index += 1) {
-        const theta = (index * 41 + 12) * Math.PI / 180;
-        const radius = 25 + index % 5 * 3.5;
-        this.createPrimitive(`Frosthook shoreline ice floe ${index + 1}`, 'sphere', {
-          x: x + Math.cos(theta) * radius, y: OCEAN_SURFACE_Y + .08,
-          z: z + Math.sin(theta) * radius * .88
-        }, { x: 1.2 + index % 4 * .45, y: .11 + index % 2 * .04, z: .8 + index % 3 * .35 },
-        index % 3 ? this.materials.solidIce : this.materials.snow,
-        { y: index * 29, z: index % 2 ? 3 : -3 }, { castShadows: false });
-      }
-      // Sparse, low opaque slush plates extend the frozen-sea read well beyond the beach
-      // while leaving most of the surface visibly liquid. Opaque ice remains depth-writing,
-      // so the global transparent ocean cannot sort in front of exposed spikes or floes.
-      for (let index = 0; index < 36; index += 1) {
-        const theta = (index * 137.5 + 6) * Math.PI / 180;
-        const radius = 38 + index % 9 * 13.5;
-        this.createPrimitive(`Frosthook offshore slush plate ${index + 1}`, 'sphere', {
-          x: x + Math.cos(theta) * radius,
-          y: OCEAN_SURFACE_Y + .035,
-          z: z + Math.sin(theta) * radius * .86
-        }, {
-          x: 1.8 + index % 5 * .72,
-          y: .035 + index % 2 * .012,
-          z: .75 + index % 4 * .42
-        }, index % 5 === 0 ? this.materials.snow : this.materials.solidIce,
-        { y: index * 47, z: index % 2 ? 1.5 : -1.5 }, { castShadows: false });
-      }
+      this.addIslandLandscape(location);
     } else if (location.id === 'veiled-athenaeum') {
       // One authored scene is authoritative in both production and World Editor V2.3.1.
       // Returning here prevents the former placeholder silhouette from being layered under it.
@@ -2367,16 +2272,6 @@ export class MountainWorld extends TestWorld {
 
   getSurfaceMotion(collider) {
     return collider ? this.movingSurfaceMotion.get(collider.handle) ?? null : null;
-  }
-
-  addIslandTree(name, x, z, baseY, size, style) {
-    const trunk = this.addCylinder(`${name} climbable trunk`, { x, y: baseY + 1.3 * size, z },
-      { x: .58 * size, y: 2.6 * size, z: .58 * size }, this.materials.wood);
-    this.registerClimbSurface(trunk, trunk.physicsCollider, 'rough', `${name} trunk`);
-    const crownType = style === 'broadleaf' ? 'sphere' : 'cone';
-    this.createPrimitive(`${name} crown`, crownType, { x, y: baseY + 3.45 * size, z },
-      { x: 2.1 * size, y: (style === 'broadleaf' ? 1.7 : 3.4) * size, z: 2.1 * size },
-      style === 'broadleaf' ? this.materials.shrubLight : this.materials.foliage);
   }
 
   addHomePondBank() {

@@ -1897,6 +1897,15 @@ function ensureBasaltEditorTerrain(level, world) {
   // v23 intentionally retires the captured procedural cave shell. Existing v23 edits are
   // preserved, while every older/bad Cave autosave is replaced once by the clean baseline.
   if (level?.metadata?.cleanCaveBaselineV23 !== true) return makeCleanCaveEditorLevel(world);
+  if (level.metadata?.sharedCaveLandscapeV1 !== true) {
+    const generated = makeCleanCaveEditorLevel(world);
+    const existingIds = new Set((level.objects ?? []).map((item) => item.id));
+    level.objects ??= [];
+    for (const item of generated.objects.filter((entry) => entry.metadata?.sharedIslandLandscape)) {
+      if (!existingIds.has(item.id)) level.objects.push(item);
+    }
+    level.metadata.sharedCaveLandscapeV1 = true;
+  }
   if (level.metadata?.basaltCoreSealedV231 === true) return level;
   const boundaryCount = boundaryLoops(level.terrain).filter((loop) => loop.closed).length;
   if (boundaryCount) level.terrain = sealTerrainMesh(level.terrain, { bottomY: -3.25 });
@@ -1912,7 +1921,9 @@ function ensureBasaltEditorTerrain(level, world) {
 async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
   if (preferAutosave) {
     const autosave = loadGenericAutosave(world.id);
-    if (autosave) return world.id === 'pirate-island'
+    if (autosave) return world.kind === 'production-island'
+      ? ensureProductionIslandTerrain(autosave, world)
+      : world.id === 'pirate-island'
       ? ensurePirateStarterComposition(ensurePirateIslandTerrain(autosave))
       : world.id === 'skyscraper'
         ? ensureProductionIslandTerrain(autosave, world)

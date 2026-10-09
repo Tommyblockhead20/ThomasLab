@@ -35,9 +35,9 @@ function normalizeObject(item = {}, index = 0) {
     prefabInstanceId: item.prefabInstanceId ? String(item.prefabInstanceId) : null,
     transform,
     size: {
-      x: Math.max(.05, finite(item.size?.x, transform.scale.x)),
-      y: Math.max(.05, finite(item.size?.y, transform.scale.y)),
-      z: Math.max(.05, finite(item.size?.z, transform.scale.z))
+      x: Math.max(.01, finite(item.size?.x, transform.scale.x)),
+      y: Math.max(.01, finite(item.size?.y, transform.scale.y)),
+      z: Math.max(.01, finite(item.size?.z, transform.scale.z))
     },
     collision: item.collision !== false,
     climbMaterial: item.climbMaterial == null ? null : String(item.climbMaterial),
