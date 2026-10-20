@@ -81,7 +81,7 @@ test('main docks, helm, and side fishing seat have functional dimensions and cue
   assert.match(mountain, /USE HELM • TRAVEL \/ GO HOME/);
 });
 
-test('selective bobbers are accessible and only modestly tilt catch quality', () => {
+test('selective bobbers are accessible and Sentinel excludes Common catches', () => {
   const selectiveItem = EQUIPMENT_BY_ID.get('selective-drift-bobber');
   const trophyItem = EQUIPMENT_BY_ID.get('trophy-sentinel-bobber');
   assert.equal(selectiveItem.price, 1800);
@@ -100,7 +100,8 @@ test('selective bobbers are accessible and only modestly tilt catch quality', ()
   const trophy = deriveAcceptedBobberProfile(normal, 'trophy');
   assert.ok(selective.Common < normal.Common && trophy.Common < selective.Common);
   assert.ok(selective.Rare + selective.Legendary < .27);
-  assert.ok(trophy.Rare + trophy.Legendary < .34);
+  assert.equal(trophy.Common, 0);
+  assert.ok(trophy.Rare + trophy.Legendary > selective.Rare + selective.Legendary);
 });
 
 test('cabin door is swung clear and the front gable closes the roof gap', async () => {

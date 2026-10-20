@@ -8,8 +8,9 @@
       content="Bass Camp is an original low-poly climbing and fishing adventure prototype."
     />
     <title>Bass Camp — Climbing & Fishing Prototype</title>
-    <script type="module" crossorigin src="./assets/index-BehDTaxo.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-7QW30erT.css">
+    <script type="module" crossorigin src="./assets/index-KznqC4Pd.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/preload-helper-B4ujOErl.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-CpLkKE2B.css">
   </head>
   <body>
     <main id="game-shell">
@@ -28,7 +29,6 @@
           <div>
             <strong>BASS CAMP</strong>
           </div>
-          <a class="site-home-link" href="../" aria-label="Return to ThomasLab home">⌂ Home</a>
         </div>
 
         <div id="run-status" class="run-status">
@@ -198,6 +198,7 @@
             <button type="button" data-pause-tab="settings" aria-pressed="false">SETTINGS</button>
             <button type="button" data-pause-tab="stats" aria-pressed="true">STATS</button>
             <button type="button" data-pause-tab="controls" aria-pressed="false">CONTROLS</button>
+            <a class="site-home-link pause-site-home" href="../" aria-label="Return to ThomasLab.me website homepage"><span>ThomasLab.me</span><small>Website homepage</small></a>
           </nav>
           <div class="pause-main">
             <p id="pause-status" class="pause-status" aria-live="polite"></p>
@@ -389,8 +390,10 @@
 
       <section id="error-panel" class="error-panel" hidden>
         <p class="eyebrow">TRAIL CLOSED</p>
-        <h1>The prototype could not start.</h1>
+        <h1>Bass Camp could not start.</h1>
         <p id="error-message"></p>
+        <p id="graphics-help" hidden><a href="https://support.mozilla.org/en-US/kb/upgrade-graphics-drivers-use-hardware-acceleration" target="_blank" rel="noopener">Firefox graphics troubleshooting ↗</a></p>
+        <div class="error-actions"><button id="retry-start" type="button">Try again</button><a class="site-home-link" href="../">← ThomasLab.me homepage</a></div>
       </section>
     </main>
 

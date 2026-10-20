@@ -24,7 +24,7 @@ export const SELECTIVE_BOBBER_SETTINGS = Object.freeze({
     targetWaitSeconds: 75,
     delayVariance: .22,
     acceptanceByRarity: Object.freeze({
-      Common: .18,
+      Common: 0,
       Uncommon: .32,
       Rare: .40,
       Legendary: .46
@@ -81,6 +81,23 @@ export function deriveAcceptedBobberProfile(profile, mode = 'standard') {
 
 export function getBobberAcceptance(mode, rarity) {
   return getSelectiveBobberSettings(mode).acceptanceByRarity[rarity] ?? 0;
+}
+
+// Select from the retained species mass, excluding zero-weight entries even when
+// the random source returns exactly zero. Keep the original table entries intact.
+export function chooseAcceptedBobberEntry(table, mode = 'standard', randomValue = Math.random()) {
+  const retained = table.map(entry => ({
+    entry,
+    weight: Math.max(0, Number(entry.probability) || 0) * getBobberAcceptance(mode, entry.fish?.rarity)
+  })).filter(candidate => Number.isFinite(candidate.weight) && candidate.weight > 0);
+  const total = retained.reduce((sum, candidate) => sum + candidate.weight, 0);
+  if (!(total > 0)) return null;
+  let roll = Math.max(0, Math.min(1, Number(randomValue) || 0)) * total;
+  for (const candidate of retained) {
+    if (roll < candidate.weight) return candidate.entry;
+    roll -= candidate.weight;
+  }
+  return retained.at(-1)?.entry ?? null;
 }
 
 export function deriveBobberAcceptance(profile, mode = 'standard') {

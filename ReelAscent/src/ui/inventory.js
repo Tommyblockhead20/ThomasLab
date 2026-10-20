@@ -1,3 +1,4 @@
+import { creatureArt } from '../fishing/creature-art.js';
 import { resolveCreaturePresentation } from '../fishing/creature-presentation.js';
 import { EQUIPMENT_CATALOG } from '../progression/equipment.js';
 import { MAP_ITEM_BY_ID } from '../world/world-locations.js';
@@ -25,7 +26,8 @@ export const INVENTORY_SORT_OPTIONS = SPECIMEN_SORT_OPTIONS;
 export function specimenPreview(specimen) {
   const presentation = resolveCreaturePresentation(specimen, { context: 'inventory preview' });
   const { visual, archetype } = presentation;
-  const [primary, accent] = visual.colors;
+  const art = creatureArt(presentation.species, archetype, Boolean(specimen.shiny));
+  const [primary, accent] = [art.flank, art.fin];
   const key = `${presentation.canonicalId}:${archetype}:${specimen.shiny ? 1 : 0}`;
   let drawing = SPECIMEN_PREVIEW_CACHE.get(key);
   const p = colorCss(primary);

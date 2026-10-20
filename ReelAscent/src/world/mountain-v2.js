@@ -1,3 +1,4 @@
+import { addSurfaceUvs, applySurfaceDetail } from '../graphics/surface-detail.js';
 import * as pc from 'playcanvas';
 import SKYREACH_WORLD_EDITOR_LEVEL from './world-editor-levels/skyscraper.json' with { type: 'json' };
 import CAVE_FISHING_WORLD_EDITOR_LEVEL from './world-editor-levels/cave-fishing-island.json' with { type: 'json' };
@@ -1152,21 +1153,25 @@ function mapContourAtHeight(height, samples = 120, terrainSamples = null) {
   return points;
 }
 
-export function createMountainMapData() {
+export function createMountainMapData({ deferContours = false } = {}) {
   // All four lower contour bands sample the same angle/radius grid. Reuse exact height
   // evaluations instead of re-running terrain and authored-patch deformation for each band.
-  const terrainSamples = Array.from({ length: 120 }, (_, index) => {
-    const angle = index * 3;
-    const heights = [];
-    for (let radius = TERRAIN_OUTER_RADIUS; radius >= 38; radius -= .5) {
-      heights.push(terrainHeightAt(angle, radius));
-    }
-    return heights;
-  });
-  const contours = MAP_ELEVATION_AREAS.map((area) => ({
-    ...area,
-    points: mapContourAtHeight(area.minimumHeight, 120, terrainSamples)
-  }));
+  let cachedContours;
+  const getContours = () => cachedContours ??= (() => {
+    const terrainSamples = Array.from({ length: 120 }, (_, index) => {
+      const angle = index * 3;
+      const heights = [];
+      for (let radius = TERRAIN_OUTER_RADIUS; radius >= 38; radius -= .5) {
+        heights.push(terrainHeightAt(angle, radius));
+      }
+      return heights;
+    });
+    return MAP_ELEVATION_AREAS.map((area) => ({
+      ...area,
+      points: mapContourAtHeight(area.minimumHeight, 120, terrainSamples)
+    }));
+  })();
+  if (!deferContours) getContours();
   const waters = MOUNTAIN_FISHING_LOCATIONS.map((water, index) => {
     const center = water.localOffset
       ? radialPoint(water.angle, water.radius + water.localOffset.z, water.y, -water.localOffset.x)
@@ -1235,8 +1240,8 @@ export function createMountainMapData() {
   return {
     center: { ...MOUNTAIN_CENTER },
     outerRadius: WORLD_MAP_RADIUS,
-    mountainRadius: Math.max(...contours[0].points.map((point) => point.radius)),
-    contours,
+    get mountainRadius() { return Math.max(...getContours()[0].points.map((point) => point.radius)); },
+    get contours() { return getContours(); },
     biomes: MOUNTAIN_BIOME_SECTORS.map((biome) => ({ ...biome })),
     waters,
     starts: START_LOCATIONS.map((start) => ({ id: start.id, label: start.label, position: { ...start.dockPosition } })),
@@ -1376,6 +1381,8 @@ function makeMaterial(values, options = {}) {
   material.emissive = new pc.Color(...(options.emissive ?? [0, 0, 0]));
   material.emissiveIntensity = options.emissiveIntensity ?? 1;
   material.gloss = options.gloss ?? .12;
+  material.useMetalness = (options.metalness ?? 0) > 0;
+  material.metalness = options.metalness ?? 0;
   material.opacity = options.opacity ?? 1;
   if (material.opacity < 1) {
     material.blendType = pc.BLEND_NORMAL;
@@ -1429,7 +1436,8 @@ export class MountainWorld extends TestWorld {
     this.islandTerrainSurfaces = new Map();
     this.locationLoadGroups = new Map();
     this.activeLocationId = MAIN_WORLD_LOCATION.id;
-    this.authoredTerrainGroundQuery = createBakedTerrainGroundQuery(MAP_EDITOR_PATCH);
+    // Smaller buckets avoid scanning unrelated terrain triangles for each rock hull vertex.
+    this.authoredTerrainGroundQuery = createBakedTerrainGroundQuery(MAP_EDITOR_PATCH, { cellSize: 2 });
     this.proceduralGroundingAudit = {
       source: this.authoredTerrainGroundQuery ? 'terrain.bakedMesh' : 'legacy-heightfield',
       grounded: 0,
@@ -1491,6 +1499,21 @@ export class MountainWorld extends TestWorld {
     this.materials.skyreachFacade = makeMaterial([.27, .31, .34], { gloss: .26, metalness: .08, emissive: [.006, .01, .014] });
     this.materials.skyreachAccent = makeMaterial([.72, .56, .23], { gloss: .7, metalness: .42, emissive: [.045, .028, .006] });
 
+    const detailGroups = {
+      wood: ['wood','woodLight','cabinWall','cabinTrim'],
+      stone: ['rock','rockLight','roughRock','normalRock','smoothRock','unclimbable','coast','wetRock','alpine','deepRock','cave','caveWall','islandRock','coldRock','decoStone','holdRough','holdNormal'],
+      grass: ['grass','grassLight','forestFloor','islandGrass','pondBank'],
+      sand: ['sand','earth','waterEdge'],
+      roof: ['cabinRoof'],
+      fabric: ['cabinFabric']
+    };
+    for (const [kind, keys] of Object.entries(detailGroups)) for (const key of keys) {
+      const material = this.materials[key];
+      if (material) applySurfaceDetail(material, this.app.graphicsDevice, kind, {
+        tiling: kind === 'fabric' ? 4 : kind === 'wood' ? 2 : 1,
+        strength: kind === 'stone' ? .32 : .23
+      });
+    }
 
     this.rockMaterialVariants = new Map();
     // A route should read as broken mountain rock, not a vertical row of cylinders.
@@ -1700,6 +1723,9 @@ export class MountainWorld extends TestWorld {
   buildOceanIsland(location) {
     const group = new pc.Entity(`${location.displayName} load group`);
     group.locationId = location.id;
+    // Build inactive islands in their final state instead of registering every
+    // render component with the scene and removing it again during startup.
+    group.enabled = location.alwaysLoaded === true || location.id === this.activeLocationId;
     this.buildTarget.addChild(group);
     this.locationLoadGroups.set(location.id, group);
     if (location.id === 'cave-fishing-island') {
@@ -1841,7 +1867,7 @@ export class MountainWorld extends TestWorld {
       }
     }
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity(`${location.displayName} terrain core`);
     entity.addComponent('render');
     const material = location.id === 'cold-island' ? this.materials.snow
@@ -2307,7 +2333,7 @@ export class MountainWorld extends TestWorld {
       geometry.indices.push(geometry.indices.length);
     }
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity('Hearthward pond connected sloped bank');
     entity.addComponent('render');
     entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.pondBank, entity)];
@@ -3487,7 +3513,7 @@ export class MountainWorld extends TestWorld {
     geometry.colors = colors;
     return {
       kind,
-      mesh: pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry),
+      mesh: pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry)),
       hull: vertices
     };
   }
@@ -3519,6 +3545,7 @@ export class MountainWorld extends TestWorld {
           });
           variant.diffuseVertexColor = true;
           variant.vertexColorGamma = false;
+          if (baseMaterial._surfaceDetail) applySurfaceDetail(variant, this.app.graphicsDevice, baseMaterial._surfaceDetail, { strength: .32 });
           variant.update();
           variant._reelAscentEnvironment = environmentIndex;
           return variant;
@@ -3811,13 +3838,16 @@ export class MountainWorld extends TestWorld {
       const actualShellRadius = this.crownVisibleRadiusAt(angle, worldY);
       return [Math.hypot(worldX - MOUNTAIN_CENTER.x, worldZ - MOUNTAIN_CENTER.z) - actualShellRadius];
     });
-    const terrainClearancesAt = (candidate) => localVertices.flatMap((vertex) => {
-      const worldX = candidate.x + vertex.x;
-      const worldY = candidate.y + vertex.y;
-      const worldZ = candidate.z + vertex.z;
-      const terrainY = this.visibleTerrainYAtWorldXZ(worldX, worldZ);
-      return Number.isFinite(terrainY) ? [worldY - terrainY] : [];
-    });
+    // Terrain grounding only changes Y, so reuse the same X/Z terrain samples
+    // throughout the support adjustments and final exposure check.
+    let terrainSamples;
+    const terrainClearancesAt = (candidate) => {
+      terrainSamples ??= localVertices.flatMap((vertex) => {
+        const terrainY = this.visibleTerrainYAtWorldXZ(candidate.x + vertex.x, candidate.z + vertex.z);
+        return Number.isFinite(terrainY) ? [{ vertexY: vertex.y, terrainY }] : [];
+      });
+      return terrainSamples.map(({ vertexY, terrainY }) => candidate.y + vertexY - terrainY);
+    };
     const exposureFrom = (clearances) => ({
       maximum: Math.max(...clearances),
       visibleFraction: clearances.filter((clearance) => clearance > .06).length / Math.max(1, clearances.length)
@@ -3871,8 +3901,14 @@ export class MountainWorld extends TestWorld {
     if (options.solid !== false && !options.allowRockOverlap) {
       const candidateRadius = Math.hypot(size.x, size.y, size.z) * .5;
       const swallowed = this.rockPlacements.some((rock) => {
-        const existingRadius = Math.hypot(rock.size.x, rock.size.y, rock.size.z) * .5;
+        const existingRadius = rock.boundingRadius;
         if (candidateRadius > existingRadius * 1.08) return false;
+        // An axis separation already outside the sphere cannot be swallowed.
+        // Avoid a square root for the thousands of distant rocks checked here.
+        const maximumDistance = existingRadius * .98 - candidateRadius * .9;
+        if (Math.abs(groundedPosition.x - rock.position.x) >= maximumDistance
+          || Math.abs(groundedPosition.y - rock.position.y) >= maximumDistance
+          || Math.abs(groundedPosition.z - rock.position.z) >= maximumDistance) return false;
         const distance = Math.hypot(
           groundedPosition.x - rock.position.x,
           groundedPosition.y - rock.position.y,
@@ -3941,6 +3977,7 @@ export class MountainWorld extends TestWorld {
       entity,
       position: { ...groundedPosition },
       size: { ...size },
+      boundingRadius: Math.hypot(size.x, size.y, size.z) * .5,
       radius: Math.hypot(localX, localZ),
       angle,
       crown: groundedPosition.y >= MAP_EDITOR_CROWN_BASE_HEIGHT - 3,
@@ -4082,7 +4119,7 @@ export class MountainWorld extends TestWorld {
       }
     }
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity('Extended walkable ocean floor');
     entity.addComponent('render');
     entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.sand, entity)];
@@ -4193,7 +4230,7 @@ export class MountainWorld extends TestWorld {
       }
     }
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity('Continuous irregular mountain body');
     entity.addComponent('render');
     entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.alpine, entity)];
@@ -5242,7 +5279,7 @@ export class MountainWorld extends TestWorld {
       }
     }
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity('Stoneveil Peak summit crown - sheer ungrippable shell');
     entity.addComponent('render');
     entity.render.meshInstances = [new pc.MeshInstance(mesh, this.materials.alpine, entity)];
@@ -5951,7 +5988,7 @@ export class MountainWorld extends TestWorld {
         }
       }
       geometry.calculateNormals();
-      const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+      const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
       const entity = new pc.Entity(name);
       entity.addComponent('render');
       entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
@@ -6358,7 +6395,7 @@ export class MountainWorld extends TestWorld {
     geometry.positions = vertices.flat();
     geometry.indices = triangles.flat();
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity(name);
     entity.addComponent('render');
     entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
@@ -6584,7 +6621,7 @@ export class MountainWorld extends TestWorld {
   }
 
   getMapData() {
-    return createMountainMapData();
+    return createMountainMapData({ deferContours: true });
   }
 
   isInDeveloperCourse(point) {

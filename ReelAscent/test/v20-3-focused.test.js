@@ -91,12 +91,12 @@ test('display names are unique per room, case-insensitively, until reservation r
   assert.equal(manager.join(duplicate, code).ok, true);
 });
 
-test('v20.3 bobbers use exact retention and bounded fixed cadence', () => {
+test('bobbers use exact retention and bounded fixed cadence', () => {
   const ocean = PHYSICAL_WATER_RARITY_PROFILES.ocean;
   assert.deepEqual(getSelectiveBobberSettings('selective').acceptanceByRarity,
     { Common: .42, Uncommon: .58, Rare: .64, Legendary: .68 });
   assert.deepEqual(getSelectiveBobberSettings('trophy').acceptanceByRarity,
-    { Common: .18, Uncommon: .32, Rare: .4, Legendary: .46 });
+    { Common: 0, Uncommon: .32, Rare: .4, Legendary: .46 });
   close(sampleBobberBiteDelay(getSelectiveBobberSettings('selective'), 0, { profile: ocean }), 21);
   close(sampleBobberBiteDelay(getSelectiveBobberSettings('trophy'), 1, { profile: ocean }), 91.5);
   const selective = deriveAcceptedBobberProfile(ocean, 'selective');
@@ -105,10 +105,10 @@ test('v20.3 bobbers use exact retention and bounded fixed cadence', () => {
   close(selective.Rare, .1423948220064725);
   close(selective.Legendary, .09627831715210355);
   const trophy = deriveAcceptedBobberProfile(ocean, 'trophy');
-  close(trophy.Common, .443208895949166);
-  close(trophy.Uncommon, .2541699761715647);
-  close(trophy.Rare, .17474185861795076);
-  close(trophy.Legendary, .1278792692613185);
+  close(trophy.Common, 0);
+  close(trophy.Uncommon, .064 / .1402);
+  close(trophy.Rare, .044 / .1402);
+  close(trophy.Legendary, .0322 / .1402);
 });
 
 test('journal cards grow with content and guide odds include equipped bobber filtering', async () => {
@@ -120,6 +120,6 @@ test('journal cards grow with content and guide odds include equipped bobber fil
   assert.match(styles, /\.journal-grid\s*\{[\s\S]*?grid-auto-rows:\s*max-content/);
   assert.match(styles, /\.journal-card\s*\{[\s\S]*?height:\s*auto[\s\S]*?overflow:\s*visible/);
   assert.match(fishing, /getEcologyGuideState\(\)[\s\S]*?deriveBobberAcceptance\(potentialProfile, bobberMode\)/);
-  assert.match(fishing, /selectedEntry \?\?= selectionTable\.filter\([\s\S]*?bobberAcceptance\[entry\.fish\.rarity\][\s\S]*?> 0/);
+  assert.match(fishing, /chooseAcceptedBobberEntry\(selectionTable, bobberMode, this\.rng\(\)\)/);
   assert.match(guide, /equipped tackle odds/);
 });

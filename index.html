@@ -184,8 +184,8 @@
     }
 
     .hero-doodle:hover { transform: rotate(-3deg) scale(1.04); }
-    .hero-doodle.avoiding { transition: transform .12s ease, translate .10s cubic-bezier(.15,.85,.2,1); }
-    .hero-doodle.avoiding.panic { transition: transform .07s ease, translate .035s cubic-bezier(.1,.95,.2,1); pointer-events: none; }
+    .hero-doodle.avoiding { transition: transform .2s ease, translate .22s cubic-bezier(.2,.8,.2,1); }
+    .hero-doodle.avoiding.panic { transition: transform .12s ease, translate .12s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
     .hero-doodle.bounce { animation: bounce .62s cubic-bezier(.2,.85,.2,1); }
 
     .hero-doodle .eye {
@@ -308,25 +308,15 @@
     }
     .section-heading { display:flex;align-items:center;justify-content:space-between;min-height:52px;margin:20px 0 11px; }
     .section-heading .row-label, .section-heading h2 { margin:0; }
-    .tour-mascot { position:relative;display:grid;place-items:center;width:44px;height:44px;margin-right:8px;border:2px solid var(--line);border-radius:13px;background:#ff9f91;box-shadow:3px 3px 0 var(--line);cursor:pointer;transform:rotate(5deg);transition:transform .25s ease,opacity .3s ease; }
-    .tour-mascot:hover { transform:rotate(-6deg) translateY(-3px); }
-    .tour-mascot:focus-visible { outline:3px solid var(--line);outline-offset:4px; }
-    .tour-mascot .tour-eyes { position:absolute;top:15px;left:12px;width:4px;height:6px;border-radius:50%;background:var(--line);box-shadow:13px 0 0 var(--line); }
-    .tour-mascot .tour-mouth { position:absolute;left:16px;bottom:9px;width:12px;height:7px;border-bottom:2px solid var(--line);border-radius:0 0 50% 50%; }
-    .tour-mascot .tour-prop { position:absolute;right:-12px;top:-14px;font-size:23px;filter:drop-shadow(1px 2px 0 rgba(0,0,0,.3)); }
-    .tour-mascot.will-animate { opacity:0;transform:translateY(14px) rotate(-12deg); }
-    .tour-mascot.will-animate.is-visible { opacity:1;transform:rotate(5deg); }
-    .tour-mascot.celebrate { animation:tourMascotCelebrate .7s ease both; }
-    .tour-mascot.celebrate .tour-prop { animation:tourPropPop .7s ease both; }
-    @keyframes tourMascotCelebrate { 35% { transform:rotate(-14deg) translateY(-7px) scale(1.08); } 70% { transform:rotate(12deg) translateY(1px); } }
-    @keyframes tourPropPop { 40% { transform:translateY(-13px) rotate(20deg) scale(1.35); } }
-    .scroll-trail { position:fixed;top:25vh;right:max(9px,calc((100vw - 1260px)/2));width:34px;height:min(48vh,360px);z-index:5;pointer-events:none; }
-    .scroll-trail-track { position:absolute;inset:0 auto 0 15px;width:4px;border-radius:4px;background:repeating-linear-gradient(to bottom,#171717 0 7px,transparent 7px 16px);opacity:.38; }
-    .scroll-trail-fill { position:absolute;left:15px;top:0;width:4px;height:0;border-radius:4px;background:#171717; }
-    .scroll-trail-rider { position:absolute;top:0;left:2px;display:grid;place-items:center;width:30px;height:30px;border:2px solid var(--line);border-radius:9px;background:#ff9f91;box-shadow:2px 2px 0 var(--line);transition:top .14s linear,transform .2s ease; }
-    .scroll-trail-eyes { width:3px;height:4px;border-radius:50%;background:var(--line);box-shadow:9px 0 0 var(--line);transform:translateX(-4px); }
-    .scroll-trail-prop { position:absolute;right:-10px;top:-15px;font-size:17px;filter:drop-shadow(1px 1px 0 rgba(0,0,0,.25)); }
-    @media (max-width: 1259px) { .scroll-trail { display:none; } }
+    .mascot-dock { display:block;flex:0 0 auto;width:48px;height:48px;margin-right:8px; }
+    .mascot-home { width:160px;height:160px;margin:0; }
+    .mascot-traveler { position:absolute;left:0;top:0;width:160px;height:160px;transform-origin:0 0;z-index:12;pointer-events:none;opacity:0; }
+    .mascot-traveler.is-ready { opacity:1; }
+    .mascot-traveler .hero-doodle { pointer-events:auto; }
+    .mascot-traveler.is-moving .hero-doodle { pointer-events:none; }
+    .mascot-prop { position:absolute;right:-25px;top:-40px;font-size:64px;line-height:1;pointer-events:none;filter:drop-shadow(3px 4px 0 rgba(0,0,0,.2)); }
+    .mascot-prop[hidden] { display:none; }
+    .hero-doodle:focus-visible { outline:4px solid var(--line);outline-offset:8px; }
 
     .grid {
       display: grid;
@@ -368,6 +358,8 @@
       min-height: 250px;
       --r: 0deg;
     }
+    #spotlightGrid .card { grid-column:1 / -1;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:26px;min-height:180px; }
+    #spotlightGrid .copy { margin:0;padding-right:42px; }
 
 
     .card:nth-child(4n + 1) { --r: -.25deg; }
@@ -1905,38 +1897,23 @@
       .hero { grid-template-columns: 1fr; min-height: auto; padding: 44px 0 26px; gap: 22px; }
       .hero-side { flex-direction: row; justify-content: flex-start; align-items: center; gap: 18px; }
       .hero-side .button { width: auto; min-width: 150px; }
-      .hero-doodle {
-        display: block;
-        width: 112px;
-        height: 112px;
-        border-radius: 27px;
-        box-shadow: 6px 6px 0 var(--line);
-        transform: rotate(5deg);
-      }
-      .hero-doodle .eye { width: 15px; height: 20px; top: 35px; }
-      .hero-doodle .eye::after { width: 5px; height: 7px; top: 5px; left: 4px; }
-      .hero-doodle .eye.one { left: 29px; }
-      .hero-doodle .eye.two { right: 29px; }
-      .hero-doodle .mouth { width: 42px; height: 20px; bottom: 25px; }
+      .mascot-home { width:112px;height:112px; }
       .card, .card.feature { grid-column: span 6; height: auto; min-height: 242px; }
       #gamesGrid .card, #aboutGrid .card { grid-column: span 6; }
     }
 
     @media (max-width: 620px) {
       .shell { width: min(100% - 20px, 1180px); }
-      .tour-mascot { display:none; }
+      .mascot-dock:not(.mascot-home) { width:40px;height:40px; }
       .hero { padding-top: 30px; padding-bottom: 22px; gap: 18px; }
       h1 { font-size: clamp(52px, 17vw, 76px); }
       .intro { margin-top: 17px; font-size: clamp(18px, 5.3vw, 22px); }
       .project-count { margin-top: 8px; }
       .hero-side { gap: 14px; }
       .hero-side .button { min-width: 0; min-height: 48px; padding-inline: 17px; }
-      .hero-doodle { width: 82px; height: 82px; border-width: 2px; border-radius: 21px; box-shadow: 4px 4px 0 var(--line); }
-      .hero-doodle .eye { width: 12px; height: 16px; top: 25px; border-width: 2px; }
-      .hero-doodle .eye::after { width: 4px; height: 5px; top: 4px; left: 3px; }
-      .hero-doodle .eye.one { left: 21px; }
-      .hero-doodle .eye.two { right: 21px; }
-      .hero-doodle .mouth { width: 31px; height: 14px; bottom: 18px; border-width: 2px; }
+      .mascot-home { width:82px;height:82px; }
+      #spotlightGrid .card { display:flex;align-items:stretch;gap:0;min-height:205px; }
+      #spotlightGrid .copy { margin-top:22px; }
       .grid { gap: 13px; }
       .grid + .grid { margin-top: 13px; }
       .card, .card.feature {
@@ -1987,8 +1964,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; }
-      .scroll-trail-rider { display:none; }
-      .tour-mascot, .tour-mascot.celebrate, .tour-mascot.celebrate .tour-prop { animation:none!important;transition:none!important; }
+      .hero-doodle { animation:none!important;transition:none!important; }
       .fishing-icon .icon-glyph { animation:none!important; }
     }
   </style>
@@ -2006,25 +1982,29 @@
 
       <div class="hero-side">
         <button class="button" id="surprise">Surprise me ✨</button>
-        <button class="hero-doodle" id="doodle" aria-label="Poke the little square face">
-          <span class="eye one"></span><span class="eye two"></span><span class="mouth"></span>
-        </button>
+        <span class="mascot-dock mascot-home" data-mascot-area="home" aria-hidden="true"></span>
+        <div class="mascot-traveler" id="mascotTraveler">
+          <button class="hero-doodle" id="doodle" aria-label="Poke the little square face">
+            <span class="eye one"></span><span class="eye two"></span><span class="mouth"></span><span class="mascot-prop" aria-hidden="true" hidden></span>
+          </button>
+        </div>
       </div>
     </header>
 
     <section class="projects" id="projects" aria-label="Things to try">
+      <div class="grid" id="spotlightGrid"></div>
       <div class="grid" id="featureGrid"></div>
-      <div class="section-heading"><h2 class="row-label">Things to explore</h2><button class="tour-mascot" type="button" aria-label="Poke the exploring mascot" data-tour-message="He found a map. He refuses to say where it leads."><span class="tour-eyes"></span><span class="tour-mouth"></span><span class="tour-prop" aria-hidden="true">🗺️</span></button></div>
+      <div class="section-heading"><h2 class="row-label">Things to explore</h2><span class="mascot-dock" data-mascot-area="explore" aria-hidden="true"></span></div>
       <div class="grid" id="mainGrid"></div>
       <div class="grid" id="thirdGrid"></div>
-      <div class="section-heading"><h2 class="row-label">Games</h2><button class="tour-mascot" type="button" aria-label="Poke the games mascot" data-tour-message="The tiny captain demands one more turn."><span class="tour-eyes"></span><span class="tour-mouth"></span><span class="tour-prop" aria-hidden="true">🏴‍☠️</span></button></div>
+      <div class="section-heading"><h2 class="row-label">Games</h2><span class="mascot-dock" data-mascot-area="games" aria-hidden="true"></span></div>
       <div class="grid" id="gamesGrid"></div>
     </section>
 
     <section class="about" aria-labelledby="about-title">
       <div class="about-head section-heading">
         <h2 id="about-title">The Thomas Zone</h2>
-        <button class="tour-mascot" type="button" aria-label="Poke the Thomas Zone mascot" data-tour-message="He says the secret ingredient is clicking around."><span class="tour-eyes"></span><span class="tour-mouth"></span><span class="tour-prop" aria-hidden="true">🥄</span></button>
+        <span class="mascot-dock" data-mascot-area="personal" aria-hidden="true"></span>
       </div>
       <div class="grid" id="aboutGrid"></div>
       <button class="visual-doodle spark-star" id="sparkStar" type="button" aria-label="Poke the suspicious little star">
@@ -2050,10 +2030,6 @@
 
   </main>
 
-  <div class="scroll-trail" id="scrollTrail" aria-hidden="true">
-    <span class="scroll-trail-track"></span><span class="scroll-trail-fill"></span>
-    <span class="scroll-trail-rider"><span class="scroll-trail-eyes"></span><span class="scroll-trail-prop">✨</span></span>
-  </div>
 
   <div class="credits-overlay" id="creditsOverlay" role="dialog" aria-modal="true" aria-label="ThomasLab credits" hidden>
     <button class="credits-skip" id="creditsSkip" type="button">Skip credits</button>
@@ -2070,6 +2046,11 @@
       Leave href as "#" while a project is not live yet.
     */
     const projects = [
+      {
+        title: "Bass Camp",
+        description: "Climb, explore, and fish your way through a growing mountain adventure.",
+        icon: "🎣", color: "#a8dcd2", href: "./BassCamp/", group: "spotlight", action: "fishing"
+      },
       {
         title: "Game Picker",
         description: "Say what you're looking for (or don't) and let it answer the eternal question: what should we play?",
@@ -2121,11 +2102,6 @@
         icon: "🐕", color: "#c7e6a4", href: "./NoseFirst/", group: "games", action: "dog"
       },
       {
-        title: "Bass Camp",
-        description: "Climb, explore, and fish your way through a growing mountain adventure.",
-        icon: "🎣", color: "#a8dcd2", href: "./BassCamp/", group: "games", action: "fishing"
-      },
-      {
         title: "Challenge Drawer",
         description: "A grab bag of simple challenges inspired by Taskmaster, Jet Lag: The Game, and Minute to Win It.",
         icon: "⚪", color: "#e5ca93", href: "./Challenges/", group: "third", action: "challenge"
@@ -2157,6 +2133,7 @@
       }
     ];
 
+    const spotlightGrid = document.getElementById("spotlightGrid");
     const featureGrid = document.getElementById("featureGrid");
     const mainGrid = document.getElementById("mainGrid");
     const thirdGrid = document.getElementById("thirdGrid");
@@ -2166,6 +2143,7 @@
     const trafficFine = document.getElementById("trafficFine");
     const toast = document.getElementById("toast");
     const doodle = document.getElementById("doodle");
+    const mascotTraveler = document.getElementById("mascotTraveler");
     const surprise = document.getElementById("surprise");
     const sparkStar = document.getElementById("sparkStar");
     const mascotTreat = document.getElementById("mascotTreat");
@@ -2549,6 +2527,7 @@
 
       const mainOrder = ["Find Your Place", "Rank Things", "Custom State Generator"];
       const thirdOrder = ["House Rater", "Scenic Adventures", "Challenge Drawer"];
+      spotlightGrid.innerHTML = byGroup("spotlight").map(({p, i}) => cardMarkup(p, i, "feature spotlight")).join("");
       featureGrid.innerHTML = byGroup("feature").map(({p, i}) => cardMarkup(p, i, "feature")).join("");
       mainGrid.innerHTML = byGroup("main")
         .sort((a, b) => mainOrder.indexOf(a.p.title) - mainOrder.indexOf(b.p.title))
@@ -2574,54 +2553,93 @@
       showToast.timer = setTimeout(() => toast.classList.remove("show"), 1600);
     }
 
-    const tourMascots = [...document.querySelectorAll('.tour-mascot')];
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    tourMascots.forEach(button => button.addEventListener('click', () => {
-      button.classList.remove('celebrate');
-      void button.offsetWidth;
-      button.classList.add('celebrate');
-      showToast(button.dataset.tourMessage);
-    }));
-    if (!reducedMotion && 'IntersectionObserver' in window) {
-      const tourObserver = new IntersectionObserver(entries => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            tourObserver.unobserve(entry.target);
-          }
-        });
-      }, { threshold: .35 });
-      tourMascots.forEach(button => { button.classList.add('will-animate'); tourObserver.observe(button); });
-    }
-
-    const scrollTrail = document.getElementById('scrollTrail');
-    if (scrollTrail) {
-      const trailFill = scrollTrail.querySelector('.scroll-trail-fill');
-      const trailRider = scrollTrail.querySelector('.scroll-trail-rider');
-      const trailProp = scrollTrail.querySelector('.scroll-trail-prop');
-      const landmarks = [
-        [document.querySelector('#projects .section-heading'), '🗺️'],
-        [document.querySelector('#gamesGrid')?.previousElementSibling, '🎲'],
-        [document.querySelector('.about-head'), '🥄']
-      ];
-      let trailFrame = 0;
-      const updateTrail = () => {
-        trailFrame = 0;
-        const maxScroll = Math.max(1, document.documentElement.scrollHeight - innerHeight);
-        const progress = Math.max(0, Math.min(1, scrollY / maxScroll));
-        const position = `${(progress * 100).toFixed(2)}%`;
-        trailFill.style.height = position;
-        if (!reducedMotion) {
-          trailRider.style.top = position;
-          const passed = landmarks.filter(([element]) => element && element.getBoundingClientRect().top < innerHeight * .45);
-          trailProp.textContent = passed.at(-1)?.[1] || '✨';
+    const mascotSpeech = {
+      home: ['Oh, hi.', 'I’m supposed to be supervising.', 'Take your time. I live here.', 'Thomas makes things. I inspect the buttons.', 'Everything here started with “what if”.', 'I was just about to look busy.'],
+      explore: ['We can call this research.', 'I checked the map. That’s as far as I got.', 'I have several strong opinions and no data.', 'This is how a quick look becomes an afternoon.', 'Go on. Change the settings.', 'I came for a look. Now I’m comparing counties.'],
+      games: ['I’m calling that a practice run.', 'We should probably save first.', 'I was keeping score. Then I got distracted.', 'One more round. You heard nothing.', 'I’m excellent at watching other people play.', 'I had a strategy. It was mostly optimism.'],
+      personal: ['I’m here for the recipes.', 'This part has more family stories.', 'I know the chef. Results may vary.', 'I’ve claimed a seat at the table.', 'Thomas has been places. I’ve been down this page.', 'The cookbook is dangerously close to the maps. Picnic?'],
+      caught: ['You caught me. Act surprised.', 'Okay, that was quick.', 'How did you even do that?', 'I’m going to need a better hiding place.'],
+      annoyed: ['Five pokes. I’m charging rent. — $50', 'Personal space, please. — $50', 'That button has feelings. And a $50 fee.'],
+      fed: ['All right. We’re good. 🍪', 'A compelling apology. 🍪', 'I accept these terms. 🍪']
+    };
+    const mascotSpeechBags = new Map();
+    let lastMascotLines = {};
+    try { lastMascotLines = JSON.parse(sessionStorage.getItem('thomaslabMascotLines') || '{}') || {}; } catch {}
+    function mascotLine(area) {
+      const pool = mascotSpeech[area] || mascotSpeech.home;
+      let bag = mascotSpeechBags.get(area);
+      if (!bag?.length) {
+        bag = [...pool];
+        for (let i = bag.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [bag[i], bag[j]] = [bag[j], bag[i]];
         }
-      };
-      const scheduleTrail = () => { if (!trailFrame) trailFrame = requestAnimationFrame(updateTrail); };
-      addEventListener('scroll', scheduleTrail, { passive: true });
-      addEventListener('resize', scheduleTrail);
-      addEventListener('load', scheduleTrail, { once: true });
-      scheduleTrail();
+        if (bag.at(-1) === lastMascotLines[area]) [bag[0], bag[bag.length - 1]] = [bag[bag.length - 1], bag[0]];
+        mascotSpeechBags.set(area, bag);
+      }
+      const line = bag.pop();
+      lastMascotLines[area] = line;
+      try { sessionStorage.setItem('thomaslabMascotLines', JSON.stringify(lastMascotLines)); } catch {}
+      return line;
+    }
+    let mascotArea = 'home';
+    let refreshMascotTour = () => {};
+    function setupWanderingMascot() {
+      const docks = [...document.querySelectorAll('[data-mascot-area]')];
+      const prop = doodle.querySelector('.mascot-prop');
+      const props = { explore: '🗺️', games: '🎲', personal: '🥄' };
+      let dock = null, flight = null, frame = 0, pendingDock = null, perchTimer = null;
+      const pose = (x, y, scale) => 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + scale + ')';
+      const desiredDock = () => docks.filter(element => element.getBoundingClientRect().top <= innerHeight * .52).at(-1) || docks[0];
+      function landAt(target, immediately = false) {
+        const bounds = target.getBoundingClientRect();
+        const x = bounds.left + scrollX, y = bounds.top + scrollY, scale = bounds.width / 160;
+        const current = new DOMMatrix(getComputedStyle(mascotTraveler).transform);
+        flight?.cancel();
+        const destination = pose(x, y, scale);
+        mascotTraveler.style.transform = destination;
+        mascotTraveler.classList.add('is-ready');
+        dock = target;
+        mascotArea = target.dataset.mascotArea;
+        const arrive = () => {
+          mascotTraveler.classList.remove('is-moving');
+          prop.textContent = props[mascotArea] || '';
+          prop.hidden = !props[mascotArea];
+        };
+        if (immediately || reducedMotion || !doodle.animate) { arrive(); return; }
+        prop.hidden = true;
+        mascotTraveler.classList.add('is-moving');
+        const bend = (Math.random() - .25) * 30;
+        const midX = Math.min(document.documentElement.clientWidth - 54, Math.max(current.e, x) + bend);
+        const midY = current.f + (y - current.f) * (.42 + Math.random() * .18);
+        const middle = pose(midX, midY, Math.min(current.a, scale) * (.92 + Math.random() * .08));
+        const keyframes = Math.random() < .35
+          ? [{ transform: pose(current.e, current.f, current.a) }, { transform: destination }]
+          : [{ transform: pose(current.e, current.f, current.a) }, { transform: middle, offset: .55 }, { transform: destination }];
+        flight = mascotTraveler.animate(keyframes, { duration: Math.min(1000, 500 + Math.abs(y - current.f) * .16 + Math.random() * 160), easing: 'cubic-bezier(.25,.7,.25,1)' });
+        flight.onfinish = arrive;
+      }
+      function updateTour() {
+        frame = 0;
+        if (mascotAvoiding || mascotTreatHeld || doodle.matches(':focus-visible')) return;
+        const next = desiredDock();
+        if (!dock) { landAt(next, true); return; }
+        if (next === dock) { clearTimeout(perchTimer); pendingDock = null; return; }
+        if (pendingDock === next) return;
+        clearTimeout(perchTimer);
+        pendingDock = next;
+        perchTimer = setTimeout(() => {
+          pendingDock = null;
+          if (!mascotAvoiding && !mascotTreatHeld) landAt(desiredDock());
+        }, 110);
+      }
+      refreshMascotTour = () => { if (!frame) frame = requestAnimationFrame(updateTour); };
+      addEventListener('scroll', refreshMascotTour, { passive: true });
+      addEventListener('resize', () => { if (dock && !mascotAvoiding) landAt(dock, true); refreshMascotTour(); });
+      doodle.addEventListener('blur', refreshMascotTour);
+      addEventListener('load', () => { if (dock && !mascotAvoiding) landAt(dock, true); refreshMascotTour(); }, { once: true });
+      refreshMascotTour();
     }
 
     let creditsTimer = null;
@@ -2721,7 +2739,7 @@
       doodle.classList.remove("caught");
       void doodle.offsetWidth;
       doodle.classList.add("caught");
-      showToast("HOW? 🏆");
+      showToast(mascotLine('caught') + ' 🏆');
       tone(880, .07, "square", .018);
       tone(1175, .10, "square", .014, .06);
       return true;
@@ -2729,6 +2747,8 @@
 
     function moveMascotAwayFrom(pointerX, pointerY, force = false) {
       if (!doodle || !mascotAvoiding || !mascotHomeRect || mascotTreatHeld) return;
+      mascotHomeRect = mascotTraveler.getBoundingClientRect();
+      const mascotScale = mascotHomeRect.width / 160;
       const now = performance.now();
       const rect = doodle.getBoundingClientRect();
       rememberMascotRect(rect, now);
@@ -2739,7 +2759,7 @@
       // Slow approaches make him react only a little earlier; the longer dodge cooldown
       // prevents him from jittering between escape spots while the pointer creeps nearby.
       const reactionDistance = pointerSpeed < .45 ? 145 : pointerSpeed < 1.15 ? 124 : 82;
-      if (!force && (cursorDistance > reactionDistance || now - mascotLastDodgeAt < 190)) return;
+      if (!force && (cursorDistance > reactionDistance || now - mascotLastDodgeAt < 250)) return;
 
       const homeX = mascotHomeRect.left + mascotHomeRect.width / 2;
       const homeY = mascotHomeRect.top + mascotHomeRect.height / 2;
@@ -2747,14 +2767,15 @@
         [-175,-55],[175,-55],[-170,64],[170,64],[-120,98],[120,98],
         [-205,12],[205,12],[0,108],[0,-88],[-82,-82],[82,-82]
       ];
-      const minX = 10 - mascotHomeRect.left;
-      const maxX = window.innerWidth - 10 - mascotHomeRect.right;
-      const minY = 8 - mascotHomeRect.top;
-      const maxY = Math.min(125, window.innerHeight - 8 - mascotHomeRect.bottom);
+      const minX = 14 - mascotHomeRect.left;
+      const maxX = document.documentElement.clientWidth - 14 - mascotHomeRect.right;
+      const minY = 12 - mascotHomeRect.top;
+      const maxY = Math.min(125, window.innerHeight - 12 - mascotHomeRect.bottom);
       let best = [mascotTargetX, mascotTargetY];
       let bestScore = -Infinity;
 
-      for (const [rawX, rawY] of candidates) {
+      for (const candidate of candidates) {
+        const [rawX, rawY] = candidate.map(value => value * Math.max(.45, mascotScale));
         const x = Math.max(minX, Math.min(maxX, rawX));
         const y = Math.max(minY, Math.min(maxY, rawY));
         const cx = homeX + x;
@@ -2762,7 +2783,7 @@
         const mouseDistance = Math.hypot(pointerX - cx, pointerY - cy);
         const travelPenalty = Math.hypot(x, y) * .025;
         const repeatPenalty = Math.hypot(x - mascotTargetX, y - mascotTargetY) < 20 ? 75 : 0;
-        const score = mouseDistance - travelPenalty - repeatPenalty;
+        const score = mouseDistance - travelPenalty - repeatPenalty + Math.random() * 24;
         if (score > bestScore) {
           bestScore = score;
           best = [x, y];
@@ -2773,14 +2794,14 @@
       mascotTargetX = best[0];
       mascotTargetY = best[1];
       mascotLastDodgeAt = now;
-      doodle.style.setProperty("--mascot-x", `${mascotTargetX}px`);
-      doodle.style.setProperty("--mascot-y", `${mascotTargetY}px`);
+      doodle.style.setProperty("--mascot-x", `${mascotTargetX / mascotScale}px`);
+      doodle.style.setProperty("--mascot-y", `${mascotTargetY / mascotScale}px`);
     }
 
     function startMascotAvoiding() {
       if (!doodle || mascotAvoiding) return;
       mascotAvoiding = true;
-      mascotHomeRect = doodle.getBoundingClientRect();
+      mascotHomeRect = mascotTraveler.getBoundingClientRect();
       mascotTargetX = 0;
       mascotTargetY = 0;
       mascotInvulnerableUntil = performance.now() + 520;
@@ -2806,7 +2827,7 @@
       startMascotAvoiding();
       unlockAchievement("home-personal-space");
       if (mascotWasFed) unlockAchievement("home-last-straw");
-      showToast("Mascot spam fine — $50. Now he's avoiding you. 👀");
+      showToast(mascotLine('annoyed') + ' 👀');
       tone(165, .16, "square", .015);
       return true;
     }
@@ -2825,7 +2846,7 @@
       void doodle.offsetWidth;
       doodle.classList.add("bounce");
       tone(330 + (facePokes % 4) * 55, .065, "sine", .018);
-      registerMascotPress();
+      if (!registerMascotPress()) showToast(mascotLine(mascotArea));
     });
 
     function makeMascotHappyAgain() {
@@ -2847,7 +2868,8 @@
       doodle.style.setProperty("--eye-y", "0px");
       doodle.setAttribute("aria-label", "Poke the little square face");
       mascotWasFed = true;
-      showToast("Peace offering accepted. 🍪");
+      showToast(mascotLine('fed'));
+      refreshMascotTour();
       tone(523, .08, "sine", .015);
       tone(659, .10, "sine", .012, .05);
       return true;
@@ -4606,6 +4628,7 @@
       if (typeof icon.rerollAll === "function") icon.rerollAll();
     });
     document.querySelectorAll(".house-icon").forEach(icon => randomizeHouse(icon, false));
+    setupWanderingMascot();
   </script>
 </body>
 </html>

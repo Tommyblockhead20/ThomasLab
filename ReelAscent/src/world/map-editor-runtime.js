@@ -1,3 +1,4 @@
+import { addSurfaceUvs } from '../graphics/surface-detail.js';
 import * as pc from 'playcanvas';
 import { MAIN_WORLD_LOCATION } from './world-locations.js';
 
@@ -437,7 +438,7 @@ function addTunnelMesh(world, name, vertices, triangles, material, friction = .9
     }
   }
   geometry.calculateNormals();
-  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, geometry);
+  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
   const entity = new pc.Entity(name);
   entity.addComponent('render');
   entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
@@ -813,7 +814,7 @@ function addBakedTerrainMesh(world, patch, center = centerFallback()) {
   geometry.positions = positions;
   geometry.indices = indices;
   geometry.normals = calculateAreaWeightedNormals(positions, indices);
-  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, geometry);
+  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
   const entity = new pc.Entity('Map Editor baked 3D mountain core');
   entity.addComponent('render');
   const material = world.materials?.alpine ?? world.materials?.rock;

@@ -72,6 +72,7 @@
     font-size: 13px;
   }
 </style>
+<link rel="stylesheet" href="polish.css">
 <script src="../achievements.js"></script>
 </head>
 <body>
@@ -79,11 +80,23 @@
   <div class="topbar">
     <a class="home-btn" href="../" aria-label="Home — Thomas Lab">⌂ Home</a>
     <div class="game-title">Train Clicker</div>
-    <div class="top-spacer" aria-hidden="true"></div>
+    <button id="pauseGame" type="button">Pause game</button>
   </div>
-  <canvas id="game" width="1000" height="800" aria-label="Train Clicker game"></canvas>
-  <div class="note">Choose your routes • Click tracks/cities to inspect • Click cows for cash • Esc pauses • Progress saves in this browser</div>
+  <div class="game-layout">
+    <div class="map-shell">
+      <div class="map-toolbar"><span>Railway map</span><div><button id="mapZoomOut" type="button" aria-label="Zoom map out">−</button><button id="mapZoomIn" type="button" aria-label="Zoom map in">+</button><button id="mapFit" type="button">Fit map</button></div></div>
+      <div class="map-stage" id="mapStage" tabindex="0" aria-label="Railway map. Scroll to pan when zoomed."><div class="map-world" id="mapWorld"><canvas id="game" width="1000" height="800" aria-label="Train Clicker game"></canvas></div></div>
+    </div>
+    <aside class="rail-controls" aria-label="Railway controls">
+      <div class="bank-ticket"><span>Bank balance</span><strong id="bankBalance">$750</strong></div>
+      <button id="buyRoute" type="button" class="buy-route"><strong id="buyRouteLabel">Buy new route</strong><span id="buyRouteCost">Cost: $500</span></button>
+      <div id="routeChoice" class="route-choice" hidden><label for="routeSelect">Choose a connection</label><select id="routeSelect"></select><button id="buildSelectedRoute" type="button">Build selected route</button></div>
+      <section class="selection-card"><span id="selectionKind" class="eyebrow">Your railway</span><h2 id="selectionTitle">Select a city or track</h2><p id="selectionInfo">Click a track or city to inspect.</p><div id="upgradeControls" hidden></div></section>
+    </aside>
+  </div>
+  <div class="note">Choose your routes • Click tracks/cities to inspect • Click cows for cash • Esc pauses • Save/load in the Pause menu</div>
 </div>
+<dialog id="pauseDialog" class="train-dialog" aria-labelledby="pauseTitle"><span class="eyebrow">Train Clicker</span><h2 id="pauseTitle">Taking a breather.</h2><p>The railway is paused.</p><button type="button" id="resumeGame" class="buy-route">Resume game</button><div class="save-actions"><button id="saveGame" type="button">Save game</button><button id="loadGame" type="button">Load game</button></div><p id="saveFeedback" role="status">Use Save game to keep your progress in this browser.</p><a href="../">← ThomasLab homepage</a></dialog>
 
 <script>
 (() => {
@@ -96,6 +109,7 @@
   const FPS_REFERENCE = 60;
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
   const COW_SPAWN_RATE_PER_SECOND = 1 / 38;
   const SAVE_KEY = 'trainClickerSaveV1';
@@ -430,9 +444,12 @@
     }
 
     draw(isSelected, isHovered) {
+      const reveal = this.revealStarted && !reducedMotion.matches ? Math.min(1, (performance.now() - this.revealStarted) / 500) : 1;
+      const trackFraction = 1 - (1 - reveal) ** 3;
       drawRailTrack(
         this.cityA.x, this.cityA.y,
-        this.cityB.x, this.cityB.y,
+        this.cityA.x + (this.cityB.x - this.cityA.x) * trackFraction,
+        this.cityA.y + (this.cityB.y - this.cityA.y) * trackFraction,
         isSelected, isHovered
       );
 
@@ -987,62 +1004,75 @@
         upgrades: Object.fromEntries(Object.entries(r.upgrades).map(([k,v]) => [k,v.lvl]))
       }))
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    flashPause('Game saved');
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      flashPause('Game saved');
+    } catch (err) {
+      console.error(err);
+      flashPause('Could not save. Browser storage may be full or unavailable.');
+    }
   }
 
   function loadGame() {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) {
-      flashPause('No save found');
-      return;
-    }
-
     try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) { flashPause('No save found'); return; }
       const data = JSON.parse(raw);
-      gameData.money = Number(data.money ?? 750);
-      checkBankAchievement();
-      gameData.cowsEnabled = data.cowsEnabled !== false;
-
-      if (Array.isArray(data.cities)) {
-        data.cities.forEach((d,i) => {
-          if (!CITIES[i]) return;
-          CITIES[i].passengers = Number(d.passengers ?? 0);
-          CITIES[i].houses = Number(d.houses ?? 1);
-        });
-      }
-
-      activeRoutes = [];
-      if (Array.isArray(data.activeRoutes)) {
-        for (const rd of data.activeRoutes) {
-          if (!CITIES[rd.a] || !CITIES[rd.b]) continue;
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid save');
+      const number = (value, fallback, minimum = 0) => {
+        const result = Number(value ?? fallback);
+        if (!Number.isFinite(result) || result < minimum) throw new Error('Invalid saved number');
+        return result;
+      };
+      const nextMoney = number(data.money, 750);
+      if (data.cities != null && !Array.isArray(data.cities)) throw new Error('Invalid cities');
+      const nextCities = CITIES.map((city, i) => {
+        const saved = data.cities?.[i];
+        if (saved == null) return { passengers: city.passengers, houses: city.houses };
+        if (typeof saved !== 'object') throw new Error('Invalid city');
+        return { passengers: Math.floor(number(saved.passengers, 0)), houses: Math.floor(number(saved.houses, 1, 1)) };
+      });
+      if (data.activeRoutes != null && !Array.isArray(data.activeRoutes)) throw new Error('Invalid routes');
+      const nextRoutes = [], seenRoutes = new Set();
+      for (const rd of data.activeRoutes ?? []) {
+          if (!rd || !Number.isInteger(rd.a) || !Number.isInteger(rd.b)
+            || !CITIES[rd.a] || !CITIES[rd.b] || rd.a === rd.b) throw new Error('Invalid route');
+          if (!POTENTIAL_ROUTES.some(([a,b]) => (a === rd.a && b === rd.b) || (a === rd.b && b === rd.a))) throw new Error('Unknown route');
+          const key = [rd.a, rd.b].sort((a,b) => a-b).join('-');
+          if (seenRoutes.has(key)) throw new Error('Duplicate route');
+          seenRoutes.add(key);
           const r = new Route(rd.a, rd.b);
           if (rd.upgrades) {
+            if (typeof rd.upgrades !== 'object' || Array.isArray(rd.upgrades)) throw new Error('Invalid upgrades');
             for (const [k,lvl] of Object.entries(rd.upgrades)) {
               if (r.upgrades[k]) {
-                r.upgrades[k].lvl = Math.max(0, Math.min(r.upgrades[k].max, Number(lvl) || 0));
+                r.upgrades[k].lvl = Math.min(r.upgrades[k].max, Math.floor(number(lvl, 0)));
               }
             }
           }
-          activeRoutes.push(r);
-        }
+          nextRoutes.push(r);
       }
-
+      // Commit only after the entire save has been prepared successfully.
+      gameData.money = nextMoney;
+      gameData.cowsEnabled = data.cowsEnabled !== false;
+      nextCities.forEach((city, i) => Object.assign(CITIES[i], city));
+      activeRoutes = nextRoutes;
       gameData.routesBought = activeRoutes.length;
       selectedRoute = null;
       selectedCity = null;
       buildMode = false;
       floatingTexts.length = 0;
+      checkBankAchievement();
       flashPause('Game loaded');
     } catch (err) {
       console.error(err);
-      flashPause('Save is corrupted');
+      flashPause('Could not load this save. Your current game is unchanged.');
     }
   }
 
   function flashPause(msg) {
     pauseFlash = msg;
-    pauseFlashUntil = performance.now() + 1600;
+    pauseFlashUntil = performance.now() + (msg.length > 40 ? 5500 : 1800);
   }
 
   // --- 7. UI Setup ---
@@ -1116,9 +1146,8 @@
     canvas.style.cursor = 'default';
   });
 
-  canvas.addEventListener('click', evt => {
+  function handleGameClick(x, y) {
     ensureAudio();
-    const {x,y} = canvasPos(evt);
 
     if (isPaused) {
       if (rectContains(saveBtn,x,y)) saveGame();
@@ -1169,22 +1198,7 @@
         }
       }
 
-      if (chosenPair && gameData.money >= routeCost) {
-        gameData.money -= routeCost;
-        const r = new Route(chosenPair[0], chosenPair[1]);
-        activeRoutes.push(r);
-        gameData.routesBought = activeRoutes.length;
-        selectedRoute = r;
-        selectedCity = null;
-        buildMode = false;
-        playUpgradeSound();
-        floatingTexts.push(new FloatingText(
-          (r.cityA.x + r.cityB.x) / 2,
-          (r.cityA.y + r.cityB.y) / 2 - 14,
-          'ROUTE BUILT!',
-          COLORS.gold
-        ));
-      }
+      if (chosenPair) purchaseRoute(chosenPair);
       clickedSomething = true;
     }
 
@@ -1230,7 +1244,24 @@
         selectedCity = null;
       }
     }
-  });
+  }
+
+  canvas.addEventListener('click', evt => { const {x,y} = canvasPos(evt); handleGameClick(x,y); });
+
+  function purchaseRoute(pair) {
+    const cost = 500 * (2 ** gameData.routesBought);
+    if (isPaused || !buildMode || gameData.money < cost || gameData.routesBought >= gameData.maxRoutes
+      || !getAvailablePairs().some(candidate => candidate[0] === pair?.[0] && candidate[1] === pair?.[1])) return false;
+    ensureAudio();
+    gameData.money -= cost;
+    const route = new Route(pair[0], pair[1]);
+    route.revealStarted = performance.now();
+    activeRoutes.push(route); gameData.routesBought = activeRoutes.length;
+    selectedRoute = route; selectedCity = null; buildMode = false;
+    playUpgradeSound();
+    floatingTexts.push(new FloatingText((route.cityA.x + route.cityB.x) / 2, (route.cityA.y + route.cityB.y) / 2 - 14, 'ROUTE BUILT!', COLORS.gold));
+    return true;
+  }
 
   window.addEventListener('keydown', evt => {
     if (evt.key === 'Escape') {
@@ -1306,151 +1337,102 @@
 
     for (const ft of floatingTexts) ft.draw();
 
-    drawUI(hoveredPotential);
-    if (isPaused) drawPauseMenu();
+    updateInterface(hoveredPotential);
   }
 
-  function drawUI(hoveredPotential) {
-    ctx.fillStyle = COLORS.uiBg;
-    ctx.fillRect(0,MAP_HEIGHT,WIDTH,HEIGHT-MAP_HEIGHT);
-    ctx.strokeStyle = COLORS.uiLine;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(0,MAP_HEIGHT);
-    ctx.lineTo(WIDTH,MAP_HEIGHT);
-    ctx.stroke();
-
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.font = 'bold 34px Arial, sans-serif';
-    ctx.fillStyle = COLORS.money;
-    ctx.fillText(`Bank: ${money(gameData.money)}`,20,617);
-
+  // Readable HTML controls share the original game actions and save data.
+  const pauseDialog = document.getElementById('pauseDialog');
+  const upgradeContainer = document.getElementById('upgradeControls');
+  const upgradeElements = {};
+  let lastInterfaceUpdate = 0;
+  const routeChoice = document.getElementById('routeChoice'), routeSelect = document.getElementById('routeSelect');
+  let routeOptionsKey = '';
+  document.getElementById('buildSelectedRoute').onclick = () => { purchaseRoute(routeSelect.value.split('-').map(Number)); lastInterfaceUpdate = 0; };
+  function setUiText(id, value) {
+    const node = document.getElementById(id);
+    if (node.textContent !== value) node.textContent = value;
+  }
+  for (const [key, label] of Object.entries(labels)) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'upgrade-button';
+    button.innerHTML = '<strong></strong><small class="upgrade-level"></small><span class="upgrade-cost"></span><span class="upgrade-effect"></span>';
+    button.querySelector('strong').textContent = label;
+    button.onclick = () => { const rect = upgButtons[key]; handleGameClick(rect.x + rect.w / 2, rect.y + rect.h / 2); lastInterfaceUpdate = 0; };
+    upgradeElements[key] = button; upgradeContainer.append(button);
+  }
+  document.getElementById('buyRoute').onclick = () => { handleGameClick(routeBtn.x + routeBtn.w / 2, routeBtn.y + routeBtn.h / 2); lastInterfaceUpdate = 0; };
+  document.getElementById('pauseGame').onclick = () => { isPaused = !isPaused; };
+  document.getElementById('resumeGame').onclick = () => { isPaused = false; };
+  document.getElementById('saveGame').onclick = saveGame;
+  document.getElementById('loadGame').onclick = () => { loadGame(); lastInterfaceUpdate = 0; };
+  pauseDialog.addEventListener('cancel', event => { event.preventDefault(); isPaused = false; });
+  pauseDialog.addEventListener('close', () => { isPaused = false; });
+  function updateInterface(hoveredPotential) {
+    if (isPaused && !pauseDialog.open) { pauseDialog.showModal(); document.getElementById('resumeGame').focus(); }
+    else if (!isPaused && pauseDialog.open) pauseDialog.close();
+    const now = performance.now();
+    if (now - lastInterfaceUpdate < 80) return;
+    lastInterfaceUpdate = now;
+    setUiText('pauseGame', isPaused ? 'Resume' : 'Pause game');
+    setUiText('saveFeedback', now < pauseFlashUntil ? pauseFlash : 'Use Save game to keep your progress in this browser.');
+    const balance = money(gameData.money);
+    const amount = document.getElementById('bankBalance');
+    if (amount.textContent !== balance) {
+      amount.textContent = balance;
+      if (!reducedMotion.matches) amount.animate([{ opacity: .5, transform: 'translateY(2px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 200 });
+    }
     const routeCost = 500 * (2 ** gameData.routesBought);
     const maxed = gameData.routesBought >= gameData.maxRoutes;
-    const canAfford = gameData.money >= routeCost;
-    const routeHover = rectContains(routeBtn,hoverX,hoverY);
-    const routeBase = maxed || (!canAfford && !buildMode) ? COLORS.btnDisabled : COLORS.btn;
-    drawButton(routeBtn, routeBase, routeHover && !maxed);
-
-    ctx.font = 'bold 21px Arial, sans-serif';
-    ctx.fillStyle = COLORS.text;
-    if (maxed) {
-      ctx.fillText('All Routes Built',routeBtn.x+10,routeBtn.y+10);
-      ctx.font = '18px Arial, sans-serif';
-      ctx.fillStyle = COLORS.muted;
-      ctx.fillText('Network complete',routeBtn.x+10,routeBtn.y+41);
-    } else if (buildMode) {
-      ctx.fillText('Cancel Build',routeBtn.x+10,routeBtn.y+10);
-      ctx.font = '18px Arial, sans-serif';
-      ctx.fillStyle = COLORS.gold;
-      ctx.fillText(`Route: ${money(routeCost)}`,routeBtn.x+10,routeBtn.y+41);
-    } else {
-      ctx.fillText('Buy New Route',routeBtn.x+10,routeBtn.y+10);
-      ctx.font = '18px Arial, sans-serif';
-      ctx.fillStyle = canAfford ? 'rgb(210,255,215)' : 'rgb(255,180,180)';
-      ctx.fillText(`Cost: ${money(routeCost)}`,routeBtn.x+10,routeBtn.y+41);
-    }
-
+    routeChoice.hidden = !buildMode;
     if (buildMode) {
-      ctx.font = 'bold 27px Arial, sans-serif';
-      ctx.fillStyle = COLORS.text;
-      ctx.fillText('Choose a dotted connection to build',20,664);
-      ctx.font = '19px Arial, sans-serif';
-      ctx.fillStyle = COLORS.muted;
-      if (hoveredPotential) {
-        const a = CITIES[hoveredPotential[0]].name;
-        const b = CITIES[hoveredPotential[1]].name;
-        ctx.fillStyle = COLORS.gold;
-        ctx.fillText(`${a} ↔ ${b} • ${money(routeCost)}`,20,701);
-      } else {
-        ctx.fillText('Hover a route to preview it • Esc cancels build mode',20,701);
+      const available = getAvailablePairs();
+      const key = available.map(pair => pair.join('-')).join(',');
+      if (routeOptionsKey !== key) {
+        const previous = routeSelect.value; routeOptionsKey = key;
+        routeSelect.replaceChildren(...available.map(pair => { const option = document.createElement('option'); option.value = pair.join('-'); option.textContent = CITIES[pair[0]].name + ' ↔ ' + CITIES[pair[1]].name; return option; }));
+        if (available.some(pair => pair.join('-') === previous)) routeSelect.value = previous;
       }
-      return;
+      document.getElementById('buildSelectedRoute').disabled = isPaused || gameData.money < routeCost;
     }
-
-    if (selectedCity) {
-      ctx.font = 'bold 29px Arial, sans-serif';
-      ctx.fillStyle = COLORS.text;
-      ctx.fillText(`City Inspector: ${selectedCity.name}`,20,662);
-      ctx.font = '21px Arial, sans-serif';
-      ctx.fillText(`Total Arrivals: ${selectedCity.passengers.toLocaleString('en-US')}`,20,704);
-      ctx.fillText(`Houses Built: ${selectedCity.houses}`,20,734);
-      ctx.fillStyle = COLORS.gold;
-      ctx.fillText(`Payout Multiplier: +${(selectedCity.houses-1)*50}%`,20,764);
+    document.getElementById('buyRoute').disabled = isPaused || maxed || (!buildMode && gameData.money < routeCost);
+    setUiText('buyRouteLabel', maxed ? 'All routes built' : buildMode ? 'Cancel build' : 'Buy new route');
+    setUiText('buyRouteCost', maxed ? 'Network complete' : (buildMode ? 'Route: ' : 'Cost: ') + money(routeCost));
+    upgradeContainer.hidden = !selectedRoute || buildMode;
+    if (buildMode) {
+      setUiText('selectionKind', 'Lay track'); setUiText('selectionTitle', 'Choose a connection');
+      setUiText('selectionInfo', hoveredPotential ? CITIES[hoveredPotential[0]].name + ' ↔ ' + CITIES[hoveredPotential[1]].name + ' · ' + money(routeCost) : 'Choose a connection from the list or dotted map lines. Esc cancels.');
+    } else if (selectedCity) {
+      setUiText('selectionKind', 'Selected city'); setUiText('selectionTitle', selectedCity.name);
+      setUiText('selectionInfo', 'Total arrivals: ' + selectedCity.passengers.toLocaleString('en-US') + '\nHouses built: ' + selectedCity.houses + '\nPayout multiplier: +' + (selectedCity.houses - 1) * 50 + '%');
     } else if (selectedRoute) {
-      ctx.font = 'bold 25px Arial, sans-serif';
-      ctx.fillStyle = COLORS.text;
-      ctx.fillText(`${selectedRoute.cityA.name} ↔ ${selectedRoute.cityB.name} Upgrades`,20,660);
-
-      for (const [key,rect] of Object.entries(upgButtons)) {
+      setUiText('selectionKind', 'Selected route'); setUiText('selectionTitle', selectedRoute.cityA.name + ' ↔ ' + selectedRoute.cityB.name);
+      setUiText('selectionInfo', 'Route upgrades');
+      for (const [key, button] of Object.entries(upgradeElements)) {
         const upg = selectedRoute.upgrades[key];
-        const maxedUpg = upg.lvl >= upg.max;
-        const hover = rectContains(rect,hoverX,hoverY);
-        drawButton(rect, maxedUpg ? COLORS.btnDisabled : COLORS.btn, hover && !maxedUpg);
-
-        ctx.textAlign = 'left';
-        if (hover && !maxedUpg) {
-          ctx.font = 'bold 18px Arial, sans-serif';
-          ctx.fillStyle = COLORS.text;
-          ctx.fillText(upgradeEffectText(selectedRoute,key),rect.x+9,rect.y+15);
-          ctx.font = '18px Arial, sans-serif';
-          ctx.fillStyle = 'rgb(210,255,215)';
-          ctx.fillText(`Cost: ${money(selectedRoute.getCost(key))}`,rect.x+9,rect.y+49);
-        } else {
-          ctx.font = 'bold 19px Arial, sans-serif';
-          ctx.fillStyle = COLORS.text;
-          ctx.fillText(labels[key],rect.x+9,rect.y+8);
-          ctx.font = '17px Arial, sans-serif';
-          ctx.fillStyle = COLORS.text;
-          ctx.fillText(`Lvl ${upg.lvl}/${upg.max}`,rect.x+9,rect.y+34);
-          ctx.fillStyle = maxedUpg ? 'rgb(220,220,220)' : 'rgb(210,255,215)';
-          ctx.fillText(maxedUpg ? 'MAXED' : money(selectedRoute.getCost(key)),rect.x+9,rect.y+58);
-        }
+        const maxedUpgrade = upg.lvl >= upg.max;
+        button.disabled = isPaused || maxedUpgrade || gameData.money < selectedRoute.getCost(key);
+        const values = { '.upgrade-level': 'Level ' + upg.lvl + '/' + upg.max, '.upgrade-cost': maxedUpgrade ? 'Maxed' : money(selectedRoute.getCost(key)), '.upgrade-effect': upgradeEffectText(selectedRoute, key) };
+        for (const [selector, text] of Object.entries(values)) { const node = button.querySelector(selector); if (node.textContent !== text) node.textContent = text; }
       }
     } else {
-      ctx.font = '30px Arial, sans-serif';
-      ctx.fillStyle = COLORS.muted;
-      ctx.fillText('Click a track or city to inspect!',20,710);
+      setUiText('selectionKind', 'Your railway'); setUiText('selectionTitle', 'Select a city or track');
+      setUiText('selectionInfo', activeRoutes.length ? 'Your trains are running. Click a city or track to inspect or upgrade.' : 'Buy a route to get your railway moving. Click cities and tracks to inspect them.');
     }
   }
-
-  function drawButton(rect, baseColor, hover) {
-    roundRect(rect.x,rect.y,rect.w,rect.h,9,hover ? COLORS.btnHover : baseColor);
-    ctx.strokeStyle = hover ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.10)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(rect.x + .5, rect.y + .5, rect.w - 1, rect.h - 1);
+  const mapStage = document.getElementById('mapStage'), mapWorld = document.getElementById('mapWorld');
+  let mapZoom = matchMedia('(max-width: 700px)').matches ? 1.8 : 1;
+  function fitMapWidth() { const width = Math.round(mapStage.clientWidth * mapZoom); mapWorld.style.width = width + 'px'; if (matchMedia('(max-width: 700px)').matches) mapStage.style.height = Math.min(340, width * .6) + 'px'; else mapStage.style.removeProperty('height'); }
+  function changeMapZoom(factor) {
+    const oldWidth = mapWorld.offsetWidth;
+    mapZoom = Math.max(1, Math.min(3.5, mapZoom * factor)); fitMapWidth();
+    const ratio = mapWorld.offsetWidth / Math.max(1, oldWidth);
+    mapStage.scrollLeft = (mapStage.scrollLeft + mapStage.clientWidth / 2) * ratio - mapStage.clientWidth / 2;
+    mapStage.scrollTop = (mapStage.scrollTop + mapStage.clientHeight / 2) * ratio - mapStage.clientHeight / 2;
   }
-
-  function drawPauseMenu() {
-    ctx.fillStyle = 'rgba(0,0,0,.64)';
-    ctx.fillRect(0,0,WIDTH,HEIGHT);
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 44px Arial, sans-serif';
-    ctx.fillStyle = '#fff';
-    ctx.fillText('PAUSED',WIDTH/2,HEIGHT/2-125);
-
-    drawButton(saveBtn,COLORS.btn,rectContains(saveBtn,hoverX,hoverY));
-    drawButton(loadBtn,COLORS.btn,rectContains(loadBtn,hoverX,hoverY));
-
-    ctx.font = '30px Arial, sans-serif';
-    ctx.fillStyle = COLORS.text;
-    ctx.fillText('SAVE GAME',WIDTH/2,saveBtn.y+saveBtn.h/2);
-    ctx.fillText('LOAD GAME',WIDTH/2,loadBtn.y+loadBtn.h/2);
-
-    ctx.font = '18px Arial, sans-serif';
-    ctx.fillStyle = '#c8ced8';
-    ctx.fillText('Saved to this browser (localStorage)',WIDTH/2,loadBtn.y+85);
-    ctx.fillText('Press Esc to resume',WIDTH/2,loadBtn.y+112);
-
-    if (performance.now() < pauseFlashUntil) {
-      ctx.font = 'bold 24px Arial, sans-serif';
-      ctx.fillStyle = 'rgb(180,255,180)';
-      ctx.fillText(pauseFlash,WIDTH/2,loadBtn.y+148);
-    }
-  }
+  document.getElementById('mapZoomIn').onclick = () => changeMapZoom(1.3);
+  document.getElementById('mapZoomOut').onclick = () => changeMapZoom(1 / 1.3);
+  document.getElementById('mapFit').onclick = () => { mapZoom = 1; fitMapWidth(); mapStage.scrollTo({ left: 0, top: 0 }); };
+  new ResizeObserver(fitMapWidth).observe(mapStage); fitMapWidth();
 
   function roundRect(x,y,w,h,r,fill) {
     const rr = Math.min(r,w/2,h/2);

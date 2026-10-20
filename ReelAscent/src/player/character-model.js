@@ -6,6 +6,7 @@ import {
   resolveAppearance
 } from './appearance.js';
 import { COSMETIC_BY_ID } from '../progression/cosmetics.js';
+import { applySurfaceDetail } from '../graphics/surface-detail.js';
 
 // This manifest is intentionally shared with the focused catalog audit. Adding an active
 // visual token without a corresponding low-poly recipe makes the audit fail instead of
@@ -180,12 +181,28 @@ function buildEyewear(humanRig, materials) {
   return result;
 }
 
+function drapedCape(parent,name,material,backY,blob,size){
+  if(!parent._app?.graphicsDevice)return false;
+  const geometry=new pc.Geometry(),positions=[],uvs=[],indices=[],rows=12,columns=16;
+  for(let r=0;r<=rows;r++)for(let c=0;c<=columns;c++){
+    const t=r/rows,u=c/columns,width=(.49+.23*Math.sin(t*Math.PI*.55))*size;
+    const hem=Math.pow(t,8)*(.02*Math.cos(u*Math.PI*6)+.018*Math.abs(u-.5));
+    positions.push((u-.5)*width,backY+.37-t*.94-hem,(blob?.49:.255)+t*.17+Math.cos(u*Math.PI*8)*(.009+.027*t));
+    uvs.push(u*1.2,t*1.6);
+  }
+  for(let r=0;r<rows;r++)for(let c=0;c<columns;c++){const a=r*(columns+1)+c,b=a+columns+1;indices.push(a,b,a+1,a+1,b,b+1);}
+  geometry.positions=positions;geometry.uvs=uvs;geometry.indices=indices;geometry.calculateNormals();
+  const cape=new pc.Entity(name,parent._app),mesh=pc.Mesh.fromGeometry(parent._app.graphicsDevice,geometry);
+  material.cull=pc.CULLFACE_NONE;material.twoSidedLighting=true;material.update();
+  cape.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,material,cape)],castShadows:true,receiveShadows:true});parent.addChild(cape);return true;
+}
+
 function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false) {
   // Hats and non-hat accessories have independent player colors. Rebind only the recipe's
   // primary tint material; authored glass, silver, dark, and pack details stay fixed.
   const materials = cosmetic.slot === 'headwear'
-    ? { ...sourceMaterials, accessory: sourceMaterials.hat }
-    : sourceMaterials;
+    ? { ...sourceMaterials, accessory: ['crown','halo','sun'].includes(cosmetic.visual) ? sourceMaterials.hatMetal : sourceMaterials.hat }
+    : cosmetic.slot === 'eyewear' ? { ...sourceMaterials, accessory: sourceMaterials.accessoryMetal } : sourceMaterials;
   const root = group(parent, `${blob ? 'Blob ' : ''}${cosmetic.label}`);
   const size = blob ? 1.16 : 1;
   const headY = blob ? 1.17 : .94;
@@ -257,7 +274,8 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
           { x: .07, y: .2, z: .07 }, materials.accessory, { x: 90, z: 90 - theta * 180 / Math.PI });
       }
     } else if (['hood', 'beanie', 'cap', 'headlamp'].includes(visual)) {
-      add('crown', visual === 'beanie' ? 'cone' : 'sphere', { x: 0, y: headY + .08, z: .03 }, { x: .5, y: .28, z: .48 });
+      add('crown', 'sphere', { x: 0, y: headY + .08, z: .03 }, { x: .5, y: .28, z: .48 });
+      if (visual === 'beanie') add('folded knit cuff', 'cylinder', { x:0,y:headY,z:.03 }, { x:.51,y:.095,z:.49 });
       if (visual === 'cap') add('bill', 'box', { x: 0, y: headY, z: -.35 }, { x: .48, y: .055, z: .34 });
       if (visual === 'headlamp') add('lamp', 'sphere', { x: 0, y: headY + .04, z: -.4 }, { x: .13, y: .12, z: .1 }, materials.silver);
     } else {
@@ -316,8 +334,15 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
   } else {
     const backY = blob ? .05 : -.03;
     if (['cape', 'wings'].includes(visual)) {
-      for (const side of (visual === 'wings' ? [-1, 1] : [0])) add(`panel ${side}`, 'box',
-        { x: side * .34, y: backY, z: blob ? .49 : .36 }, { x: visual === 'wings' ? .42 : .68, y: .9, z: .07 }, materials.accessory, { z: side * -17, x: -7 });
+      if(visual==='wings'||!drapedCape(root,`${cosmetic.label} folded cloth`,materials.accessory,backY,blob,size)){
+        for (const side of (visual === 'wings' ? [-1, 1] : [0])) add(`panel ${side}`, 'box',
+          { x: side * .34, y: backY, z: blob ? .49 : .36 }, { x: visual === 'wings' ? .42 : .68, y: .9, z: .07 }, materials.accessory, { z: side * -17, x: -7 });
+      }
+      if(visual==='cape'){
+        add('woven trail patch','box',{x:0,y:backY+.12,z:blob?.555:.32},{x:.17,y:.15,z:.012},materials.pack,{x:-10});
+        add('patch mountain','cone',{x:0,y:backY+.12,z:blob?.564:.329},{x:.09,y:.1,z:.012},materials.silver);
+        for(const side of [-1,1])add(`shoulder fastening ${side}`,'sphere',{x:side*.19,y:backY+.35,z:blob?.51:.28},{x:.055,y:.04,z:.025},materials.silver);
+      }
     } else if (['fin', 'flag'].includes(visual)) {
       add('spine', 'box', { x: 0, y: backY + .2, z: blob ? .52 : .38 }, { x: .08, y: .9, z: .08 });
       add('fin', visual === 'flag' ? 'box' : 'cone', { x: .22, y: backY + .38, z: blob ? .52 : .4 }, { x: .45, y: .58, z: .08 }, materials.accessory, { z: -20 });
@@ -359,6 +384,18 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
       for (const side of [-1, 1]) add(`trophy handle ${side}`, 'sphere', { x: side * .2, y: backY + .2, z: blob ? .69 : .54 }, { x: .1, y: .13, z: .04 }, materials.accessory);
     } else {
       add('pack', 'box', { x: 0, y: backY, z: blob ? .5 : .35 }, { x: .58, y: .7, z: .3 }, cosmetic.id === 'backpack' ? materials.pack : materials.accessory, { x: -7 });
+    }
+  }
+  if (cosmetic.slot === 'headwear' && ['cowboy','bucket','top-hat','wizard'].includes(visual)) {
+    add('woven hat band', 'cylinder', { x:0,y:headY+.08,z:.02 }, { x:.45,y:.055,z:.45 }, materials.dark);
+    add('hat band clasp', 'box', { x:0,y:headY+.08,z:-.214 }, { x:.08,y:.07,z:.022 }, materials.silver);
+  }
+  if (cosmetic.slot === 'backAccessory' && visual === 'pack') {
+    const y=blob?.05:-.03,z=blob?.67:.52;
+    add('stitched front pocket','box',{x:0,y:y-.18,z},{x:.38,y:.24,z:.09},materials.pack,{x:-7});
+    for(const side of [-1,1]){
+      add(`compression strap ${side}`,'box',{x:side*.18,y,z:z+.04},{x:.035,y:.57,z:.015},materials.dark,{x:-7});
+      add(`strap buckle ${side}`,'box',{x:side*.18,y:y+.08,z:z+.06},{x:.063,y:.07,z:.025},materials.silver);
     }
   }
   // Deliberate, name/theme-authored distinctions for the most obvious shared recipes.
@@ -447,12 +484,23 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     glass: surface([.2, .52, .62], .82),
     silver: surface([.72, .74, .72], .7)
   };
+  materials.hatMetal = surface(LEGACY_CHARACTER_PALETTE.playerAccent, .7);
+  materials.accessoryMetal = surface([.84,.42,.13], .65);
+  for (const key of ['silver','hatMetal','accessoryMetal']) {
+    materials[key].useMetalness = true; materials[key].metalness = .65; materials[key].update();
+  }
+  const device = parent._app?.graphicsDevice;
+  for (const key of ['jacket','accent','trousers','pack','hat','accessory']) applySurfaceDetail(materials[key],device,'fabric',{tiling:4,strength:.24});
+  materials.glass.opacity = .72; materials.glass.blendType = pc.BLEND_NORMAL; materials.glass.depthWrite = false; materials.glass.update();
   const humanRig = group(parent, `${name} human avatar`);
   const blobRig = group(parent, `${name} Blue Blob avatar`);
 
   primitive(humanRig, 'Tapered upper torso', 'box', AVATAR_ATTACHMENT_SPEC.upperTorso.position, AVATAR_ATTACHMENT_SPEC.upperTorso.scale, materials.jacket);
   primitive(humanRig, 'Lower torso', 'box', AVATAR_ATTACHMENT_SPEC.lowerTorso.position, AVATAR_ATTACHMENT_SPEC.lowerTorso.scale, materials.accent);
   primitive(humanRig, 'Jacket collar', 'box', { x: 0, y: .34, z: -.04 }, { x: .38, y: .12, z: .47 }, materials.accent);
+  primitive(humanRig, 'Jacket center zip', 'box', { x: 0, y: .06, z: -.219 }, { x: .018, y: .48, z: .015 }, materials.dark);
+  primitive(humanRig, 'Jacket zip pull', 'box', { x: 0, y: .26, z: -.235 }, { x: .033, y: .047, z: .02 }, materials.silver);
+  for (const side of [-1,1]) primitive(humanRig, `Jacket pocket welt ${side}`, 'box', { x: side*.21, y: -.1, z: -.219 }, { x: .16, y: .025, z: .012 }, materials.accent, { z: side*12 });
   primitive(humanRig, 'Neck', 'cylinder', AVATAR_ATTACHMENT_SPEC.neck.position, AVATAR_ATTACHMENT_SPEC.neck.scale, materials.skin);
   primitive(humanRig, 'Left shoulder cap', 'sphere', { x: -.37, y: .27, z: 0 }, { x: .25, y: .25, z: .27 }, materials.jacket);
   primitive(humanRig, 'Right shoulder cap', 'sphere', { x: .37, y: .27, z: 0 }, { x: .25, y: .25, z: .27 }, materials.jacket);
@@ -518,7 +566,7 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     return root;
   };
   const beanie = makeAccessory('beanie', 'Beanie');
-  primitive(beanie, 'Beanie crown', 'cone', { x: 0, y: 1, z: 0 }, { x: .5, y: .34, z: .5 }, materials.hat);
+  primitive(beanie, 'Beanie crown', 'sphere', { x: 0, y: 1, z: 0 }, { x: .5, y: .34, z: .5 }, materials.hat);
   primitive(beanie, 'Beanie band', 'cylinder', { x: 0, y: .89, z: 0 }, { x: .51, y: .12, z: .51 }, materials.hat);
   const trailHat = makeAccessory('trail-hat', 'Trail hat');
   primitive(trailHat, 'Trail hat brim', 'box', { x: 0, y: .94, z: -.05 }, { x: .72, y: .055, z: .62 }, materials.hat);
@@ -547,7 +595,14 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
 
   const backpackBody = primitive(humanRig, 'Backpack', 'box', { x: 0, y: -.03, z: .33 }, { x: .55, y: .66, z: .31 }, materials.pack, { x: -7 });
   const backpackFlap = primitive(humanRig, 'Backpack flap', 'box', { x: 0, y: .15, z: .495 }, { x: .45, y: .18, z: .05 }, materials.pack, { x: -7 });
-  const backAccessoryRoots = new Map([['backpack', [backpackBody, backpackFlap]]]);
+  const packDetails = group(humanRig, 'Backpack tailoring');
+  primitive(packDetails, 'Backpack front pocket', 'box', { x:0, y:-.17, z:.51 }, { x:.36, y:.23, z:.075 }, materials.pack, { x:-7 });
+  for (const side of [-1,1]) {
+    primitive(packDetails, `Backpack webbing ${side}`, 'box', { x:side*.16, y:.01, z:.545 }, { x:.035, y:.5, z:.016 }, materials.dark, { x:-7 });
+    primitive(packDetails, `Backpack buckle ${side}`, 'box', { x:side*.16, y:.05, z:.565 }, { x:.065, y:.07, z:.025 }, materials.silver);
+    primitive(packDetails, `Backpack shoulder strap ${side}`, 'box', { x:side*.26, y:.07, z:.16 }, { x:.065, y:.58, z:.06 }, materials.pack, { x:-12,z:side*8 });
+  }
+  const backAccessoryRoots = new Map([['backpack', [backpackBody, backpackFlap, packDetails]]]);
   const blobAccessories = new Map();
   const blobBackAccessoryRoots = new Map();
   const leftLimb = buildLimb(humanRig, 'Left', materials);
@@ -580,7 +635,9 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
     recolor(materials.trousers, resolved.pantsColorValue.color);
     recolor(materials.hair, resolved.hairColorValue.color);
     recolor(materials.hat, resolved.hatColor);
+    recolor(materials.hatMetal, resolved.hatColor);
     recolor(materials.accessory, resolved.accessoryColor);
+    recolor(materials.accessoryMetal, resolved.accessoryColor);
     recolor(materials.pack, resolved.backpackColorValue.color);
     recolor(materials.blobBlue, resolved.blobColor, .03);
     humanRig.enabled = appearance.avatarType === 'human';

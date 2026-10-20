@@ -1,3 +1,4 @@
+import { addSurfaceUvs } from '../graphics/surface-detail.js';
 import * as pc from 'playcanvas';
 import { TRIANGLE_PRISM_POSITIONS, TRIANGLE_PRISM_INDICES } from './triangle-prism.js';
 
@@ -323,7 +324,7 @@ function addStaticObject(world, root, item) {
     geometry.positions = [...TRIANGLE_PRISM_POSITIONS];
     geometry.indices = [...TRIANGLE_PRISM_INDICES];
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity(`WorldEditor ${item.name}`);
     entity.addComponent('render');
     entity.render.meshInstances = [new pc.MeshInstance(mesh, materialForObject(world, item), entity)];

@@ -26,7 +26,7 @@ const close = (actual, expected, tolerance = 1e-9) => assert.ok(
   `${actual} should be within ${tolerance} of ${expected}`
 );
 
-test('Outer Ocean bobber retention uses the v20.3 per-rarity acceptance chances', () => {
+test('Outer Ocean bobber filtering preserves the current per-rarity acceptance chances', () => {
   const ocean = PHYSICAL_WATER_RARITY_PROFILES.ocean;
   const normal = expectedAcceptedBites(ocean, 'standard');
   const selective = expectedAcceptedBites(ocean, 'selective');
@@ -41,11 +41,11 @@ test('Outer Ocean bobber retention uses the v20.3 per-rarity acceptance chances'
   close(selective.Rare, 4.224);
   close(selective.Legendary, 2.856);
   close(selective.total, 29.664);
-  close(trophy.Common, 6.696);
+  close(trophy.Common, 0);
   close(trophy.Uncommon, 3.84);
   close(trophy.Rare, 2.64);
   close(trophy.Legendary, 1.932);
-  close(trophy.total, 15.108);
+  close(trophy.total, 8.412);
   assert.equal(getSelectiveBobberSettings('selective').acceptanceByRarity.Rare, .64);
 });
 
@@ -64,11 +64,11 @@ test('Cloudstep keeps its own high-rarity ecology under the same retention filte
   close(selective.Rare, 21.12);
   close(selective.Legendary, 5.304);
   close(selective.total, 36.792);
-  close(trophy.Common, .864);
+  close(trophy.Common, 0);
   close(trophy.Uncommon, 4.608);
   close(trophy.Rare, 13.2);
   close(trophy.Legendary, 3.588);
-  close(trophy.total, 22.26);
+  close(trophy.total, 21.396);
   const scaled = deriveBobberAcceptance(cloudstep, 'trophy');
   assert.ok(scaled.Legendary > scaled.Rare && scaled.Rare > scaled.Uncommon);
 });
@@ -134,7 +134,7 @@ test('bobber wiring analytically preserves filtering while using one bounded vis
     readFile(new URL('src/fishing/rarity-selection.js', here), 'utf8'),
     readFile(new URL('src/config.js', here), 'utf8')
   ]);
-  assert.match(fishing, /deriveAcceptedBobberProfile\(potentialProfile, bobberMode\)/);
+  assert.match(fishing, /chooseAcceptedBobberEntry\(selectionTable, bobberMode, this\.rng\(\)\)/);
   assert.match(fishing, /sampleBobberBiteDelay\(bobber, this\.rng\(\)/);
   assert.doesNotMatch(fishing, /this\.rng\(\) >= acceptance/);
   assert.doesNotMatch(rarity, /bobberAcceptanceByRarity/);

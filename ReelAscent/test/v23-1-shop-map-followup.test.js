@@ -42,17 +42,18 @@ test('Outfitter upgrades have concise, useful effects and coherent category pric
   }
 });
 
-test('balanced selective bobbers use the intended shorter cadence and modest rarity tilt', () => {
+test('selective bobbers retain their cadence and Sentinel excludes Common fish', () => {
   assert.deepEqual(SELECTIVE_BOBBER_SETTINGS.selective.acceptanceByRarity,
     { Common: .42, Uncommon: .58, Rare: .64, Legendary: .68 });
   assert.deepEqual(SELECTIVE_BOBBER_SETTINGS.trophy.acceptanceByRarity,
-    { Common: .18, Uncommon: .32, Rare: .4, Legendary: .46 });
+    { Common: 0, Uncommon: .32, Rare: .4, Legendary: .46 });
   assert.equal(SELECTIVE_BOBBER_SETTINGS.selective.targetWaitSeconds, 28);
   assert.equal(SELECTIVE_BOBBER_SETTINGS.trophy.targetWaitSeconds, 75);
   const selective = deriveAcceptedBobberProfile(PHYSICAL_WATER_RARITY_PROFILES.ocean, 'selective');
   const trophy = deriveAcceptedBobberProfile(PHYSICAL_WATER_RARITY_PROFILES.ocean, 'trophy');
   close(selective.Rare + selective.Legendary, .23867313915857605);
-  close(trophy.Rare + trophy.Legendary, .30262112867355045);
+  assert.equal(trophy.Common, 0);
+  close(trophy.Rare + trophy.Legendary, .0762 / .1402);
 });
 
 test('Binder combines only owned Field Note pages and Catch Log Pages are passive', () => {

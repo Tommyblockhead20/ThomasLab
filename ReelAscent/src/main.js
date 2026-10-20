@@ -1,5 +1,5 @@
 import { markStartup, getStartupTimings, reportStartupTimings } from './debug/startup-timings.js';
-import { Game } from './game.js';
+import { WEBGL_RECOVERY_TEXT } from '../../webgl-support.js';
 
 markStartup('js:module-evaluated');
 globalThis.__reelAscentStartup = getStartupTimings;
@@ -11,11 +11,14 @@ const errorPanel = document.querySelector('#error-panel');
 const errorMessage = document.querySelector('#error-message');
 
 // Vite serves this project at / in development, where ../ would point back here.
-if (import.meta.env.DEV) document.querySelector('.site-home-link')?.setAttribute('href', 'https://thomaslab.me/');
+if (import.meta.env.DEV) document.querySelectorAll('.site-home-link').forEach((link) => link.setAttribute('href', 'https://thomaslab.me/'));
+
+document.querySelector('#retry-start')?.addEventListener('click', () => location.reload());
 
 async function start() {
   try {
     markStartup('bootstrap:start');
+    const { Game } = await import('./game.js');
     await Game.create(canvas, (status) => {
       loadingStatus.textContent = status;
     });
@@ -27,7 +30,10 @@ async function start() {
     console.error(error);
     loading.hidden = true;
     errorPanel.hidden = false;
-    errorMessage.textContent = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
+    const graphicsFailure = error?.name === 'GraphicsUnavailableError' || /webgl|graphics context/i.test(message);
+    errorMessage.textContent = graphicsFailure ? WEBGL_RECOVERY_TEXT : message;
+    document.querySelector('#graphics-help').hidden = !graphicsFailure;
   }
 }
 

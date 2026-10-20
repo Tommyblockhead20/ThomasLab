@@ -2028,6 +2028,12 @@ body.mobile-mode .reason-touch-hint { display: inline; }
 .error-panel {
   background: linear-gradient(155deg, #574c56, #8c6665);
 }
+.error-panel #error-message { max-width: 42rem; line-height: 1.6; margin-top: .75rem; }
+.error-panel #graphics-help { margin-top: 1rem; }
+.error-panel a { color: #fff5cb; }
+.error-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem; margin-top: 1.5rem; }
+.error-actions button, .error-actions .site-home-link { min-height: 44px; margin: 0; padding: .65rem 1rem; border: 1px solid rgb(255 255 255 / 35%); border-radius: .65rem; background: #244c45; color: #fff9e8; font: inherit; font-weight: 800; cursor: pointer; }
+.error-actions button:focus-visible { outline: 3px solid #f5d679; outline-offset: 3px; }
 
 @media (max-width: 700px) {
   .stamina-panel {
@@ -2833,6 +2839,9 @@ body.pause-open #game-shell::after {
 .pause-tabs { display: grid; align-content: start; gap: .38rem; }
 .pause-tabs button { color: #e8f1e9; background: rgb(255 255 255 / 8%); border: 1px solid rgb(255 255 255 / 8%); }
 .pause-tabs button[aria-pressed="true"] { color: #153a36; background: #edd58c; border-color: #edd58c; }
+.pause-site-home { display:grid;gap:.2rem;margin:.8rem 0 0;padding:.65rem .72rem;white-space:normal;line-height:1.35;border-top-color:rgb(239 217 139 / 45%); }
+.pause-site-home span { font-size:.68rem; }
+.pause-site-home small { color:rgb(234 244 231 / 72%);font-size:.55rem;font-weight:650; }
 .pause-status { min-height: 1rem; margin: 0; color: rgb(234 244 231 / 64%); font-size: .6rem; font-weight: 750; }
 .pause-content { min-height: 0; overflow: auto; padding: .08rem .2rem .25rem .05rem; scrollbar-color: #d9bb66 rgb(255 255 255 / 8%); }
 .pause-multiplayer-host { min-height: 0; }

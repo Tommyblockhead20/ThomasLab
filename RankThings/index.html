@@ -500,6 +500,7 @@
             #canvas-container, #tier-list-container, #analysis-container { height: 50vh; }
         }
     </style>
+<link rel="stylesheet" href="polish.css">
 <script src="../achievements.js"></script>
 </head>
 <body>
@@ -18959,10 +18960,10 @@
             const unsure = foods.filter(f => f.special === 'unsure').length;
             const staging = foods.length - ranked;
             if (currentDataset === 'outdoors') {
-                progressBox.innerHTML = `Ranked: ${ranked} / ${foods.length}<br>Staging: ${staging} · Unsure: ${unsure}`;
+                progressBox.innerHTML = `Ranked: ${ranked} / ${foods.length}<br> Staging: ${staging} · Unsure: ${unsure}`;
             } else {
                 const haventLabel = currentDataset === 'trips' ? "Haven't Done" : "Haven't Had";
-                progressBox.innerHTML = `Ranked: ${ranked} / ${foods.length}<br>Staging: ${staging} · ${haventLabel}: ${havent} · Unsure: ${unsure}`;
+                progressBox.innerHTML = `Ranked: ${ranked} / ${foods.length}<br> Staging: ${staging} · ${haventLabel}: ${havent} · Unsure: ${unsure}`;
             }
         }
 
@@ -18972,6 +18973,14 @@
             if (food.needsReview) el.classList.add('needs-review');
             el.id = 'food-' + food.id;
             el.draggable = true;
+            el.tabIndex = 0;
+            el.setAttribute('role', 'button');
+            el.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    quickMoveFood(food.id);
+                }
+            });
             el.ondragstart = drag;
             el.ondblclick = () => forceWikiFetch(food.id);
             el.onclick = () => {
@@ -19153,29 +19162,70 @@
             btn.disabled = false;
         }
 
-        async function fetchWikiImage(name, img, food) {
-            const url = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(name)}&gsrlimit=1&prop=pageimages&format=json&pithumbsize=400&origin=*`;
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                const page = Object.values(data.query.pages)[0];
-                if (page.thumbnail) { img.src = page.thumbnail.source; food.src = page.thumbnail.source; }
-            } catch(e) {}
+        const wikiRequests = new Map();
+        const wikiQueue = [];
+        let activeWikiRequests = 0;
+        const pendingWikiImages = new WeakMap();
+        function drainWikiQueue() {
+            while (activeWikiRequests < 6 && wikiQueue.length) {
+                const task = wikiQueue.shift();
+                activeWikiRequests++;
+                task().finally(() => { activeWikiRequests--; drainWikiQueue(); });
+            }
+        }
+        function requestWikiImage(name, refresh = false) {
+            if (refresh) wikiRequests.delete(name);
+            if (!wikiRequests.has(name)) {
+                const request = new Promise(resolve => {
+                    wikiQueue.push(async () => {
+                        try {
+                            const url = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(name)}&gsrlimit=1&prop=pageimages&format=json&pithumbsize=400&origin=*`;
+                            const res = await fetch(url);
+                            if (!res.ok) return resolve(null);
+                            const data = await res.json();
+                            resolve(Object.values(data.query?.pages ?? {})[0]?.thumbnail?.source ?? null);
+                        } catch { resolve(null); }
+                    });
+                });
+                wikiRequests.set(name, request);
+                drainWikiQueue();
+            }
+            return wikiRequests.get(name);
+        }
+        const wikiImageObserver = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
+            for (const entry of entries) {
+                if (!entry.target.isConnected) { wikiImageObserver.unobserve(entry.target); continue; }
+                if (!entry.isIntersecting) continue;
+                wikiImageObserver.unobserve(entry.target);
+                pendingWikiImages.get(entry.target)?.();
+                pendingWikiImages.delete(entry.target);
+            }
+        }, { rootMargin: '120px' });
+        function fetchWikiImage(name, img, food, refresh = false) {
+            const load = async () => {
+                const source = await requestWikiImage(name, refresh);
+                if (source) { img.src = source; food.src = source; }
+            };
+            if (refresh || !wikiImageObserver) return load();
+            pendingWikiImages.set(img, load);
+            wikiImageObserver.observe(img);
         }
 
 		function forceWikiFetch(id) { 
             const food = foods.find(f => f.id === id);
             // CHANGED: Extracts the base filename for forced fetches as well
             const searchName = food.src.split('/').pop().split('.')[0];
-            fetchWikiImage(searchName, document.getElementById('img-'+id), food); 
+            const img = document.getElementById('img-'+id);
+            if (img) fetchWikiImage(searchName, img, food, true);
         }        
 
-        function quickMoveFood(id) {
+        function quickMoveFood(id, selection) {
             const food = foods.find(f => f.id === id);
             if (!food) return;
+            if (!selection && window.RankThingsUI) return window.RankThingsUI.moveItem(id);
             const activeTiers = getActiveTierLetters();
             const specialChoices = currentDataset === 'outdoors' ? 'unsure' : 'havent, unsure';
-            const choice = prompt(`Move to: staging, plot, ${activeTiers.join(', ')}, ${specialChoices}`);
+            const choice = selection?.target ?? prompt(`Move to: staging, plot, ${activeTiers.join(', ')}, ${specialChoices}`);
             if (!choice) return;
             const target = choice.trim().toLowerCase();
             pushUndo();
@@ -19184,8 +19234,8 @@
                 food.x = null; food.y = null; food.tier = null; food.special = null;
             } else if (target === 'plot') {
                 markFoodTouched(food);
-                const x = parseFloat(prompt('Quality / X position 0-100:', food.x ?? 50));
-                const y = parseFloat(prompt('Value / Y position 0-100:', food.y ?? 50));
+                const x = selection?.x ?? parseFloat(prompt('Quality / X position 0-100:', food.x ?? 50));
+                const y = selection?.y ?? parseFloat(prompt('Value / Y position 0-100:', food.y ?? 50));
                 if (Number.isNaN(x) || Number.isNaN(y)) { undoStack.pop(); return; }
                 food.x = Math.max(0, Math.min(100, x));
                 food.y = Math.max(0, Math.min(100, y));
@@ -19425,5 +19475,6 @@
         populateOriginFilter(true);
         setView('tier');
     </script>
+<script src="polish.js"></script>
 </body>
 </html>

@@ -1,5 +1,10 @@
 import * as pc from 'playcanvas';
 import { resolveCreaturePresentation } from './creature-presentation.js';
+import { applySurfaceDetail } from '../graphics/surface-detail.js';
+import { creatureArt } from './creature-art.js';
+import { SCULPTED_FISH_ARCHETYPES, buildFishSculpture } from './fish-sculpture.js';
+import { repairSolidAttachments } from './solid-attachments.js';
+import { AQUATIC_SCULPTURES, buildAquaticSculpture } from './aquatic-sculpture.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -13,6 +18,7 @@ function surface(color, { shiny = false, dark = false } = {}) {
   return material;
 }
 
+const primitiveVertices = new Map();
 function primitive(parent, name, type, position, scale, material, rotation = {}) {
   const entity = new pc.Entity(name, parent._app);
   entity.addComponent('render', { type, material, castShadows: true, receiveShadows: true });
@@ -20,10 +26,31 @@ function primitive(parent, name, type, position, scale, material, rotation = {})
   entity.setLocalScale(scale.x, scale.y, scale.z);
   entity.setLocalEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
   parent.addChild(entity);
+  let unitVertices = primitiveVertices.get(type);
+  if (!unitVertices && entity.render?.meshInstances?.[0]?.mesh?.getPositions) {
+    unitVertices = [];
+    entity.render.meshInstances[0].mesh.getPositions(unitVertices);
+    primitiveVertices.set(type, unitVertices);
+  }
+  const vertices = [];
+  if (unitVertices) {
+    const q = new pc.Quat().setFromEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+    for (let i = 0; i < unitVertices.length; i += 3) {
+      const p = q.transformVector(new pc.Vec3(unitVertices[i] * scale.x, unitVertices[i + 1] * scale.y, unitVertices[i + 2] * scale.z));
+      vertices.push(p.x, p.y, p.z);
+    }
+  }
+  const actualScale = { ...scale },center=[0,0,0];
+  if (vertices.length) {
+    for (const [axis,key] of ['x','y','z'].entries()) {
+      let min=Infinity,max=-Infinity;for(let i=axis;i<vertices.length;i+=3){min=Math.min(min,vertices[i]);max=Math.max(max,vertices[i]);}actualScale[key]=max-min;center[axis]=(min+max)/2;
+    }
+    for(let i=0;i<vertices.length;i++)vertices[i]-=center[i%3];
+  }
   entity._creatureAttachmentPart = {
-    name,
-    position: { x: position.x, y: position.y, z: position.z },
-    scale: { x: Math.abs(scale.x), y: Math.abs(scale.y), z: Math.abs(scale.z) }
+    name, type, vertices,
+    position: { x: position.x+center[0], y: position.y+center[1], z: position.z+center[2] },
+    scale: { x: Math.abs(actualScale.x), y: Math.abs(actualScale.y), z: Math.abs(actualScale.z) }
   };
   return entity;
 }
@@ -42,6 +69,7 @@ function attachmentDeficits(a, b, epsilon) {
 /** Pure model-space repair used by the runtime factory and regression tests. */
 export function repairAttachmentLayout(parts, epsilon = CREATURE_ATTACHMENT_OVERLAP_EPSILON) {
   if (!Array.isArray(parts) || parts.length < 2) return { parts: parts ?? [], corrections: [] };
+  if (parts.some(part => part.vertices?.length)) return repairSolidAttachments(parts, epsilon);
   const output = parts.map((part) => ({
     ...part,
     position: { ...part.position },
@@ -92,8 +120,12 @@ function enforceCreatureAttachmentInvariant(root, archetype) {
   const entities = root.children.filter((child) => child._creatureAttachmentPart);
   const result = repairAttachmentLayout(entities.map((entity) => entity._creatureAttachmentPart));
   result.parts.forEach((part, index) => {
-    entities[index].setLocalPosition(part.position.x, part.position.y, part.position.z);
-    entities[index]._creatureAttachmentPart.position = { ...part.position };
+    // Mesh vertices can have an offset from the entity's origin (e.g. a curled
+    // arm). Apply only the repair displacement; assigning the bounds center
+    // would translate those vertices a second time and visibly detach the part.
+    const entity=entities[index],before=entity._creatureAttachmentPart.position,origin=entity.getLocalPosition();
+    entity.setLocalPosition(origin.x+part.position.x-before.x,origin.y+part.position.y-before.y,origin.z+part.position.z-before.z);
+    entity._creatureAttachmentPart.position = { ...part.position };
   });
   root._attachmentValidation = Object.freeze({
     archetype,
@@ -142,18 +174,28 @@ export function specimenModelLength(parts, fallback = 1.45) {
 export function createSpecimenModel(specimen, { name = 'Specimen display', maximumScale = Number.POSITIVE_INFINITY, app = undefined } = {}) {
   const presentation = resolveCreaturePresentation(specimen, { context: name });
   const { species, visual, archetype } = presentation;
-  const colors = visual.colors ?? [[.3, .66, .48], [.84, .56, .22]];
+  const art = creatureArt(species, archetype, Boolean(specimen?.shiny));
+  const colors = [art.flank, art.fin];
   const materials = [
     surface(colors[0] ?? [.3, .66, .48], { shiny: Boolean(specimen?.shiny) }),
     surface(colors[1] ?? [.84, .56, .22], { shiny: Boolean(specimen?.shiny) }),
-    surface([.025, .035, .03], { dark: true })
+    surface([.025, .035, .03], { dark: true }),
+    surface([.88, .9, .8], { dark: true })
   ];
   const [base, accent, dark] = materials;
   const root = new pc.Entity(name, app);
   const speciesId = presentation.canonicalId;
   let tail = null;
+  const device = root._app?.graphicsDevice;
+  if (device && art.pattern !== 'skin') {
+    applySurfaceDetail(base, device, art.pattern === 'fur' ? 'fabric' : art.pattern === 'shell' ? 'stone' : 'scales', { strength: .12 });
+  }
 
-  if (speciesId === 'penguin') {
+  if (SCULPTED_FISH_ARCHETYPES.has(archetype) && device) {
+    tail = buildFishSculpture(root, { archetype, visual, art, name, primitive, base, accent, dark, materials }).tail;
+  } else if (AQUATIC_SCULPTURES.has(archetype)) {
+    tail = buildAquaticSculpture(root, { archetype, name, art, primitive, base, accent, dark, materials }).tail;
+  } else if (speciesId === 'penguin') {
     primitive(root, `${name} penguin upright body`, 'sphere', { x: 0, y: .02, z: 0 }, { x: .35, y: .62, z: .34 }, dark);
     primitive(root, `${name} penguin white belly`, 'sphere', { x: .25, y: -.04, z: 0 }, { x: .16, y: .44, z: .27 }, base);
     primitive(root, `${name} penguin head`, 'sphere', { x: .03, y: .55, z: 0 }, { x: .29, y: .29, z: .29 }, dark);
@@ -392,12 +434,12 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
     serpent: [.69, .14, .15], dragon: [.69, .14, .15], plesiosaur: [.69, .14, .15], waterhorse: [.69, .14, .15], eel: [.69, .14, .15]
   };
   const eye = eyeProfiles[archetype] ?? [.53 * clamp(visual.lengthScale ?? 1, .58, 1.55), .08, .2 * clamp(visual.width ?? 1, .5, 1.5)];
-  if (!['penguin', 'polar_bear', 'giant_panda'].includes(speciesId)
+  if (!root._continuousCreature && !root._anatomicalEyes && !['penguin', 'polar_bear', 'giant_panda'].includes(speciesId)
     && !['clam', 'oyster', 'mussel', 'scallop', 'bivalve', 'nautilus', 'starfish', 'urchin', 'anemone', 'wisp'].includes(archetype)) {
     for (const side of [-1, 1]) primitive(root, `${name} ${side < 0 ? 'far' : 'near'} eye`, 'sphere',
       { x: eye[0], y: eye[1], z: side * eye[2] }, { x: .046, y: .046, z: .035 }, dark);
   }
-  if (['panfish', 'slender', 'bass', 'carp', 'catfish', 'trout', 'sculpin', 'shark', 'dogfish'].includes(archetype)) {
+  if (!root._continuousCreature && ['panfish', 'slender', 'bass', 'carp', 'catfish', 'trout', 'sculpin', 'shark', 'dogfish'].includes(archetype)) {
     for (let index = 0; index < 3; index += 1) primitive(root, `${name} species marking ${index + 1}`, 'box',
       { x: .2 - index * .22, y: .03, z: .225 }, { x: .07, y: .16, z: .012 }, accent,
       { z: -10 + index * 10 });
@@ -405,7 +447,9 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
 
   // Every species, including the dedicated bear and penguin models, shares the same
   // connectivity repair before Hand, catch, remote-player, or Aquarium transforms.
-  const attachmentValidation = enforceCreatureAttachmentInvariant(root, archetype);
+  const attachmentValidation = root._continuousCreature
+    ? Object.freeze({ archetype, connected: true, correctionCount: 0, corrections: Object.freeze([]), continuousBody: true })
+    : enforceCreatureAttachmentInvariant(root, archetype);
 
   const nativeLength = specimenModelLength(root.children.map((child) => child._creatureAttachmentPart).filter(Boolean),
     NATIVE_MODEL_LENGTH[archetype] ?? 1.45);

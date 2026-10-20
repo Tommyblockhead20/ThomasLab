@@ -29,10 +29,10 @@ export const EQUIPMENT_CATALOG = Object.freeze([
 
   item('trail-bobber', 'bobber', 'Trail Bobber', 0, 'Responsive starter float.', {}, { bobberMode: 'standard' }),
   item('selective-drift-bobber', 'bobber', 'Selective Drift Bobber', 1800,
-    'Waits longer and favors uncommon or rarer bites.', {},
+    'Waits longer and reduces Common bites, favoring uncommon or rarer fish.', {},
     { bobberMode: 'selective' }),
   item('trophy-sentinel-bobber', 'bobber', 'Trophy Sentinel Bobber', 4500,
-    'Waits much longer and strongly favors rare trophies.', {},
+    'Never hooks Common fish. Waits much longer and favors rarer trophies.', {},
     { bobberMode: 'trophy' }),
 
   item('common-field-notes', 'guide', 'Common Field Notes', 225, 'Shows the five likeliest Common creatures nearby.', {}, { guideMode: 'rarity', guideRarity: 'Common' }),

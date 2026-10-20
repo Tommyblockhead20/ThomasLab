@@ -28,6 +28,7 @@ svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;back
 @media(max-width:800px){.layout{grid-template-columns:1fr}.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}.legend h2,.legend .note{grid-column:1/-1}}
 @media(max-width:500px){.legend{grid-template-columns:1fr}.legend h2,.legend .note{grid-column:auto}}
 </style>
+<link rel="stylesheet" href="polish.css">
 <script src="../achievements.js"></script>
 </head>
 <body><div class="app">
@@ -48,19 +49,20 @@ svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;back
 (()=>{
 const svg=document.getElementById('map'), vp=document.getElementById('viewport'), tip=document.getElementById('tip'), card=document.getElementById('mapCard');
 let scale=1, tx=0, ty=0, drag=false, lastX=0,lastY=0;
-function apply(){vp.setAttribute('transform',`translate(${tx} ${ty}) scale(${scale})`);}
+function apply(animate=false){vp.style.transition=animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches?'transform 240ms cubic-bezier(.2,.7,.2,1)':'none';vp.setAttribute('transform',`translate(${tx} ${ty}) scale(${scale})`);const label=document.getElementById('zoomLevel');if(label)label.textContent=scale.toFixed(1)+'×';}
 function zoomAt(f,cx=500,cy=325){const ns=Math.max(1,Math.min(8,scale*f)); if(ns===scale)return; tx=cx-(cx-tx)*(ns/scale); ty=cy-(cy-ty)*(ns/scale); scale=ns; apply();ThomasAchievements.unlock('places-viewed');}
-document.getElementById('zin').addEventListener('click',()=>zoomAt(1.3));
-document.getElementById('zout').addEventListener('click',()=>zoomAt(1/1.3));
-document.getElementById('reset').addEventListener('click',()=>{scale=1;tx=0;ty=0;apply();});
+document.getElementById('zin').addEventListener('click',()=>{zoomAt(1.3);apply(true)});
+document.getElementById('zout').addEventListener('click',()=>{zoomAt(1/1.3);apply(true)});
+document.getElementById('reset').addEventListener('click',()=>{scale=1;tx=0;ty=0;apply(true);});
 svg.addEventListener('wheel',e=>{e.preventDefault(); const r=svg.getBoundingClientRect(); const cx=(e.clientX-r.left)*1000/r.width, cy=(e.clientY-r.top)*650/r.height; zoomAt(e.deltaY<0?1.16:1/1.16,cx,cy);},{passive:false});
-svg.addEventListener('pointerdown',e=>{ThomasAchievements.unlock('places-viewed');drag=true;lastX=e.clientX;lastY=e.clientY;svg.setPointerCapture(e.pointerId);});
+svg.addEventListener('pointerdown',e=>{if(e.button!==0)return;ThomasAchievements.unlock('places-viewed');drag=true;tip.style.display='none';svg.classList.add('dragging');lastX=e.clientX;lastY=e.clientY;svg.setPointerCapture(e.pointerId);});
 svg.addEventListener('pointermove',e=>{if(drag){const r=svg.getBoundingClientRect();tx+=(e.clientX-lastX)*1000/r.width;ty+=(e.clientY-lastY)*650/r.height;lastX=e.clientX;lastY=e.clientY;apply();}});
-svg.addEventListener('pointerup',()=>drag=false); svg.addEventListener('pointercancel',()=>drag=false);
+const stopDrag=()=>{drag=false;svg.classList.remove('dragging')};svg.addEventListener('pointerup',stopDrag);svg.addEventListener('pointercancel',stopDrag);
+svg.addEventListener('keydown',e=>{if(['+','=','-','Home','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();if(e.key==='+'||e.key==='=')zoomAt(1.3);else if(e.key==='-')zoomAt(1/1.3);else if(e.key==='Home'){scale=1;tx=ty=0}else{tx+=e.key==='ArrowLeft'?35:e.key==='ArrowRight'?-35:0;ty+=e.key==='ArrowUp'?35:e.key==='ArrowDown'?-35:0}apply(true)}});
 document.querySelectorAll('.county').forEach(p=>{
  p.addEventListener('pointerenter',()=>{tip.style.display='block'; tip.innerHTML=`<b>${p.dataset.name}, ${p.dataset.state}</b><br>${p.dataset.group}`;});
- p.addEventListener('pointermove',e=>{const r=card.getBoundingClientRect();tip.style.left=Math.min(r.width-220,e.clientX-r.left+12)+'px';tip.style.top=(e.clientY-r.top+12)+'px';});
+ p.addEventListener('pointermove',e=>{if(drag)return;const r=card.getBoundingClientRect();tip.style.left=Math.max(8,Math.min(r.width-tip.offsetWidth-8,e.clientX-r.left+12))+'px';tip.style.top=Math.max(8,Math.min(r.height-tip.offsetHeight-8,e.clientY-r.top+12))+'px';});
  p.addEventListener('pointerleave',()=>tip.style.display='none');
 });
 })();
-</script></body></html>
+</script><script src="polish.js"></script></body></html>

@@ -36,7 +36,7 @@ export class MountainMapMenu {
     this.minimapSignature = '';
     this.isOpen = false;
     this.previousFocus = null;
-    this.view = this.computeView();
+    this.view = null;
     this.onOpenRequest = (event) => this.open(event.detail?.mode ?? 'paper');
     this.onCloseClick = () => this.close();
     this.onKeyDown = (event) => {
@@ -48,16 +48,17 @@ export class MountainMapMenu {
     window.addEventListener('reel-ascent:open-map', this.onOpenRequest);
     window.addEventListener('keydown', this.onKeyDown, true);
     this.closeButton?.addEventListener('click', this.onCloseClick);
-    this.renderMap();
+    // Map contours and SVG nodes are built when the player first opens a map.
     this.updateMinimap();
   }
 
   project(point) {
+    const view = this.view ??= this.computeView();
     const mapped = compressWorldMapPosition(point);
     return {
-      x: 260 + (mapped.x - this.view.center.x) * this.view.scale,
-      y: 260 + (mapped.z - this.view.center.z) * this.view.scale,
-      scale: this.view.scale
+      x: 260 + (mapped.x - view.center.x) * view.scale,
+      y: 260 + (mapped.z - view.center.z) * view.scale,
+      scale: view.scale
     };
   }
 

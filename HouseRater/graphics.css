@@ -1,0 +1,26 @@
+/* Architectural paper and ink. Scoring states retain their existing colors. */
+:root{color-scheme:light;--draft-ink:#204e50;--draft-line:#d3d9ce}
+body{background-color:#eaece3;background-image:linear-gradient(#51695708 1px,transparent 1px),linear-gradient(90deg,#51695708 1px,transparent 1px),radial-gradient(ellipse at 50% 0,#fcf8eb 0,transparent 70%);background-size:32px 32px,32px 32px,100% 100%;background-attachment:scroll}
+.siteHeader{position:relative;isolation:isolate;overflow:hidden;min-height:142px;padding:23px 216px 23px 23px;border:1px solid #42635b;border-radius:17px;background:#244d4d;box-shadow:0 8px 24px #243f3914;gap:17px}
+.siteHeader::after{content:"";position:absolute;z-index:-1;right:12px;bottom:0;width:204px;height:140px;background:url('house-study.svg') center/contain no-repeat;opacity:.6;pointer-events:none}
+.brandCopy h1{font-family:Georgia,'Times New Roman',serif;font-size:clamp(2rem,4vw,2.8rem);font-weight:400;letter-spacing:-.035em;color:#f6eed6}
+.brandCopy p{color:#cbd8cc;font-size:.82rem;line-height:1.5;max-width:430px}.brandCopy .weightNote{color:#cbd8cc;font-weight:400}
+.siteHeader .homeButton{background:#f3edda;color:#274d48;border-color:#dce3ce;box-shadow:none;border-radius:12px}
+.siteHeader .homeButton:hover{background:#fff9e5;border-color:#fff9e5}
+.panel,.setupCard{box-shadow:0 3px 12px #2d463709;border-color:var(--draft-line)}
+.zillowStart{border-width:1px;border-color:#acbaaa;background:#f8f5e9;border-radius:12px;color:#31544c}
+.zillowStart strong{background:#416250;color:#fff9e6;letter-spacing:.1em}
+.zillowCard{border:1px solid #a9bcad;background:#fdfbf4;box-shadow:0 8px 25px #284b3b0a}
+.listingArea textarea{background:#fffef9;border:1px solid #b9c7ba;border-radius:9px;box-shadow:inset 0 2px 4px #3c4d3505;line-height:1.6}
+.scoreDock{background:#eff1e7;border-color:#bdc9b9;box-shadow:0 5px 18px #243f3917}
+.gauge{background:#fffdf4;border-color:#cbd4c4;border-radius:9px}.gauge span,.modeDock span{letter-spacing:.07em;font-size:.66rem}.gauge strong{font-variant-numeric:tabular-nums}
+.gauge .gaugeTrack{background:#e0e7d8}.gauge .gaugeFill{background:linear-gradient(90deg,#c67459,#d2ba6f,#63966b)}
+.scoreSide{background:#f5f6ed}.break{border-color:#d6ddcf}.setupCard{background:#f9faf3}
+.mapPrimary{background:#edf1e7}.mapPlaceholder{background-image:linear-gradient(#58714a0b 1px,transparent 1px),linear-gradient(90deg,#58714a0b 1px,transparent 1px);background-size:24px 24px;color:#6c806f}
+button,.homeButton,summary,input,textarea,select{transition:background-color .14s,border-color .14s,box-shadow .14s,transform .14s}
+button:active:not(:disabled),.homeButton:active{transform:translateY(1px)}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #71986b;outline-offset:3px}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid #7d9d70;outline-offset:2px}
+details>summary:hover{color:#386b52}
+@media(max-width:720px){.siteHeader{min-height:125px;padding:18px;gap:14px}.siteHeader::after{opacity:.16;right:-18px;width:175px}.brandCopy p{max-width:420px}.siteHeader .homeButton{width:53px;height:58px}.brandCopy h1{font-size:2rem}.scoreDock{top:.4rem}.zillowStart{padding:.7rem .85rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}button,.homeButton,summary,input,textarea,select{transition:none}}

@@ -1,3 +1,4 @@
+import { addSurfaceUvs } from '../graphics/surface-detail.js';
 import * as pc from 'playcanvas';
 import SCENE from './library-island-v2.scene.json' with { type: 'json' };
 import { stockLibraryScene } from './library-shelf-stocking.js';
@@ -82,7 +83,7 @@ function addTriangleScenePart(world, parent, id, name, position, size, material,
   geometry.positions = [...TRIANGLE_PRISM_POSITIONS];
   geometry.indices = [...TRIANGLE_PRISM_INDICES];
   geometry.calculateNormals();
-  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, geometry);
+  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
   const entity = new pc.Entity(name);
   entity.addComponent('render');
   entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)];
