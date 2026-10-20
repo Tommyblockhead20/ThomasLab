@@ -72,11 +72,12 @@
     font-size: 13px;
   }
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
 <div class="wrap">
   <div class="topbar">
-    <a class="home-btn" href="https://thomaslab.me" aria-label="Home — Thomas Lab">⌂ Home</a>
+    <a class="home-btn" href="../" aria-label="Home — Thomas Lab">⌂ Home</a>
     <div class="game-title">Train Clicker</div>
     <div class="top-spacer" aria-hidden="true"></div>
   </div>
@@ -279,6 +280,9 @@
     maxRoutes: POTENTIAL_ROUTES.length,
     cowsEnabled: true
   };
+  function checkBankAchievement() {
+    if (gameData.money >= 2026) ThomasAchievements.unlock('train-2026');
+  }
 
   let activeRoutes = [];
   let selectedRoute = null;
@@ -386,6 +390,7 @@
           const baseY = this.cityA.y + (this.cityB.y - this.cityA.y) * this.cow.progress;
           const reward = this.getCowReward();
           gameData.money += reward;
+          checkBankAchievement();
           addFloatingMoney(baseX, baseY - 18, reward);
           playCowSound();
           this.cow = null;
@@ -407,6 +412,7 @@
           const growth = this.cityB.addPassengers(cars);
           const earned = Math.floor(basePayout * (1 + (this.cityB.houses - 1) * 0.5));
           gameData.money += earned;
+          checkBankAchievement();
           addFloatingMoney(this.cityB.x, this.cityB.y - 30, earned);
           if (growth.cityGrew) playCityGrowthSound(growth.stageGrew);
         } else if (this.progress <= 0) {
@@ -416,6 +422,7 @@
           const growth = this.cityA.addPassengers(cars);
           const earned = Math.floor(basePayout * (1 + (this.cityA.houses - 1) * 0.5));
           gameData.money += earned;
+          checkBankAchievement();
           addFloatingMoney(this.cityA.x, this.cityA.y - 30, earned);
           if (growth.cityGrew) playCityGrowthSound(growth.stageGrew);
         }
@@ -994,6 +1001,7 @@
     try {
       const data = JSON.parse(raw);
       gameData.money = Number(data.money ?? 750);
+      checkBankAchievement();
       gameData.cowsEnabled = data.cowsEnabled !== false;
 
       if (Array.isArray(data.cities)) {
@@ -1127,6 +1135,7 @@
         if (r.cow && Math.hypot(x-r.cow.x, y-r.cow.y) <= 20) {
           const reward = r.getCowReward();
           gameData.money += reward;
+          checkBankAchievement();
           addFloatingMoney(r.cow.x, r.cow.y - 18, reward);
           playCowSound();
           r.cow = null;
@@ -1240,6 +1249,7 @@
 
       if (keyBuffer.includes('money')) {
         gameData.money += 100000000;
+        checkBankAchievement();
         keyBuffer = '';
       } else if (keyBuffer.includes('nocow')) {
         gameData.cowsEnabled = false;

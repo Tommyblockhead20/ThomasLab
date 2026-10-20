@@ -287,7 +287,7 @@ export class PauseMenu {
     const storageWarning = this.progression.saveSystem.lastLoadError === 'write-unavailable'
       ? '<p class="save-storage-warning" role="alert">Browser storage is unavailable. This session may not persist after you close the tab; download progress now.</p>'
       : '';
-    return `${storageWarning}<p class="save-local-note">Progress autosaves in this browser and device. Download a backup to move it elsewhere or protect it before clearing browser data.</p><div class="save-data-content">${slotCards}</div><section class="progress-import"><header><h3>IMPORT PROGRESS</h3><strong>.REELASCENT / JSON</strong></header><p>Select one compressed Reel Ascent backup or a current/legacy JSON export. The file is validated before any slot is overwritten.</p><button data-pause-progress-action="file">IMPORT PROGRESS</button>${pending}</section>`;
+    return `${storageWarning}<p class="save-local-note">Progress autosaves in this browser and device. Download a backup to move it elsewhere or protect it before clearing browser data.</p><div class="save-data-content">${slotCards}</div><section class="progress-import"><header><h3>IMPORT PROGRESS</h3><strong>BACKUP / JSON</strong></header><p>Select a compressed Bass Camp backup (.reelascent) or a current/legacy JSON export. The file is validated before any slot is overwritten.</p><button data-pause-progress-action="file">IMPORT PROGRESS</button>${pending}</section>`;
   }
 
   renderSettings() {

@@ -108,13 +108,14 @@ button:disabled{cursor:not-allowed;opacity:.5;transform:none!important;filter:no
 .custom-selection-note{grid-column:1/-1;padding:11px 12px;border:1px solid rgba(56,189,248,.24);border-radius:14px;background:rgba(56,189,248,.07);color:var(--muted);line-height:1.4}
 
 </style>
+<script src="../achievements.js"></script>
 </head>
 
 <body>
 <header>
   <div class="header-layout">
     <div class="header-title">
-      <a class="home-link" href="https://thomaslab.me" aria-label="Return to Thomas Lab home">⌂ Home</a>
+      <a class="home-link" href="../" aria-label="Return to Thomas Lab home">⌂ Home</a>
       <h1>Game Picker</h1>
     </div>
     <section id="joinOnlineSection" class="card header-join" aria-label="Join an online room">
@@ -1879,12 +1880,14 @@ function pickForMe() {
     pool = strongMatches.slice(0, 20);
     chosen = pool[Math.floor(Math.random() * pool.length)];
     box.innerHTML = `<strong>🎲 ${esc(chosen.displayTitle)}</strong> · ${Math.round(chosen._score)}/100<br>Randomly picked from ${pool.length} strong match${pool.length === 1 ? '' : 'es'} scoring above 80.`;
+    ThomasAchievements.unlock('game-picker-picked');
     return;
   }
 
   pool = list.slice(0, 3);
   chosen = pool[Math.floor(Math.random() * pool.length)];
   box.innerHTML = `<strong>No good matches scored above 80.</strong><br>Consider changing your settings. If you still want a pick: <strong>${esc(chosen.displayTitle)}</strong> · ${Math.round(chosen._score)}/100, randomly chosen from the top ${pool.length}.`;
+  ThomasAchievements.unlock('game-picker-picked');
 }
 
 function vetoerCount() {

@@ -136,6 +136,7 @@
   @media(max-width:1100px) and (min-width:981px){.rank-list{grid-template-columns:repeat(3,minmax(0,1fr))}.ranking-panel{max-height:205px}}@media(max-width:720px){.ranking-panel{width:calc(100% - 58px);left:48px;top:8px;max-height:170px}.rank-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
 <div class="app">
@@ -147,7 +148,7 @@
       </div>
 
       <div class="toolbar">
-        <a class="home-btn" href="https://thomaslab.me" aria-label="Back to thomaslab.me" title="Back to thomaslab.me"><span aria-hidden="true">⌂</span><span>Home</span></a>
+        <a class="home-btn" href="../" aria-label="Back to thomaslab.me" title="Back to thomaslab.me"><span aria-hidden="true">⌂</span><span>Home</span></a>
         <input class="search" id="metricSearch" placeholder="Search criteria…" />
         <button class="icon-btn" id="collapseAll">Collapse</button>
         <button class="icon-btn" id="resetWeights">Reset</button>
@@ -1495,7 +1496,7 @@ document.addEventListener('focusin',e=>{
   if(e.target.matches('.weight:not(:disabled),.bipolar:not(:disabled)'))ensureMetricReady(metricKeyFromControl(e.target));
 });
 document.addEventListener('input',e=>{if(e.target.matches('.weight:not(:disabled),.bipolar:not(:disabled)')){ensureMetricReady(metricKeyFromControl(e.target));queueAutoRank();}});
-document.addEventListener('change',e=>{if(e.target.matches('.weight:not(:disabled),.bipolar:not(:disabled),.extreme-check:not(:disabled)')){ensureMetricReady(metricKeyFromControl(e.target));queueAutoRank();}});
+document.addEventListener('change',e=>{if(e.target.matches('.weight:not(:disabled),.bipolar:not(:disabled),.extreme-check:not(:disabled)')){const key=metricKeyFromControl(e.target);ensureMetricReady(key);queueAutoRank();if(key&&e.target.matches('.weight:not(:disabled),.bipolar:not(:disabled)')&&ThomasAchievements.markUnique('find-your-place.weights',key)>=10)ThomasAchievements.unlock('find-your-place-10-weights');}});
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600)}
 
 

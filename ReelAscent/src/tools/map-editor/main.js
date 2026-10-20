@@ -3675,7 +3675,7 @@ async function savePatch() {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: filename,
-        types: [{ description: 'Reel Ascent world/editor JSON', accept: { 'application/json': ['.json'] } }]
+        types: [{ description: 'Bass Camp world/editor JSON', accept: { 'application/json': ['.json'] } }]
       });
       const writable = await handle.createWritable();
       await writable.write(text);

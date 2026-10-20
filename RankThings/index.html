@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Ranker & Tier List v37</title>
+    <title>Rank Things | ThomasLab</title>
     
     <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -226,6 +226,23 @@
             cursor: grab;
             position: relative;
         }
+        .food-item::before {
+            content: attr(data-fallback);
+            position: absolute;
+            inset: 0 auto auto 0;
+            width: 100%;
+            aspect-ratio: 1;
+            box-sizing: border-box;
+            display: grid;
+            place-items: center;
+            border: 2px solid white;
+            border-radius: 50%;
+            background: #e4e9f0;
+            color: #344054;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-size: 1.55rem;
+            font-weight: 700;
+        }
         .food-item.needs-review {
             background: #ffe1e1;
             border: 3px solid #dc3545;
@@ -234,6 +251,9 @@
             box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.22);
         }
         .food-item.needs-review img {
+            border-color: #dc3545;
+        }
+        .food-item.needs-review::before {
             border-color: #dc3545;
         }
         .food-item.needs-review span::after {
@@ -245,14 +265,20 @@
             width: 100%;
             aspect-ratio: 1;
             object-fit: cover;
+            position: relative;
+            z-index: 1;
             border-radius: 50%;
             border: 2px solid white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             pointer-events: none; 
             background: #ddd;
         }
+        .food-item img[data-loaded="false"] {
+            opacity: 0;
+        }
         .food-item span {
             display: block;
+            z-index: 2;
             font-size: 0.7rem;
             background: rgba(255,255,255,0.9);
             border-radius: 4px;
@@ -292,6 +318,10 @@
             margin: 0;
             min-width: max-content;
         }
+        .header-brand { display: flex; flex-direction: column; gap: 3px; }
+        .home-link { width: fit-content; color: #4354a7; font-size: 0.8rem; font-weight: 700; text-decoration: none; }
+        .home-link:hover { text-decoration: underline; }
+        .home-link:focus-visible { outline: 2px solid #4354a7; outline-offset: 3px; }
         .header-actions {
             display: flex;
             gap: 12px;
@@ -458,16 +488,23 @@
 
         @media (max-width: 768px) {
             body { height: auto; } /* Let it scroll naturally on mobile */
+            #header-bar { flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+            .header-actions { width: 100%; justify-content: flex-start; }
+            .header-toggle-group { max-width: 100%; flex-wrap: wrap; }
+            .header-toggle-group .group-label { width: 100%; }
             #main-content { flex-direction: column; overflow: visible; }
             #right-panel { overflow: visible; }
-            #sidebar { width: 100%; height: 50vh; }
+            #sidebar { width: 100%; height: 50vh; box-sizing: border-box; min-width: 0; }
+            #sidebar input, #sidebar select { max-width: 100%; box-sizing: border-box; }
+            #sidebar details input, #sidebar details select { min-width: 0; flex: 1 1 0; }
             #canvas-container, #tier-list-container, #analysis-container { height: 50vh; }
         }
     </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
     <div id="header-bar">
-        <h2 class="header-title">Ranker v41</h2>
+        <div class="header-brand"><a class="home-link" href="../">← ThomasLab</a><h2 class="header-title">Rank Things <small>v41</small></h2></div>
         <div class="header-actions">
             <div class="header-toggle-group dataset-switcher" aria-label="Choose list">
                 <span class="group-label">List</span>
@@ -18239,9 +18276,12 @@
                         : (isChains ? '🔍 Search chains, types...' : '🔍 Search foods, cuisines, origins...'));
             }
             const title = document.querySelector('#header-bar h2');
-            if (title) title.innerText = isTrips
-                ? 'Trip Ranker v41'
-                : (isOutdoors ? 'Outdoor Activity Ranker v41' : (isChains ? 'Chain Ranker v41' : 'Food Ranker v41'));
+            if (title) {
+                title.innerText = isTrips
+                    ? 'Rank Things · Trips v41'
+                    : (isOutdoors ? 'Rank Things · Outdoors v41' : (isChains ? 'Rank Things · Chains v41' : 'Rank Things · Foods v41'));
+                document.title = `${title.innerText} | ThomasLab`;
+            }
 
             const sortDropdown = document.getElementById('sortDropdown');
             if (sortDropdown) {
@@ -18912,6 +18952,8 @@
         function updateProgress() {
             const progressBox = document.getElementById('progressBox');
             if (!progressBox) return;
+            const placed = foods.filter(f => (Number.isFinite(f.x) && Number.isFinite(f.y)) || f.tier != null).length;
+            if (placed >= 10) ThomasAchievements.unlock('rank-things-10-items');
             const ranked = foods.filter(f => f.x !== null || f.y !== null || f.tier !== null || f.special).length;
             const havent = foods.filter(f => f.special === 'havent-had').length;
             const unsure = foods.filter(f => f.special === 'unsure').length;
@@ -18939,11 +18981,24 @@
 
             const img = document.createElement('img');
             img.id = 'img-' + food.id;
-            img.src = food.src;
+            img.alt = '';
             img.setAttribute('data-loaded', 'false');
             img.onload = () => img.setAttribute('data-loaded', 'true');
             const searchName = food.src.split('/').pop().split('.')[0];
-            img.onerror = () => fetchWikiImage(searchName, img, food);
+            img.onerror = () => {
+                img.setAttribute('data-loaded', 'false');
+                if (img.dataset.wikiAttempted === 'true') return;
+                img.dataset.wikiAttempted = 'true';
+                fetchWikiImage(searchName, img, food);
+            };
+            // This project ships without an images/ directory. Use the existing
+            // Wikipedia lookup directly instead of requesting a missing file first.
+            if (food.src.startsWith('images/')) {
+                img.dataset.wikiAttempted = 'true';
+                fetchWikiImage(searchName, img, food);
+            } else {
+                img.src = food.src;
+            }
             
             const span = document.createElement('span');
             
@@ -18962,6 +19017,7 @@
             }
             
             span.innerText = food.emoji ? `${displayName} ${food.emoji}` : displayName;
+            el.dataset.fallback = food.emoji || displayName.charAt(0).toUpperCase() || '?';
 
             el.appendChild(img);
             el.appendChild(span);

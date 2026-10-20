@@ -102,12 +102,13 @@
     .app{padding:10px}.control-left{grid-template-columns:1fr}.traffic-demand-layout{grid-template-columns:1fr}.demand-grid{grid-template-columns:repeat(2,1fr)}.set-all-demand{display:grid;grid-template-columns:repeat(4,1fr)}.set-all-label{grid-column:1/-1}.control-panel{padding:10px}.cards{gap:10px}h1{font-size:28px}
   }
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
 <div class="app">
   <header>
     <div class="title-area">
-      <a class="home-btn" href="https://thomaslab.me/" aria-label="Home" title="Home">
+      <a class="home-btn" href="../" aria-label="Home" title="Home">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.8 12 3.8l8.5 7v9.4a1 1 0 0 1-1 1h-5.1v-6.1H9.6v6.1H4.5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/></svg>
         <span>Home</span>
       </a>
@@ -2477,6 +2478,20 @@ function metricRow(label,key,fmt,lowerBetter=false){
   if(simTime<=8)return `<tr><td>${label}</td>${vals.map(v=>`<td>${fmt(v)}</td>`).join('')}</tr>`;
   return valueRow(label,vals,fmt,lowerBetter);
 }
+const triedScenarios=new Set(ThomasAchievements.getStat('traffic.scenarios')||[]);
+const scenarioNames=new Set(['neighborhood','suburban','threeLane','arterial','majorMinor','turning','stress']);
+function checkTrafficAchievements(metrics){
+  const scenario=document.getElementById('scenarioPresetSelect').value;
+  if(simTime>=10&&scenarioNames.has(scenario)&&!triedScenarios.has(scenario)){
+    triedScenarios.add(scenario);
+    if(ThomasAchievements.markUnique('traffic.scenarios',scenario)>=scenarioNames.size)ThomasAchievements.unlock('traffic-all-scenarios');
+  }
+  const values=Object.values(metrics);
+  if(values.some(m=>m.queue>=250))ThomasAchievements.unlock('traffic-queue-250');
+  if(values.some(m=>m.longestWaitNow>=500))ThomasAchievements.unlock('traffic-longest-wait-500');
+  if(values.some(m=>m.recentThroughput>=75))ThomasAchievements.unlock('traffic-moving-people');
+  if(simTime>=120&&values.some(m=>m.throughput>2000&&m.avgDelay<7))ThomasAchievements.unlock('traffic-engineer');
+}
 function updateUI(){
   const cfg=signalConfig(approachCount), sc=sims.signal.controller;
   const pill=document.getElementById('signalPhasePill');
@@ -2493,6 +2508,7 @@ function updateUI(){
   document.getElementById('stopCostHeader').textContent=twoWay?(approachCount===3?'Side-Street Stop':'Two-Way Stop'):'All-Way Stop';
   document.getElementById('roundModePill').textContent=ROUND_TYPE==='mini'?'Mini-roundabout · yield on entry':ROUND_TYPE==='spiral'?`Spiral · major 2/dir · minor 1/dir · ${effectiveRoundSpeedMph()} mph`:ROUND_TYPE==='double'?`Two lanes · ${effectiveRoundSpeedMph()} mph design`:`Single lane · ${effectiveRoundSpeedMph()} mph design`;
   const M={};for(const [k,s] of Object.entries(sims))M[k]=s.metrics();
+  checkTrafficAchievements(M);
   for(const k of ['signal','stop','round']){
     document.getElementById(k+'Queue').textContent=Math.round(M[k].queue);
     document.getElementById(k+'P95').textContent=`${Math.round(M[k].longestWaitNow)} s`;

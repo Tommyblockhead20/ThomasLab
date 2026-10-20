@@ -306,6 +306,27 @@
       text-transform: uppercase;
       color: var(--muted);
     }
+    .section-heading { display:flex;align-items:center;justify-content:space-between;min-height:52px;margin:20px 0 11px; }
+    .section-heading .row-label, .section-heading h2 { margin:0; }
+    .tour-mascot { position:relative;display:grid;place-items:center;width:44px;height:44px;margin-right:8px;border:2px solid var(--line);border-radius:13px;background:#ff9f91;box-shadow:3px 3px 0 var(--line);cursor:pointer;transform:rotate(5deg);transition:transform .25s ease,opacity .3s ease; }
+    .tour-mascot:hover { transform:rotate(-6deg) translateY(-3px); }
+    .tour-mascot:focus-visible { outline:3px solid var(--line);outline-offset:4px; }
+    .tour-mascot .tour-eyes { position:absolute;top:15px;left:12px;width:4px;height:6px;border-radius:50%;background:var(--line);box-shadow:13px 0 0 var(--line); }
+    .tour-mascot .tour-mouth { position:absolute;left:16px;bottom:9px;width:12px;height:7px;border-bottom:2px solid var(--line);border-radius:0 0 50% 50%; }
+    .tour-mascot .tour-prop { position:absolute;right:-12px;top:-14px;font-size:23px;filter:drop-shadow(1px 2px 0 rgba(0,0,0,.3)); }
+    .tour-mascot.will-animate { opacity:0;transform:translateY(14px) rotate(-12deg); }
+    .tour-mascot.will-animate.is-visible { opacity:1;transform:rotate(5deg); }
+    .tour-mascot.celebrate { animation:tourMascotCelebrate .7s ease both; }
+    .tour-mascot.celebrate .tour-prop { animation:tourPropPop .7s ease both; }
+    @keyframes tourMascotCelebrate { 35% { transform:rotate(-14deg) translateY(-7px) scale(1.08); } 70% { transform:rotate(12deg) translateY(1px); } }
+    @keyframes tourPropPop { 40% { transform:translateY(-13px) rotate(20deg) scale(1.35); } }
+    .scroll-trail { position:fixed;top:25vh;right:max(9px,calc((100vw - 1260px)/2));width:34px;height:min(48vh,360px);z-index:5;pointer-events:none; }
+    .scroll-trail-track { position:absolute;inset:0 auto 0 15px;width:4px;border-radius:4px;background:repeating-linear-gradient(to bottom,#171717 0 7px,transparent 7px 16px);opacity:.38; }
+    .scroll-trail-fill { position:absolute;left:15px;top:0;width:4px;height:0;border-radius:4px;background:#171717; }
+    .scroll-trail-rider { position:absolute;top:0;left:2px;display:grid;place-items:center;width:30px;height:30px;border:2px solid var(--line);border-radius:9px;background:#ff9f91;box-shadow:2px 2px 0 var(--line);transition:top .14s linear,transform .2s ease; }
+    .scroll-trail-eyes { width:3px;height:4px;border-radius:50%;background:var(--line);box-shadow:9px 0 0 var(--line);transform:translateX(-4px); }
+    .scroll-trail-prop { position:absolute;right:-10px;top:-15px;font-size:17px;filter:drop-shadow(1px 1px 0 rgba(0,0,0,.25)); }
+    @media (max-width: 1259px) { .scroll-trail { display:none; } }
 
     .grid {
       display: grid;
@@ -425,6 +446,11 @@
       display: inline-block;
       transform-origin: center;
     }
+
+    .fishing-icon .icon-glyph { transform-origin: 75% 20%; }
+    :is(.card:hover, .card.mobile-focus) .fishing-icon .icon-glyph { animation: fishingCast 1.6s ease-in-out infinite alternate; }
+    .fishing-icon.active .icon-glyph { animation: fishingCast .7s ease-in-out 2; }
+    @keyframes fishingCast { 0%,100% { transform:rotate(-8deg); } 55% { transform:rotate(21deg) translateY(-4px); } }
 
     .train-icon .train-glyph {
       display: inline-block;
@@ -1898,6 +1924,7 @@
 
     @media (max-width: 620px) {
       .shell { width: min(100% - 20px, 1180px); }
+      .tour-mascot { display:none; }
       .hero { padding-top: 30px; padding-bottom: 22px; gap: 18px; }
       h1 { font-size: clamp(52px, 17vw, 76px); }
       .intro { margin-top: 17px; font-size: clamp(18px, 5.3vw, 22px); }
@@ -1960,6 +1987,9 @@
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; }
+      .scroll-trail-rider { display:none; }
+      .tour-mascot, .tour-mascot.celebrate, .tour-mascot.celebrate .tour-prop { animation:none!important;transition:none!important; }
+      .fishing-icon .icon-glyph { animation:none!important; }
     }
   </style>
 </head>
@@ -1970,7 +2000,7 @@
         <p class="eyebrow">Thomas's corner of the internet</p>
         <h1>I make <span class="underline">stuff.</span></h1>
         <p class="intro">Try it out!</p>
-        <p class="project-count" id="projectCount">14 incomplete projects &amp; counting</p>
+        <p class="project-count" id="projectCount">17 incomplete projects &amp; counting</p>
         <p class="traffic-fine" id="trafficFine" hidden>Money lost today <strong>$100</strong> 💸</p>
       </div>
 
@@ -1984,15 +2014,17 @@
 
     <section class="projects" id="projects" aria-label="Things to try">
       <div class="grid" id="featureGrid"></div>
+      <div class="section-heading"><h2 class="row-label">Things to explore</h2><button class="tour-mascot" type="button" aria-label="Poke the exploring mascot" data-tour-message="He found a map. He refuses to say where it leads."><span class="tour-eyes"></span><span class="tour-mouth"></span><span class="tour-prop" aria-hidden="true">🗺️</span></button></div>
       <div class="grid" id="mainGrid"></div>
       <div class="grid" id="thirdGrid"></div>
-      <h2 class="row-label">Games</h2>
+      <div class="section-heading"><h2 class="row-label">Games</h2><button class="tour-mascot" type="button" aria-label="Poke the games mascot" data-tour-message="The tiny captain demands one more turn."><span class="tour-eyes"></span><span class="tour-mouth"></span><span class="tour-prop" aria-hidden="true">🏴‍☠️</span></button></div>
       <div class="grid" id="gamesGrid"></div>
     </section>
 
     <section class="about" aria-labelledby="about-title">
-      <div class="about-head">
+      <div class="about-head section-heading">
         <h2 id="about-title">The Thomas Zone</h2>
+        <button class="tour-mascot" type="button" aria-label="Poke the Thomas Zone mascot" data-tour-message="He says the secret ingredient is clicking around."><span class="tour-eyes"></span><span class="tour-mouth"></span><span class="tour-prop" aria-hidden="true">🥄</span></button>
       </div>
       <div class="grid" id="aboutGrid"></div>
       <button class="visual-doodle spark-star" id="sparkStar" type="button" aria-label="Poke the suspicious little star">
@@ -2017,6 +2049,11 @@
     </section>
 
   </main>
+
+  <div class="scroll-trail" id="scrollTrail" aria-hidden="true">
+    <span class="scroll-trail-track"></span><span class="scroll-trail-fill"></span>
+    <span class="scroll-trail-rider"><span class="scroll-trail-eyes"></span><span class="scroll-trail-prop">✨</span></span>
+  </div>
 
   <div class="credits-overlay" id="creditsOverlay" role="dialog" aria-modal="true" aria-label="ThomasLab credits" hidden>
     <button class="credits-skip" id="creditsSkip" type="button">Skip credits</button>
@@ -2064,7 +2101,7 @@
         icon: "🥇", color: "#ffc4d5", href: "./RankThings/", group: "main", action: "medals"
       },
       {
-        title: "Pirate Legacy",
+        title: "Tides: A Pirate Legacy",
         description: "Build a pirate legacy through choices, upgrades, treasure, and questionable decisions.",
         icon: "🏴‍☠️", color: "#9fc5ee", href: "./PirateLegacy/", group: "games", action: "pirate"
       },
@@ -2074,22 +2111,27 @@
         icon: "🚂", color: "#aee3d9", href: "./TrainClicker/", group: "games", action: "train"
       },
       {
-        title: "Traffic Sim",
+        title: "Intersection Lab",
         description: "Mess with traffic flow, signals, lanes, and watch an intersection deal with your choices.",
         icon: "🚦", color: "#ffb38f", href: "./TrafficSim/", group: "games", action: "traffic"
       },
       {
-        title: "Doggy Style",
+        title: "Nose First",
         description: "Explore the world from a dog's point of view, sniff out secrets, and solve dog-sized problems.",
-        icon: "🐕", color: "#c7e6a4", href: "./DoggyStyle/", group: "games", action: "dog"
+        icon: "🐕", color: "#c7e6a4", href: "./NoseFirst/", group: "games", action: "dog"
       },
       {
-        title: "Challenges",
+        title: "Bass Camp",
+        description: "Climb, explore, and fish your way through a growing mountain adventure.",
+        icon: "🎣", color: "#a8dcd2", href: "./BassCamp/", group: "games", action: "fishing"
+      },
+      {
+        title: "Challenge Drawer",
         description: "A grab bag of simple challenges inspired by Taskmaster, Jet Lag: The Game, and Minute to Win It.",
         icon: "⚪", color: "#e5ca93", href: "./Challenges/", group: "third", action: "challenge"
       },
       {
-        title: "My Recipe Book",
+        title: "My Cookbook",
         description: "Recipes worth making again, without digging through seventeen paragraphs first.",
         icon: "🍳", color: "#ffc3a8", href: "./MyRecipeBook/", group: "about", action: "recipe"
       },
@@ -2104,7 +2146,7 @@
         icon: "📍", color: "#ffd6a3", href: "./PlacesIHaveBeen/", group: "about", action: "visited"
       },
       {
-        title: "Recommended Routes",
+        title: "Scenic Adventures",
         description: "My recommended hikes, bike rides, train rides, drives, and boating routes, ranked.",
         icon: "🥾", color: "#b8df96", href: "./RecommendedRoutes/", group: "third", action: "routes"
       },
@@ -2155,37 +2197,37 @@
       { id:"home-indecisive", name:"Indecisive", page:"ThomasLab", description:"Finished a full Rank Things icon set after making at least 6 manual reranks." },
       { id:"home-completionist", name:"Completionist", page:"ThomasLab", description:"Clicked every project icon on the ThomasLab homepage." },
       { id:"home-tourist", name:"Tourist", page:"ThomasLab", description:"Visited every project from the ThomasLab homepage." },
-      { id:"home-wanted", name:"Wanted", page:"ThomasLab", description:"Got caught by the Traffic Sim red-light trap." },
+      { id:"home-wanted", name:"Wanted", page:"ThomasLab", description:"Got caught by the Intersection Lab red-light trap." },
       { id:"home-button-masher", name:"Button Masher", page:"ThomasLab", description:"Clicked animation icons 12 times within 5 seconds." },
       { id:"home-expensive-hobby", name:"Expensive Hobby", page:"ThomasLab", description:"Accumulated at least $500 in fines in a single day." },
       { id:"home-personal-space", name:"Personal Space", page:"ThomasLab", description:"Clicked the mascot 5 times within 5 seconds." },
       { id:"home-gotcha", name:"Gotcha!", page:"ThomasLab", description:"Caught the mascot while it was actively avoiding the mouse." },
       { id:"home-peace-offering", name:"Peace Offering", page:"ThomasLab", description:"Fed the hidden cookie to the unhappy mascot." },
       { id:"home-last-straw", name:"Last Straw", page:"ThomasLab", description:"Made the mascot angry again after winning him back with the cookie." },
-      { id:"home-highway-robbery", name:"Highway Robbery", page:"ThomasLab", description:"Had the Pirate Legacy card stolen." },
+      { id:"home-highway-robbery", name:"Highway Robbery", page:"ThomasLab", description:"Had the Tides: A Pirate Legacy card stolen." },
       { id:"home-clean-slate", name:"Clean Slate", page:"ThomasLab", description:"Worked a positive Money Lost Today balance back to $0 using pirate coins." },
       { id:"home-full-steam", name:"Full Steam Ahead", page:"ThomasLab", description:"Clicked the Train Clicker icon 20 times and unleashed the massive steam cloud." },
       { id:"home-persistent", name:"Persistent", page:"ThomasLab", description:"Reached the star's final message." },
       { id:"home-you-again", name:"You Again?", page:"ThomasLab", description:"Found and clicked the star after it moved." },
-      { id:"home-scenic-route", name:"Taking the Scenic Route", page:"ThomasLab", description:"Saw all five Recommended Routes icon animations." },
+      { id:"home-scenic-route", name:"Taking the Scenic Route", page:"ThomasLab", description:"Saw all five Scenic Adventures icon animations." },
 
       { id:"game-picker-picked", name:"Dealer's Choice", page:"Game Picker", description:"Picked a game." },
       { id:"find-your-place-10-weights", name:"Tweaker", page:"Find Your Place", description:"Changed 10 weights." },
       { id:"rank-things-10-items", name:"Getting Crowded", page:"Rank Things", description:"Placed 10 things." },
       { id:"custom-state-3-maps", name:"New Management", page:"Custom State Generator", description:"Generated 3 custom state maps." },
       { id:"house-rater-complete", name:"Home Inspector", page:"House Rater", description:"Fully rated a house." },
-      { id:"challenges-all-categories", name:"Variety Pack", page:"Challenges", description:"Got a recommendation from all 8 challenge categories." },
-      { id:"challenges-complete", name:"Actually Did It", page:"Challenges", description:"Completed a challenge." },
-      { id:"pirate-start-campaign", name:"Set Sail", page:"Pirate Legacy", description:"Started a Pirate Legacy campaign." },
+      { id:"challenges-all-categories", name:"Variety Pack", page:"Challenge Drawer", description:"Got a recommendation from all 8 challenge categories." },
+      { id:"challenges-complete", name:"Actually Did It", page:"Challenge Drawer", description:"Completed a challenge." },
+      { id:"pirate-start-campaign", name:"Set Sail", page:"Tides: A Pirate Legacy", description:"Started a campaign in Tides: A Pirate Legacy." },
       { id:"train-2026", name:"It's 2026 Somewhere", page:"Train Clicker", description:"Reached $2,026." },
-      { id:"traffic-all-scenarios", name:"Try Everything", page:"Traffic Sim", description:"Tried every Traffic Sim scenario." },
-      { id:"traffic-queue-250", name:"Traffic Jam", page:"Traffic Sim", description:"Reached a queue of 250 cars." },
-      { id:"traffic-longest-wait-500", name:"Are We There Yet?", page:"Traffic Sim", description:"Reached a longest wait time of 500 seconds." },
-      { id:"traffic-moving-people", name:"Moving People", page:"Traffic Sim", description:"Reached a 1-minute throughput of at least 75 vehicles per minute." },
-      { id:"traffic-engineer", name:"Traffic Engineer", page:"Traffic Sim", description:"After at least 2 minutes of simulation time, exceeded 2,000 vehicles/hour with under 7 seconds average delay." },
-      { id:"dog-25-discoveries", name:"Good Boy", page:"Doggy Style", description:"Made 25 discoveries." },
-      { id:"dog-69-discoveries", name:"Nice.", page:"Doggy Style", description:"Made 69 discoveries." },
-      { id:"recipes-view-all", name:"Clean Plate Club", page:"My Recipe Book", description:"Viewed every recipe." },
+      { id:"traffic-all-scenarios", name:"Try Everything", page:"Intersection Lab", description:"Tried every Intersection Lab scenario." },
+      { id:"traffic-queue-250", name:"Traffic Jam", page:"Intersection Lab", description:"Reached a queue of 250 cars." },
+      { id:"traffic-longest-wait-500", name:"Are We There Yet?", page:"Intersection Lab", description:"Reached a longest wait time of 500 seconds." },
+      { id:"traffic-moving-people", name:"Moving People", page:"Intersection Lab", description:"Reached a 1-minute throughput of at least 75 vehicles per minute." },
+      { id:"traffic-engineer", name:"Traffic Engineer", page:"Intersection Lab", description:"After at least 2 minutes of simulation time, exceeded 2,000 vehicles/hour with under 7 seconds average delay." },
+      { id:"dog-25-discoveries", name:"Good Boy", page:"Nose First", description:"Made 25 discoveries." },
+      { id:"dog-69-discoveries", name:"Nice.", page:"Nose First", description:"Made 69 discoveries." },
+      { id:"recipes-view-all", name:"Clean Plate Club", page:"My Cookbook", description:"Viewed every completed recipe. Newly finished recipes count too." },
       { id:"ancestors-view-all", name:"Family Reunion", page:"Journey of My Ancestors", description:"Viewed the entire ancestral journey." },
       { id:"places-viewed", name:"Been Around", page:"Places I Have Been", description:"Saw where Thomas has been." },
       { id:"ti-5-questions", name:"Curious", page:"Thomas Intelligence", description:"Asked Thomas Intelligence 5 questions." },
@@ -2243,7 +2285,18 @@
       writeAchievementState(state);
       return next;
     }
+    const legacyProjectStorageKeys = {
+      "./PirateLegacy/": "pirate-legacy",
+      "./TrafficSim/": "traffic-sim",
+      "./Challenges/": "challenges",
+      "./MyRecipeBook/": "my-recipe-book",
+      "./RecommendedRoutes/": "recommended-routes",
+      "./NoseFirst/": "doggy-style"
+    };
     function projectStorageKey(projectOrTitle) {
+      if (typeof projectOrTitle === "object" && projectOrTitle?.href && legacyProjectStorageKeys[projectOrTitle.href]) {
+        return legacyProjectStorageKeys[projectOrTitle.href];
+      }
       const title = typeof projectOrTitle === "string" ? projectOrTitle : projectOrTitle?.title || "project";
       return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     }
@@ -2495,7 +2548,7 @@
         .filter(({ p }) => p.group === group);
 
       const mainOrder = ["Find Your Place", "Rank Things", "Custom State Generator"];
-      const thirdOrder = ["House Rater", "Recommended Routes", "Challenges"];
+      const thirdOrder = ["House Rater", "Scenic Adventures", "Challenge Drawer"];
       featureGrid.innerHTML = byGroup("feature").map(({p, i}) => cardMarkup(p, i, "feature")).join("");
       mainGrid.innerHTML = byGroup("main")
         .sort((a, b) => mainOrder.indexOf(a.p.title) - mainOrder.indexOf(b.p.title))
@@ -2519,6 +2572,56 @@
       toast.classList.add("show");
       clearTimeout(showToast.timer);
       showToast.timer = setTimeout(() => toast.classList.remove("show"), 1600);
+    }
+
+    const tourMascots = [...document.querySelectorAll('.tour-mascot')];
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    tourMascots.forEach(button => button.addEventListener('click', () => {
+      button.classList.remove('celebrate');
+      void button.offsetWidth;
+      button.classList.add('celebrate');
+      showToast(button.dataset.tourMessage);
+    }));
+    if (!reducedMotion && 'IntersectionObserver' in window) {
+      const tourObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            tourObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: .35 });
+      tourMascots.forEach(button => { button.classList.add('will-animate'); tourObserver.observe(button); });
+    }
+
+    const scrollTrail = document.getElementById('scrollTrail');
+    if (scrollTrail) {
+      const trailFill = scrollTrail.querySelector('.scroll-trail-fill');
+      const trailRider = scrollTrail.querySelector('.scroll-trail-rider');
+      const trailProp = scrollTrail.querySelector('.scroll-trail-prop');
+      const landmarks = [
+        [document.querySelector('#projects .section-heading'), '🗺️'],
+        [document.querySelector('#gamesGrid')?.previousElementSibling, '🎲'],
+        [document.querySelector('.about-head'), '🥄']
+      ];
+      let trailFrame = 0;
+      const updateTrail = () => {
+        trailFrame = 0;
+        const maxScroll = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+        const progress = Math.max(0, Math.min(1, scrollY / maxScroll));
+        const position = `${(progress * 100).toFixed(2)}%`;
+        trailFill.style.height = position;
+        if (!reducedMotion) {
+          trailRider.style.top = position;
+          const passed = landmarks.filter(([element]) => element && element.getBoundingClientRect().top < innerHeight * .45);
+          trailProp.textContent = passed.at(-1)?.[1] || '✨';
+        }
+      };
+      const scheduleTrail = () => { if (!trailFrame) trailFrame = requestAnimationFrame(updateTrail); };
+      addEventListener('scroll', scheduleTrail, { passive: true });
+      addEventListener('resize', scheduleTrail);
+      addEventListener('load', scheduleTrail, { once: true });
+      scheduleTrail();
     }
 
     let creditsTimer = null;
@@ -4211,7 +4314,7 @@
 
           const lockPirateCard = () => {
             card.classList.add("pirate-locked");
-            card.setAttribute("aria-label", "Pirate Legacy is locked. Click to pay a $200 bribe.");
+            card.setAttribute("aria-label", "Tides: A Pirate Legacy is locked. Click to pay a $200 bribe.");
           };
 
           const triggerPirateRaid = () => {

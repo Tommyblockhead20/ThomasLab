@@ -287,6 +287,7 @@
     .assistant-row{grid-template-columns:30px 1fr;gap:9px}
   }
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
 <div class="app">
@@ -305,7 +306,7 @@
     <div class="history" id="history"></div>
 
     <div class="sidebar-footer">
-      <a class="side-link" href="https://thomaslab.me/"><span>⌂</span><span>Back to Thomas Lab</span></a>
+      <a class="side-link" href="../"><span>⌂</span><span>Back to Thomas Lab</span></a>
       <button class="side-link" id="clearHistory" style="border:0;background:transparent;cursor:pointer;width:100%;text-align:left"><span>⌫</span><span>Clear chat history</span></button>
       <div class="side-link" style="cursor:default"><span>⚙</span><span>Settings are already perfect</span></div>
     </div>
@@ -634,6 +635,7 @@
 
   function updateUnlockCounter() {
     const count = Math.min(ANSWERS.length, unlocked.length);
+    if (ANSWERS.every(answer => unlocked.includes(answer))) ThomasAchievements.unlock('ti-all-responses');
     const el = document.getElementById('unlockCount');
     if (!el) return;
     if (count === 0) {
@@ -788,6 +790,7 @@
 
     addUserMessage(text);
     saveChats();
+    if (ThomasAchievements.increment('ti.questions') >= 5) ThomasAchievements.unlock('ti-5-questions');
 
     const thinking = createThinkingMessage();
     const card = thinking.querySelector('.thinking-card');
@@ -920,6 +923,9 @@
 
   bindChips();
   renderHistory();
+  const previousQuestions = chats.reduce((total, chat) => total + (chat.messages || []).filter(message => message.role === 'user').length, 0);
+  if (previousQuestions > Number(ThomasAchievements.getStat('ti.questions') || 0)) ThomasAchievements.setStat('ti.questions', previousQuestions);
+  if (Number(ThomasAchievements.getStat('ti.questions') || 0) >= 5) ThomasAchievements.unlock('ti-5-questions');
   updateUnlockCounter();
   resizePrompt();
 

@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
 server/node_modules/
+src/world/map-editor-patch.compact.json
+src/world/map-editor-patch.compact.json.gz
 
 # Local environment settings
 .env

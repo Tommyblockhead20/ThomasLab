@@ -2,7 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>County State Redrawer v1.36.8</title>
+<title>Custom State Generator v1.36.8</title>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <style>
 :root{--bg:#0e1116;--panel:#171c24;--panel2:#202733;--text:#eef3fa;--muted:#9aa8ba;--line:#303a49;--accent:#7cc4ff;--good:#71d69b;--warn:#ffcf70;--bad:#ff7d86}
@@ -15,6 +15,7 @@
 .countyCanvasOutline{display:none;fill:none;stroke:#9aa7b6;stroke-width:.32;stroke-opacity:.24;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 .zooming .countyCanvasOutline{display:none}
 h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;margin:20px 0 8px;color:#dfe8f4}p{margin:5px 0;color:var(--muted)}.tiny{font-size:11px;color:var(--muted)}
+.home-link{display:inline-block;margin-bottom:12px;color:var(--accent);font-size:12px;font-weight:700;text-decoration:none}.home-link:hover{text-decoration:underline}.home-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .control{margin:11px 0}.control label{display:flex;justify-content:space-between;gap:8px;margin-bottom:5px}.value{font-variant-numeric:tabular-nums;color:var(--accent)}input[type=range]{width:100%}input[type=number],input[type=text],select{width:100%;background:#0e131b;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:8px}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}button{border:1px solid #40516a;background:#25334a;color:white;border-radius:7px;padding:9px;cursor:pointer;font-weight:650}button:hover{filter:brightness(1.1)}button.primary{background:#286b9d}.buttons .wide{grid-column:1/-1}.toggleBtn.active{background:#294f3c;border-color:#5f9f7a;outline:1px solid #75c99a}button:disabled{opacity:.45;cursor:not-allowed}
 .status{background:#10151d;border:1px solid var(--line);border-radius:7px;padding:9px;margin:8px 0}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}.ok{background:var(--good)}.partial{background:var(--warn)}.no{background:var(--bad)}
@@ -45,12 +46,15 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}.check{display:flex;g
 .manualEditor{margin-top:9px;padding-top:8px;border-top:1px solid #294052}.manualEditorTitle{font-size:11px;font-weight:800;color:#d9e6f5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.035em}.manualTools{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:7px 0}.manualTools button{padding:6px 5px;font-size:11px;font-weight:700;background:#182331}.manualTools button.active{outline:2px solid #8ed0ff;background:#294561}.manualTools .whiteTool.active{outline-color:#f5fbff}.manualTools .yellowTool.active{outline-color:#ffd98a}.manualTools .turqTool.active{outline-color:#49dbc9}.manualTools .purpleTool.active{outline-color:#c58cff}.manualTools .eraseBorderTool.active,.manualTools .eraseSingleTool.active,.manualTools .eraseVisualTool.active{outline-color:#ff7d86;background:#4a2730}.manualTools .eraseVisualTool{grid-column:1/-1}.manualEditorHelp{font-size:10.5px;color:#9fb0c4;line-height:1.35;margin:5px 0 7px}.manualEditor .tool.panTool{grid-column:1/-1}.manualEditor button{min-width:0}.manualEditor .manualSave{background:#286b9d}.manualEditor .manualReset{background:#382a30;border-color:#68424c}.manualEraseHit{fill:none;stroke:rgba(255,125,134,0);stroke-width:5;pointer-events:stroke;vector-effect:non-scaling-stroke;cursor:crosshair}.manualEraseHit:hover{stroke:rgba(255,125,134,.52);stroke-width:3}.manualEraseHover{fill:none;stroke:#ff7d86;stroke-width:4.2;stroke-opacity:.9;pointer-events:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}.manualEraseCapture{fill:transparent;pointer-events:all;cursor:crosshair}.manualCalGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 9px}.manualCalGrid .control{margin:3px 0}.manualCalGrid label{font-size:10.5px}.manualActions{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:7px}.manualActions button{font-size:11px;padding:7px 5px}.manualSave{width:100%;margin-top:7px;background:#286b9d}.manualStatus{font-size:10.5px;color:#aebbd0;margin-top:5px}.manualWhite{fill:none;stroke:#f4fbff;stroke-width:4.4;stroke-dasharray:none!important;stroke-dashoffset:0!important;opacity:1;filter:drop-shadow(0 0 2.5px #1778b8);pointer-events:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}.manualYellow{fill:none;stroke:#ffd98a;stroke-width:3.8;stroke-dasharray:none!important;stroke-dashoffset:0!important;opacity:1;filter:drop-shadow(0 0 2px #704912);pointer-events:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}.manualTurquoise,.manualPurple,.manualDrawingPreview{fill:none;pointer-events:none;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}.manualTurquoise{stroke:#31ead7;stroke-width:3;stroke-dasharray:7 4;opacity:1;filter:drop-shadow(0 0 1.5px #063f42)}.manualPurple{stroke:#d39aff;stroke-width:2.9;stroke-dasharray:2 4;opacity:1;filter:drop-shadow(0 0 1.4px #3b2358)}.manualDrawingPreview.turquoise{stroke:#31ead7;stroke-width:3;stroke-dasharray:7 4}.manualDrawingPreview.purple{stroke:#d39aff;stroke-width:2.9;stroke-dasharray:2 4}.manualDrawingPreview.eraseVisual{stroke:#ff7d86;stroke-width:12;opacity:.78}.manualBorderHit{fill:none;stroke:rgba(255,255,255,0);stroke-width:12;pointer-events:stroke;vector-effect:non-scaling-stroke;cursor:crosshair}.manualBorderHit:hover{stroke:rgba(255,255,255,.52);stroke-width:4}.manualDrawCapture{fill:transparent;pointer-events:all;cursor:crosshair}.editingNatural .county{cursor:crosshair}.editingNatural .county:hover{filter:none}.editingNatural .stateBorder,.editingNatural .newBorder{pointer-events:none}.editingNatural .overlayLine,.editingNatural .manualWhite,.editingNatural .manualYellow,.editingNatural .manualTurquoise,.editingNatural .manualPurple{filter:none!important}
 
 @media(max-width:1000px){#app{grid-template-columns:300px 1fr}.right{display:none}}
+@media(max-width:600px){#app{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(260px,40vh)}.left{border-right:0;border-bottom:1px solid var(--line);box-shadow:none}.mapWrap{min-height:0}.legend{max-width:calc(100% - 24px);font-size:11px}.topbar{gap:6px;flex-wrap:wrap}}
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
 <div id="app">
   <aside class="panel left">
-    <h1>County State Redrawer <span class="tiny">v1.36.8</span></h1>
+    <a class="home-link" href="../">← ThomasLab</a>
+    <h1>Custom State Generator <span class="tiny">v1.36.8</span></h1>
     <p>Build alternate U.S. states from whole counties.</p>
 
     <h2>State rules</h2>
@@ -1195,10 +1199,12 @@ function drawManualPreview(){
 function saveManualStateElement(){const el=document.querySelector('#savedManualState');if(el)el.textContent=manualSnapshot()}
 function saveEditedHtml(){
  saveManualStateElement();const clone=document.documentElement.cloneNode(true),map=clone.querySelector('#map');if(map)map.replaceChildren();
+ clone.querySelector('script[src="../achievements.js"]')?.remove();
+ clone.querySelector('.home-link')?.setAttribute('href','https://thomaslab.me/');
  const raster=clone.querySelector('#countyRaster');if(raster){raster.removeAttribute('style');raster.width=1;raster.height=1}
- const title=clone.querySelector('title');if(title)title.textContent='County State Redrawer v1.34.16';const ver=clone.querySelector('h1 .tiny');if(ver)ver.textContent='v1.34.16';
+ const title=clone.querySelector('title');if(title)title.textContent='Custom State Generator v1.34.16';const ver=clone.querySelector('h1 .tiny');if(ver)ver.textContent='v1.34.16';
  const tipClone=clone.querySelector('#tip');if(tipClone){tipClone.style.display='none';tipClone.textContent=''}
- let html='<!DOCTYPE html>\n'+clone.outerHTML;const blob=new Blob([html],{type:'text/html'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='county_state_redrawer_v1.34.16_edited.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+ let html='<!DOCTYPE html>\n'+clone.outerHTML;const blob=new Blob([html],{type:'text/html'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='custom_state_generator_v1.34.16_edited.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
 function initManualEditorUI(){
  document.querySelectorAll('.manualTools .tool').forEach(b=>b.onclick=()=>setManualTool(b.dataset.tool));
@@ -2282,6 +2288,7 @@ function optimize(){
      finalK=k+2;activeIdx=allActive;
    }
    assignment=best;generatedStateNames=buildGeneratedStateNames(assignment,activeIdx,finalK);lastOptimizeSignature=optimizeSignature;assignmentRevision++;colorGeneratedStates(finalK);renderSummary(finalK,w);
+    if(window.ThomasAchievements?.markUnique('custom-state.maps',optimizeSignature)>=3)window.ThomasAchievements.unlock('custom-state-3-maps');
    document.querySelector('#mapMode').textContent=lockAKHI?`${finalK} generated states · AK/HI fixed`:`${finalK} generated states`;draw();
  },30);
 }

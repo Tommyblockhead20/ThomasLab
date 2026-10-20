@@ -8,7 +8,7 @@ import { buildCleanBasaltTerrainWorld } from './cave-island-v23.js';
 import { islandLandscapeSpec } from './island-landscape-spec.js';
 import { attachSignText } from './sign-text-renderer.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
-import MAP_EDITOR_PATCH from './map-editor-patch.json' with { type: 'json' };
+import MAP_EDITOR_PATCH from './map-editor-patch-loader.js';
 import {
   applyFishingLayoutPatch,
   applyMapEditorHeight,

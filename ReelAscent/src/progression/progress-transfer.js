@@ -57,7 +57,7 @@ function parseDocument(input) {
 
 export function validateProgressImport(input) {
   const document = parseDocument(input);
-  if (document.format !== PROGRESS_EXPORT_FORMAT) throw new Error('This is not a Reel Ascent progress export.');
+  if (document.format !== PROGRESS_EXPORT_FORMAT) throw new Error('This is not a Bass Camp progress export.');
   if (!Number.isInteger(document.exportVersion) || document.exportVersion < 1 || document.exportVersion > PROGRESS_EXPORT_VERSION) {
     throw new Error(`Unsupported progress export version: ${document.exportVersion}.`);
   }

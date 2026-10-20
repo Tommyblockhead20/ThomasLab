@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/prepare-map-patch.mjs",
     "dev": "vite",
     "test": "node --test",
     "validate:library": "node scripts/validate-library-island.mjs",
+    "prebuild": "node scripts/prepare-map-patch.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

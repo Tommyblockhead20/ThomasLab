@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>County Travel Map</title>
+<title>Places I Have Been</title>
 <style>
 :root{--ink:#15191d;--muted:#66707a;--panel:#f5f7f8;--line:#c9d0d5;--accent:#2f6fda}
 *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#fff}
@@ -11,6 +11,7 @@
 header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:12px}
 h1{margin:0;font-size:clamp(23px,3vw,34px)} .sub{font-size:14px;color:var(--muted);margin-top:4px}
 .controls{display:flex;gap:7px;flex-wrap:wrap} button{border:1px solid #bcc5cc;background:#fff;border-radius:8px;padding:7px 11px;font:inherit;cursor:pointer} button:hover{background:#f2f4f5}
+.home-link{display:inline-flex;align-items:center;border:1px solid #bcc5cc;border-radius:8px;padding:7px 11px;color:var(--ink);font:inherit;text-decoration:none}.home-link:hover{background:#f2f4f5}.home-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:14px;align-items:start}
 .map-card{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;min-height:420px}
 svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;background:#fff}
@@ -27,10 +28,11 @@ svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;back
 @media(max-width:800px){.layout{grid-template-columns:1fr}.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}.legend h2,.legend .note{grid-column:1/-1}}
 @media(max-width:500px){.legend{grid-template-columns:1fr}.legend h2,.legend .note{grid-column:auto}}
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body><div class="app">
-<header><div><h1>County Travel Map</h1><div class="sub">Baked-in county geometry • no internet connection or external map files needed</div></div>
-<div class="controls"><button id="zin" type="button">Zoom +</button><button id="zout" type="button">Zoom −</button><button id="reset" type="button">Reset view</button></div></header>
+<header><div><h1>Places I Have Been</h1><div class="sub">Baked-in county geometry • no internet connection or external map files needed</div></div>
+<div class="controls"><a class="home-link" href="../">← ThomasLab</a><button id="zin" type="button">Zoom +</button><button id="zout" type="button">Zoom −</button><button id="reset" type="button">Reset view</button></div></header>
 <div class="layout">
 <div class="map-card" id="mapCard"><div class="tooltip" id="tip"></div>
 <svg id="map" viewBox="0 0 1000 650" role="img" aria-label="United States county map colored from the supplied MapChart save">
@@ -47,12 +49,12 @@ svg{display:block;width:100%;height:auto;touch-action:none;user-select:none;back
 const svg=document.getElementById('map'), vp=document.getElementById('viewport'), tip=document.getElementById('tip'), card=document.getElementById('mapCard');
 let scale=1, tx=0, ty=0, drag=false, lastX=0,lastY=0;
 function apply(){vp.setAttribute('transform',`translate(${tx} ${ty}) scale(${scale})`);}
-function zoomAt(f,cx=500,cy=325){const ns=Math.max(1,Math.min(8,scale*f)); if(ns===scale)return; tx=cx-(cx-tx)*(ns/scale); ty=cy-(cy-ty)*(ns/scale); scale=ns; apply();}
+function zoomAt(f,cx=500,cy=325){const ns=Math.max(1,Math.min(8,scale*f)); if(ns===scale)return; tx=cx-(cx-tx)*(ns/scale); ty=cy-(cy-ty)*(ns/scale); scale=ns; apply();ThomasAchievements.unlock('places-viewed');}
 document.getElementById('zin').addEventListener('click',()=>zoomAt(1.3));
 document.getElementById('zout').addEventListener('click',()=>zoomAt(1/1.3));
 document.getElementById('reset').addEventListener('click',()=>{scale=1;tx=0;ty=0;apply();});
 svg.addEventListener('wheel',e=>{e.preventDefault(); const r=svg.getBoundingClientRect(); const cx=(e.clientX-r.left)*1000/r.width, cy=(e.clientY-r.top)*650/r.height; zoomAt(e.deltaY<0?1.16:1/1.16,cx,cy);},{passive:false});
-svg.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY;svg.setPointerCapture(e.pointerId);});
+svg.addEventListener('pointerdown',e=>{ThomasAchievements.unlock('places-viewed');drag=true;lastX=e.clientX;lastY=e.clientY;svg.setPointerCapture(e.pointerId);});
 svg.addEventListener('pointermove',e=>{if(drag){const r=svg.getBoundingClientRect();tx+=(e.clientX-lastX)*1000/r.width;ty+=(e.clientY-lastY)*650/r.height;lastX=e.clientX;lastY=e.clientY;apply();}});
 svg.addEventListener('pointerup',()=>drag=false); svg.addEventListener('pointercancel',()=>drag=false);
 document.querySelectorAll('.county').forEach(p=>{

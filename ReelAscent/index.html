@@ -5,28 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Reel Ascent is an original low-poly climbing and fishing adventure prototype."
+      content="Bass Camp is an original low-poly climbing and fishing adventure prototype."
     />
-    <title>Reel Ascent — Climbing & Fishing Prototype</title>
+    <title>Bass Camp — Climbing & Fishing Prototype</title>
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
     <main id="game-shell">
-      <canvas id="game-canvas" tabindex="0" aria-label="Reel Ascent 3D game"></canvas>
+      <canvas id="game-canvas" tabindex="0" aria-label="Bass Camp 3D game"></canvas>
 
       <section id="loading" class="loading-panel" aria-live="polite">
         <div class="loading-mark" aria-hidden="true"></div>
-        <p class="eyebrow">REEL ASCENT</p>
+        <p class="eyebrow">BASS CAMP</p>
         <h1>Finding the trail…</h1>
         <p id="loading-status">Preparing the mountain</p>
       </section>
 
       <section id="hud" class="hud" hidden>
-        <div class="brand" aria-label="Reel Ascent">
+        <div class="brand" aria-label="Bass Camp">
           <span class="brand-mark" aria-hidden="true">▲</span>
           <div>
-            <strong>REEL ASCENT</strong>
+            <strong>BASS CAMP</strong>
           </div>
+          <a class="site-home-link" href="../" aria-label="Return to ThomasLab home">⌂ Home</a>
         </div>
 
         <div id="run-status" class="run-status">
@@ -185,7 +186,7 @@
 
       <section id="pause-menu" class="pause-menu" role="dialog" aria-modal="true" hidden aria-labelledby="pause-title">
         <header class="pause-header">
-          <div><span class="eyebrow">REEL ASCENT <small id="pause-version" class="game-version"></small></span><h2 id="pause-title">Paused</h2></div>
+          <div><span class="eyebrow">BASS CAMP <small id="pause-version" class="game-version"></small></span><h2 id="pause-title">Paused</h2></div>
           <button id="pause-resume" type="button">RESUME <kbd>Esc</kbd></button>
         </header>
         <div class="pause-workspace">

@@ -10,6 +10,9 @@ const loadingStatus = document.querySelector('#loading-status');
 const errorPanel = document.querySelector('#error-panel');
 const errorMessage = document.querySelector('#error-message');
 
+// Vite serves this project at / in development, where ../ would point back here.
+if (import.meta.env.DEV) document.querySelector('.site-home-link')?.setAttribute('href', 'https://thomaslab.me/');
+
 async function start() {
   try {
     markStartup('bootstrap:start');

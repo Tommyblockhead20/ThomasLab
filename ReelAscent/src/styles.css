@@ -122,6 +122,27 @@ body {
   letter-spacing: 0.08em;
 }
 
+.site-home-link {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.2rem;
+  margin-left: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  color: #fff9e8;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  background: rgb(13 43 42 / 70%);
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 0.65rem;
+  backdrop-filter: blur(7px);
+}
+
+.site-home-link:hover { background: rgb(13 43 42 / 90%); }
+.site-home-link:focus-visible { outline: 3px solid #f5d679; outline-offset: 3px; }
+
 .run-status {
   position: absolute;
   top: max(4.45rem, calc(env(safe-area-inset-top) + 4.45rem));

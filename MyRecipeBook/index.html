@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thomas's Cookbook</title>
+<title>My Cookbook</title>
 <style>
 :root{
   --wood1:#4f2f1e;--wood2:#805033;--wood3:#a16b46;--paper:#f4e8ca;--ink:#473729;
@@ -33,10 +33,11 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
 @media(max-width:900px){body{padding:28px 10px 56px}.book{display:block;height:auto}.page{height:720px;padding:36px 24px 52px}.left-page{border-radius:16px 16px 0 0}.right-page{border-radius:0 0 16px 16px}.spine{top:720px;left:0;right:0;width:auto;height:28px;transform:translateY(-50%);background:linear-gradient(0deg,rgba(54,34,20,.16),rgba(50,30,17,.25) 35%,rgba(255,255,255,.25) 49%,rgba(61,38,21,.18) 63%,rgba(50,30,17,.08))}.turner{display:none!important}.bookmark-wrap{right:18px;top:-16px;width:110px;height:108px}.bookmark-tab{width:110px;height:108px}.summary-grid{grid-template-columns:1fr}.ingredient-card{height:378px}.step-card{height:590px}}
 @media(max-width:560px){.top-actions{flex-direction:column;align-items:stretch}.bookmark-wrap{right:12px;width:104px}.bookmark-tab{width:104px}.cover-page h1{font-size:2.5rem}.recipe-title h2{font-size:1.75rem}.heading-row h2,.instructions-head h2{font-size:1.6rem}}
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
 <main class="stage at-index" id="stage">
-  <div class="top-actions"><a class="home-btn" href="https://thomaslab.me" aria-label="Home"><svg class="home-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7v9a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a><div></div></div>
+  <div class="top-actions"><a class="home-btn" href="../" aria-label="Home"><svg class="home-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7v9a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z"/></svg><span>Home</span></a><div></div></div>
   <div class="bookmark-wrap"><button class="bookmark-tab" id="bookmarkIndex" type="button" title="Return to recipe index">RECIPE INDEX<small>jump back</small></button><div class="bookmark-tail"></div></div>
   <button class="nav prev" id="prevBtn" type="button" aria-label="Previous recipe">‹</button>
   <button class="nav next" id="nextBtn" type="button" aria-label="Next recipe">›</button>
@@ -234,7 +235,7 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
   function context(index){return {scale:defaultScale(index),alts:altBucket(index)}}
   function resolveSteps(steps,index){const ctx=context(index);return steps.map((s,rawIndex)=>{if(typeof s==='string')return {id:rawIndex,text:s};if(typeof s==='function')return {id:rawIndex,text:s(ctx)};if(s.alt&&!ctx.alts[s.alt])return null;if(s.when&&!s.when(ctx))return null;const text=typeof s.text==='function'?s.text(ctx):s.text;return {id:rawIndex,text}}).filter(Boolean)}
 
-  function titlePage(){return `<div class="cover-page"><div class="eyebrow">From the kitchen of</div><h1>Thomas's<br>Cookbook</h1><div class="title-rule"></div><p class="subtitle">A growing collection of soups, sauces, mains, and other things worth making again.</p><div class="note">The quantities, servings, and costs are estimates. More recipes to come.</div><div class="footer-stamp">Est. 2026 · Kitchen Copy</div></div><div class="page-num">i</div>`}
+  function titlePage(){return `<div class="cover-page"><div class="eyebrow">Recipes from my kitchen</div><h1>My<br>Cookbook</h1><div class="title-rule"></div><p class="subtitle">A growing collection of soups, sauces, mains, and other things worth making again.</p><div class="note">The quantities, servings, and costs are estimates. More recipes to come.</div><div class="footer-stamp">Est. 2026 · Kitchen Copy</div></div><div class="page-num">i</div>`}
   function indexPage(){const cards=recipes.map((r,i)=>`<button class="index-card" type="button" data-recipe="${i+1}"><span class="index-top"><span class="index-name">${r.name}</span>${r.lf?lfIcon():""}</span><span class="index-meta ${r.lf?"":"no-lf"}">${r.type}</span><span class="index-num">${i+1}</span></button>`).join("");return `<div class="heading-row"><h2>Recipe Index</h2><div class="flourish"></div></div><div class="legend">${lfIcon()}<span>lactose free</span></div><div class="index-list">${cards}</div><div class="page-num">ii</div>`}
   function summaryCard(recipe,index){const scale=defaultScale(index),cost=recipeCost(recipe,index),serv=servingCount(recipe,index);return `<section class="summary-card"><div class="summary-grid"><div class="summary-pill"><strong>Servings</strong><span>${formatQty(serv)}</span></div><div class="summary-pill"><strong>Est. cost</strong><span>${money(cost)}</span></div><div class="summary-pill"><strong>Est. per serving</strong><span>${money(cost/serv)}</span></div></div><div class="scale-row"><div class="scale-buttons">${recipe.scales.map(mult=>`<button class="scale-btn ${scale===mult?'active':''}" data-scale="${mult}" data-recipe="${index}">${mult}x</button>`).join('')}</div>${recipe.summaryNote?`<div class="scale-note">${recipe.summaryNote}</div>`:''}</div></section>`}
   function alternativesCard(recipe,index){if(!recipe.alternatives?.length)return "";const alts=altBucket(index);return `<section class="options-card"><div class="section-label">${recipe.optionsLabel||'Options'}</div><div class="option-buttons">${recipe.alternatives.map(a=>`<button class="option-btn ${alts[a.id]?'active':''}" data-alt="${a.id}" data-recipe="${index}">${alts[a.id]?'✓ ':''}${a.label}</button>`).join('')}</div></section>`}
@@ -244,7 +245,14 @@ button,a{font:inherit} a{text-decoration:none}.stage{width:min(1140px,100%);marg
   const spreadLeft=i=>i===0?titlePage():recipeLeft(i),spreadRight=i=>i===0?indexPage():recipeRight(i);
   function bindIndex(){if(current!==0)return;rightPage.querySelectorAll('.index-card').forEach(b=>b.addEventListener('click',()=>goTo(Number(b.dataset.recipe))))}
   function bindInteractive(){if(current===0)return;leftPage.querySelectorAll('.scale-btn').forEach(b=>b.addEventListener('click',()=>{state.scale[Number(b.dataset.recipe)]=Number(b.dataset.scale);saveState();render()}));leftPage.querySelectorAll('.option-btn').forEach(b=>b.addEventListener('click',()=>{const idx=Number(b.dataset.recipe),bucket=altBucket(idx);bucket[b.dataset.alt]=!bucket[b.dataset.alt];saveState();render()}));[leftPage,rightPage].forEach(p=>p.querySelectorAll('input[type="checkbox"]').forEach(input=>input.addEventListener('change',()=>{const bucket=input.dataset.kind==='ingredient'?'ingredients':'steps';checkBucket(bucket,Number(input.dataset.recipe))[input.dataset.id]=input.checked;saveState()})))}
-  function render(){leftPage.innerHTML=spreadLeft(current);rightPage.innerHTML=spreadRight(current);bindIndex();bindInteractive();stage.classList.toggle('at-index',current===0);prevBtn.disabled=busy||current===0;nextBtn.disabled=busy||current===recipes.length;bookmarkIndex.disabled=busy||current===0;progress.textContent=current===0?'Title + Index':`Recipe ${current} of ${recipes.length}`}
+  function recordRecipeView(){
+    // Completed recipes are checked from the live recipe list, so new finished entries join automatically.
+    if(current>0&&!recipes[current-1].placeholder)ThomasAchievements.markUnique('recipes.viewed',recipes[current-1].name);
+    const viewed=ThomasAchievements.getStat('recipes.viewed')||[];
+    const completed=recipes.filter(recipe=>!recipe.placeholder);
+    if(completed.length&&completed.every(recipe=>viewed.includes(recipe.name)))ThomasAchievements.unlock('recipes-view-all');
+  }
+  function render(){leftPage.innerHTML=spreadLeft(current);rightPage.innerHTML=spreadRight(current);bindIndex();bindInteractive();stage.classList.toggle('at-index',current===0);prevBtn.disabled=busy||current===0;nextBtn.disabled=busy||current===recipes.length;bookmarkIndex.disabled=busy||current===0;progress.textContent=current===0?'Title + Index':`Recipe ${current} of ${recipes.length}`;recordRecipeView()}
   async function animateFrames(dir){for(const angle of(dir==='forward'?FORWARD_ANGLES:BACKWARD_ANGLES)){turner.style.transform=`rotateY(${angle}deg)`;turner.classList.toggle('mid-flip',Math.abs(angle)>=60&&Math.abs(angle)<=120);await sleep(FRAME_MS)}}
   async function oneForward(){if(current>=recipes.length)return;const next=current+1;turnFront.innerHTML=spreadRight(current);turnBack.innerHTML=spreadLeft(next);turner.className='turner forward';turner.style.transform='rotateY(0deg)';void turner.offsetWidth;await animateFrames('forward');current=next;turner.className='turner';turner.style.transform='';render()}
   async function oneBackward(){if(current<=0)return;const previous=current-1;turnFront.innerHTML=spreadLeft(current);turnBack.innerHTML=spreadRight(previous);turner.className='turner backward';turner.style.transform='rotateY(0deg)';void turner.offsetWidth;await animateFrames('backward');current=previous;turner.className='turner';turner.style.transform='';render()}

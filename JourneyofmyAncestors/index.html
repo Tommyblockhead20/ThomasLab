@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ancestor Migration Animation</title>
+<title>Journey of My Ancestors</title>
 <style>
 :root{color-scheme:dark;--bg:#17191c;--panel:#282b2f;--panel2:#202327;--line:#555b61;--text:#eceff2;--muted:#aeb4ba;--blue:#52bde0;--pink:#f2799d;--amber:#ffbe5a}
 *{box-sizing:border-box}
@@ -11,6 +11,7 @@ html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-s
 body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:0}
 .app{width:100%;max-width:1800px;background:#111315;overflow:hidden;user-select:none}
 .mapwrap{position:relative;width:100%;aspect-ratio:1800/946;background:#202327;overflow:hidden;cursor:grab}
+.home-link{position:absolute;left:14px;top:14px;z-index:2;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:rgba(20,22,25,.86);color:var(--text);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer}.home-link:hover{background:#3b3f44}.home-link:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .mapwrap.dragging{cursor:grabbing}
 #mapCanvas{display:block;width:100%;height:100%;background:#202327}
 .legend{position:absolute;right:14px;top:14px;display:flex;gap:14px;align-items:center;padding:7px 10px;border-radius:8px;background:rgba(20,22,25,.78);font-size:12px;color:#d7dadd;pointer-events:none;backdrop-filter:blur(2px)}
@@ -29,13 +30,15 @@ input[type=range]{width:100%;margin:0;accent-color:#e7e9eb;cursor:pointer}
 .camera-marker{position:absolute;top:-8px;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:7px solid var(--amber);transform:translateX(-50%);pointer-events:none}
 .bottomrow{display:flex;justify-content:space-between;gap:12px;align-items:center;color:#7f878e;font-size:10px;margin-top:1px}
 .help{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media(max-width:800px){.toprow{grid-template-columns:repeat(4,auto) 1fr}.stats{grid-column:1/-2;grid-row:2}.year{grid-column:-2/-1;grid-row:2}.legend{font-size:10px;gap:8px}.controls{padding-left:8px;padding-right:8px}button{padding:6px 8px}.help{display:none}}
+@media(max-width:800px){body{align-items:flex-start}.toprow{grid-template-columns:repeat(4,auto) 1fr}.stats{grid-column:1/-2;grid-row:2}.year{grid-column:-2/-1;grid-row:2}.legend{font-size:10px;gap:8px}.controls{padding-left:8px;padding-right:8px}button{padding:6px 8px}.help{display:none}.tick:nth-last-child(2){display:none}.tick:last-child{transform:translateX(-100%)}}
 </style>
+<script src="../achievements.js"></script>
 </head>
 <body>
 <div class="app" id="app">
   <div class="mapwrap" id="mapWrap" aria-label="Animated map of ancestor migrations">
     <canvas id="mapCanvas" width="1800" height="946"></canvas>
+    <a class="home-link" href="../">← ThomasLab</a>
     <div class="legend"><span><i class="dot" style="background:var(--blue)"></i>Male</span><span><i class="dot" style="background:var(--pink)"></i>Female</span><span><i class="dot" style="background:var(--amber)"></i>Unknown</span></div>
   </div>
   <div class="controls">
@@ -59,7 +62,7 @@ input[type=range]{width:100%;margin:0;accent-color:#e7e9eb;cursor:pointer}
         <span class="tick" style="left:100%">2025</span>
       </div>
     </div>
-    <div class="bottomrow"><div class="help">Space pause · A auto camera · [ ] speed · +/- zoom · arrows pan · drag map · mouse wheel zoom · drag timeline to scrub</div><div>Offline basemap · HTML conversion</div></div>
+    <div class="bottomrow"><div class="help">Space pause · A auto camera · [ ] speed · +/- zoom · arrows pan · drag map · mouse wheel zoom · drag timeline to scrub</div><div>Journey of My Ancestors</div></div>
   </div>
 </div>
 <script>
@@ -80,6 +83,7 @@ function yearToFrame(y){return Math.round((y-1000)/(2025-1000)*TOTAL_FRAMES)}
 function frameToYear(f){return Math.round(1000+Math.max(0,Math.min(TOTAL_FRAMES,f))/TOTAL_FRAMES*(2025-1000))}
 const START_FRAME=yearToFrame(START_YEAR);
 let frameCursor=START_FRAME,counterFrames=START_FRAME;
+let fullJourneyPlayback=true;
 let camera={lat:51.5,lon:-2,zoom:5.35};
 const cameraFrames=[
  {year:1000,lat:51.5,lon:-2.0,zoom:5.35},{year:1450,lat:51.5,lon:-2.0,zoom:5.35},
@@ -141,7 +145,7 @@ function drawTrips(v){
 }
 function currentPlaybackSpeed(){return autoZoom&&frameToYear(counterFrames)>=1900?.5:playbackSpeed}
 function setFrame(f){counterFrames=Math.max(0,Math.min(TOTAL_FRAMES,Math.round(f)));frameCursor=counterFrames;endAnimation=counterFrames>=TOTAL_FRAMES;timeline.value=counterFrames}
-function resetToStart(play=true){setFrame(START_FRAME);endAnimation=false;pause=!play;if(autoZoom)updateAutoCamera()}
+function resetToStart(play=true){setFrame(START_FRAME);fullJourneyPlayback=true;endAnimation=false;pause=!play;if(autoZoom)updateAutoCamera()}
 function render(){
  if(autoZoom)updateAutoCamera();
  const v=viewBox();drawBasemap(v);const s=drawTrips(v);
@@ -154,7 +158,7 @@ let last=performance.now(),accum=0;
 function tick(now){
  const dt=Math.min(100,now-last);last=now;accum+=dt;
  while(accum>=1000/60){
-   if(!pause&&!endAnimation){frameCursor+=currentPlaybackSpeed();counterFrames=Math.min(TOTAL_FRAMES,Math.floor(frameCursor));if(counterFrames>=TOTAL_FRAMES){counterFrames=TOTAL_FRAMES;frameCursor=TOTAL_FRAMES;pause=true;endAnimation=true}}
+   if(!pause&&!endAnimation){frameCursor+=currentPlaybackSpeed();counterFrames=Math.min(TOTAL_FRAMES,Math.floor(frameCursor));if(counterFrames>=TOTAL_FRAMES){counterFrames=TOTAL_FRAMES;frameCursor=TOTAL_FRAMES;pause=true;endAnimation=true;if(fullJourneyPlayback)ThomasAchievements.unlock('ancestors-view-all')}}
    accum-=1000/60;
  }
  render();requestAnimationFrame(tick);
@@ -163,7 +167,7 @@ playBtn.addEventListener('click',()=>{if(endAnimation)resetToStart(true);else pa
 slowBtn.addEventListener('click',()=>{speedIndex=Math.max(0,speedIndex-1);playbackSpeed=speedOptions[speedIndex]});
 fastBtn.addEventListener('click',()=>{speedIndex=Math.min(speedOptions.length-1,speedIndex+1);playbackSpeed=speedOptions[speedIndex]});
 autoBtn.addEventListener('click',()=>{autoZoom=!autoZoom});
-timeline.addEventListener('input',()=>{setFrame(+timeline.value);pause=true});
+timeline.addEventListener('input',()=>{fullJourneyPlayback=false;setFrame(+timeline.value);pause=true});
 // Camera markers
 const markers=document.getElementById('cameraMarkers');
 cameraFrames.forEach(cf=>{const m=document.createElement('span');m.className='camera-marker';m.style.left=(cf.frame/TOTAL_FRAMES*100)+'%';m.title=`Camera ${cf.year}`;markers.appendChild(m)});
