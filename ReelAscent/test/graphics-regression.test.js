@@ -49,7 +49,7 @@ test('all 300 species have valid art palettes and distinct bounded shiny treatme
 });
 
 test('material tiles are deterministic and valid, and adding UVs preserves mesh/collision coordinates', () => {
-  for(const kind of ['wood','fabric','roof','sand','grass','scales','stone']){
+  for(const kind of ['wood','fabric','roof','sand','grass','scales','stone','rock-rough','rock-normal','rock-smooth','rock-ice','core-standable','core-walkable','core-slide']){
     const a=createSurfacePixels(kind,32),b=createSurfacePixels(kind,32);
     assert.deepEqual(a,b,kind);assert.equal(a.color.length,4096);assert.equal(a.normal.length,4096);
     for(let i=3;i<a.color.length;i+=4){assert.equal(a.color[i],255);assert.equal(a.normal[i],255);}
@@ -57,4 +57,7 @@ test('material tiles are deterministic and valid, and adding UVs preserves mesh/
   const geometry={positions:[0,0,0,1,0,0,0,1,0],normals:[0,0,1,0,0,1,0,0,1]},before=structuredClone(geometry);
   addSurfaceUvs(geometry);
   assert.deepEqual(geometry.positions,before.positions);assert.deepEqual(geometry.normals,before.normals);assert.equal(geometry.uvs.length,6);
+  const rockKinds = ['rock-rough','rock-normal','rock-smooth','rock-ice'];
+  const signatures = rockKinds.map((kind) => Buffer.from(createSurfacePixels(kind,32).color).toString('base64'));
+  assert.equal(new Set(signatures).size, rockKinds.length, 'each climb material needs its own visual tile');
 });

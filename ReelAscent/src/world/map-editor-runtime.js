@@ -1,4 +1,5 @@
-import { addSurfaceUvs } from '../graphics/surface-detail.js';
+import { addSurfaceUvs, applySurfaceDetail } from '../graphics/surface-detail.js';
+import { PLAYER_CONFIG } from '../config.js';
 import * as pc from 'playcanvas';
 import { MAIN_WORLD_LOCATION } from './world-locations.js';
 
@@ -632,6 +633,40 @@ function calculateAreaWeightedNormals(positions, indices) {
   return normals;
 }
 
+// Classify the *render* triangles by upward support slope. The authored index
+// buffer remains the single collision mesh, so this cannot change traversal.
+export function partitionTerrainBySupport(positions, indices, normals = calculateAreaWeightedNormals(positions, indices)) {
+  // 35° and below reads as a comfortable standing terrace. The slide boundary
+  // follows the actual player movement config; the middle band is traversable
+  // incline and the steepest faces use the slick visual treatment.
+  const standableNormalY = Math.cos(35 * Math.PI / 180);
+  const slideNormalY = Math.cos(PLAYER_CONFIG.slideSlopeDegrees * Math.PI / 180);
+  const groups = Object.fromEntries(['standable', 'walkable', 'slide'].map((kind) => [kind, {
+    positions: [], normals: [], indices: [], vertexMap: new Map()
+  }]));
+  for (let i = 0; i < indices.length; i += 3) {
+    const [a, b, c] = indices.slice(i, i + 3);
+    const ia = a * 3, ib = b * 3, ic = c * 3;
+    const abx = positions[ib] - positions[ia], aby = positions[ib + 1] - positions[ia + 1], abz = positions[ib + 2] - positions[ia + 2];
+    const acx = positions[ic] - positions[ia], acy = positions[ic + 1] - positions[ia + 1], acz = positions[ic + 2] - positions[ia + 2];
+    const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx;
+    const upward = ny / (Math.hypot(nx, ny, nz) || 1);
+    const group = groups[upward >= standableNormalY ? 'standable'
+      : upward >= slideNormalY ? 'walkable' : 'slide'];
+    for (const vertex of [a, b, c]) {
+      let local = group.vertexMap.get(vertex);
+      if (local === undefined) {
+        local = group.positions.length / 3;
+        group.vertexMap.set(vertex, local);
+        group.positions.push(...positions.slice(vertex * 3, vertex * 3 + 3));
+        group.normals.push(...normals.slice(vertex * 3, vertex * 3 + 3));
+      }
+      group.indices.push(local);
+    }
+  }
+  return groups;
+}
+
 function validBakedTerrainMesh(patch) {
   const mesh = patch?.terrain?.bakedMesh;
   if (!mesh || !Array.isArray(mesh.positions) || !Array.isArray(mesh.indices)) return null;
@@ -810,20 +845,23 @@ function addBakedTerrainMesh(world, patch, center = centerFallback()) {
   const summitVertexOffset = bakedPositions.length / 3;
   const positions = [...bakedPositions, ...summitPositions];
   const indices = [...bakedIndices, ...summitIndices.map((index) => index + summitVertexOffset)];
-  const geometry = new pc.Geometry();
-  geometry.positions = positions;
-  geometry.indices = indices;
-  geometry.normals = calculateAreaWeightedNormals(positions, indices);
-  const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
   const entity = new pc.Entity('Map Editor baked 3D mountain core');
   entity.addComponent('render');
   const material = world.materials?.alpine ?? world.materials?.rock;
   if (material) {
-    // Folded cave surfaces can be viewed from either side while sculpting has changed
-    // their orientation. Use a clone so the rest of the world keeps its normal culling.
-    const meshMaterial = material.clone?.() ?? material;
-    try { meshMaterial.cull = pc.CULLFACE_NONE; meshMaterial.update?.(); } catch {}
-    entity.render.meshInstances = [new pc.MeshInstance(mesh, meshMaterial, entity)];
+    const groups = partitionTerrainBySupport(positions, indices);
+    entity.render.meshInstances = Object.entries(groups).filter(([, group]) => group.indices.length).map(([kind, group]) => {
+      const geometry = new pc.Geometry();
+      geometry.positions = group.positions;
+      geometry.normals = group.normals;
+      geometry.indices = group.indices;
+      const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
+      const meshMaterial = material.clone();
+      meshMaterial.name = `Stoneveil ${kind} core`;
+      meshMaterial.cull = pc.CULLFACE_NONE;
+      applySurfaceDetail(meshMaterial, world.app.graphicsDevice, `core-${kind}`, { tiling: 2.4, strength: .3 });
+      return new pc.MeshInstance(mesh, meshMaterial, entity);
+    });
   }
   entity.render.castShadows = false;
   (world.buildTarget ?? world.root).addChild(entity);

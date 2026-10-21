@@ -1,3 +1,5 @@
+import { WORLD_LOCATIONS } from '../world/world-locations.js';
+
 export const DESTINATION_UNLOCK_RULES = Object.freeze({
   'cave-fishing-island': Object.freeze({ badges: 2, species: 10, playable: false, label: 'Basalt Hollow' }),
   'normal-fishing-island': Object.freeze({ badges: 5, species: 25, playable: true, label: 'Mangrove Island' }),
@@ -29,6 +31,7 @@ export function derivedDestinationUnlocks(save = {}) {
 
 export function normalizeDestinationProgression(value = {}, save = {}) {
   return {
+    debugUnlockedAll: value.debugUnlockedAll === true,
     unlocked: cleanIds([
       ...cleanIds(value.unlocked),
       ...derivedDestinationUnlocks(save)
@@ -46,6 +49,11 @@ export function refreshDestinationProgression(save = {}) {
 export function getDestinationAccess(save = {}, locationId) {
   const counts = destinationProgressCounts(save);
   const boatOwned = save.boat?.owned === true;
+  if (save.destinationProgression?.debugUnlockedAll === true
+    && WORLD_LOCATIONS.some((location) => location.id === locationId)) {
+    return Object.freeze({ state: 'available', revealed: true, playable: true,
+      boatOwned: true, reason: 'Debug access on this save.' });
+  }
   if (locationId === 'skyreach-foundation') {
     return Object.freeze({ state: 'known-unavailable', revealed: true, playable: false, boatOwned,
       reason: 'Skyreach is charted, but unavailable in this version.' });

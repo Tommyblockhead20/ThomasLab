@@ -44,6 +44,35 @@ export function createSurfacePixels(kind, size = 128) {
       const edge = Math.abs(Math.sqrt(du * du + (dv - .15) ** 2) - .52);
       h = .5 + (edge < .055 ? -.12 : .06) + grain * .025;
       shade = edge < .055 ? .94 : .99 + grain * .015;
+    } else if (kind === 'rock-rough') {
+      const fracture = Math.abs(Math.sin(TAU * (u * 5 + v * 3 + broad * .16)));
+      const chips = noise(Math.floor(x / 7), Math.floor(y / 7)) - .5;
+      h = .5 + chips * .25 + grain * .24 - (fracture < .11 ? .2 : 0);
+      shade = .9 + chips * .105 + grain * .06 - (fracture < .11 ? .09 : 0);
+    } else if (kind === 'rock-normal') {
+      const strata = Math.sin(TAU * (v * 8 + u * .7 + broad * .12));
+      h = .5 + strata * .075 + grain * .14;
+      shade = .94 + strata * .07 + grain * .04;
+    } else if (kind === 'rock-smooth') {
+      const polish = Math.sin(TAU * (u * 2 + v * .8));
+      h = .5 + polish * .025 + grain * .035;
+      shade = .98 + polish * .018 + grain * .012;
+    } else if (kind === 'rock-ice') {
+      const shard = Math.abs(Math.sin(TAU * (u * 3 - v * 5 + broad * .09)));
+      h = .5 + (shard < .055 ? -.1 : .025) + grain * .035;
+      shade = .96 + (shard < .055 ? -.09 : .015) + grain * .015;
+    } else if (kind === 'core-standable') {
+      const pebbles = noise(Math.floor(x / 5), Math.floor(y / 5)) - .5;
+      h = .5 + pebbles * .13 + grain * .08;
+      shade = .97 + pebbles * .08 + grain * .025;
+    } else if (kind === 'core-walkable') {
+      const contour = Math.sin(TAU * (v * 6 + u * 1.5 + broad * .12));
+      h = .5 + contour * .08 + grain * .12;
+      shade = .94 + contour * .065 + grain * .04;
+    } else if (kind === 'core-slide') {
+      const streak = Math.sin(TAU * (u * 12 + v * .5 + broad * .08));
+      h = .5 + streak * .045 + grain * .06;
+      shade = .93 + streak * .045 + grain * .025;
     } else {
       const vein = Math.abs(Math.sin(TAU * (u * 3 + v * 2 + broad * .22)));
       h = .5 + broad * .12 + grain * .2 - (vein < .055 ? .09 : 0);

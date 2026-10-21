@@ -32,6 +32,7 @@ export class BoatTravelMenu {
     this.ownsBoat = ownsBoat;
     this.screen = document.querySelector('#boat-travel');
     this.map = document.querySelector('#boat-travel-map');
+    this.list = document.querySelector('#boat-travel-list');
     this.title = document.querySelector('#boat-travel-selection');
     this.confirmButton = document.querySelector('#confirm-boat-travel');
     this.closeButton = document.querySelector('#close-boat-travel');
@@ -60,6 +61,7 @@ export class BoatTravelMenu {
     };
     this.map?.addEventListener('click', this.onClick);
     this.map?.addEventListener('dblclick', this.onDoubleClick);
+    this.list?.addEventListener('click', this.onClick);
     this.confirmButton?.addEventListener('click', this.onConfirm);
     this.closeButton?.addEventListener('click', this.onClose);
     window.addEventListener('keydown', this.onKeyDown, true);
@@ -139,6 +141,26 @@ export class BoatTravelMenu {
       button.title = lockMessage ? `${access.revealed === false ? 'Uncharted Waters' : location.displayName} — ${lockMessage}` : location.displayName;
       return button;
     }));
+    this.list?.replaceChildren(...WORLD_LOCATIONS.map((location) => {
+      const access = this.markerAccess(location);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'boat-travel-list-item';
+      button.dataset.travelDestination = location.id;
+      button.disabled = !access.playable;
+      const name = document.createElement('strong');
+      name.textContent = access.revealed === false ? 'Uncharted Waters' : location.displayName;
+      const status = document.createElement('small');
+      status.textContent = access.reason ? boatMapLockSummary(access) : 'Ready to sail';
+      button.append(name, status);
+      return button;
+    }));
+    if (this.isOpen) for (const marker of this.screen.querySelectorAll('[data-travel-destination]')) {
+      const isCurrent = marker.dataset.travelDestination === this.currentId;
+      marker.classList.toggle('is-current', isCurrent);
+      marker.classList.toggle('is-selected', marker.dataset.travelDestination === this.selectedId);
+      marker.disabled ||= isCurrent;
+    }
   }
 
   open(currentId = 'main-mountain') {
@@ -151,9 +173,9 @@ export class BoatTravelMenu {
     this.render();
     this.screen.hidden = false;
     document.body.classList.add('boat-travel-open');
-    this.title.textContent = 'Choose a destination on the chart';
+    this.title.textContent = 'Choose a destination';
     this.confirmButton.disabled = true;
-    for (const marker of this.map?.querySelectorAll('[data-travel-destination]') ?? []) {
+    for (const marker of this.screen.querySelectorAll('[data-travel-destination]')) {
       const isCurrent = marker.dataset.travelDestination === currentId;
       marker.classList.toggle('is-current', isCurrent);
       marker.disabled = isCurrent || marker.disabled;
@@ -168,7 +190,7 @@ export class BoatTravelMenu {
     this.selectedId = id;
     this.title.textContent = location.displayName;
     this.confirmButton.disabled = false;
-    for (const marker of this.map?.querySelectorAll('[data-travel-destination]') ?? []) {
+    for (const marker of this.screen.querySelectorAll('[data-travel-destination]')) {
       marker.classList.toggle('is-selected', marker.dataset.travelDestination === id);
     }
     return true;
@@ -210,6 +232,7 @@ export class BoatTravelMenu {
   destroy() {
     this.map?.removeEventListener('click', this.onClick);
     this.map?.removeEventListener('dblclick', this.onDoubleClick);
+    this.list?.removeEventListener('click', this.onClick);
     this.confirmButton?.removeEventListener('click', this.onConfirm);
     this.closeButton?.removeEventListener('click', this.onClose);
     window.removeEventListener('keydown', this.onKeyDown, true);

@@ -508,6 +508,15 @@ export class ProgressionSystem {
     this.commit();
   }
 
+  debugUnlockAllIslands() {
+    // This is a per-save test override, not earned badges, discoveries, or a purchase.
+    // It deliberately permits visiting charted unfinished destinations for inspection.
+    this.saveSystem.data.destinationProgression ??= { unlocked: [] };
+    this.saveSystem.data.destinationProgression.debugUnlockedAll = true;
+    this.saveSystem.save();
+    this.revision += 1;
+  }
+
   ownsWorldItem(itemId) {
     return this.state.ownedItems.includes(itemId);
   }

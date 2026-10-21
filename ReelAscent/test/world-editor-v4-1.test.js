@@ -235,7 +235,7 @@ test('v4.1 production seating mirrors every active island bench and its runtime-
     'shop-island': { parts: 4, yaw: 235, target: 'ocean' },
     'aquarium-island': { parts: 4, yaw: 175, target: 'ocean' },
     'cave-fishing-island': { parts: 4, yaw: 120, target: 'ocean' },
-    'normal-fishing-island': { parts: 4, yaw: -240, target: 'pond' },
+    'normal-fishing-island': { parts: 4, yaw: -60, target: 'lagoon' },
     'cold-island': { parts: 4, yaw: -180, target: 'pond' }
   };
   for (const [worldId, expectation] of Object.entries(expected)) {
@@ -266,9 +266,9 @@ test('v4.1 production seating mirrors every active island bench and its runtime-
     z: oldBack.transform.position.z - oldSeat.transform.position.z };
   oldSeat.transform.position.x += 2;
   oldBack.transform.position.x += 2;
-  for (const part of oldBench) { part.metadata.facesToward = 'ocean'; part.metadata.facingYaw += 180; part.transform.rotation.y += 180; }
+  for (const part of oldBench) { part.metadata.facesToward = 'pond'; part.metadata.facingYaw += 180; part.transform.rotation.y += 180; }
   ensureProductionIslandTerrain(oldMangrove, 'normal-fishing-island');
-  assert.equal(oldBench.every((entry) => entry.metadata.facesToward === 'pond'), true);
+  assert.equal(oldBench.every((entry) => entry.metadata.facesToward === 'lagoon'), true);
   assert.equal(oldSeat.transform.position.x, mangrove.objects.find((entry) => entry.id === oldSeat.id).transform.position.x + 2);
   assert.ok(Math.abs((oldBack.transform.position.x - oldSeat.transform.position.x) + oldOffset.x) < 1e-8);
   assert.ok(Math.abs((oldBack.transform.position.z - oldSeat.transform.position.z) + oldOffset.z) < 1e-8);

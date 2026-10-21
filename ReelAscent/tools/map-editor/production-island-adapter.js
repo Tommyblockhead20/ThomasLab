@@ -384,11 +384,17 @@ function aquariumDefinition() {
       : lerp(aquariumLocation.elevation + .06, OCEAN_SURFACE_Y - .16,
         clamp01((footprint - .68) / .32));
   };
-  const segmentLength = (pathEndZ - pathStartZ) / 21 + .18;
+  const segmentLength = (pathEndZ - pathStartZ) / 21;
+  const aquariumTerrain = buildOceanIslandTerrainData(aquariumLocation);
+  const aquariumRadians = aquariumLocation.angle * Math.PI / 180;
   for (let index = 0; index < 22; index += 1) {
     const pathZ = lerp(pathStartZ, pathEndZ, index / 21);
+    const groundY = triangleSurfaceHeightAt(aquariumTerrain.vertices, aquariumTerrain.triangles,
+      aquariumLocation.worldPosition.x + Math.cos(aquariumRadians) * pathZ,
+      aquariumLocation.worldPosition.z + Math.sin(aquariumRadians) * pathZ,
+      pathSurfaceY(pathZ));
     detail(`Glasswater packed dock path ${index + 1}`,
-      { x: Math.sin(index * 1.31) * .08, y: pathSurfaceY(pathZ) - config.floorY - .015, z: pathZ },
+      { x: Math.sin(index * 1.31) * .08, y: groundY + .015 - config.floorY, z: pathZ },
       { x: 4.1 + index % 3 * .12, y: .04, z: segmentLength }, 'sand',
       { y: index % 2 ? 1.2 : -1.2 });
   }
@@ -486,9 +492,9 @@ function composeProductionStructure(structure) {
 
 const SHORE_BENCHES = Object.freeze({
   'shop-island': Object.freeze({ radial: 7.6, tangent: 8.8, towardCenter: false }),
-  'aquarium-island': Object.freeze({ radial: 56, tangent: 24, towardCenter: false }),
+  'aquarium-island': Object.freeze({ radial: 61, tangent: 18, towardCenter: false }),
   'cave-fishing-island': Object.freeze({ radial: 6.2, tangent: 8.3, towardCenter: false }),
-  'normal-fishing-island': Object.freeze({ radial: -9.4, tangent: -1.4, towardCenter: true }),
+  'normal-fishing-island': Object.freeze({ radial: -9.4, tangent: -1.4, towardCenter: false }),
   'cold-island': Object.freeze({ radial: 8.6, tangent: 1.8, towardCenter: true })
 });
 
@@ -522,7 +528,8 @@ function addProductionShoreBench(objects, location, data) {
     addBox(objects, `${location.id.toUpperCase()}-BENCH`, name, position, size, material, rotation, true, category);
     Object.assign(objects.at(-1).metadata, {
       sourceBuilder: 'buildAuthoredIslandBench', componentName: `${location.displayName} Shore Bench`,
-      benchId, facingYaw: yaw, facesToward: config.towardCenter ? 'pond' : 'ocean'
+      benchId, facingYaw: yaw, facesToward: location.id === 'normal-fishing-island'
+        ? 'lagoon' : config.towardCenter ? 'pond' : 'ocean'
     });
   };
   const name = `${location.displayName} shore rest bench`;
@@ -686,20 +693,20 @@ export function ensureProductionIslandTerrain(level, worldOrId) {
       level.objects[index].category = item.category;
     }
   }
-  // Migrate the formerly reversed inner-bank bench in existing browser autosaves.
+  // Migrate the former inward-facing Mangrove shore bench in browser autosaves.
   // Rotate in place rather than replacing the saved assembly, preserving a moved bench.
   if (generated.runtimeLocationId === 'normal-fishing-island') {
     const benchId = 'normal-fishing-island-shore-bench';
     const parts = level.objects.filter((entry) => entry.metadata?.benchId === benchId);
     const seat = parts.find((entry) => entry.name.endsWith('seat'));
     const back = parts.find((entry) => entry.name.endsWith('back'));
-    if (seat && back && parts.some((entry) => entry.metadata?.facesToward === 'ocean')) {
+    if (seat && back && parts.some((entry) => entry.metadata?.facesToward === 'pond')) {
       back.transform.position.x = 2 * seat.transform.position.x - back.transform.position.x;
       back.transform.position.z = 2 * seat.transform.position.z - back.transform.position.z;
       for (const part of parts) {
         part.transform.rotation.y -= 180;
         part.metadata.facingYaw -= 180;
-        part.metadata.facesToward = 'pond';
+        part.metadata.facesToward = 'lagoon';
       }
     }
   }

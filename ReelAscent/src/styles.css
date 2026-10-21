@@ -3099,6 +3099,23 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .map-construction-marker { fill: #241f12; stroke: #f2c24e; stroke-width: 3; paint-order: stroke; font-size: 6px; font-weight: 900; text-anchor: middle; }
 .boat-map-island.is-locked-purchase { background: transparent !important; border: 0 !important; box-shadow: none; }
 .boat-map-lock { display: block; max-width: 8.5rem; color: #f5dda0; font-size: .42rem; line-height: 1.25; }
+.boat-travel-list { display: none; }
+
+@media (max-width: 700px), (max-height: 620px) {
+  .boat-travel { width: min(38rem, calc(100vw - 1rem)); max-height: calc(100dvh - 1rem); padding: .7rem; overflow-y: auto; overscroll-behavior: contain; }
+  .boat-travel > header, .boat-travel > footer { gap: .5rem; }
+  .boat-travel h2 { font-size: 1.15rem; }
+  .boat-travel-map { display: none; }
+  .boat-travel-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin: .6rem 0; }
+  .boat-travel-list-item { display: grid; min-width: 0; min-height: 3.5rem; align-content: center; gap: .18rem; padding: .45rem .55rem !important; color: #f1f5e9 !important; text-align: left; background: #20535a !important; border: 1px solid #618d87 !important; }
+  .boat-travel-list-item strong { font-size: .66rem; }
+  .boat-travel-list-item small { color: #d6deb7; font-size: .5rem; line-height: 1.2; }
+  .boat-travel-list-item:disabled { opacity: .78 !important; background: #2b4244 !important; }
+  .boat-travel-list-item.is-current { border-color: #fff0a2 !important; box-shadow: inset 0 0 0 1px #fff0a2; }
+  .boat-travel-list-item.is-selected { border-color: #ffd45b !important; box-shadow: inset 0 0 0 2px #ffd45b; }
+  .boat-travel > footer strong { min-width: 0; font-size: .7rem; }
+}
+@media (max-width: 420px) { .boat-travel-list { grid-template-columns: 1fr; } }
 
 .map-islands :is(ellipse, polygon) { fill: #6f9958; stroke: #2d5c45; stroke-width: 1.4; }
 .map-island-cold-island :is(ellipse, polygon) { fill: #e4efea; stroke: #78aeb9; }
@@ -3110,8 +3127,6 @@ body:is(.pause-open, .inventory-open, .shop-open, .aquarium-open, .boat-travel-o
 .map-open-water-boat path + path,
 .minimap-open-water-boat path + path { fill: none; }
 
-/* Secret cheat activation has no pre-activation progress state. */
-.cheat-activation { --cheat-progress: 100%; background: rgb(6 35 38 / 94%); }
 
 @media (max-width: 760px) {
   .pause-menu { width: calc(100vw - 1rem); max-height: calc(100vh - 1rem); padding: .75rem; }

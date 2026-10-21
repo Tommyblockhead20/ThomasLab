@@ -358,6 +358,14 @@ export class Game {
       }
       if (event.code === 'F9') {
         event.preventDefault();
+        if (event.shiftKey) {
+          this.progression.debugUnlockAllIslands();
+          this.markCheatAction('unlock-all-islands');
+          this.boatTravel?.render?.();
+          this.mapMenu?.update?.();
+          this.hud.showToast?.('DEBUG • All islands available on this save', 3);
+          return;
+        }
         const money = this.progression.addMoney(1000, { legitimate: false });
         this.recordStatEvent('debug-money', { amount: 1000 }, false);
         this.hud.showToast?.(`+$1,000 • $${money}`);

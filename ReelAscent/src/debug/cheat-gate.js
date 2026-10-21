@@ -16,16 +16,24 @@ export class CheatGate extends EventTarget {
     this.installed = true;
     this.indicator = document.querySelector('#cheat-activation');
     this.onKeyDown = (event) => {
-      if (event.code !== 'F1' || event.repeat || this.enabled) return;
+      const activation = event.code === 'F1' || (event.code === 'KeyC'
+        && event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey);
+      if (!activation) return;
+      if (event.code === 'KeyC' && (event.target?.isContentEditable
+        || event.target?.matches?.('input, textarea, select, [contenteditable]'))) return;
+      // F1 repeats during a long hold. Letting its repeated events reach the browser
+      // can open Help, blur the game, and cancel the unlock just before completion.
       event.preventDefault();
+      if (event.repeat || this.enabled || this.timer) return;
+      this.activationCode = event.code;
       this.startedAt = performance.now();
-      // Secret gate: no hint, progress bar, or acknowledgement exists before success.
+      this.show('HOLD TO ENABLE CHEATS', 0);
       this.timer = globalThis.setTimeout(() => this.enable(), this.holdDurationMs);
     };
     this.onKeyUp = (event) => {
-      if (event.code !== 'F1' || this.enabled) return;
+      if (event.code !== this.activationCode) return;
       event.preventDefault();
-      this.cancel();
+      if (!this.enabled) this.cancel();
     };
     this.onBlur = () => { if (!this.enabled) this.cancel(); };
     window.addEventListener('keydown', this.onKeyDown, true);
@@ -46,6 +54,7 @@ export class CheatGate extends EventTarget {
     globalThis.clearTimeout(this.hideTimer);
     this.timer = null;
     this.startedAt = 0;
+    this.activationCode = null;
     if (this.indicator) this.indicator.hidden = true;
   }
 
@@ -54,7 +63,7 @@ export class CheatGate extends EventTarget {
     this.enabled = true;
     globalThis.clearTimeout(this.timer);
     this.timer = null;
-    this.show('CHEATS ENABLED', 1);
+    this.show('CHEATS ENABLED • F10 ITEMS • SHIFT+F9 ISLANDS', 1);
     this.hideTimer = globalThis.setTimeout(() => { if (this.indicator) this.indicator.hidden = true; }, 1800);
     this.dispatchEvent(new Event('enabled'));
   }

@@ -27,6 +27,7 @@ import { markStartup } from '../debug/startup-timings.js';
 import { attachZoneEcology, ECOLOGY_TARGETS } from '../fishing/fish-ecology.js';
 import { FishingZone } from '../fishing/fishing-zone.js';
 import { createSpecimenModel, destroySpecimenModel } from '../fishing/specimen-model.js';
+import { normalizeAquariumTankDisplays } from '../progression/aquarium.js';
 import { getClimbMaterial } from '../player/climbing-materials.js';
 import { TestWorld } from './world.js';
 import {
@@ -320,6 +321,44 @@ export function deriveAquariumWaterBounds(config = PUBLIC_AQUARIUM_CONFIG) {
     waterlineY: config.waterlineY,
     safeInset: config.waterInset
   });
+}
+
+export function resolveAquariumResidentDisplays(progression = {}, socialShowcases = []) {
+  const stored = progression.aquarium ?? [];
+  const byId = new Map(stored.map((specimen) => [specimen.specimenId, specimen]));
+  const tankCount = Math.max(1, Math.min(10, Number(progression.aquariumTankCount) || 1));
+  const assignments = normalizeAquariumTankDisplays(
+    stored, tankCount, progression.aquariumTankDisplays, progression.aquariumTankManual
+  ).displays;
+  const soloDisplays = assignments.map((ids, tankIndex) => ({
+    owner: `Tank ${tankIndex + 1}`,
+    ownerId: 'solo',
+    specimens: ids.map((id) => byId.get(id)).filter(Boolean)
+  }));
+  const multiplayerDisplays = Array.isArray(socialShowcases) && socialShowcases.length
+    ? socialShowcases.slice(0, 10).map((entry) => {
+        const seen = new Set();
+        return {
+          owner: entry.displayName,
+          ownerId: entry.playerId,
+          specimens: (entry.isLocal && !entry.specimens?.length
+            ? soloDisplays.flatMap((tank) => tank.specimens).slice(0, 30)
+            : entry.specimens ?? []).filter((specimen) => {
+            if (!specimen?.specimenId || seen.has(specimen.specimenId)) return false;
+            seen.add(specimen.specimenId);
+            return true;
+          }).slice(0, 30)
+        };
+      })
+    : null;
+  return { displays: multiplayerDisplays ?? soloDisplays, multiplayer: Boolean(multiplayerDisplays) };
+}
+
+export function aquariumResidentDisplayMultiplier(lengthMeters) {
+  // The public tanks are 18 m wide. Literal 10–20 cm catches all but vanish
+  // behind two transparent panes, so only their exhibit models get a bounded
+  // presentation boost. Save data, economy, and catch measurements stay exact.
+  return Math.min(8, Math.max(1, 1 / Math.max(.01, Number(lengthMeters) || .2)));
 }
 export const DOCK_DECK_LOWERING = .22;
 export const CAVE_TOPOLOGY_CONFIG = Object.freeze({
@@ -1501,7 +1540,13 @@ export class MountainWorld extends TestWorld {
 
     const detailGroups = {
       wood: ['wood','woodLight','cabinWall','cabinTrim'],
-      stone: ['rock','rockLight','roughRock','normalRock','smoothRock','unclimbable','coast','wetRock','alpine','deepRock','cave','caveWall','islandRock','coldRock','decoStone','holdRough','holdNormal'],
+      stone: ['rock','rockLight','coast','deepRock','cave','caveWall','islandRock','coldRock','decoStone'],
+      'rock-rough': ['roughRock','holdRough'],
+      'rock-normal': ['normalRock','holdNormal'],
+      'rock-smooth': ['smoothRock','holdSmooth','wetRock'],
+      'rock-ice': ['ice','holdIce'],
+      'core-slide': ['unclimbable'],
+      'core-walkable': ['alpine'],
       grass: ['grass','grassLight','forestFloor','islandGrass','pondBank'],
       sand: ['sand','earth','waterEdge'],
       roof: ['cabinRoof'],
@@ -1511,7 +1556,7 @@ export class MountainWorld extends TestWorld {
       const material = this.materials[key];
       if (material) applySurfaceDetail(material, this.app.graphicsDevice, kind, {
         tiling: kind === 'fabric' ? 4 : kind === 'wood' ? 2 : 1,
-        strength: kind === 'stone' ? .32 : .23
+        strength: kind === 'stone' || kind.startsWith('rock-') || kind.startsWith('core-') ? .32 : .23
       });
     }
 
@@ -2133,11 +2178,11 @@ export class MountainWorld extends TestWorld {
     }
     const islandBench = {
       'shop-island': { radial: 7.6, tangent: 8.8, towardCenter: false },
-      // Near the ocean-facing landscaped edge, clear of the 104 m Aquarium footprint.
-      'aquarium-island': { radial: 56, tangent: 24, towardCenter: false },
+      // Shoreward of the Aquarium footprint, with a short cast to open water.
+      'aquarium-island': { radial: 61, tangent: 18, towardCenter: false },
       'cave-fishing-island': { radial: 6.2, tangent: 8.3, towardCenter: false },
-      // The bench is on the inner lagoon bank; face the lagoon, not the outer sea.
-      'normal-fishing-island': { radial: -9.4, tangent: -1.4, towardCenter: true },
+      // From the inner bank, face across the lagoon (toward the island's outer side).
+      'normal-fishing-island': { radial: -9.4, tangent: -1.4, towardCenter: false },
       'cold-island': { radial: 8.6, tangent: 1.8, towardCenter: true }
     }[location.id];
     if (islandBench) this.buildAuthoredIslandBench(location, islandBench);
@@ -2183,7 +2228,8 @@ export class MountainWorld extends TestWorld {
     const exit = horizontalPoint(towardCenter ? .92 : -.92);
     this.homeInteractions.push({
       id: `${location.id}-shore-bench`, action: 'bench', label: 'SIT & FISH',
-      seatKind: 'shore fishing bench', fishingLabel: towardCenter ? 'the pond' : 'the ocean',
+      seatKind: 'shore fishing bench', fishingLabel: location.id === 'normal-fishing-island'
+        ? 'the lagoon' : towardCenter ? 'the pond' : 'the ocean',
       position: seatSurface,
       seatPosition: { ...seatSurface, y: seatSurface.y + PLAYER_FOOT_OFFSET + .03 },
       exitPosition: { ...exit, y: groundAt(exit) + PLAYER_FOOT_OFFSET + .08 },
@@ -2971,13 +3017,19 @@ export class MountainWorld extends TestWorld {
       );
     };
     const pathSegmentCount = 22;
-    const segmentLength = (pathEndZ - pathStartZ) / (pathSegmentCount - 1) + .18;
+    const segmentLength = (pathEndZ - pathStartZ) / (pathSegmentCount - 1);
+    const islandSurface = this.islandTerrainSurfaces.get('aquarium-island');
     for (let index = 0; index < pathSegmentCount; index += 1) {
       const progress = index / (pathSegmentCount - 1);
       const pathZ = lerp(pathStartZ, pathEndZ, progress);
-      const surfaceLocalY = pathSurfaceY(pathZ) - this.publicAquariumFloorY;
+      const pathWorld = this.aquariumPoint(0, 0, pathZ);
+      const groundY = triangleSurfaceHeightAt(islandSurface?.vertices, islandSurface?.triangles,
+        pathWorld.x, pathWorld.z, pathSurfaceY(pathZ));
+      // Separate the thin visual path from the actual terrain by a visible but
+      // small clearance; the old top was almost coplanar and shimmered.
+      const surfaceLocalY = groundY + .035 - this.publicAquariumFloorY;
       this.addAquariumBox(`Glasswater packed dock path ${index + 1}`,
-        { x: Math.sin(index * 1.31) * .08, y: surfaceLocalY - .015, z: pathZ },
+        { x: Math.sin(index * 1.31) * .08, y: surfaceLocalY - .02, z: pathZ },
         { x: 4.1 + index % 3 * .12, y: .04, z: segmentLength },
         this.materials.pondBank, { y: index % 2 ? 1.2 : -1.2 }, false);
     }
@@ -3106,29 +3158,7 @@ export class MountainWorld extends TestWorld {
 
   updateAquariumResidents(save = {}, socialShowcases = []) {
     const progression = save.progression ?? save;
-    const stored = progression.aquarium ?? [];
-    const byId = new Map(stored.map((specimen) => [specimen.specimenId, specimen]));
-    const multiplayerDisplays = Array.isArray(socialShowcases) && socialShowcases.length
-      ? socialShowcases.slice(0, 10).map((entry) => {
-          const seen = new Set();
-          return {
-            owner: entry.displayName,
-            ownerId: entry.playerId,
-            specimens: (entry.specimens ?? []).filter((specimen) => {
-              if (!specimen?.specimenId || seen.has(specimen.specimenId)) return false;
-              seen.add(specimen.specimenId);
-              return true;
-            }).slice(0, 30)
-          };
-        })
-      : null;
-    const soloCount = Math.max(1, Math.min(10, Number(progression.aquariumTankCount) || 1));
-    const soloDisplays = Array.from({ length: soloCount }, (_, tankIndex) => ({
-      owner: `Tank ${tankIndex + 1}`,
-      ownerId: 'solo',
-      specimens: (progression.aquariumTankDisplays?.[tankIndex] ?? []).map((id) => byId.get(id)).filter(Boolean).slice(0, 30)
-    }));
-    const displays = multiplayerDisplays ?? soloDisplays;
+    const { displays, multiplayer } = resolveAquariumResidentDisplays(progression, socialShowcases);
     const layoutCount = displays.length;
     const galleryColumns = layoutCount <= 4 ? layoutCount : Math.ceil(layoutCount / 2);
     this.aquariumTankRoots?.forEach((root, index) => {
@@ -3157,7 +3187,7 @@ export class MountainWorld extends TestWorld {
       );
     });
     this.aquariumTankLabels?.forEach((label, index) => {
-      const text = multiplayerDisplays ? (displays[index]?.owner || `Player ${index + 1}`) : `Tank ${index + 1}`;
+      const text = multiplayer ? (displays[index]?.owner || `Player ${index + 1}`) : `Tank ${index + 1}`;
       if (!displays[index] || label._labelText === text) return;
       const material = this.createAquariumLabelMaterial(text);
       for (const meshInstance of label.render.meshInstances) meshInstance.material = material;
@@ -3190,12 +3220,16 @@ export class MountainWorld extends TestWorld {
         app: this.app
       });
       reusable.delete(cacheKey);
+      const presentationMultiplier = aquariumResidentDisplayMultiplier(model.physicalLengthMeters);
+      model.root.setLocalScale(model.scale * presentationMultiplier,
+        model.scale * presentationMultiplier, model.scale * presentationMultiplier);
       // Ownership is structural: a resident is a child of exactly one tank module. Moving
       // or hiding that module therefore cannot strand the creature in world/midair space.
       cell.root.addChild(model.root);
       const bounds = cell.waterBounds;
-      const visualHalfLength = Math.min(3.8, Math.max(.28, (model.physicalLengthMeters ?? .6) * .5));
-      const bodyRadius = Math.min(1.65, Math.max(.28, model.scale * .45));
+      const visualHalfLength = Math.min(3.8, Math.max(.28,
+        (model.physicalLengthMeters ?? .6) * presentationMultiplier * .5));
+      const bodyRadius = Math.min(1.65, Math.max(.28, model.scale * presentationMultiplier * .45));
       const largeCreature = visualHalfLength > 1.65 || bodyRadius > 1.15;
       const bottomDweller = ['penguin', 'polar_bear', 'giant_panda'].includes(specimen.speciesId);
       const motionBounds = Object.freeze({
@@ -4109,12 +4143,18 @@ export class MountainWorld extends TestWorld {
         triangles.push([outer, outerNext, inner], [outerNext, innerNext, inner]);
       }
     }
+    // The authored beach rim is resampled at fixed bearings while its triangles
+    // have their own spacing. A small visual-only underlap closes hairline skybox
+    // gaps without creating a second overlapping ground collider or a coplanar lip.
+    const visualVertices = vertices.map((point, index) => index < segments
+      ? [point[0] * .9983, point[1] - .06, point[2] * .9983]
+      : point);
     const geometry = new pc.Geometry();
     geometry.positions = [];
     geometry.indices = [];
     for (const triangle of triangles) {
       for (const vertexIndex of triangle) {
-        geometry.positions.push(...vertices[vertexIndex]);
+        geometry.positions.push(...visualVertices[vertexIndex]);
         geometry.indices.push(geometry.indices.length);
       }
     }
