@@ -387,16 +387,20 @@ function aquariumDefinition() {
   const segmentLength = (pathEndZ - pathStartZ) / 21;
   const aquariumTerrain = buildOceanIslandTerrainData(aquariumLocation);
   const aquariumRadians = aquariumLocation.angle * Math.PI / 180;
+  const pathWidth = 3.2;
   for (let index = 0; index < 22; index += 1) {
     const pathZ = lerp(pathStartZ, pathEndZ, index / 21);
-    const groundY = triangleSurfaceHeightAt(aquariumTerrain.vertices, aquariumTerrain.triangles,
-      aquariumLocation.worldPosition.x + Math.cos(aquariumRadians) * pathZ,
-      aquariumLocation.worldPosition.z + Math.sin(aquariumRadians) * pathZ,
-      pathSurfaceY(pathZ));
+    const groundY = Math.max(...[-pathWidth * .5, 0, pathWidth * .5].flatMap((offsetX) =>
+      [-segmentLength * .5, segmentLength * .5].map((offsetZ) => {
+        const z = pathZ + offsetZ;
+        return triangleSurfaceHeightAt(aquariumTerrain.vertices, aquariumTerrain.triangles,
+          aquariumLocation.worldPosition.x + Math.cos(aquariumRadians) * z + Math.sin(aquariumRadians) * offsetX,
+          aquariumLocation.worldPosition.z + Math.sin(aquariumRadians) * z - Math.cos(aquariumRadians) * offsetX,
+          pathSurfaceY(z));
+      })));
     detail(`Glasswater packed dock path ${index + 1}`,
-      { x: Math.sin(index * 1.31) * .08, y: groundY + .015 - config.floorY, z: pathZ },
-      { x: 4.1 + index % 3 * .12, y: .04, z: segmentLength }, 'sand',
-      { y: index % 2 ? 1.2 : -1.2 });
+      { x: 0, y: groundY + .04 - config.floorY, z: pathZ },
+      { x: pathWidth, y: .05, z: segmentLength * .96 }, 'sand');
   }
   for (const side of [-1, 1]) for (let index = 0; index < 4; index += 1) {
     const pathZ = lerp(pathStartZ + 2, pathStartZ + (pathEndZ - pathStartZ) * .42, index / 3);

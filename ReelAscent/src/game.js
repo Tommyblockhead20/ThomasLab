@@ -543,6 +543,7 @@ export class Game {
     const globalPosition = this.getLocalGlobalPosition(multiplayerPlayerState.position);
     this.multiplayer.update(Date.now(), {
       position: multiplayerPlayerState.position,
+      teleportRevision: this.player.teleportRevision,
       globalPosition,
       locationId: this.currentLocationId,
       coordinateSpace: this.currentCoordinateSpace,
@@ -626,7 +627,8 @@ export class Game {
   }
 
   hasEscapePriorityState() {
-    return this.isGameplayModalOpen() || this.fishing.active || Boolean(this.player?.benchSeat);
+    return this.isGameplayModalOpen() || this.fishing.active || this.fishing.gallery?.active
+      || Boolean(this.player?.benchSeat);
   }
 
   setLocalPause(active) {

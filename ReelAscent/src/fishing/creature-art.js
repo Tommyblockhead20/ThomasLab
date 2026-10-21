@@ -23,12 +23,15 @@ export function creatureArt(species, archetype, shiny = false) {
   else if (['panfish','bass','slender','sculpin','trout','carp','catfish','eel'].includes(archetype)) p = palette(0x365760,0x91aaa7,0xdcded0,0x6b9297,'scales');
   else if (/panda|penguin|orca/.test(name)) p = palette(0x242c2e,0xe2ded0,0xe8e2d2,0x343f43,'skin');
   else if (/polar.*bear|beluga/.test(name)) p = palette(0xc3c4b5,0xe0dfce,0xeee8d7,0xb6b9ad,'skin');
+  else if (archetype === 'lusca') p = palette(0x251d37,0x68446d,0xb17b83,0x9b5664,'spots');
+  else if (archetype === 'dragon') p = palette(0x244838,0x568a68,0xb6a66c,0xb88c50,'scales');
+  else if (archetype === 'serpent' && !/alligator|crocodile/.test(name)) p = palette(0x1d3b45,0x507f77,0xb1b188,0x9fa765,'scales');
   else if (['frog','turtle','salamander','serpent'].includes(archetype)) p = palette(0x3b5240,0x778a54,0xb7b77f,0x596b42,'spots');
   else if (['crab','lobster','crayfish','shrimp'].includes(archetype)) p = palette(0x62483b,0x9c7858,0xc8ad84,0x856c52,'shell');
   else if (['cetacean','pinniped'].includes(archetype)) p = palette(0x344c58,0x798b8d,0xc7c9bb,0x536b72,'skin');
   else if (['otter','mammal','beaver','platypus','rodent','waterhorse'].includes(archetype)) p = palette(0x4b3e32,0x796347,0xb8a078,0x514536,'fur');
   else if (['clam','bivalve','mussel','oyster','snail','nautilus'].includes(archetype)) p = palette(0x3b4c53,0x7b8d89,0xc6bb9e,0xa79471,'shell');
-  else if (['octopus','squid','lusca','softbody'].includes(archetype)) p = palette(0x714e4e,0xad8170,0xd2b5a0,0x95685f,'spots');
+  else if (['octopus','squid','softbody'].includes(archetype)) p = palette(0x714e4e,0xad8170,0xd2b5a0,0x95685f,'spots');
   else p = palette(0x4b6072,0x88a1ac,0xc2cfc3,0x8b91ad,'spots');
   if (shiny) {
     const shift = color => color.map((c,i) => Math.min(1,c * .68 + [.34,.25,.1][i]));

@@ -528,12 +528,12 @@ export class Hud {
       `CAM HIT   ${playerState.camera.obstructionHandle ?? 'none'} @ ${playerState.camera.obstructionDistance.toFixed(2)}m`,
       ...fishingDebugLines,
       `CATCHES   ${playerState.fishing.catches}`,
-      `FISH CHEAT B random • N easy • M hard`,
+      `FISH CHEAT B force bite • N easy • Shift+F10 hard`,
       `GALLERY   P open • J/K species • L length • B body • H shiny`,
       `FISH DEBUG F6 compact ecology overlay`,
       `COLLECTION I inventory / gear / aquarium`,
       `TELEPORT  1–6 starts • 7 lower • 8 middle • 9 upper • 0 summit • O fishing`,
-      `DEBUG     T course • V grip wall • Y recovery • U fail • R new run`
+      `DEBUG     T course • V grip wall • Y upper traverse • U fail • R new run`
     ].join('\n');
   }
 

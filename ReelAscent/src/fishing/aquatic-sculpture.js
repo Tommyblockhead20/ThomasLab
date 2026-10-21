@@ -1,9 +1,9 @@
 import * as pc from 'playcanvas';
 import { modelMesh } from './fish-sculpture.js';
-export const AQUATIC_SCULPTURES = new Set(['frog','crab','lobster','crayfish','octopus','lusca','jellyfish','turtle','salamander','ray','skate']);
+export const AQUATIC_SCULPTURES = new Set(['frog','crab','lobster','crayfish','octopus','lusca','jellyfish','turtle','salamander','ray','skate','serpent','dragon','plesiosaur','waterhorse','wisp']);
 
 // Anatomical attachment points, rather than independent floating decorative pieces.
-export function buildAquaticSculpture(root,{archetype,name,art,primitive,base,accent,dark,materials}) {
+export function buildAquaticSculpture(root,{archetype,speciesId,name,art,primitive,base,accent,dark,materials}) {
   const add=(label,type,p,s,m=base,r={})=>primitive(root,`${name} ${label}`,type,{x:p[0],y:p[1],z:p[2]},{x:s[0],y:s[1],z:s[2]},m,r);
   const ball=(label,p,s,m=base)=>add(label,'sphere',p,s,m);
   const segment=(label,a,b,r,m=base)=>{
@@ -42,13 +42,104 @@ export function buildAquaticSculpture(root,{archetype,name,art,primitive,base,ac
       segment(`eye stalk ${side}`,[.28,.09,side*.15],[.34,.23,side*.19],.023);eye(`eye ${side}`,[.35,.24,side*.19]);
       if(!crab)segment(`antenna ${side}`,[.38,.11,side*.11],[.9,.2,side*.24],.012,accent);
     }
-  }else if(['octopus','lusca'].includes(archetype)){
+  }else if(archetype==='octopus'){
     ball('mantle',[.16,.2,0],[.62,.65,.58]);ball('arm crown',[.04,-.05,0],[.5,.28,.49]);
     for(let i=0;i<8;i++){
       if(root._app?.graphicsDevice)modelMesh(root,`${name} tapered curling arm ${i}`,createArmTubeData(i),i%2?accent:base);
       else {const a=i/8*Math.PI*2;segment(`arm ${i}`,[Math.cos(a)*.13,-.1,Math.sin(a)*.16],[Math.cos(a)*.72,-.27,Math.sin(a)*.68],.065);}
     }
     for(const side of [-1,1])eye(`eye ${side}`,[.38,.16,side*.21],.085);
+  }else if(archetype==='lusca'){
+    // Restore the original corrupted-octopus idea: a forward, fish-like skull and
+    // sweeping rear arm fan, not the ordinary octopus's upright mantle and radial arms.
+    ball('corrupted dorsal mantle',[-.08,.13,0],[.82,.67,.67],base);
+    ball('forward monstrous head',[.32,-.02,0],[.61,.43,.59],accent);
+    ball('beaked lower jaw',[.59,-.17,0],[.34,.14,.38],base);
+    ball('arm skirt',[-.3,-.16,0],[.53,.2,.56],accent);
+    for(const side of [-1,1]){
+      eye(`sunken eye ${side}`,[.49,.07,side*.245],.095);
+      add(`horn ${side}`,'cone',[.16,.43,side*.22],[.15,.49,.14],dark,{z:side*15});
+      for(let band=0;band<4;band++){
+        const z=side*(.09+band*.115),y=-.24-band*.025;
+        segment(`corrupted arm ${side}:${band} root`,[-.3,y,z],[-.62-band*.055,y-.04,z+side*.04],.072-(band*.006),accent);
+        segment(`corrupted arm ${side}:${band} sweep`,[-.62-band*.055,y-.04,z+side*.04],[-1.05-band*.075,y-.1+band*.075,z+side*(.09+band*.03)],.045-(band*.003),band%2?base:accent);
+      }
+    }
+    for(let row=0;row<4;row++)add(`mantle thorn ${row}`,'cone',[-.29+row*.16,.45-row*.015,0],[.11,.26,.11],dark,{z:-18});
+  }else if(archetype==='serpent' || archetype==='dragon' || archetype==='plesiosaur'){
+    const crocodilian=archetype==='serpent' && /alligator|crocodile/i.test(speciesId || name);
+    const leafy=speciesId==='leafy_seadragon';
+    const longNeck=archetype==='plesiosaur';
+    const hydra=speciesId==='lernaean_hydra';
+    const bodyCount=crocodilian?6:longNeck?5:8;
+    for(let i=0;i<bodyCount;i++){
+      const t=i/(bodyCount-1),x=.34-i*(crocodilian?.24:.265);
+      const y=crocodilian?-.045:Math.sin(t*Math.PI*2.1)*.13;
+      const z=crocodilian?0:Math.sin(t*Math.PI*1.65)*.12;
+      ball(`sinuous armored segment ${i+1}`,[x,y,z],[.4-i*.021,crocodilian?.32:.34-i*.013,crocodilian?.34:.31-i*.01],i%3===0?accent:base);
+      if(i>0 && i<bodyCount-1 && !leafy)add(`dorsal crest ${i}`,'cone',[x,y+.18,z],[.12,.24-i*.008,.1],accent,{z:12});
+    }
+    if(longNeck){
+      segment('rising neck root',[.38,.02,0],[.61,.4,0],.11,base);
+      segment('arched neck',[.61,.4,0],[.87,.6,0],.085,base);
+      ball('watchful small head',[.96,.6,0],[.3,.19,.22],accent);
+      for(const side of [-1,1]){
+        eye(`eye ${side}`,[1.02,.65,side*.1],.043);
+        for(const x of [-.56,.2])ball(`paddle ${x}:${side}`,[x,-.14,side*.38],[.36,.07,.42],accent);
+      }
+    }else if(crocodilian){
+      ball('broad crocodilian skull',[.55,.01,0],[.49,.26,.4],base);
+      ball('long armored snout',[.83,-.055,0],[.49,.16,.3],accent);
+      for(const side of [-1,1]){
+        eye(`high eye ${side}`,[.58,.15,side*.16],.057);
+        for(const x of [-.62,.13]){segment(`splayed leg ${x}:${side}`,[x,-.12,side*.14],[x+.05,-.33,side*.39],.065,base);ball(`webbed foot ${x}:${side}`,[x+.09,-.34,side*.42],[.21,.075,.16],accent);}
+      }
+    }else if(leafy){
+      ball('seahorse muzzle',[.61,.13,0],[.34,.17,.17],accent);
+      for(let i=0;i<7;i++)for(const side of [-1,1])add(`leafy camouflage ${i}:${side}`,'cone',[.35-i*.23,.13+Math.sin(i)*.08,side*.18],[.1,.3+(i%3)*.08,.07],accent,{x:side*55,z:(i%2?1:-1)*25});
+      for(const side of [-1,1])eye(`eye ${side}`,[.57,.2,side*.09],.036);
+    }else{
+      const headCount=hydra?3:1;
+      for(let h=0;h<headCount;h++){
+        const offset=h-(headCount-1)/2,headZ=offset*.33,headY=.19+(h===1?.2:0);
+        segment(`neck ${h}`,[.34,.06,offset*.09],[.59,headY,headZ],.09,base);
+        ball(`dragon head ${h}`,[.72,headY,headZ],[.37,.27,.28],base);
+        ball(`toothed snout ${h}`,[.9,headY-.08,headZ],[.28,.14,.22],accent);
+        for(const side of [-1,1]){
+          eye(`dragon eye ${h}:${side}`,[.77,headY+.065,headZ+side*.125],.047);
+          add(`swept horn ${h}:${side}`,'cone',[.56,headY+.19,headZ+side*.13],[.08,.28,.08],accent,{z:-24,x:side*16});
+        }
+      }
+      for(const side of [-1,1]){
+        ball(`webbed shoulder fin ${side}`,[.09,.02,side*.31],[.47,.075,.35],accent,{y:side*25});
+        ball(`webbed hind fin ${side}`,[-.72,-.06,side*.22],[.39,.07,.3],accent,{y:side*30});
+      }
+    }
+    tail=segment('tapering tail',[-1.28,-.03,0],[-1.8,-.09,.09],.07,accent);
+  }else if(archetype==='waterhorse'){
+    const spirit=speciesId==='umibozu';
+    ball(spirit?'shadowy sea spirit torso':'arched waterhorse torso',[-.13,.03,0],[.93,.54,.47],base);
+    segment('rising neck',[.24,.08,0],[.53,.56,0],.18,base);
+    ball('horse head',[.65,.58,0],[.38,.29,.28],accent);
+    ball('long muzzle',[.84,.46,0],[.28,.16,.23],base);
+    for(const side of [-1,1]){
+      eye(`eye ${side}`,[.7,.64,side*.135],.05);
+      add(`pointed ear ${side}`,'cone',[.57,.77,side*.11],[.08,.24,.08],base,{z:-12});
+      for(const x of [-.46,.15]){
+        segment(`fore or hind leg ${x}:${side}`,[x,-.16,side*.17],[x+.03,-.53,side*.21],.07,base);
+        ball(`water hoof ${x}:${side}`,[x+.09,-.56,side*.21],[.19,.09,.14],accent);
+      }
+    }
+    for(let i=0;i<5;i++)add(`wave mane ${i}`,'cone',[.43-i*.1,.63-i*.08,0],[.1,.24,.14],accent,{z:-26});
+    tail=segment('streaming tail',[-.55,.03,0],[-1.07,.22,.08],.07,accent);
+    if(spirit)for(let i=0;i<4;i++)ball(`spectral spray ${i}`,[-.68-i*.1,-.03+(i%2)*.13,(i%2?1:-1)*.22],[.12,.12,.12],accent);
+  }else if(archetype==='wisp'){
+    ball('luminous heart',[.1,.05,0],[.47,.44,.44],base);
+    for(let i=0;i<7;i++){
+      const a=i/7*Math.PI*2;
+      segment(`radiant streamer ${i}`,[.05,.03,0],[-.18-Math.cos(a)*.3,.04+Math.sin(a)*.3,Math.cos(a*1.3)*.26],.045,accent);
+    }
+    ball('trailing ember',[-.55,-.05,0],[.22,.2,.19],accent);
   }else if(archetype==='jellyfish'){
     ball('bell',[0,.2,0],[.72,.41,.72]);ball('bell skirt',[0,.07,0],[.76,.14,.76],accent);
     for(let i=0;i<8;i++){

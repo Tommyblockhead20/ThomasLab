@@ -65,7 +65,12 @@ export class RoomState {
         remote.setLocalLocationId(this.localLocationId);
         this.members.set(playerId, remote);
       }
-      this.members.get(playerId)?.representation?.setAppearance?.(presentation?.appearance);
+      // A room roster may precede the first appearance snapshot. Null means
+      // "not received yet", not "reset this avatar to the default outfit".
+      if (!presentation?.snapshot && presentation?.appearance != null
+        && this.members.get(playerId)?.lastSequence < 0) {
+        this.members.get(playerId)?.representation?.setAppearance?.(presentation.appearance);
+      }
       this.members.get(playerId)?.representation?.setDisplayName?.(presentation?.displayName ?? presentation?.name ?? 'Player');
       this.members.get(playerId)?.representation?.setPosture?.(presentation?.posture);
       this.members.get(playerId)?.representation?.setEmote?.(presentation?.emote ?? null);
@@ -74,8 +79,8 @@ export class RoomState {
       if (presentation?.snapshot) remote.consumeSnapshot(presentation.snapshot);
       remote?.representation?.setFishingState?.(presentation?.fishingState);
       remote?.representation?.setHeldItem?.(presentation?.heldItem ?? null);
-      if (typeof presentation?.locationId === 'string') remote.locationId = presentation.locationId;
-      if (presentation?.globalPosition) remote.globalPosition = { ...presentation.globalPosition };
+      if (remote.lastSequence < 0 && typeof presentation?.locationId === 'string') remote.locationId = presentation.locationId;
+      if (remote.lastSequence < 0 && presentation?.globalPosition) remote.globalPosition = { ...presentation.globalPosition };
       remote?.syncVisibility?.();
     }
     for (const [playerId, player] of this.members) {

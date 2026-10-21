@@ -94,6 +94,7 @@ export class Player {
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
     this.facingYaw = 0;
+    this.teleportRevision = 0;
     this.motionTime = 0;
     this.lastSpeed = 0;
     this.momentumDeflectCooldown = 0;
@@ -2197,6 +2198,7 @@ export class Player {
     if (this.benchSeat) this.onSeatCleared?.(this.benchSeat.id);
     this.benchSeat = null;
     const spawn = this.resolveSafeSpawn(position, facingYaw);
+    this.teleportRevision += 1;
     this.body.setTranslation(spawn, true);
     this.body.setNextKinematicTranslation(spawn);
     this.horizontalVelocity.set(0, 0, 0);

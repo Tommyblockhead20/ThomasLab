@@ -68,6 +68,7 @@ export function createPlayerSnapshot(playerId, state, sequence) {
     playerId,
     sequence,
     position: state.position,
+    teleportRevision: Number.isSafeInteger(state.teleportRevision) ? state.teleportRevision : 0,
     // Optional v9 location metadata is backward-compatible with protocol v1 servers.
     // Rendering still interpolates `position`; GPS/room state can use stable global data.
     locationId: state.locationId ?? 'main-mountain',

@@ -858,6 +858,7 @@ function addBakedTerrainMesh(world, patch, center = centerFallback()) {
       const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
       const meshMaterial = material.clone();
       meshMaterial.name = `Stoneveil ${kind} core`;
+      if (kind === 'standable') meshMaterial.diffuse.set(.62, .72, .53);
       meshMaterial.cull = pc.CULLFACE_NONE;
       applySurfaceDetail(meshMaterial, world.app.graphicsDevice, `core-${kind}`, { tiling: 2.4, strength: .3 });
       return new pc.MeshInstance(mesh, meshMaterial, entity);

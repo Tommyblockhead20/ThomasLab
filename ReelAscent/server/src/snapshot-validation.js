@@ -108,11 +108,16 @@ export function validateSnapshot(payload, session, now = Date.now()) {
   const locationId = cleanString(payload.locationId, 100) || 'main-mountain';
   const coordinateSpace = cleanString(payload.coordinateSpace, 40) || 'global-world';
   const rawGlobalPosition = payload.globalPosition;
+  // A controller teleport is an explicit discontinuity, unlike an ordinary movement
+  // packet. Keep older clients (which omit this field) on the previous speed check.
+  const teleportRevision = Number.isSafeInteger(payload.teleportRevision)
+    && payload.teleportRevision >= 0 ? payload.teleportRevision : null;
   const globalPosition = rawGlobalPosition && ['x', 'y', 'z'].every((axis) => finite(rawGlobalPosition[axis]))
     ? { x: Number(rawGlobalPosition.x), y: Number(rawGlobalPosition.y), z: Number(rawGlobalPosition.z) }
     : { ...normalizedPosition };
 
-  if (session.lastSnapshot && session.lastSnapshot.locationId === locationId) {
+  if (session.lastSnapshot && session.lastSnapshot.locationId === locationId
+    && (teleportRevision === null || teleportRevision === session.lastSnapshot.teleportRevision)) {
     const dt = Math.max(0.05, Math.min(5, (now - session.lastSnapshot.serverTime) / 1000));
     const previous = session.lastSnapshot.position;
     const distance = Math.hypot(
@@ -132,6 +137,7 @@ export function validateSnapshot(payload, session, now = Date.now()) {
       playerId: session.playerId,
       sequence,
       position: normalizedPosition,
+      teleportRevision,
       yaw: ((yaw % 360) + 360) % 360,
       movement,
       posture: POSTURES.has(payload.posture) ? payload.posture : 'standing',

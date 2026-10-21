@@ -17,11 +17,30 @@ export class RemotePlayer {
     this.lastSampleAt = null;
     this.connected = true;
     this.lastSequence = -1;
+    this.teleportRevision = null;
   }
 
   consumeSnapshot(snapshot) {
     if (snapshot?.playerId !== this.playerId) return false;
     if (Number.isSafeInteger(snapshot.sequence) && snapshot.sequence <= this.lastSequence) return false;
+    const validPosition = snapshot.position && ['x', 'y', 'z'].every((axis) => Number.isFinite(snapshot.position[axis]));
+    const validTime = Number.isFinite(Number(snapshot.serverTime ?? snapshot.sentAt));
+    if (!validPosition || !validTime) return false;
+    const previous = this.snapshots.snapshots.at(-1);
+    const discontinuity = previous && (
+      (typeof snapshot.locationId === 'string' && snapshot.locationId !== this.locationId)
+      || (typeof snapshot.coordinateSpace === 'string' && snapshot.coordinateSpace !== this.coordinateSpace)
+      || (Number.isSafeInteger(snapshot.teleportRevision) && this.teleportRevision !== null
+        && snapshot.teleportRevision !== this.teleportRevision)
+      || Math.hypot(snapshot.position.x - previous.position.x,
+        snapshot.position.y - previous.position.y, snapshot.position.z - previous.position.z) > 18
+    );
+    if (discontinuity) {
+      this.snapshots.clear();
+      this.lastSample = null;
+      this.lastSampleAt = null;
+    }
+    if (Number.isSafeInteger(snapshot.teleportRevision)) this.teleportRevision = snapshot.teleportRevision;
     if (typeof snapshot.locationId === 'string' && snapshot.locationId) this.locationId = snapshot.locationId;
     if (typeof snapshot.coordinateSpace === 'string') this.coordinateSpace = snapshot.coordinateSpace;
     if (snapshot.globalPosition && ['x', 'y', 'z'].every((axis) => Number.isFinite(snapshot.globalPosition[axis]))) {

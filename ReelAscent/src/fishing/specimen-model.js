@@ -194,7 +194,7 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
   if (SCULPTED_FISH_ARCHETYPES.has(archetype) && device) {
     tail = buildFishSculpture(root, { archetype, visual, art, name, primitive, base, accent, dark, materials }).tail;
   } else if (AQUATIC_SCULPTURES.has(archetype)) {
-    tail = buildAquaticSculpture(root, { archetype, name, art, primitive, base, accent, dark, materials }).tail;
+    tail = buildAquaticSculpture(root, { archetype, speciesId, name, art, primitive, base, accent, dark, materials }).tail;
   } else if (speciesId === 'penguin') {
     primitive(root, `${name} penguin upright body`, 'sphere', { x: 0, y: .02, z: 0 }, { x: .35, y: .62, z: .34 }, dark);
     primitive(root, `${name} penguin white belly`, 'sphere', { x: .25, y: -.04, z: 0 }, { x: .16, y: .44, z: .27 }, base);

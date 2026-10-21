@@ -1588,6 +1588,7 @@ export class MountainWorld extends TestWorld {
     this.buildThreeToSevenHundredRockField();
     this.buildMidHighTraversalAnchors();
     this.buildSparseRegionInfill();
+    this.buildAltitudeGapRockInfill();
     markStartup('world:procedural-rocks');
     this.buildEnvironmentAesthetics();
     markStartup('world:vegetation-and-decor');
@@ -3022,16 +3023,20 @@ export class MountainWorld extends TestWorld {
     for (let index = 0; index < pathSegmentCount; index += 1) {
       const progress = index / (pathSegmentCount - 1);
       const pathZ = lerp(pathStartZ, pathEndZ, progress);
-      const pathWorld = this.aquariumPoint(0, 0, pathZ);
-      const groundY = triangleSurfaceHeightAt(islandSurface?.vertices, islandSurface?.triangles,
-        pathWorld.x, pathWorld.z, pathSurfaceY(pathZ));
-      // Separate the thin visual path from the actual terrain by a visible but
-      // small clearance; the old top was almost coplanar and shimmered.
-      const surfaceLocalY = groundY + .035 - this.publicAquariumFloorY;
+      const pathWidth = 3.2;
+      // The terrain rolls both across and along the path. Sampling its centre alone
+      // left the outer box corners buried/coplanar, producing the remaining shimmer.
+      const groundY = Math.max(...[-pathWidth * .5, 0, pathWidth * .5].flatMap((offsetX) =>
+        [-segmentLength * .5, segmentLength * .5].map((offsetZ) => {
+          const worldPoint = this.aquariumPoint(offsetX, 0, pathZ + offsetZ);
+          return triangleSurfaceHeightAt(islandSurface?.vertices, islandSurface?.triangles,
+            worldPoint.x, worldPoint.z, pathSurfaceY(pathZ + offsetZ));
+        })));
+      const surfaceLocalY = groundY + .065 - this.publicAquariumFloorY;
       this.addAquariumBox(`Glasswater packed dock path ${index + 1}`,
-        { x: Math.sin(index * 1.31) * .08, y: surfaceLocalY - .02, z: pathZ },
-        { x: 4.1 + index % 3 * .12, y: .04, z: segmentLength },
-        this.materials.pondBank, { y: index % 2 ? 1.2 : -1.2 }, false);
+        { x: 0, y: surfaceLocalY - .025, z: pathZ },
+        { x: pathWidth, y: .05, z: segmentLength * .96 },
+        this.materials.pondBank, {}, false);
     }
     for (const side of [-1, 1]) {
       for (let index = 0; index < 4; index += 1) {
@@ -5085,15 +5090,32 @@ export class MountainWorld extends TestWorld {
       if (!point) continue;
       const baseY = point.y;
       if (biome === 'blackstone') {
-        this.createPrimitive(`Blackstone pine sapling ${index + 1}`, 'cone',
+        if (index % 5 === 0) {
+          for (const side of [-1, 0, 1]) this.createPrimitive(`Blackstone heather ${index + 1}:${side}`, 'cone',
+            { x: point.x + side * .16, y: baseY + .21, z: point.z + side * .09 },
+            { x: .18, y: .43 + Math.abs(side) * .08, z: .16 },
+            side ? this.materials.shrubDark : this.materials.flowerPink, { z: side * 12 }, { castShadows: false });
+        } else this.createPrimitive(`Blackstone pine sapling ${index + 1}`, 'cone',
           { x: point.x, y: baseY + .72, z: point.z }, { x: .48, y: 1.45, z: .48 },
           this.materials.shrubDark, {}, { castShadows: false });
       } else if (biome === 'fernwood') {
-        for (const side of [-1, 1]) this.createPrimitive(`Fernwood fern fan ${index + 1}:${side}`, 'cone',
+        if (index % 7 === 0) {
+          this.createPrimitive(`Fernwood mushroom stem ${index + 1}`, 'cylinder',
+            { x: point.x, y: baseY + .16, z: point.z }, { x: .075, y: .32, z: .075 },
+            this.materials.woodLight, {}, { castShadows: false });
+          this.createPrimitive(`Fernwood mushroom cap ${index + 1}`, 'sphere',
+            { x: point.x, y: baseY + .35, z: point.z }, { x: .32, y: .15, z: .32 },
+            this.materials.flowerPink, {}, { castShadows: false });
+        } else for (const side of [-1, 1]) this.createPrimitive(`Fernwood fern fan ${index + 1}:${side}`, 'cone',
           { x: point.x + side * .22, y: baseY + .24, z: point.z }, { x: .34, y: .55, z: .12 },
           this.materials.shrubLight, { z: side * 58 }, { castShadows: false });
       } else {
-        this.createPrimitive(`Sunwash dry scrub ${index + 1}`, 'sphere',
+        if (index % 4 === 0) {
+          for (const side of [-1, 0, 1]) this.createPrimitive(`Sunwash swordleaf ${index + 1}:${side}`, 'cone',
+            { x: point.x + side * .12, y: baseY + .29, z: point.z },
+            { x: .14, y: .62 - Math.abs(side) * .15, z: .13 },
+            this.materials.dryGrass, { z: side * 34 }, { castShadows: false });
+        } else this.createPrimitive(`Sunwash dry scrub ${index + 1}`, 'sphere',
           { x: point.x, y: baseY + .22, z: point.z }, { x: .72, y: .38, z: .58 },
           index % 3 ? this.materials.dryGrass : this.materials.shrubLight, {}, { castShadows: false });
       }
@@ -5114,6 +5136,22 @@ export class MountainWorld extends TestWorld {
       if (!this.isEnvironmentPlacementOpen(angle, radius, 1.35)) continue;
       this.addEnvironmentBush(angle, radius, .38 + (index % 3) * .1,
         `Hardy alpine scrub ${index + 1}`, index % 2 ? this.materials.shrubDark : this.materials.dryGrass);
+    }
+
+    for (let index = 0; index < 54; index += 1) {
+      const angle = (19 + index * 37.7) % 360;
+      const radius = 72 + (index * 13 % 43);
+      if (!this.isEnvironmentPlacementOpen(angle, radius, .8)) continue;
+      const point = this.proceduralGroundAt(angle, radius, { minimumNormalY: .62 });
+      if (!point) continue;
+      const height = .28 + (index % 3) * .08;
+      this.createPrimitive(`Alpine cushion plant ${index + 1}`, 'sphere',
+        { x: point.x, y: point.y + height * .28, z: point.z },
+        { x: .48, y: height, z: .39 }, index % 4 ? this.materials.shrubDark : this.materials.shrubLight,
+        {}, { castShadows: false });
+      if (index % 5 === 0) this.createPrimitive(`Alpine bell flower ${index + 1}`, 'sphere',
+        { x: point.x, y: point.y + height * .55, z: point.z },
+        { x: .14, y: .12, z: .14 }, this.materials.flowerPink, {}, { castShadows: false });
     }
 
     for (let index = 0; index < 176; index += 1) {
@@ -5864,6 +5902,42 @@ export class MountainWorld extends TestWorld {
       remainingSparseRegions: actionable.length,
       protectedSparseRegions: remaining.length - actionable.length
     };
+  }
+
+  buildAltitudeGapRockInfill() {
+    // The older density audit counts X/Z sectors, so a sector with many low rocks
+    // can still have a completely bare 300–700 ft face. Sample actual authored
+    // elevations and add only exposed, supported rocks in those vertical gaps.
+    let considered = 0, added = 0;
+    const maximumAdded = 150;
+    for (let feet = 312; feet <= 690 && added < maximumAdded; feet += 24) {
+      const targetHeight = feet * .3048;
+      for (let sector = 0; sector < 24 && added < maximumAdded; sector += 1) {
+        const angle = (sector * 15 + (Math.floor(feet / 24) % 2) * 7.5) % 360;
+        const radius = this.findRouteRadiusForHeight(angle, 160, 36, targetHeight);
+        if (!Number.isFinite(radius) || this.isRockInProtectedWaterApproach(angle, radius)) continue;
+        const ground = this.proceduralGroundAt(angle, radius, { minimumNormalY: .1 });
+        if (!ground || Math.abs(ground.y - targetHeight) > 9) continue;
+        considered += 1;
+        const nearby = this.rockPlacements.some((rock) =>
+          Math.abs(rock.position.y - ground.y) < 4.8
+          && Math.hypot(rock.position.x - ground.x, rock.position.z - ground.z) < 5.4);
+        if (nearby) continue;
+        const size = 2.05 + (sector % 4) * .23;
+        const rock = this.addRadialRock(`authored altitude gap ${feet}ft:${sector + 1}`,
+          angle, radius, this.terrainY(angle, radius) + size * .24,
+          { x: 1.8 + (sector % 3) * .22, y: size, z: 1.5 + (sector % 2) * .25 },
+          this.materialForClimb(sector % 5 === 0 ? 'normal' : 'rough'), {
+            formKind: ['wedge', 'knuckle', 'blade', 'crouch'][sector % 4],
+            pitch: -8 - sector % 4 * 3,
+            roll: (sector % 3 - 1) * 7,
+            climbMaterial: sector % 5 === 0 ? 'normal' : 'rough',
+            collisionProxy: 'rounded-box'
+          });
+        if (rock) added += 1;
+      }
+    }
+    this.altitudeGapRockAudit = { considered, added, targetRangeFeet: [300, 700] };
   }
 
   auditSolidRockSupport() {

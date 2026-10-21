@@ -334,9 +334,16 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
   } else {
     const backY = blob ? .05 : -.03;
     if (['cape', 'wings'].includes(visual)) {
-      if(visual==='wings'||!drapedCape(root,`${cosmetic.label} folded cloth`,materials.accessory,backY,blob,size)){
-        for (const side of (visual === 'wings' ? [-1, 1] : [0])) add(`panel ${side}`, 'box',
-          { x: side * .34, y: backY, z: blob ? .49 : .36 }, { x: visual === 'wings' ? .42 : .68, y: .9, z: .07 }, materials.accessory, { z: side * -17, x: -7 });
+      if(visual==='wings'){
+        for(const side of [-1,1]){
+          add(`wing shoulder ${side}`,'sphere',{x:side*.22,y:backY+.32,z:blob?.53:.39},{x:.29,y:.2,z:.13},materials.accessory);
+          for(let feather=0;feather<5;feather++) add(`swept feather ${side}:${feather}`,'cone',
+            {x:side*(.32+feather*.075),y:backY+.12-feather*.12,z:blob?.57:.43},
+            {x:.16,y:.43-feather*.035,z:.065},feather%2?materials.accessory:materials.silver,
+            {z:side*(24+feather*6),x:-9});
+        }
+      }else if(!drapedCape(root,`${cosmetic.label} folded cloth`,materials.accessory,backY,blob,size)){
+        add('cape panel','box',{x:0,y:backY,z:blob?.49:.36},{x:.68,y:.9,z:.07},materials.accessory,{x:-7});
       }
       if(visual==='cape'){
         add('woven trail patch','box',{x:0,y:backY+.12,z:blob?.555:.32},{x:.17,y:.15,z:.012},materials.pack,{x:-10});
@@ -357,11 +364,21 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
     } else if (visual === 'hydra') {
       for (const [index, x] of [-.32, 0, .32].entries()) {
         add(`neck ${index + 1}`, 'capsule', { x, y: backY + .2 + (index === 1 ? .13 : 0), z: blob ? .55 : .4 }, { x: .085, y: .75, z: .085 }, materials.accessory, { z: x * -45 });
-        add(`head ${index + 1}`, 'sphere', { x: x * 1.5, y: backY + .58 + (index === 1 ? .15 : 0), z: blob ? .54 : .39 }, { x: .14, y: .11, z: .12 }, materials.dark);
+        const headY=backY+.58+(index===1?.15:0),headZ=blob?.54:.39;
+        add(`head ${index + 1}`, 'sphere', { x: x * 1.5, y: headY, z: headZ }, { x: .19, y: .14, z: .14 }, materials.accessory);
+        add(`snout ${index + 1}`,'sphere',{x:x*1.5,y:headY-.035,z:headZ+.1},{x:.12,y:.065,z:.15},materials.dark);
+        for(const side of [-1,1]){
+          add(`horn ${index + 1}:${side}`,'cone',{x:x*1.5+side*.07,y:headY+.12,z:headZ-.015},{x:.055,y:.16,z:.055},materials.silver,{z:side*22});
+          add(`eye ${index + 1}:${side}`,'sphere',{x:x*1.5+side*.085,y:headY+.025,z:headZ+.1},{x:.03,y:.035,z:.018},materials.dark);
+        }
       }
     } else if (visual === 'tentacle') {
-      for (const [index, x] of [-.38, -.19, 0, .19, .38].entries()) add(`tentacle ${index + 1}`, 'capsule',
-        { x, y: backY - .08 + Math.abs(x) * .18, z: blob ? .55 : .4 }, { x: .085, y: .82, z: .085 }, materials.accessory, { x: index % 2 ? 8 : -8, z: x * -55 });
+      for (const [index, x] of [-.38, -.19, 0, .19, .38].entries()) {
+        const z=blob?.55:.4;
+        add(`tentacle ${index + 1} root`,'capsule',{x,y:backY+.05,z},{x:.12,y:.49,z:.12},materials.accessory,{z:x*-45});
+        add(`tentacle ${index + 1} curled tip`,'capsule',{x:x*1.45,y:backY-.34+Math.abs(x)*.2,z:z+.09},{x:.07,y:.37,z:.07},materials.accessory,{x:index%2?12:-12,z:x*65});
+        add(`tentacle ${index + 1} sucker`,'sphere',{x:x*1.37,y:backY-.29+Math.abs(x)*.2,z:z+.14},{x:.055,y:.04,z:.025},materials.silver);
+      }
     } else if (visual === 'shell') {
       add('spiral shell', 'sphere', { x: 0, y: backY, z: blob ? .56 : .43 }, { x: .58, y: .58, z: .2 });
       for (let index = 0; index < 13; index += 1) {
@@ -375,9 +392,12 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
       add('tank glass', 'sphere', { x: 0, y: backY, z: blob ? .69 : .53 }, { x: .38, y: .49, z: .11 }, materials.glass);
       add('tank fish', 'cone', { x: .04, y: backY, z: blob ? .79 : .63 }, { x: .09, y: .2, z: .045 }, materials.accessory, { x: 90, z: 90 });
     } else if (visual === 'atlas') {
-      add('book', 'box', { x: 0, y: backY, z: blob ? .54 : .39 }, { x: .6, y: .72, z: .18 }, materials.pack, { x: -7 });
-      add('book spine', 'box', { x: -.27, y: backY, z: blob ? .65 : .5 }, { x: .08, y: .72, z: .08 }, materials.silver, { x: -7 });
-      add('compass rose', 'sphere', { x: .05, y: backY + .06, z: blob ? .68 : .54 }, { x: .17, y: .17, z: .035 }, materials.accessory);
+      const z=blob?.56:.42;
+      add('bound field atlas','box',{x:0,y:backY,z},{x:.58,y:.69,z:.18},materials.pack,{x:-7});
+      add('book spine','box',{x:-.25,y:backY,z:z+.1},{x:.07,y:.67,z:.2},materials.accessory,{x:-7});
+      add('page block','box',{x:.035,y:backY,z:z+.115},{x:.43,y:.55,z:.08},materials.silver,{x:-7});
+      add('compass rose','sphere',{x:.035,y:backY+.08,z:z+.17},{x:.2,y:.2,z:.025},materials.accessory);
+      for(const side of [-1,1]) add(`atlas corner ${side}`,'box',{x:side*.22,y:backY+.29,z:z+.14},{x:.1,y:.06,z:.055},materials.silver);
     } else if (visual === 'emblem') {
       add('trophy harness', 'box', { x: 0, y: backY, z: blob ? .51 : .36 }, { x: .5, y: .65, z: .22 }, materials.pack, { x: -7 });
       add('trophy cup', 'cylinder', { x: 0, y: backY + .15, z: blob ? .7 : .55 }, { x: .19, y: .25, z: .19 }, materials.silver);

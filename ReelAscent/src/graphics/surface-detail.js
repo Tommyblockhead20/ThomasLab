@@ -62,9 +62,12 @@ export function createSurfacePixels(kind, size = 128) {
       h = .5 + (shard < .055 ? -.1 : .025) + grain * .035;
       shade = .96 + (shard < .055 ? -.09 : .015) + grain * .015;
     } else if (kind === 'core-standable') {
-      const pebbles = noise(Math.floor(x / 5), Math.floor(y / 5)) - .5;
-      h = .5 + pebbles * .13 + grain * .08;
-      shade = .97 + pebbles * .08 + grain * .025;
+      const bladeRow = Math.floor(y / 9), bladeColumn = Math.floor((x + (bladeRow % 2) * 4) / 7);
+      const stem = noise(bladeColumn, bladeRow) > .26
+        && Math.abs((x + (bladeRow % 2) * 4) % 7 - 3 - (y % 9 - 4) * .22) < .85;
+      const tuft = noise(Math.floor(x / 12), Math.floor(y / 12)) - .5;
+      h = .5 + tuft * .09 + grain * .055 + (stem ? .12 : 0);
+      shade = .91 + tuft * .07 + grain * .03 + (stem ? .065 : 0);
     } else if (kind === 'core-walkable') {
       const contour = Math.sin(TAU * (v * 6 + u * 1.5 + broad * .12));
       h = .5 + contour * .08 + grain * .12;
