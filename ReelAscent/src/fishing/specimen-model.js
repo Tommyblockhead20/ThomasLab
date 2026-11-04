@@ -5,6 +5,7 @@ import { creatureArt } from './creature-art.js';
 import { SCULPTED_FISH_ARCHETYPES, buildFishSculpture } from './fish-sculpture.js';
 import { repairSolidAttachments } from './solid-attachments.js';
 import { AQUATIC_SCULPTURES, buildAquaticSculpture } from './aquatic-sculpture.js';
+import { INVERTEBRATE_SCULPTURES } from './invertebrate-sculpture.js';
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
@@ -193,7 +194,7 @@ export function createSpecimenModel(specimen, { name = 'Specimen display', maxim
 
   if (SCULPTED_FISH_ARCHETYPES.has(archetype) && device) {
     tail = buildFishSculpture(root, { archetype, visual, art, name, primitive, base, accent, dark, materials }).tail;
-  } else if (AQUATIC_SCULPTURES.has(archetype)) {
+  } else if (AQUATIC_SCULPTURES.has(archetype) && (device || !INVERTEBRATE_SCULPTURES.has(archetype))) {
     tail = buildAquaticSculpture(root, { archetype, speciesId, name, art, primitive, base, accent, dark, materials }).tail;
   } else if (speciesId === 'penguin') {
     primitive(root, `${name} penguin upright body`, 'sphere', { x: 0, y: .02, z: 0 }, { x: .35, y: .62, z: .34 }, dark);

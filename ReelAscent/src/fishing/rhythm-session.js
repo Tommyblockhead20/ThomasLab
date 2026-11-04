@@ -749,7 +749,7 @@ export class RhythmSession {
         { type: 'timeout', noteId: note.id, lane: note.lane, time: mistakeTime, escapeContribution }
       );
     }
-    this.failCleanPerformanceIfNecessary();
+    this.resolveOutcome();
   }
 
   registerOffBeat(inputLane, mistakeTime = this.songTime, timingTarget = null, signedMs = null) {
@@ -764,13 +764,7 @@ export class RhythmSession {
       `${this.laneLabel(inputLane)} — ${timing}${timingTarget ? ` (expected ${this.laneLabel(timingTarget.lane)})` : ''}`,
       { type: 'off-beat', noteId: timingTarget?.id ?? null, lane: inputLane, time: mistakeTime, signedMs, escapeContribution }
     );
-    this.failCleanPerformanceIfNecessary();
-  }
-
-  failCleanPerformanceIfNecessary() {
-    if (!this.requiresCleanPerformance || this.lossMeter <= 0) return false;
-    this.finish('escaped');
-    return true;
+    this.resolveOutcome();
   }
 
   finish(result) {
@@ -825,11 +819,11 @@ export class RhythmSession {
       this.finish('escaped');
     } else if (this.lossMeter >= 1 && this.spacedMistakeCount >= 2) {
       this.finish('escaped');
-    } else if (this.successfulNotes * this.reelGainMultiplier + remaining < this.pattern.requiredHits && this.spacedMistakeCount >= 2) {
-      // Clustered mistakes are given the same anti-burst grace before a line break.
-      this.finish('escaped');
     } else if (songJudged) {
-      this.finish(this.successfulNotes * this.reelGainMultiplier >= this.pattern.requiredHits ? 'caught' : 'escaped');
+      // The escape budget is authoritative for normal fish. A second, fixed hit-count
+      // gate contradicted line upgrades and chord/burst forgiveness, allowing a song
+      // to continue even though it could no longer award its fish.
+      this.finish(this.successfulNotes > 0 ? 'caught' : 'escaped');
     } else if (this.songTime >= this.pattern.duration) {
       this.finish('escaped');
     }
@@ -927,15 +921,17 @@ export class RhythmSession {
     })[latest?.type] ?? null;
     if (this.fish.shiny && this.lossMeter > 0) return `shiny escaped${cause ? ` — ${cause}` : ''}`;
     if (this.lossMeter >= 1) return `escape meter filled${cause ? ` — ${cause}` : ''}`;
-    if (this.songTime >= this.pattern.duration) return `song ended before enough notes${cause ? ` — ${cause}` : ''}`;
-    if (this.successfulNotes * this.reelGainMultiplier < this.pattern.requiredHits) {
-      return `too many mistakes${cause ? ` — ${cause}` : ''}`;
-    }
+    if (this.successfulNotes === 0) return `no completed notes${cause ? ` — ${cause}` : ''}`;
+    if (this.songTime >= this.pattern.duration) return `song ended with unfinished notes${cause ? ` — ${cause}` : ''}`;
     return cause ?? 'rhythm failed';
   }
 
   get progress() {
-    return clamp(this.successfulNotes * this.reelGainMultiplier / this.pattern.requiredHits, 0, 1);
+    if (this.result === 'caught') return 1;
+    const allowedMisses = this.requiresCleanPerformance ? 0 : Math.max(0, Math.ceil(2 / this.escapeGainMultiplier - 1e-9) - 1);
+    const required = Math.max(1, this.pattern.notes.length - allowedMisses);
+    const stillPlaying = this.pattern.notes.some(note => note.status === 'pending' || note.status === 'holding');
+    return clamp(this.successfulNotes * this.reelGainMultiplier / required, 0, stillPlaying ? .99 : 1);
   }
 
   get perfectWindow() {

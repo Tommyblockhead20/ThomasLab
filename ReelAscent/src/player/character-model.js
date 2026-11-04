@@ -1,4 +1,5 @@
 import * as pc from 'playcanvas';
+import { buildCosmeticSculpture } from './cosmetic-sculpture.js';
 import {
   LEGACY_CHARACTER_PALETTE,
   hairVisibilityForHeadwear,
@@ -213,7 +214,10 @@ function buildGeneratedCosmetic(parent, cosmetic, sourceMaterials, blob = false)
     { x: scale.x * size, y: scale.y * size, z: scale.z * size }, material, rotation
   );
   const visual = cosmetic.visual;
-  if (cosmetic.slot === 'headwear') {
+  const sculpted = buildCosmeticSculpture(root, cosmetic, materials, { blob, headY, add });
+  if (sculpted) {
+    // Theme-specific trim below still belongs to this item.
+  } else if (cosmetic.slot === 'headwear') {
     if (visual === 'crown') {
       add('band', 'cylinder', { x: 0, y: headY, z: 0 }, { x: .5, y: .1, z: .5 });
       for (const x of [-.3, 0, .3]) add(`point ${x}`, 'cone', { x, y: headY + .22 + (x ? 0 : .06), z: -.05 }, { x: .13, y: .36, z: .13 });
@@ -612,6 +616,11 @@ export function createCharacterModel(parent, { name = 'Character' } = {}) {
   primitive(flowers, 'Flower crown band', 'cylinder', { x: 0, y: .91, z: 0 }, { x: .49, y: .06, z: .49 }, materials.hat);
   [-.3, -.15, 0, .15, .3].forEach((x, index) => primitive(flowers, `Flower crown bloom ${index + 1}`, 'sphere',
     { x, y: .96 + index % 2 * .03, z: -.23 + Math.abs(x) * .14 }, { x: .1, y: .1, z: .08 }, materials.hat));
+
+  // These original prebuilt accessories otherwise bypass the shared sculpted recipes.
+  if (parent._app?.graphicsDevice) for (const id of ['beanie', 'trail-hat', 'scarf', 'necklace', 'glasses', 'round-glasses', 'aviators', 'sport-shades', 'clear-spectacles', 'snow-glasses', 'goggles']) {
+    accessories.get(id)?.destroy(); accessories.delete(id);
+  }
 
   const backpackBody = primitive(humanRig, 'Backpack', 'box', { x: 0, y: -.03, z: .33 }, { x: .55, y: .66, z: .31 }, materials.pack, { x: -7 });
   const backpackFlap = primitive(humanRig, 'Backpack flap', 'box', { x: 0, y: .15, z: .495 }, { x: .45, y: .18, z: .05 }, materials.pack, { x: -7 });

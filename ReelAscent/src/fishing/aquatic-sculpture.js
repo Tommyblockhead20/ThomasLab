@@ -1,9 +1,13 @@
 import * as pc from 'playcanvas';
 import { modelMesh } from './fish-sculpture.js';
-export const AQUATIC_SCULPTURES = new Set(['frog','crab','lobster','crayfish','octopus','lusca','jellyfish','turtle','salamander','ray','skate','serpent','dragon','plesiosaur','waterhorse','wisp']);
+import { buildMythicSculpture } from './mythic-sculpture.js';
+import { INVERTEBRATE_SCULPTURES, buildInvertebrateSculpture } from './invertebrate-sculpture.js';
+export const AQUATIC_SCULPTURES = new Set(['frog','crab','lobster','crayfish','octopus','lusca','jellyfish','turtle','salamander','ray','skate','serpent','dragon','plesiosaur','waterhorse','wisp', ...INVERTEBRATE_SCULPTURES]);
 
 // Anatomical attachment points, rather than independent floating decorative pieces.
 export function buildAquaticSculpture(root,{archetype,speciesId,name,art,primitive,base,accent,dark,materials}) {
+  if (buildMythicSculpture(root, { archetype, speciesId, name, primitive, base, accent, dark, materials })) return { tail: null };
+  if (buildInvertebrateSculpture(root, { archetype, speciesId, name, primitive, base, accent, dark, materials })) return { tail: null };
   const add=(label,type,p,s,m=base,r={})=>primitive(root,`${name} ${label}`,type,{x:p[0],y:p[1],z:p[2]},{x:s[0],y:s[1],z:s[2]},m,r);
   const ball=(label,p,s,m=base)=>add(label,'sphere',p,s,m);
   const segment=(label,a,b,r,m=base)=>{

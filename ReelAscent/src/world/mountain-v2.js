@@ -7,6 +7,8 @@ import { buildVeiledAthenaeumV2 } from './library-island-v2.js';
 import { updateVeiledAthenaeumRides } from './library-island-v2.js';
 import { buildCleanBasaltTerrainWorld } from './cave-island-v23.js';
 import { islandLandscapeSpec } from './island-landscape-spec.js';
+import { authoredRockCandidates } from './authored-rock-coverage.js';
+import { aquariumPathSurface, tankRimBoxes, unitSurfacePlane } from './aquarium-surfaces.js';
 import { attachSignText } from './sign-text-renderer.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch-loader.js';
@@ -1501,6 +1503,7 @@ export class MountainWorld extends TestWorld {
     this.materials.shallowWater = makeMaterial([.27, .69, .7], { opacity: .66, gloss: .82, emissive: [.03, .13, .12], doubleSided: true });
     this.materials.mangroveWater = makeMaterial([.18, .62, .46], { opacity: .54, gloss: .84, emissive: [.025, .1, .065], doubleSided: true });
     this.materials.aquariumWater = makeMaterial([.3, .72, .76], { opacity: .3, gloss: .92, emissive: [.025, .1, .11], doubleSided: true });
+    this.materials.aquariumGlass = makeMaterial([.58, .81, .82], { opacity: .15, gloss: .94, doubleSided: true });
     this.materials.frostWater = makeMaterial([.54, .76, .82], { opacity: .36, gloss: .94, emissive: [.035, .09, .12], doubleSided: true });
     // Opaque, depth-writing materials sit below the single global ocean surface. Using the
     // ordinary transparent ice material here caused the cold shelf and spikes to sort through
@@ -2990,10 +2993,8 @@ export class MountainWorld extends TestWorld {
       { x: 8.8, y: 1.15, z: .18 }, this.materials.woodLight, {}, false);
     attachSignText(this.app.graphicsDevice, collectionSign, 'GLASSWATER AQUARIUM');
 
-    // A thin packed-earth trail follows the actual generated island profile from the public
-    // entrance to the inward end of the dock. It is deliberately inset into the ground and
-    // visual-only: the continuous island/dock colliders remain the walking surface, so there
-    // are no raised decorative blocks for the capsule to clip through.
+    // Clip one visual trail from the actual island triangles and lift it uniformly.
+    // The existing island/dock colliders remain the walking surface.
     const dockArrival = AQUARIUM_WORLD_LOCATION?.dock?.arrivalPosition;
     const dockArrivalDistance = dockArrival
       ? Math.hypot(
@@ -3017,27 +3018,14 @@ export class MountainWorld extends TestWorld {
         clamp((footprintFactor - .68) / .32, 0, 1)
       );
     };
-    const pathSegmentCount = 22;
-    const segmentLength = (pathEndZ - pathStartZ) / (pathSegmentCount - 1);
     const islandSurface = this.islandTerrainSurfaces.get('aquarium-island');
-    for (let index = 0; index < pathSegmentCount; index += 1) {
-      const progress = index / (pathSegmentCount - 1);
-      const pathZ = lerp(pathStartZ, pathEndZ, progress);
-      const pathWidth = 3.2;
-      // The terrain rolls both across and along the path. Sampling its centre alone
-      // left the outer box corners buried/coplanar, producing the remaining shimmer.
-      const groundY = Math.max(...[-pathWidth * .5, 0, pathWidth * .5].flatMap((offsetX) =>
-        [-segmentLength * .5, segmentLength * .5].map((offsetZ) => {
-          const worldPoint = this.aquariumPoint(offsetX, 0, pathZ + offsetZ);
-          return triangleSurfaceHeightAt(islandSurface?.vertices, islandSurface?.triangles,
-            worldPoint.x, worldPoint.z, pathSurfaceY(pathZ + offsetZ));
-        })));
-      const surfaceLocalY = groundY + .065 - this.publicAquariumFloorY;
-      this.addAquariumBox(`Glasswater packed dock path ${index + 1}`,
-        { x: 0, y: surfaceLocalY - .025, z: pathZ },
-        { x: pathWidth, y: .05, z: segmentLength * .96 },
-        this.materials.pondBank, {}, false);
-    }
+    const surfaceMesh = (entity, data, material) => {
+      const geometry = new pc.Geometry(); geometry.positions = data.positions; geometry.indices = data.indices; geometry.uvs = data.uvs; geometry.calculateNormals();
+      const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+      entity.render.meshInstances = [new pc.MeshInstance(mesh, material, entity)]; entity.render.castShadows = false;
+    };
+    const path = new pc.Entity('Glasswater terrain-following dock path', this.app); path.addComponent('render'); this.publicAquariumRoot.addChild(path);
+    surfaceMesh(path, aquariumPathSurface(islandSurface, AQUARIUM_WORLD_LOCATION, { startZ: pathStartZ, endZ: pathEndZ, floorY: this.publicAquariumFloorY }), this.materials.sand);
     for (const side of [-1, 1]) {
       for (let index = 0; index < 4; index += 1) {
         const pathZ = lerp(pathStartZ + 2, pathStartZ + (pathEndZ - pathStartZ) * .42, index / 3);
@@ -3094,26 +3082,25 @@ export class MountainWorld extends TestWorld {
         { x: config.tankWidth + .55, y: .96, z: config.tankDepth + .55 }, this.materials.deepRock, {}, true);
       addTankBox('sand substrate', { x: 0, y: config.waterFloorY, z: 0 },
         { x: config.tankWidth, y: .25, z: config.tankDepth }, this.materials.waterEdge);
-      addTankBox('front viewing glass', { x: 0, y: glassCenterY, z: config.tankDepth * .5 },
-        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass, {}, true);
-      addTankBox('rear viewing glass', { x: 0, y: glassCenterY, z: -config.tankDepth * .5 },
-        { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.cabinGlass, {}, true);
-      addTankBox('left glass', { x: -config.tankWidth * .5, y: glassCenterY, z: 0 },
-        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass, {}, true);
-      addTankBox('right glass', { x: config.tankWidth * .5, y: glassCenterY, z: 0 },
-        { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.cabinGlass, {}, true);
+      for (const side of [-1, 1]) {
+        const front = addTankBox(`${side < 0 ? 'rear' : 'front'} viewing glass`, { x: 0, y: glassCenterY, z: side * config.tankDepth * .5 },
+          { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, this.materials.aquariumGlass, {}, true);
+        const flank = addTankBox(`${side < 0 ? 'left' : 'right'} glass`, { x: side * config.tankWidth * .5, y: glassCenterY, z: 0 },
+          { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, this.materials.aquariumGlass, {}, true);
+        surfaceMesh(front, unitSurfacePlane('xy'), this.materials.aquariumGlass);
+        surfaceMesh(flank, unitSurfacePlane('yz'), this.materials.aquariumGlass);
+      }
       for (const side of [-1, 1]) {
         addTankBox(`${side < 0 ? 'left' : 'right'} structural frame`,
           { x: side * config.tankWidth * .5, y: glassCenterY, z: 0 },
           { x: .38, y: config.tankHeight + .55, z: .38 }, this.materials.cabinTrim);
       }
-      addTankBox('upper exhibit frame', { x: 0, y: config.waterlineY + .16, z: 0 },
-        { x: config.tankWidth + .55, y: .32, z: config.tankDepth + .55 }, this.materials.cabinTrim);
-      const tankWater = addTankBox('bounded water volume',
-        { x: 0, y: (config.waterFloorY + config.waterlineY) * .5, z: 0 },
-        { x: config.tankWidth - config.glassThickness * 2, y: config.waterlineY - config.waterFloorY, z: config.tankDepth - config.glassThickness * 2 },
+      for (const rim of tankRimBoxes(config)) addTankBox(rim.name, rim.position, rim.size, this.materials.cabinTrim);
+      const tankWater = addTankBox('single water surface',
+        { x: 0, y: config.waterlineY - .065, z: 0 },
+        { x: config.tankWidth - config.glassThickness * 2, y: .02, z: config.tankDepth - config.glassThickness * 2 },
         this.materials.aquariumWater);
-      tankWater.render.castShadows = false;
+      surfaceMesh(tankWater, unitSurfacePlane('xz'), this.materials.aquariumWater);
       for (let decor = 0; decor < 6; decor += 1) {
         const decorX = -config.tankWidth * .31 + (decor % 3) * config.tankWidth * .31;
         const decorZ = -4.7 + Math.floor(decor / 3) * 9.4;
@@ -3823,6 +3810,19 @@ export class MountainWorld extends TestWorld {
 
   ensureRockCoreContact(position, size, quaternion, form, options = {}) {
     const grounded = { ...position };
+    if (options.authoredSurface) {
+      const { point, normal } = options.authoredSurface;
+      const signed = form.hull.map(vertex => {
+        const v = quaternion.transformVector(new pc.Vec3(vertex[0] * size.x, vertex[1] * size.y, vertex[2] * size.z));
+        return (position.x + v.x - point.x) * normal.x + (position.y + v.y - point.y) * normal.y + (position.z + v.z - point.z) * normal.z;
+      });
+      const adjustment = Math.max(0, [...signed].sort((a, b) => a - b)[2] + .1);
+      grounded.x -= normal.x * adjustment; grounded.y -= normal.y * adjustment; grounded.z -= normal.z * adjustment;
+      const clearances = signed.map(d => d - adjustment);
+      const contactCount = clearances.filter(d => d < -.06).length;
+      return { position: grounded, support: { supported: contactCount >= 3, contactCount, adjustment: 0 },
+        exposure: { maximum: Math.max(...clearances), visibleFraction: clearances.filter(d => d > .06).length / clearances.length } };
+    }
     const externalSupport = ['map-editor', 'satellite-island'].includes(options.supportKind);
     if (this.authoredTerrainGroundQuery && !externalSupport) {
       const authoredGround = this.authoredGroundAtWorldXZ(position.x, position.z, { minimumNormalY: .08 });
@@ -5905,39 +5905,24 @@ export class MountainWorld extends TestWorld {
   }
 
   buildAltitudeGapRockInfill() {
-    // The older density audit counts X/Z sectors, so a sector with many low rocks
-    // can still have a completely bare 300–700 ft face. Sample actual authored
-    // elevations and add only exposed, supported rocks in those vertical gaps.
-    let considered = 0, added = 0;
-    const maximumAdded = 150;
-    for (let feet = 312; feet <= 690 && added < maximumAdded; feet += 24) {
-      const targetHeight = feet * .3048;
-      for (let sector = 0; sector < 24 && added < maximumAdded; sector += 1) {
-        const angle = (sector * 15 + (Math.floor(feet / 24) % 2) * 7.5) % 360;
-        const radius = this.findRouteRadiusForHeight(angle, 160, 36, targetHeight);
-        if (!Number.isFinite(radius) || this.isRockInProtectedWaterApproach(angle, radius)) continue;
-        const ground = this.proceduralGroundAt(angle, radius, { minimumNormalY: .1 });
-        if (!ground || Math.abs(ground.y - targetHeight) > 9) continue;
-        considered += 1;
-        const nearby = this.rockPlacements.some((rock) =>
-          Math.abs(rock.position.y - ground.y) < 4.8
-          && Math.hypot(rock.position.x - ground.x, rock.position.z - ground.z) < 5.4);
-        if (nearby) continue;
-        const size = 2.05 + (sector % 4) * .23;
-        const rock = this.addRadialRock(`authored altitude gap ${feet}ft:${sector + 1}`,
-          angle, radius, this.terrainY(angle, radius) + size * .24,
-          { x: 1.8 + (sector % 3) * .22, y: size, z: 1.5 + (sector % 2) * .25 },
-          this.materialForClimb(sector % 5 === 0 ? 'normal' : 'rough'), {
-            formKind: ['wedge', 'knuckle', 'blade', 'crouch'][sector % 4],
-            pitch: -8 - sector % 4 * 3,
-            roll: (sector % 3 - 1) * 7,
-            climbMaterial: sector % 5 === 0 ? 'normal' : 'rough',
-            collisionProxy: 'rounded-box'
-          });
-        if (rock) added += 1;
-      }
+    const exclude = point => MOUNTAIN_FISHING_LOCATIONS.some(water => {
+      if (water.offshore || Math.abs(point.y - water.y) > (water.cave ? 15 : 5)) return false;
+      const center = this.point(water.angle, water.radius, water.y);
+      return Math.hypot(point.x - center.x, point.z - center.z) < Math.max(...water.radii) + (water.cave ? 8 : 3.2);
+    });
+    const candidates = authoredRockCandidates(MAP_EDITOR_PATCH.terrain?.bakedMesh, { existing: this.rockPlacements, center: MOUNTAIN_CENTER, exclude });
+    let added = 0; const byHundredFeet = {};
+    for (const { point, normal, ordinal } of candidates) {
+      const type = ['rough', 'normal', 'rough', 'smooth', 'normal', 'rough', 'ice'][ordinal % 7];
+      const q = new pc.Quat().setFromDirections(new pc.Vec3(0, 0, 1), new pc.Vec3(normal.x, normal.y, normal.z));
+      const rotation = q.getEulerAngles();
+      const position = { x: point.x + normal.x * .25, y: point.y + normal.y * .25, z: point.z + normal.z * .25 };
+      const rock = this.addNaturalRock(`authored surface coverage ${ordinal}`, position,
+        { x: 2.5 + ordinal % 4 * .35, y: 2.4 + ordinal % 3 * .4, z: 1.9 + ordinal % 2 * .35 }, this.materialForClimb(type), rotation,
+        { authoredSurface: { point, normal }, formKind: ['wedge', 'knuckle', 'blade', 'crouch'][ordinal % 4], climbMaterial: type });
+      if (rock) { added += 1; const band = Math.floor(point.y / .3048 / 100) * 100; byHundredFeet[band] = (byHundredFeet[band] ?? 0) + 1; }
     }
-    this.altitudeGapRockAudit = { considered, added, targetRangeFeet: [300, 700] };
+    this.altitudeGapRockAudit = { considered: candidates.length, added, byHundredFeet, source: 'authored triangle surface', targetRangeFeet: [46, 978] };
   }
 
   auditSolidRockSupport() {
@@ -6730,7 +6715,8 @@ export class MountainWorld extends TestWorld {
       band: course ? 'Mechanics test' : this.getElevationBand(elevation),
       material: this.inferGroundMaterial(point, climbMaterial),
       rockSupport: this.rockSupportAudit,
-      rockDensity: this.rockDensityAudit
+      rockDensity: this.rockDensityAudit,
+      authoredCoverage: this.altitudeGapRockAudit
     };
   }
 

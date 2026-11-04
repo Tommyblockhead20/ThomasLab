@@ -257,9 +257,12 @@
 
       <section id="boat-travel" class="boat-travel" role="dialog" aria-modal="true" hidden aria-labelledby="boat-travel-title">
         <header><div><span class="eyebrow">TINY BOAT • BIG OCEAN</span><h2 id="boat-travel-title">Where to, captain?</h2></div><button id="close-boat-travel" type="button">STAY HERE <kbd>Esc</kbd></button></header>
-        <div id="boat-travel-map" class="boat-travel-map" aria-label="Clickable map of travel destinations"></div>
-        <div id="boat-travel-list" class="boat-travel-list" aria-label="Travel destinations"></div>
-        <footer><strong id="boat-travel-selection">Choose a destination on the chart</strong><button id="confirm-boat-travel" type="button" disabled>SET SAIL</button></footer>
+        <button id="boat-travel-view" class="boat-travel-view" type="button" aria-pressed="false">VIEW CHART</button>
+        <div class="boat-travel-body">
+          <div id="boat-travel-map" class="boat-travel-map" aria-label="Clickable map of travel destinations"></div>
+          <nav id="boat-travel-list" class="boat-travel-list" aria-label="Travel destinations"></nav>
+        </div>
+        <footer><div class="boat-travel-selected"><strong id="boat-travel-selection">Choose your next stop</strong><p id="boat-travel-detail" aria-live="polite">Pick an island to see what awaits.</p></div><button id="confirm-boat-travel" type="button" disabled>SET SAIL</button></footer>
         <div id="boat-travel-transition" class="boat-travel-transition" hidden><span aria-hidden="true">⛵</span><strong>Sailing…</strong></div>
       </section>
 

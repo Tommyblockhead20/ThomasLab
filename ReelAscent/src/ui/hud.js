@@ -503,6 +503,7 @@ export class Hud {
       `WORLD MAT ${playerState.world.material}`,
       `ROCKS     ${playerState.world.rockSupport?.total ?? 0} placed • ${playerState.world.rockSupport?.crown ?? 0} crown • ${playerState.world.rockSupport?.rejected ?? 0} rejected • ${playerState.world.rockSupport?.unsupported?.length ?? 0} unsupported`,
       `DENSITY   ${playerState.world.rockDensity?.added ?? 0} infill rocks • ${playerState.world.rockDensity?.remainingSparseRegions ?? 0} actionable sparse • ${playerState.world.rockDensity?.protectedSparseRegions ?? 0} kept open`,
+      `CORE FILL ${playerState.world.authoredCoverage?.added ?? 0} rocks on actual authored faces`,
       `RUN       ${playerState.run.status} — ${playerState.run.start} — ${playerState.run.elapsed.toFixed(1)}s`,
       `GROUNDED  ${playerState.grounded ? 'yes' : 'no'}`,
       `STATE     ${playerState.movementState}`,

@@ -6,7 +6,19 @@ const palette = (back, flank, belly, fin, pattern = 'scales') => ({ back: rgb(ba
 export function creatureArt(species, archetype, shiny = false) {
   const name = String(species?.name ?? species?.id ?? '').toLowerCase();
   let p;
-  if (/rainbow.*trout|steelhead/.test(name)) p = palette(0x4a6661,0x9aaab0,0xe4dcd0,0xb87573,'rainbow');
+  if (/umibozu/.test(name)) p = palette(0x172632,0x294452,0x60787a,0x497b81,'skin');
+  else if (/naiad|undine|water sprite/.test(name)) p = palette(0x417e83,0x91c4ba,0xe0e5c1,0x72aaa9,'skin');
+  else if (/hippocampus/.test(name)) p = palette(0x2a5f62,0x629981,0xc9c390,0xa79e63,'scales');
+  else if (/taniwha/.test(name)) p = palette(0x234948,0x4c8981,0xc8b68a,0xa96851,'scales');
+  else if (archetype === 'starfish') p = palette(0xa75a3b,0xd49556,0xe4c393,0xf2d499,'shell');
+  else if (archetype === 'urchin') p = palette(0x302a43,0x63566f,0x93888e,0x362f47,'shell');
+  else if (archetype === 'arachnid' || archetype === 'insect') p = palette(0x333a32,0x686c4b,0xbbb788,0x4c4b36,'shell');
+  else if (/vampire squid/.test(name)) p = palette(0x301d36,0x853d54,0xcca581,0x5c2447,'skin');
+  else if (/blue dragon.*slug|man o war/.test(name)) p = palette(0x253f80,0x5e9cc6,0xcbdfe2,0x364ea0,'skin');
+  else if (/nautilus/.test(name)) p = palette(0x8f4733,0xd2a46f,0xf0dfb2,0xb9704e,'shell');
+  else if (/jormungandr/.test(name)) p = palette(0x243b42,0x437e76,0xc9b879,0xb18d4b,'scales');
+  else if (/frost wyrm|rimefin/.test(name)) p = palette(0x324c70,0x81b7c4,0xd9e6dd,0x9fa5ce,'scales');
+  else if (/rainbow.*trout|steelhead/.test(name)) p = palette(0x4a6661,0x9aaab0,0xe4dcd0,0xb87573,'rainbow');
   else if (/brook|char|dolly/.test(name)) p = palette(0x304841,0x647665,0xd2a071,0xb76d47,'light-spots');
   else if (/golden|goldfish|koi/.test(name)) p = palette(0x9c6837,0xd7a54c,0xf0dcc0,0xc57936,'scales');
   else if (/brown.*trout|tiger.*trout/.test(name)) p = palette(0x66533c,0xb69a68,0xead8a9,0x9d7146,'spots');

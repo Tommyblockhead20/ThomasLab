@@ -279,6 +279,16 @@ function createSphere(parent, name, position, radius, material) {
 }
 
 function createPrimitive(parent, name, type, position, size, material, rotation = {}, record = null) {
+  const surface = record?.editorRecord?.metadata?.surfaceMesh;
+  if (surface?.positions?.length && surface?.indices?.length) {
+    const geometry = new pc.Geometry(); geometry.positions = surface.positions; geometry.indices = surface.indices; geometry.uvs = surface.uvs; geometry.calculateNormals();
+    const mesh = pc.Mesh.fromGeometry(parent._app.graphicsDevice, geometry);
+    const entity = new pc.Entity(name, parent._app); entity._editorOwnedMeshes = [mesh]; entity._editorBaseMaterial = material;
+    material.cull = pc.CULLFACE_NONE; material.update();
+    entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material, entity)], castShadows: false });
+    parent.addChild(entity); entity.setLocalPosition(position.x, position.y, position.z); entity.setLocalScale(size.x, size.y, size.z);
+    entity.setLocalEulerAngles(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0); if (record) Object.assign(entity, record); return entity;
+  }
   if (type === 'triangle-prism') {
     const geometry = new pc.Geometry();
     geometry.positions = [...TRIANGLE_PRISM_POSITIONS];

@@ -129,7 +129,9 @@ test('v4.1 production island editor includes the cabin, shop, aquarium, and shor
   assert.equal(aquarium.objects.filter((item) => /Aquarium garden flower/.test(item.name)).length, 18);
   assert.equal(aquariumParts.filter((item) => /warm gallery light/.test(item.name)).length, 9);
   assert.equal(aquariumParts.filter((item) => /garden planting/.test(item.name)).length, 14);
-  assert.equal(aquariumParts.filter((item) => /packed dock path \d+/.test(item.name)).length, 22);
+  const path = aquariumParts.find((item) => item.name === 'Glasswater terrain-following dock path');
+  assert.ok(path?.metadata?.surfaceMesh?.indices?.length, 'the dock path uses its shared terrain-following mesh');
+  assert.equal(aquariumParts.filter((item) => /packed dock path \d+/.test(item.name)).length, 0);
   assert.equal(aquariumParts.filter((item) => /path edging plant/.test(item.name)).length, 8);
   assert.equal(aquariumParts.filter((item) => /Aquarium Tank \d+ \/ Habitat stone/.test(item.name)).length, 60);
   for (const entry of [...homeParts, ...shopParts, ...aquariumParts]) {

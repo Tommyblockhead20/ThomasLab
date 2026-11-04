@@ -1,5 +1,6 @@
 import { Quat, Vec3 } from 'playcanvas';
 import { islandLandscapeSpec } from '../../src/world/island-landscape-spec.js';
+import { aquariumPathSurface, normalizedSurfaceRecord, tankRimBoxes, unitSurfacePlane } from '../../src/world/aquarium-surfaces.js';
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
 import {
   buildOceanIslandTerrainData,
@@ -325,13 +326,16 @@ function aquariumDefinition() {
     const at = (position) => ({ x: centerX + position.x, y: position.y, z: centerZ + position.z });
     const category = `Aquarium Tank ${index + 1}`;
     add(`${category} stone plinth`, at({ x: 0, y: .48, z: 0 }), { x: config.tankWidth + .55, y: .96, z: config.tankDepth + .55 }, 'stone', {}, true, category);
-    add(`${category} front viewing glass`, at({ x: 0, y: glassCenterY, z: config.tankDepth * .5 }), { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, 'glass', {}, true, category);
-    add(`${category} rear viewing glass`, at({ x: 0, y: glassCenterY, z: -config.tankDepth * .5 }), { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, 'glass', {}, true, category);
-    add(`${category} left glass`, at({ x: -config.tankWidth * .5, y: glassCenterY, z: 0 }), { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, 'glass', {}, true, category);
-    add(`${category} right glass`, at({ x: config.tankWidth * .5, y: glassCenterY, z: 0 }), { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, 'glass', {}, true, category);
-    add(`${category} upper exhibit frame`, at({ x: 0, y: config.waterlineY + .16, z: 0 }), { x: config.tankWidth + .55, y: .32, z: config.tankDepth + .55 }, 'trim', {}, true, category);
-    add(`${category} bounded water volume`, at({ x: 0, y: (config.waterFloorY + config.waterlineY) * .5, z: 0 }),
-      { x: config.tankWidth - config.glassThickness * 2, y: config.waterlineY - config.waterFloorY, z: config.tankDepth - config.glassThickness * 2 }, 'water', {}, false, category);
+    for (const side of [-1, 1]) {
+      add(`${category} ${side < 0 ? 'rear' : 'front'} viewing glass`, at({ x: 0, y: glassCenterY, z: side * config.tankDepth * .5 }), { x: config.tankWidth, y: config.tankHeight, z: config.glassThickness }, 'glass', {}, true, category);
+      objects.at(-1).metadata.surfaceMesh = unitSurfacePlane('xy');
+      add(`${category} ${side < 0 ? 'left' : 'right'} glass`, at({ x: side * config.tankWidth * .5, y: glassCenterY, z: 0 }), { x: config.glassThickness, y: config.tankHeight, z: config.tankDepth }, 'glass', {}, true, category);
+      objects.at(-1).metadata.surfaceMesh = unitSurfacePlane('yz');
+    }
+    for (const rim of tankRimBoxes(config)) add(`${category} ${rim.name}`, at(rim.position), rim.size, 'trim', {}, true, category);
+    add(`${category} single water surface`, at({ x: 0, y: config.waterlineY - .065, z: 0 }),
+      { x: config.tankWidth - config.glassThickness * 2, y: .02, z: config.tankDepth - config.glassThickness * 2 }, 'water', {}, false, category);
+    objects.at(-1).metadata.surfaceMesh = unitSurfacePlane('xz');
   }
   for (const x of [-config.width * .29, 0, config.width * .29]) {
     for (const z of [-2.35, 2.35]) {
@@ -384,24 +388,11 @@ function aquariumDefinition() {
       : lerp(aquariumLocation.elevation + .06, OCEAN_SURFACE_Y - .16,
         clamp01((footprint - .68) / .32));
   };
-  const segmentLength = (pathEndZ - pathStartZ) / 21;
   const aquariumTerrain = buildOceanIslandTerrainData(aquariumLocation);
-  const aquariumRadians = aquariumLocation.angle * Math.PI / 180;
-  const pathWidth = 3.2;
-  for (let index = 0; index < 22; index += 1) {
-    const pathZ = lerp(pathStartZ, pathEndZ, index / 21);
-    const groundY = Math.max(...[-pathWidth * .5, 0, pathWidth * .5].flatMap((offsetX) =>
-      [-segmentLength * .5, segmentLength * .5].map((offsetZ) => {
-        const z = pathZ + offsetZ;
-        return triangleSurfaceHeightAt(aquariumTerrain.vertices, aquariumTerrain.triangles,
-          aquariumLocation.worldPosition.x + Math.cos(aquariumRadians) * z + Math.sin(aquariumRadians) * offsetX,
-          aquariumLocation.worldPosition.z + Math.sin(aquariumRadians) * z - Math.cos(aquariumRadians) * offsetX,
-          pathSurfaceY(z));
-      })));
-    detail(`Glasswater packed dock path ${index + 1}`,
-      { x: 0, y: groundY + .04 - config.floorY, z: pathZ },
-      { x: pathWidth, y: .05, z: segmentLength * .96 }, 'sand');
-  }
+  const pathRecord = normalizedSurfaceRecord(aquariumPathSurface(aquariumTerrain, aquariumLocation,
+    { startZ: pathStartZ, endZ: pathEndZ, floorY: config.floorY }));
+  detail('Glasswater terrain-following dock path', pathRecord.position, pathRecord.size, 'sand');
+  objects.at(-1).metadata.surfaceMesh = pathRecord.mesh;
   for (const side of [-1, 1]) for (let index = 0; index < 4; index += 1) {
     const pathZ = lerp(pathStartZ + 2, pathStartZ + (pathEndZ - pathStartZ) * .42, index / 3);
     const height = .7 + index % 2 * .22;
@@ -670,7 +661,13 @@ export function ensureProductionIslandTerrain(level, worldOrId) {
   const productionObjects = generated.objects.filter((item) => item.metadata?.productionReference);
   level.objects ??= [];
   for (const item of productionObjects) {
-    const index = level.objects.findIndex((entry) => entry.id === item.id);
+    // Sequence IDs can change when a builder adds a part. Match the stable named
+    // reference before reconciling IDs so an old water box cannot become a new rim.
+    const index = level.objects.findIndex((entry) => entry.metadata?.productionReference && entry.name === item.name);
+    if (index >= 0) {
+      level.objects[index].id = item.id;
+      if (item.metadata?.surfaceMesh) (level.objects[index].metadata ??= {}).surfaceMesh = structuredClone(item.metadata.surfaceMesh);
+    }
     if (index < 0) level.objects.push(item);
     else if (item.metadata?.sharedIslandLandscape) {
       const existing = level.objects[index];
@@ -715,8 +712,8 @@ export function ensureProductionIslandTerrain(level, worldOrId) {
     }
   }
   level.prefabs ??= { definitions: [], instances: [] };
-  const generatedProductionIds = new Set(productionObjects.map((item) => item.id));
-  level.objects = level.objects.filter((item) => !item.metadata?.productionReference || generatedProductionIds.has(item.id));
+  const generatedProductionNames = new Set(productionObjects.map((item) => item.name));
+  level.objects = level.objects.filter((item) => !item.metadata?.productionReference || generatedProductionNames.has(item.name));
   level.waters ??= [];
   const generatedProductionWaterIds = new Set((generated.waters ?? []).map((item) => String(item.id || item.identity)));
   level.waters = level.waters.filter((item) => !item.metadata?.productionReference || generatedProductionWaterIds.has(String(item.id || item.identity)));

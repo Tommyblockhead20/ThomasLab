@@ -2321,12 +2321,17 @@ export class FishingController {
       return;
     }
     if (result === 'escaped') {
-      this.loseFish('The fish broke the rhythm and escaped', this.rhythm.getFailureReason());
+      const message = this.rhythm.requiresCleanPerformance
+        ? 'Shiny escaped — the song must have no misses or stray presses.'
+        : this.rhythm.lossMeter >= 1 ? 'The fish escaped — too many mistakes.'
+          : 'The fish escaped — the song ended with unfinished notes.';
+      this.loseFish(message, this.rhythm.getFailureReason());
       return;
     }
   }
 
   landCatch() {
+    if (this.state !== 'rhythm' || this.rhythm?.result !== 'caught' || !this.selectedFish) return false;
     this.player.input.endRhythmCapture();
     const songId = this.rhythm?.pattern?.songId ?? null;
     const perfectSong = this.rhythm?.perfectPerformance ?? false;
@@ -2380,6 +2385,7 @@ export class FishingController {
     this.bobberRoot.enabled = false;
     this.showCaughtFish();
     this.audio.success(perfectSong);
+    return true;
   }
 
   loseFish(message, failureReason = this.rhythm?.getFailureReason() ?? 'fish escaped') {
