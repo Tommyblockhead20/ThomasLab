@@ -1,7 +1,9 @@
 import * as pc from 'playcanvas';
+import { createProductionReferenceEntity } from '../../src/world/production-scene-catalog.js';
+import { addSurfaceUvs } from '../../src/graphics/surface-detail.js';
 import { TRIANGLE_PRISM_POSITIONS, TRIANGLE_PRISM_INDICES } from '../../src/world/triangle-prism.js';
 import { SMALL_ISLAND_LOCATIONS } from '../../src/world/world-locations.js';
-import { OCEAN_SURFACE_Y, SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes } from '../../src/world/mountain-v2.js';
+import { OCEAN_SURFACE_Y, SKYREACH_TOWER_CONFIG, skyreachHollowCollisionBoxes,createEllipseSurfaceMeshData } from '../../src/world/mountain-v2.js';
 import { movingPlatformPose, normalizeWorldEditorLevel } from '../../src/world/world-editor-v2-runtime.js';
 import { edgeKey, faceVertices, meshDiagnostics, vertex } from './mesh-authoring.js';
 import { attachEditorSignText, supportsEditableSignText } from './sign-text.js';
@@ -797,7 +799,7 @@ export class GenericWorldScene {
   }
 
   emitEditorStatus(message, detail = {}) {
-    window.dispatchEvent(new CustomEvent('reel-ascent:editor-status', { detail: { message, ...detail } }));
+    globalThis.window?.dispatchEvent(new CustomEvent('reel-ascent:editor-status', { detail: { message, ...detail } }));
   }
 
   registerSelectable(entity, { id, kind, record, worldId = this.world?.id, meshPartId = null }) {
@@ -907,12 +909,12 @@ export class GenericWorldScene {
     this.registerSelectable(entity, { id: '__basalt-authored-terrain', kind: 'terrain-mesh', record: terrain });
   }
 
-  buildMeshEntity(name, positions, indices, material, parent) {
+  buildMeshEntity(name, positions, indices, material, parent, flat = false) {
     const geometry = new pc.Geometry();
-    geometry.positions = [...positions];
-    geometry.indices = [...indices];
+    geometry.positions = flat ? indices.flatMap(i=>positions.slice(i*3,i*3+3)) : [...positions];
+    geometry.indices = flat ? Array.from({length:indices.length},(_,i)=>i) : [...indices];
     geometry.calculateNormals();
-    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, geometry);
+    const mesh = pc.Mesh.fromGeometry(this.app.graphicsDevice, addSurfaceUvs(geometry));
     const entity = new pc.Entity(name);
     entity._editorOwnedMeshes = [mesh];
     entity.addComponent('render');
@@ -955,10 +957,11 @@ export class GenericWorldScene {
   buildProductionIslandTerrain() {
     const terrain = this.editableTerrainMesh();
     if (!terrain) return;
-    const material = this.world.id === 'cold-island' ? this.materials.productionSnow
-      : this.world.id === 'cave-fishing-island' ? this.materials.productionIslandRock
-        : this.materials.productionIslandGrass;
-    const entity = this.buildMeshEntity(`${this.world.label} production terrain`, terrain.positions, terrain.indices, material, this.referenceRoot);
+    const source = this.productionCatalog?.world.materials;
+    const material = this.world.id === 'cold-island' ? source?.snow ?? this.materials.productionSnow
+      : this.world.id === 'cave-fishing-island' ? source?.islandRock ?? this.materials.productionIslandRock
+        : source?.islandGrass ?? this.materials.productionIslandGrass;
+    const entity = this.buildMeshEntity(`${this.world.label} production terrain`, terrain.positions, terrain.indices, material, this.referenceRoot,true);
     this.registerSelectable(entity, { id: this.terrainMeshId(), kind: 'terrain-mesh', record: terrain, meshPartId: 'full-island' });
     this.emitEditorStatus(`${this.world.label} production island terrain ready (${terrain.positions.length / 3} vertices).`, { state: 'ready', worldId: this.world.id });
   }
@@ -989,8 +992,14 @@ export class GenericWorldScene {
   buildWaterRecord(water) {
     const radii = water.radii ?? { x: 4, z: 4 };
     const position = water.position ?? { x: 0, y: 0, z: 0 };
-    const entity = new pc.Entity(water.name || water.id || 'Water');
-    if (water.shape === 'path' && Array.isArray(water.metadata?.pathLocal)) {
+    let entity = new pc.Entity(water.name || water.id || 'Water');
+    const id=water.identity||water.id,source=this.productionCatalog?.waterReferences.get(id),baseline=water.metadata?.productionSourceWater;
+    const unchanged=baseline&&JSON.stringify(baseline)===JSON.stringify({position:water.position,radii:water.radii,depthMeters:water.depthMeters,color:water.color});
+    if(source&&unchanged&&!this.workspaceDefinition) {
+      const p=source.entity.getPosition(),r=source.entity.getEulerAngles(),s=source.entity.getWorldTransform().getScale(),o=this.level.metadata?.globalOrigin??{x:0,z:0};
+      entity.destroy();entity=createProductionReferenceEntity(this.app,{name:water.name,metadata:{productionMeshRef:`WATER:${id}`},
+        transform:{position:{x:p.x-o.x,y:p.y,z:p.z-o.z},rotation:r},size:s},this.productionCatalog);
+    } else if (water.shape === 'path' && Array.isArray(water.metadata?.pathLocal)) {
       const oldCenter = water.metadata.pathOriginalCenter ?? [finite(position.x), finite(position.z)];
       const oldRadii = water.metadata.pathOriginalRadii ?? [finite(radii.x, 1.25), finite(radii.z, 1)];
       const sx = Math.max(.01, finite(radii.x, oldRadii[0])) / Math.max(.01, finite(oldRadii[0], 1));
@@ -1011,10 +1020,16 @@ export class GenericWorldScene {
         this.registerSelectable(node, { id, kind: 'water-path-node', record: { ...water, pathNodeIndex: index } });
       });
     } else {
-      entity.addComponent('render', { type: 'cylinder', material: this.materials.water, castShadows: false, receiveShadows: true });
-      entity.setLocalPosition(finite(position.x), finite(position.y) - .035, finite(position.z));
-      entity.setLocalScale(Math.max(.1, finite(radii.x, 4) * 2), .07, Math.max(.1, finite(radii.z, 4) * 2));
-      entity.setLocalEulerAngles(finite(water.rotation?.x), finite(water.rotation?.y), finite(water.rotation?.z));
+      const data=createEllipseSurfaceMeshData({x:0,y:0,z:0},radii),geometry=new pc.Geometry();
+      geometry.positions=data.vertices.flat();geometry.indices=data.triangles.flat();geometry.calculateNormals();
+      const mesh=pc.Mesh.fromGeometry(this.app.graphicsDevice,addSurfaceUvs(geometry));entity._editorOwnedMeshes=[mesh];
+      let material=source?.meshInstances[0]?.material??this.materials.water;
+      if(/^#[0-9a-f]{6}$/i.test(water.color??'')&&(!baseline||water.color!==baseline.color)) {
+        material=material.clone();material.diffuse.fromString(water.color);material.update();const owned=material;entity.once('destroy',()=>owned.destroy());
+      }
+      const instance=new pc.MeshInstance(mesh,material,entity);instance._editorBaseMaterial=material;
+      entity.addComponent('render',{meshInstances:[instance],castShadows:false});entity.setLocalPosition(finite(position.x),finite(position.y),finite(position.z));
+      entity.setLocalEulerAngles(finite(water.rotation?.x),finite(water.rotation?.y),finite(water.rotation?.z));
     }
     entity.editorKind = this.workspaceDefinition ? 'prefab-child-water' : 'water-v2';
     entity.editorRecord = water;
@@ -1030,7 +1045,12 @@ export class GenericWorldScene {
     if (item.visible === false) return null;
     const sourceKind = item.metadata?.librarySourceKind;
     let entity;
-    if (sourceKind === 'bench') {
+    if (item.metadata?.productionMeshRef && this.productionCatalog) {
+      entity = createProductionReferenceEntity(this.app,item,this.productionCatalog);
+      if (!entity) return null;
+      this.objectRoot.addChild(entity);
+      Object.assign(entity,{editorKind:kind,editorRecord:item,editorId:item.id});
+    } else if (sourceKind === 'bench') {
       entity = new pc.Entity(item.name || item.id);
       entity.setLocalPosition(item.transform.position.x, item.transform.position.y, item.transform.position.z);
       entity.setLocalEulerAngles(0, item.transform.rotation.y ?? 0, 0);
@@ -1050,6 +1070,8 @@ export class GenericWorldScene {
         this.materialForRecord(item), item.transform.rotation,
         { editorKind: kind, editorRecord: item, editorId: item.id });
     }
+    const authoredScale=item.transform?.scale??{x:1,y:1,z:1},scale=entity.getLocalScale();
+    entity.setLocalScale(scale.x*authoredScale.x,scale.y*authoredScale.y,scale.z*authoredScale.z);
     if (supportsEditableSignText(item)) attachEditorSignText(this.app.graphicsDevice, entity, item);
     entity._editorBook = item.category === 'books' || /(^|[-_ ])book/i.test(`${item.id || ''} ${item.name || ''}`);
     this.registerSelectable(entity, { id: item.id, kind, record: item });

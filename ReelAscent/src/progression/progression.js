@@ -119,6 +119,21 @@ export class ProgressionSystem {
     return { ok: true, specimen, value };
   }
 
+  claimCompetitionReward(award, playerId) {
+    if (!award || award.playerId !== playerId || award.saveId !== this.saveSystem.data.saveId
+      || !['derby', 'race'].includes(award.kind) || typeof award.eventId !== 'string'
+      || award.eventId.length > 140 || !award.eventId.length
+      || !Number.isSafeInteger(award.amount) || award.amount < 1 || award.amount > 200) return false;
+    this.state.competitionRewards ??= [];
+    if (this.state.competitionRewards.includes(award.eventId)) return false;
+    this.state.competitionRewards = [...this.state.competitionRewards, award.eventId].slice(-256);
+    this.state.money += award.amount;
+    // Save receipt and money together, before any follow-up UI or network activity.
+    this.commit();
+    this.saveSystem.recordLegitimateEarnings?.(award.amount);
+    return true;
+  }
+
   sellInventorySpecimen(specimenId) {
     const index = findSpecimenIndex(this.state.inventory, specimenId);
     if (index < 0) return { ok: false, reason: 'Specimen not found in Inventory' };
@@ -526,6 +541,7 @@ export class ProgressionSystem {
   }
 
   getHeldEquipmentItem() {
+    if (this.equipment.basicOnly) return null;
     const item = EQUIPMENT_BY_ID.get(this.state.heldItemId);
     return item?.usesHand ? item : null;
   }
@@ -557,6 +573,7 @@ export class ProgressionSystem {
   }
 
   setHeldEquipmentItem(itemId = null) {
+    if (itemId && this.equipment.basicOnly) return { ok: false, reason: 'Basic equipment only during this event.' };
     if (itemId === null) {
       if (!this.getHeldEquipmentItem()) return { ok: true, item: null };
       this.state.heldItemId = null;

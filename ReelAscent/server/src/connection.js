@@ -71,6 +71,12 @@ export class ClientConnection {
       case MESSAGE_TYPES.PLAYER_SNAPSHOT:
         this.handleSnapshot(message.payload);
         break;
+      case MESSAGE_TYPES.COMPETITION_ACTION:
+        if (this.session.room && this.rateLimit('competition', 15, 10_000)) {
+          const error = this.session.room.competition.action(this.session, message.payload);
+          if (error) sendError(this.socket, 'competition_error', error);
+        }
+        break;
       case MESSAGE_TYPES.FISHING_STATE:
         this.handleFishingState(message.payload);
         break;
@@ -189,6 +195,7 @@ export class ClientConnection {
     }
     this.session.lastSequence = snapshot.sequence;
     this.session.lastSnapshot = snapshot;
+    this.session.room.competition.snapshot(this.session, snapshot);
     this.session.room.broadcast(MESSAGE_TYPES.PLAYER_SNAPSHOT, snapshot, this.session.playerId);
   }
 
@@ -223,6 +230,7 @@ export class ClientConnection {
       serverTime: Date.now()
     };
     this.session.room.broadcast(MESSAGE_TYPES.CATCH_EVENT, event, this.session.playerId);
+    this.session.room.competition.catch(this.session, payload);
   }
 
   handleAquariumShowcase(payload = {}) {

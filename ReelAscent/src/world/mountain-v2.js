@@ -3,11 +3,13 @@ import * as pc from 'playcanvas';
 import SKYREACH_WORLD_EDITOR_LEVEL from './world-editor-levels/skyscraper.json' with { type: 'json' };
 import CAVE_FISHING_WORLD_EDITOR_LEVEL from './world-editor-levels/cave-fishing-island.json' with { type: 'json' };
 import { attachWorldEditorLevelToStructure, updateWorldEditorKinematics } from './world-editor-v2-runtime.js';
-import { buildVeiledAthenaeumV2 } from './library-island-v2.js';
+import { buildVeiledAthenaeumV2, authoredLibraryTerrainData } from './library-island-v2.js';
 import { updateVeiledAthenaeumRides } from './library-island-v2.js';
 import { buildCleanBasaltTerrainWorld } from './cave-island-v23.js';
 import { islandLandscapeSpec } from './island-landscape-spec.js';
 import { authoredRockCandidates } from './authored-rock-coverage.js';
+import { indexProductionEntities } from './production-scene-catalog.js';
+import { PRODUCTION_LEVELS, applyProductionLevelEdits } from './production-level-edits.js';
 import { aquariumPathSurface, tankRimBoxes, unitSurfacePlane } from './aquarium-surfaces.js';
 import { attachSignText } from './sign-text-renderer.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
@@ -726,6 +728,7 @@ export function oceanFloorHeightAt(radius, shorelineY = -.32) {
 // proxy pad while production renders the real coastline, submerged apron, and island top.
 export function buildOceanIslandTerrainData(location) {
   if (location.id === 'cave-fishing-island') return buildCleanBasaltTerrainWorld(location);
+  if(location.id==='veiled-athenaeum') {const terrain=authoredLibraryTerrainData(location);if(terrain)return terrain;}
   const segments = 36;
   const topRingFactors = location.id === 'home-island' ? [.84, .68, .52, .36, .2]
     : location.id === 'normal-fishing-island' ? [.84, .68, .52, .36, .2]
@@ -1459,9 +1462,11 @@ export function createEllipseSurfaceMeshData(center, radii, segments = 40) {
 }
 
 export class MountainWorld extends TestWorld {
-  constructor(app, RAPIER, physicsWorld) {
+  constructor(app, RAPIER, physicsWorld, { editorReference = false } = {}) {
     super(app, RAPIER, physicsWorld);
     this.root.name = 'Mountain V2.8 slide-and-density traversal graybox';
+    this.editorReference = editorReference;
+    if (editorReference) this.root.enabled = false;
     this.courseRoot.enabled = false;
     this.buildTarget = this.root;
     this.mountainWaters = [];
@@ -1603,14 +1608,17 @@ export class MountainWorld extends TestWorld {
     markStartup('world:debug-id-index');
     this.setActiveLocation(this.activeLocationId);
     markStartup('world:active-location');
+    indexProductionEntities(this);
     applyWorldObjectPatch(this, MAP_EDITOR_PATCH, MOUNTAIN_CENTER);
+    indexProductionEntities(this);
+    for (const level of PRODUCTION_LEVELS) applyProductionLevelEdits(this,level);
     markStartup('world:map-editor-overrides');
     this.stoneveilTerrainAuthority = this.auditStoneveilTerrainAuthority();
     if (this.authoredStoneveilCoreActive) {
       const audit = this.stoneveilTerrainAuthority;
       console.info(`Stoneveil terrain authority: baked render ${audit.bakedRenders}, baked collider ${audit.bakedColliders}, legacy main ${audit.legacyMainColliders}, legacy crown ${audit.legacyCrownColliders}.`);
     }
-    installMapEditorBridge(this, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
+    if (!editorReference) installMapEditorBridge(this, MAP_EDITOR_PATCH); // REEL_ASCENT_MAP_EDITOR_V1
   }
 
   point(angle, radius, y, tangentOffset = 0) {
@@ -1783,7 +1791,7 @@ export class MountainWorld extends TestWorld {
       const authoredRoot = new pc.Entity('Basalt Hollow World Editor V2 authored root');
       authoredRoot.setLocalPosition(location.worldPosition.x, 0, location.worldPosition.z);
       group.addChild(authoredRoot);
-      this.caveFishingWorldEditorState = attachWorldEditorLevelToStructure(
+      this.caveFishingWorldEditorState = CAVE_FISHING_WORLD_EDITOR_LEVEL.metadata?.productionCatalog ? null : attachWorldEditorLevelToStructure(
         this, authoredRoot, CAVE_FISHING_WORLD_EDITOR_LEVEL
       );
     }
@@ -2278,7 +2286,8 @@ export class MountainWorld extends TestWorld {
     this.skyreachWorldEditorState = attachWorldEditorLevelToStructure(this, root, SKYREACH_WORLD_EDITOR_LEVEL);
   }
   loadSkyreachVisualShell(root) {
-    this.app.assets.loadFromUrl(SKYREACH_TOWER_CONFIG.visualAssetUrl, 'container', (error, asset) => {
+    const assetUrl = this.editorReference ? new URL(`../../${SKYREACH_TOWER_CONFIG.visualAssetUrl}`,document.baseURI).href : SKYREACH_TOWER_CONFIG.visualAssetUrl;
+    this.app.assets.loadFromUrl(assetUrl, 'container', (error, asset) => {
       if (error || !asset?.resource || !root?.parent) {
         console.warn('[reel-ascent] Skyreach visual shell unavailable; solid collision baseline remains active.');
         return;
@@ -6576,6 +6585,7 @@ export class MountainWorld extends TestWorld {
     water.render.castShadows = false;
     this.mountainWaters.push({
       entity: water,
+      zoneId: location.id,
       base: { x: visibleRadii.x * 2, y: waterThickness, z: visibleRadii.z * 2 },
       rate: .31 + index * .035
     });

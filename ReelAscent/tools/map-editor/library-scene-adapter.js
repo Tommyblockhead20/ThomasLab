@@ -64,7 +64,7 @@ export function libraryProductionTerrain() {
   }
   // Two midpoint passes preserve the exact generated surface while taking the island from
   // coarse multi-metre faces to a mesh that responds locally to a ~1 m sculpt brush.
-  const refined = refineLibraryTerrain({ positions, indices: source.triangles.flat(), metadata: {} });
+  const refined = refineLibraryTerrain({ positions, indices: source.triangles.flat(), metadata: source.metadata??{} });
   return {
     mode: 'production-island-terrain', format: 'triangle-mesh-v1', coordinateSpace: 'library-root-local',
     positions: refined.positions, indices: refined.indices, revision: 0,
@@ -230,7 +230,7 @@ export function adaptLibrarySceneToEditor(scene) {
       terrain: 'production-generator', architecture: 'authored-scene', waters: 'authored-scene',
       objects: 'authored-scene', movingPlatforms: 'authored-scene', prefabs: 'authored-scene'
     },
-    terrain: libraryProductionTerrain(),
+    terrain: source.editorTerrain ? clone(source.editorTerrain) : libraryProductionTerrain(),
     waters: [
       ...(source.waters ?? []).map((water, index) => waterToEditor(water, index, 'waters')),
       ...(source.rideWaters ?? []).map((water, index) => waterToEditor(water, index, 'rideWaters'))
@@ -405,6 +405,8 @@ export function serializeLibrarySceneFromEditor(level) {
     return result;
   });
   source.version = Math.max(1, Math.trunc(finite(source.version, 1)));
+  const baseline=source.editorTerrain??libraryProductionTerrain();
+  if(level.terrain?.positions?.length && JSON.stringify([level.terrain.positions,level.terrain.indices])!==JSON.stringify([baseline?.positions,baseline?.indices])) source.editorTerrain=clone(level.terrain);
   return source;
 }
 

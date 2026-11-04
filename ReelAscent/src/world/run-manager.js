@@ -22,7 +22,7 @@ function rarestCatch(catches) {
 }
 
 export class RunManager {
-  constructor(player, fishing, world, hud, camera, initialStart, { onLocationChange = () => {} } = {}) {
+  constructor(player, fishing, world, hud, camera, initialStart, { onLocationChange = () => {}, onDebugAction = () => {} } = {}) {
     this.player = player;
     this.fishing = fishing;
     this.world = world;
@@ -30,6 +30,7 @@ export class RunManager {
     this.camera = camera;
     this.currentStart = initialStart;
     this.onLocationChange = onLocationChange;
+    this.onDebugAction = onDebugAction;
     this.pendingStart = null;
     this.status = 'active';
     this.elapsed = 0;
@@ -115,6 +116,7 @@ export class RunManager {
 
   processDebugQueue() {
     for (const action of this.debugQueue.splice(0)) {
+      if(['teleport','toggle-unlimited-stamina'].includes(action.type))this.onDebugAction(action.type);
       if (action.type === 'new-run') {
         this.startRun(this.world.chooseStart(this.currentStart?.id), true);
         continue;

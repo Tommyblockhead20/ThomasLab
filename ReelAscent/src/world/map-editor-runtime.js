@@ -1,6 +1,7 @@
 import { addSurfaceUvs, applySurfaceDetail } from '../graphics/surface-detail.js';
 import { PLAYER_CONFIG } from '../config.js';
 import * as pc from 'playcanvas';
+import { applyProductionObjectTransform } from './production-level-edits.js';
 import { MAIN_WORLD_LOCATION } from './world-locations.js';
 
 export const MAP_EDITOR_SCHEMA = 1;
@@ -232,7 +233,7 @@ function transformCollider(entity, position, rotation) {
 }
 
 function entityStableId(entity) {
-  return entity?.rockId || entity?.mapObjectId || entity?.debugId || entity?.mapDebugId || null;
+  return entity?.rockId || entity?.mapObjectId || entity?.debugId || entity?.mapDebugId || entity?.productionReferenceId || null;
 }
 
 function walkEntities(root, output = []) {
@@ -254,6 +255,7 @@ function applyExistingObjectEdits(world, patch) {
   for (const entity of walkEntities(world?.root)) {
     const id = entityStableId(entity);
     if (id) byId.set(String(id), entity);
+    if (entity.productionReferenceId) byId.set(entity.productionReferenceId,entity);
   }
 
   for (const [id, entity] of byId) {
@@ -277,12 +279,7 @@ function applyExistingObjectEdits(world, patch) {
       y: finite(override.rotation?.y, currentRotation.y),
       z: finite(override.rotation?.z, currentRotation.z)
     };
-    entity.setPosition?.(position.x, position.y, position.z);
-    entity.setEulerAngles?.(rotation.x, rotation.y, rotation.z);
-    transformCollider(entity, position, rotation);
-    // Scale on a generated solid cannot safely mutate its Rapier hull in place. Keep
-    // existing collision/visual scale consistent; to resize a generated rock, hide it and
-    // place a new editor rock of the desired form/size instead.
+    applyProductionObjectTransform(world,entity,{transform:{position,rotation},size:override.scale});
   }
 }
 

@@ -1,6 +1,15 @@
 import { addSurfaceUvs } from '../graphics/surface-detail.js';
 import * as pc from 'playcanvas';
 import SCENE from './library-island-v2.scene.json' with { type: 'json' };
+
+export function authoredLibraryTerrainData(location, t=SCENE.editorTerrain) {
+  if(!t?.positions?.length || !t.indices?.length || t.positions.length%3 || t.indices.length%3)return null;
+  const yaw=(90-location.angle)*Math.PI/180,c=Math.cos(yaw),s=Math.sin(yaw),floor=location.elevation+1.28;
+  const vertices=Array.from({length:t.positions.length/3},(_,i)=>{
+    const [x,y,z]=t.positions.slice(i*3,i*3+3);return[location.worldPosition.x+x*c+z*s,y+floor,location.worldPosition.z-x*s+z*c];
+  });
+  return {vertices,triangles:Array.from({length:t.indices.length/3},(_,i)=>t.indices.slice(i*3,i*3+3)),metadata:t.metadata};
+}
 import { stockLibraryScene } from './library-shelf-stocking.js';
 import { PLAYER_FOOT_OFFSET } from '../config.js';
 import { attachZoneEcology, ECOLOGY_TARGETS } from '../fishing/fish-ecology.js';

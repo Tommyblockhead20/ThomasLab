@@ -49,6 +49,9 @@ export class MultiplayerClient extends EventTarget {
     this.voteRetryTimer = null;
     this.voteRetryDelay = 2000;
     this.songVoteAggregates = new Map();
+    this.competition = null;
+    this.competitionSupported = false;
+    this.hostId = null;
     this.transport.onMessage = (value) => this.handleMessage(value);
     this.transport.onClose = () => this.handleClose();
   }
@@ -153,6 +156,8 @@ export class MultiplayerClient extends EventTarget {
     this.pendingRoomRequest = null;
     this.reconnectToken = '';
     this.room.clear();
+    this.competition = null;
+    this.competitionSupported = false;
     this.setState(this.transport.isOpen ? 'connected' : 'disconnected');
   }
 
@@ -181,6 +186,12 @@ export class MultiplayerClient extends EventTarget {
     return this.transport.send(createProtocolMessage(MESSAGE_TYPES.BENCH_SEAT_RELEASE));
   }
 
+  competitionAction(action, payload = {}) {
+    if (this.state !== 'in_room' || !this.competitionSupported) return false;
+    return this.transport.send(createProtocolMessage(MESSAGE_TYPES.COMPETITION_ACTION,
+      { ...payload, action, eventId: payload.eventId ?? this.competition?.id }));
+  }
+
   sendFishingState(state = {}) {
     if (this.state !== 'in_room') return false;
     return this.transport.send(createProtocolMessage(MESSAGE_TYPES.FISHING_STATE, {
@@ -195,6 +206,11 @@ export class MultiplayerClient extends EventTarget {
     if (this.state !== 'in_room') return false;
     return this.transport.send(createProtocolMessage(MESSAGE_TYPES.CATCH_EVENT, {
       playerId: this.playerId,
+      eventId: catchData.eventId,
+      saveId: catchData.saveId,
+      specimenId: catchData.specimenId,
+      value: catchData.value,
+      legitimate: catchData.legitimate === true,
       speciesId: String(catchData.speciesId ?? '').slice(0, 100),
       name: String(catchData.name ?? catchData.speciesName ?? 'Catch').slice(0, 100),
       rarity: String(catchData.rarity ?? 'Common').slice(0, 24),
@@ -316,6 +332,9 @@ export class MultiplayerClient extends EventTarget {
         this.reconnectToken = message.payload.reconnectToken;
       }
       this.pendingRoomRequest = null;
+      this.hostId = message.payload.hostId ?? null;
+      this.competitionSupported = message.payload.competitionSupported === true;
+      this.competition = message.payload.competition ?? null;
       this.reconnectAttempt = 0;
       this.cancelReconnect();
       this.setState('in_room');
@@ -357,6 +376,10 @@ export class MultiplayerClient extends EventTarget {
     } else if (message.type === MESSAGE_TYPES.ERROR) {
       const code = String(message.payload.code ?? 'server_error');
       const text = String(message.payload.message ?? 'Multiplayer service error.');
+      if (code === 'competition_error') {
+        this.dispatchEvent(new CustomEvent('competitionerror', { detail: text }));
+        return;
+      }
       if (code.startsWith('song_vote_')) {
         if (message.payload.requestId) this.settleVoteRequest(message.payload.requestId, null, new Error(text));
         this.dispatchEvent(new CustomEvent('songvoteerror', { detail: { code, message: text } }));
@@ -443,7 +466,8 @@ export class MultiplayerClient extends EventTarget {
       remotePlayers: this.room.members.size,
       players,
       reconnecting: this.state === 'reconnecting',
-      displayName: this.displayName
+      displayName: this.displayName,
+      hostId: this.hostId, competition: this.competition, competitionSupported: this.competitionSupported
     };
   }
 

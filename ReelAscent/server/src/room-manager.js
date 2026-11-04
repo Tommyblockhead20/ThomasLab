@@ -55,7 +55,7 @@ export class RoomManager {
     if (session.reconnectTimer) clearTimeout(session.reconnectTimer);
     session.reconnectTimer = null;
     room.remove(session);
-    if (room.size === 0) this.rooms.delete(room.code);
+    if (room.size === 0) { room.competition.dispose(); this.rooms.delete(room.code); }
     else room.broadcastState();
     return { ok: true };
   }
@@ -69,7 +69,7 @@ export class RoomManager {
     session.reconnectTimer = setTimeout(() => {
       if (session.connected || session.room !== room) return;
       room.remove(session);
-      if (room.size === 0) this.rooms.delete(room.code);
+      if (room.size === 0) { room.competition.dispose(); this.rooms.delete(room.code); }
       else room.broadcastState();
     }, this.reconnectWindowMs);
     session.reconnectTimer.unref?.();

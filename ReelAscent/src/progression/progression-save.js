@@ -52,6 +52,7 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     schemaVersion: PROGRESSION_SCHEMA_VERSION,
     player: { id: playerId, createdAt: Date.now() },
     money: 0,
+    competitionRewards: [],
     inventory: [],
     aquarium: [],
     aquariumTankCount: 1,
@@ -232,6 +233,8 @@ export function normalizeProgressionState(value = {}) {
       createdAt: Math.max(0, finite(value.player?.createdAt, defaults.player.createdAt))
     },
     money: Math.max(0, Math.floor(finite(value.money))),
+    competitionRewards: [...new Set((Array.isArray(value.competitionRewards) ? value.competitionRewards : [])
+      .filter(id => typeof id === 'string' && id.length <= 140))].slice(-256),
     inventory,
     aquarium,
     aquariumTankCount,

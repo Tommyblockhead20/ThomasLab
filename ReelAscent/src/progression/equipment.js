@@ -72,6 +72,7 @@ export class EquipmentManager {
   }
 
   getModifiers() {
+    if (this.basicOnly) return Object.freeze({});
     const result = {};
     const state = this.getState();
     for (const itemId of Object.values(state.equipped)) {
@@ -92,6 +93,7 @@ export class EquipmentManager {
   }
 
   getEquippedItem(category) {
+    if (this.basicOnly) return EQUIPMENT_BY_ID.get(DEFAULT_EQUIPPED[category]) ?? null;
     return EQUIPMENT_BY_ID.get(this.getState().equipped[category]) ?? null;
   }
 
@@ -108,6 +110,7 @@ export class EquipmentManager {
   }
 
   equip(itemId) {
+    if (this.basicOnly) return { ok: false, reason: 'This event uses basic equipment. Your saved loadout returns afterward.' };
     const state = this.getState();
     const selected = EQUIPMENT_BY_ID.get(itemId);
     if (!selected || !state.ownedEquipment.includes(itemId)) return { ok: false, reason: 'Item not owned' };

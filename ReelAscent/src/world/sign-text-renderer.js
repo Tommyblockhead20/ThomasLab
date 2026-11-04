@@ -8,6 +8,7 @@ const normalizeSignText = (value, fallback = 'SIGN') => (
 // runtime source prevents the editor from promising lettering that the shipped game never
 // constructs.
 export function attachSignText(device, parent, value, options = {}) {
+  if (parent) parent._productionSignText = normalizeSignText(value, options.fallback ?? 'SIGN');
   if (!device || !parent || typeof document === 'undefined') return null;
   const text = normalizeSignText(value, options.fallback ?? 'SIGN');
   const canvas = document.createElement('canvas');

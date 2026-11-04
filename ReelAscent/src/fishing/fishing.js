@@ -2342,8 +2342,9 @@ export class FishingController {
       ? minimumQuality
       : earnedQuality;
     this.recordPerformanceEncounter('caught', quality);
-    const caughtFish = createCatchRecord(this.selectedFish, this.zone, quality);
-    const ownership = this.progression?.captureCatch(caughtFish) ?? { ok: false, value: null, specimen: null };
+    const landedFish = createCatchRecord(this.selectedFish, this.zone, quality);
+    const ownership = this.progression?.captureCatch(landedFish) ?? { ok: false, value: null, specimen: null };
+    const caughtFish = ownership.ok ? Object.freeze({ ...landedFish, specimenId: ownership.specimen?.specimenId, value: ownership.value }) : landedFish;
     const previousBest = this.bestBySpecies.get(this.selectedFish.speciesId);
     const newSpecies = !this.seenSpecies.has(this.selectedFish.speciesId);
     const newRecord = !previousBest

@@ -149,18 +149,17 @@ const legendaryCosmetics = legendarySpecies.map((species, index) => {
   // Generic reward names describe a Crest/Lens/Charm/Mantle. Match that concept instead
   // of assigning an unrelated wizard hat, scarf, flag, etc. from a numeric rotation.
   const visual = LEGENDARY_OVERRIDES[speciesId]?.[2] ?? ({
-    headwear: 'crest', eyewear: 'round', faceAccessory: 'necklace', backAccessory: 'cape'
+    headwear: 'species-crest', eyewear: 'species-lens', faceAccessory: 'species-charm', backAccessory: 'species-mantle'
   })[slot];
   const label = LEGENDARY_OVERRIDES[speciesId]?.[0] ?? `${species.name} ${SUFFIX[slot]}`;
   return item(`catch-${speciesId}`, label, slot,
     { type: 'catch', speciesId, speciesName: species.name, hint: `Catch: ${species.name}` }, visual);
 });
 
-// These records/unlocks stay canonical, but their current generated model is still one of
-// the shared fallback Crest/Lens/Charm/Mantle recipes. The wardrobe labels them honestly
-// and prevents new selection until each earns an authored silhouette.
+// Species sculptures have their own anatomy and remain selectable. Keep the duplicate
+// guard for any genuinely shared placeholder recipes introduced by future content.
 const genericLegendaryCosmetics = legendaryCosmetics
-  .filter((cosmetic) => !LEGENDARY_OVERRIDES[cosmetic.source.speciesId]);
+  .filter((cosmetic) => !LEGENDARY_OVERRIDES[cosmetic.source.speciesId] && !cosmetic.visual.startsWith('species-'));
 const genericVisualGroups = new Map();
 for (const cosmetic of genericLegendaryCosmetics) {
   const key = `${cosmetic.slot}:${cosmetic.visual}`;

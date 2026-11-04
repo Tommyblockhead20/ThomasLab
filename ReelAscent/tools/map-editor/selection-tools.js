@@ -140,12 +140,16 @@ export function transformObjectRecords(records = [], options = {}) {
 
 export function duplicateObjectRecords(records = [], idFactory, offset = { x: 1.5, y: 0, z: 1.5 }) {
   const used = new Set();
+  const groups=new Map();
   return records.map((record, index) => {
     const copy = clone(record);
     let id = String(idFactory(record, index));
     while (used.has(id)) id = String(idFactory(record, index + used.size + 1));
     used.add(id);
     copy.id = id;
+    for(const key of ['benchId','npcId'])if(copy.metadata?.[key]){
+      const old=copy.metadata[key];if(!groups.has(old))groups.set(old,`${old}-copy-${id}`);copy.metadata[key]=groups.get(old);
+    }
     copy.name = `${record.name || record.id || 'Object'} Copy`;
     const position = recordPosition(copy);
     if (position) {

@@ -4,8 +4,13 @@ import {
   MOUNTAIN_FISHING_LOCATIONS,
   SUMMIT_HEIGHT,
   terrainHeightAt,
-  FRACTURED_ROCK_FORM_KINDS
+  FRACTURED_ROCK_FORM_KINDS,
+  MountainWorld
 } from '../../src/world/mountain-v2.js';
+import { captureProductionCatalog, createProductionReferenceEntity, mergeProductionCatalog, productionTerrainForLocation } from '../../src/world/production-scene-catalog.js';
+import { PRODUCTION_LEVELS, terrainSignature } from '../../src/world/production-level-edits.js';
+import { partitionTerrainBySupport } from '../../src/world/map-editor-runtime.js';
+import { addSurfaceUvs } from '../../src/graphics/surface-detail.js';
 import {
   applyTerrainPatchHeight,
   downloadJson,
@@ -162,6 +167,7 @@ let suppressHistory = false;
 let activeBrushTransaction = false;
 let currentTerrainData = null;
 const terrainRenderState = { entity: null, mesh: null, vertexCapacity: 0, indexCapacity: 0 };
+const coreSupportStates = new Map();
 let caveConnectStart = null;
 let activeWorldId = (() => {
   try {
@@ -175,6 +181,24 @@ const genericLevels = new Map();
 const genericHistories = new Map();
 const genericFutures = new Map();
 let genericScene = null;
+let productionCatalog = null;
+let productionCatalogPromise = null;
+async function ensureProductionCatalog() {
+  if (!productionCatalogPromise) productionCatalogPromise = (async () => {
+    setStatus('Building the current game world for exact editor references…');
+    const physics = await ensureWalkthroughRapier();
+    const physicsWorld = new physics.World({ x:0,y:-20,z:0 });
+    const world = new MountainWorld(app,physics,physicsWorld,{editorReference:true});
+    world.root.enabled=true; world.setActiveLocation('aquarium-island');
+    world.updateAquariumResidents({ progression: { aquarium:[],inventory:[],aquariumTankCount:1,aquariumTankDisplays:[[]] } });
+    world.root.enabled=false;
+    productionCatalog = captureProductionCatalog(world); genericScene.productionCatalog = productionCatalog;
+    const records = productionCatalog.records.get('main-mountain') ?? [];
+    runtimeSnapshot = { rocks:[],objects:records.map(r=>({...r,position:r.transform.position,rotation:r.transform.rotation,scale:r.size,mapObjectId:r.id})) };
+    return productionCatalog;
+  })();
+  return productionCatalogPromise;
+}
 let slopeOverlay = null;
 let outlinerFilter = '';
 let validationIssues = [];
@@ -340,8 +364,14 @@ const canvas = $('#editor-canvas');
 const app = new pc.Application(canvas, {
   graphicsDeviceOptions: { antialias: true, alpha: false }
 });
-app.setCanvasFillMode(pc.FILLMODE_FILL_WINDOW);
+const resizeEditorCanvas = () => {
+  const bounds = canvas.parentElement.getBoundingClientRect();
+  app.resizeCanvas(Math.max(1,Math.floor(bounds.width)),Math.max(1,Math.floor(bounds.height)));
+};
+app.setCanvasFillMode(pc.FILLMODE_NONE,1,1);
 app.setCanvasResolution(pc.RESOLUTION_AUTO);
+resizeEditorCanvas();
+new ResizeObserver(resizeEditorCanvas).observe(canvas.parentElement);
 
 function loadMinimumBrightness() {
   try {
@@ -518,7 +548,7 @@ function hexToRgb01(value) {
 }
 function waterMaterialFor(record) {
   const override = patch.fishingOverrides?.[record.id] ?? {};
-  if (!override.color) return materials.water;
+  if (!override.color) return productionCatalog?.waterReferences.get(record.id)?.meshInstances[0]?.material??materials.water;
   const hex = normalizeHexColor(override.color);
   if (!waterMaterialCache.has(hex)) waterMaterialCache.set(hex, makeMaterial(hexToRgb01(hex), 0.78, 0.5));
   return waterMaterialCache.get(hex);
@@ -1113,7 +1143,10 @@ function applyTerrainDisplayMode() {
   const material = collisionDebug ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
   for (const entity of terrainRoot.children) {
     if (!entity.render?.meshInstances) continue;
-    for (const instance of entity.render.meshInstances) instance.material = material;
+    const support = entity._coreSupportKind;
+    entity.render.enabled = support ? isMeshMode() && !collisionDebug && !xrayCoreEnabled()
+      : !isMeshMode() || collisionDebug || xrayCoreEnabled() || !coreSupportStates.size;
+    for (const instance of entity.render.meshInstances) instance.material = support ? entity._coreMaterial : material;
   }
 }
 
@@ -1312,12 +1345,37 @@ function rebuildTerrain() {
   terrainRenderState.entity.name = isMeshMode() ? 'Frozen 3D Mountain Mesh' : 'Editable Mountain';
   const terrainMaterial = collisionVisible() ? materials.terrainWire : (xrayCoreEnabled() ? materials.terrainXray : materials.terrain);
   terrainRenderState.entity.render.meshInstances[0].material = terrainMaterial;
+  if(productionCatalog && isMeshMode()) updateCoreSupportMeshes(data);
+  applyTerrainDisplayMode();
 
   if ($('#show-slope')?.checked) slopeOverlay.setEnabled(true, data);
   rebuildWaterMeshes();
   rebuildTunnels();
   updatePlacedObjectHeights();
   rebuildSelectionHelper();
+}
+
+function updateCoreSupportMeshes(data) {
+  const source=productionCatalog.world.mapEditorBakedTerrain?.render?.meshInstances??[];
+  const groups=partitionTerrainBySupport(data.positions,data.indices);
+  for(const [kind,group] of Object.entries(groups)) {
+    const material=source.find(mi=>mi.material.name===`Stoneveil ${kind} core`)?.material;
+    if(!material)continue;
+    let state=coreSupportStates.get(kind);
+    if(!state) {
+      const entity=new pc.Entity(`Shared ${kind} core`,app),mesh=new pc.Mesh(app.graphicsDevice);
+      entity._editorOwnedMeshes=[mesh];entity._coreSupportKind=kind;entity._coreMaterial=material;
+      entity.addComponent('render',{meshInstances:[new pc.MeshInstance(mesh,material,entity)],castShadows:false});
+      terrainRoot.addChild(entity);state={entity,mesh,vertices:0,indices:0};coreSupportStates.set(kind,state);
+    }
+    if(group.positions.length/3>state.vertices || group.indices.length>state.indices) {
+      state.vertices=Math.max(group.positions.length/3,Math.ceil(state.vertices*1.3));state.indices=Math.max(group.indices.length,Math.ceil(state.indices*1.3));
+      state.mesh.clear(true,true,state.vertices,state.indices);
+    }
+    const geometry=new pc.Geometry();geometry.positions=group.positions;geometry.normals=group.normals;
+    addSurfaceUvs(geometry);state.mesh.setPositions(group.positions);state.mesh.setNormals(group.normals);
+    state.mesh.setUvs(0,geometry.uvs);state.mesh.setIndices(group.indices);state.mesh.update(pc.PRIMITIVE_TRIANGLES,true);
+  }
 }
 
 function triangleCutWorld(a, b, c) {
@@ -1763,11 +1821,24 @@ function addPrimitive(parent, type, material, position = [0, 0, 0], scale = [1, 
 }
 
 function rebuildSnapshotObjects() {
+  const signature=JSON.stringify([Boolean($('#show-snapshot-rocks').checked),runtimeSnapshot.objects?.length,runtimeSnapshot.rocks?.length,patch.objectOverrides,patch.hiddenObjectIds]);
+  if(snapshotRoot._productionSignature===signature) {
+    const selection=selected?.kind==='snapshot'?selected.id:null;
+    if(snapshotRoot._activeSelection===selection)return;
+    snapshotRoot._activeSelection=selection;
+    for(const entity of snapshotRoot.children) for(const instance of entity.render?.meshInstances??[]) {
+      const active=selected?.kind==='snapshot' && selected.id===entity.editorRecord?.id;
+      instance.material=active?materials.selected:instance._editorBaseMaterial??materials.snapshotRock;
+    }
+    return;
+  }
+  snapshotRoot._productionSignature=signature;
   destroyChildren(snapshotRoot);
   if (!$('#show-snapshot-rocks').checked) return;
   const all = [...(runtimeSnapshot.rocks || []), ...(runtimeSnapshot.objects || [])];
   const seen = new Set();
   for (const record of all) {
+    if(record.visible===false) continue;
     const id = String(record.rockId || record.mapObjectId || record.debugId || record.id || '');
     if (!id || seen.has(id) || patch.hiddenObjectIds.includes(id)) continue;
     seen.add(id);
@@ -1775,11 +1846,14 @@ function rebuildSnapshotObjects() {
     const position = override.position || record.position;
     const scale = override.scale || record.size || record.scale || { x: 1, y: 1, z: 1 };
     if (!position) continue;
-    const entity = new pc.Entity(record.name || id);
-    entity.addComponent('render', { type: 'box' });
-    if (entity.render?.meshInstances) for (const instance of entity.render.meshInstances) instance.material = selected?.kind === 'snapshot' && selected.id === id ? materials.selected : materials.snapshotRock;
+    const entity = createProductionReferenceEntity(app,{...record,transform:{position,rotation:override.rotation || record.rotation || {x:0,y:0,z:0}},size:scale},productionCatalog) ?? new pc.Entity(record.name || id);
+    if (!entity.render) entity.addComponent('render', { type: 'box' });
+    if (entity.render?.meshInstances) for (const instance of entity.render.meshInstances) {
+      if (selected?.kind === 'snapshot' && selected.id === id) instance.material = materials.selected;
+      else if (!record.metadata?.productionMeshRef) instance.material = materials.snapshotRock;
+    }
     entity.setPosition(position.x, position.y, position.z);
-    entity.setLocalScale(Math.max(.2, scale.x || 1), Math.max(.2, scale.y || 1), Math.max(.2, scale.z || 1));
+    entity.setLocalScale(Math.max(.001, scale.x || 1), Math.max(.001, scale.y || 1), Math.max(.001, scale.z || 1));
     const rot = override.rotation || record.rotation || { x: 0, y: 0, z: 0 };
     entity.setEulerAngles(rot.x || 0, rot.y || 0, rot.z || 0);
     entity.editorRecord = { ...record, id, position, scale, rotation: rot };
@@ -1931,6 +2005,8 @@ async function loadGenericProjectLevel(world, { preferAutosave = true } = {}) {
           ? ensureBasaltEditorTerrain(autosave, world)
           : autosave;
   }
+  const canonical = PRODUCTION_LEVELS.find(l=>l.runtimeLocationId===world.runtimeLocationId && l.metadata?.productionCatalog);
+  if (canonical) return normalizeWorldEditorLevel(canonical,{worldId:world.id,runtimeLocationId:world.runtimeLocationId});
   if (world.kind === 'production-island') return makeProductionIslandEditorLevel(world);
   const response = await fetch(world.dataUrl, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Could not load ${world.label}: HTTP ${response.status}`);
@@ -2084,6 +2160,7 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
   if (prefabWorkspace.active) exitPrefabWorkspace({ restore: false });
   if (assetPlacementState) cancelV3AssetPlacement();
   const world = getWorldEditorWorld(worldId);
+  await ensureProductionCatalog();
   if (walkthroughState.active) exitWalkthrough();
   activeWorldId = world.id;
   try { localStorage.setItem(WORLD_V2_ACTIVE_KEY, activeWorldId); } catch {}
@@ -2100,6 +2177,10 @@ async function switchWorld(worldId, { keepCamera = false } = {}) {
     slopeOverlay.setEnabled(false);
     if (!genericLevels.has(activeWorldId)) {
       genericLevels.set(activeWorldId, await loadGenericProjectLevel(world, { preferAutosave: true }));
+      if (world.kind === 'production-island' || world.id === 'cave-fishing-island') {
+        mergeProductionCatalog(activeGenericLevel(),productionCatalog,world.runtimeLocationId,makeProductionIslandEditorLevel(world));
+        activeGenericLevel().metadata.productionTerrainBaseline ??= terrainSignature(productionTerrainForLocation(productionCatalog,world.runtimeLocationId));
+      }
     }
     if (activeWorldId === 'cave-fishing-island' && activeGenericLevel()?.metadata?.basaltCoreAutoRepairedAt) {
       persistGenericLevel(activeGenericLevel());
@@ -2417,7 +2498,7 @@ async function reloadProjectPatch() {
     saveHistory();
     patch = normalizePatch(data);
     stoneveilProjectSignature = stoneveilTerrainSignature(patch);
-    runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
+    if (!productionCatalog) runtimeSnapshot = clone(patch.bakedSnapshot ?? { objects: [], rocks: [] });
     selected = null;
     persistPatch();
     // Do not leave a stale older mesh in IndexedDB if a graphics reset/page reload happens
@@ -3776,6 +3857,7 @@ function rebuildSelectionHelper() {
 
 function syncWorldUi() {
   const world = activeWorld();
+  $('#restore-game-terrain').hidden=!(world.kind==='production-island'||world.id==='cave-fishing-island');
   const parity = worldParityProfile(world.id);
   const parityLabel = $('#world-source-indicator');
   if (parityLabel) {
@@ -3786,6 +3868,12 @@ function syncWorldUi() {
       'editor-only-future': 'Editor only'
     })[parity.status] || 'Editor reference';
     parityLabel.title = `Game: ${parity.production}\nEditor: ${parity.editor}\n${parity.origin}\nEditor changes are local until saved and integrated into game data.`;
+    const terrain=activeGenericLevel()?.terrain,current=productionCatalog&&productionTerrainForLocation(productionCatalog,world.runtimeLocationId);
+    if(!isStoneveilWorld()&&current&&terrain) {
+      const matches=terrainSignature(terrain)===terrainSignature(current);
+      parityLabel.textContent=matches?'Current game source':'Edited terrain';
+      if(!matches)parityLabel.title+='\nThis editor terrain differs from the current game. Project → Restore Current Game Terrain is undoable.';
+    }
   }
   const selector = $('#world-selector');
   if (selector && selector.value !== world.id) selector.value = world.id;
@@ -5220,7 +5308,7 @@ async function savePatch() {
       const writable = await handle.createWritable();
       await writable.write(text);
       await writable.close();
-      setStatus(`${activeWorld().label} saved.`);
+      setStatus(`${activeWorld().label} saved. ${isStoneveilWorld()||isLibraryWorld()?'':`Use src/world/world-editor-levels/${filename} in the project. `}Rebuild the game to publish.`);
       return;
     } catch (error) {
       if (error?.name === 'AbortError') return;
@@ -5228,7 +5316,7 @@ async function savePatch() {
   }
   if (isStoneveilWorld() || isLibraryWorld()) downloadJson(filename, data);
   else downloadWorldLevel(data, filename);
-  setStatus(`${activeWorld().label} downloaded.`);
+  setStatus(`${filename} downloaded. ${isStoneveilWorld()||isLibraryWorld()?'':`Place it in src/world/world-editor-levels/. `}Rebuild the game to publish.`);
 }
 
 function exportActiveWorldV2() {
@@ -5301,12 +5389,17 @@ async function loadJsonFile(file, type) {
 }
 
 function syncSnapshotUi() {
-  const count = runtimeSnapshot.rocks?.length || 0;
+  if (productionCatalog) {
+    const records = productionCatalog.records.get('main-mountain') ?? [];
+    runtimeSnapshot = { rocks:records.filter(r=>r.category === 'Climbing rocks').map(r=>({...r,position:r.transform.position,rotation:r.transform.rotation,scale:r.size,mapObjectId:r.id})),
+      objects:records.filter(r=>r.category !== 'Climbing rocks').map(r=>({...r,position:r.transform.position,rotation:r.transform.rotation,scale:r.size,mapObjectId:r.id})) };
+  }
+  const count = (runtimeSnapshot.rocks?.length || 0) + (runtimeSnapshot.objects?.length || 0);
   const rockToggle = $('#show-snapshot-rocks');
   rockToggle.disabled = count === 0;
   if (count) rockToggle.checked = true;
   const rockLabel = $('#existing-rocks-label');
-  if (rockLabel) rockLabel.lastChild.textContent = count ? ` Existing rocks (${count})` : ' Existing rocks (import snapshot)';
+  if (rockLabel) rockLabel.lastChild.textContent = count ? ` Game objects (${count})` : ' Game objects';
   const bakeButton = $('#bake-snapshot');
   if (bakeButton) bakeButton.disabled = count === 0;
 }
@@ -5368,7 +5461,7 @@ function setupResizableRightPanel() {
   const apply = () => {
     document.documentElement.style.setProperty('--right-panel-width', `${width}px`);
     handle.style.right = `calc(${width}px - 3px)`;
-    app.resizeCanvas();
+    resizeEditorCanvas();
   };
   apply();
   let startX = 0, startWidth = width;
@@ -6233,6 +6326,13 @@ $('#redo').addEventListener('click', redo);
 $('#checkpoint').addEventListener('click', saveManualCheckpoint);
 $('#restore-checkpoint').addEventListener('click', restoreManualCheckpoint);
 $('#reload-project-patch').addEventListener('click', reloadProjectPatch);
+$('#restore-game-terrain').addEventListener('click',()=>{
+  if(isStoneveilWorld()||!productionCatalog)return;
+  const terrain=productionTerrainForLocation(productionCatalog,activeWorld().runtimeLocationId);if(!terrain)return;
+  saveGenericHistory();activeGenericLevel().terrain=terrain;
+  activeGenericLevel().metadata.productionTerrainBaseline=terrainSignature(terrain);
+  persistGenericLevel(activeGenericLevel());rebuildAll();syncWorldUi();setStatus('Restored the current game terrain. Undo restores your previous edited mesh.');
+});
 $('#recover-browser-autosave')?.addEventListener('click', recoverBrowserAutosaveExplicitly);
 $('#freeze-core').addEventListener('click', freezeCoreToMesh);
 $('#return-heightfield').addEventListener('click', returnToHeightfield);
@@ -6819,7 +6919,7 @@ canvas.addEventListener('webglcontextrestored', () => {
   setStatus(`Graphics context restored in-place (${webglRecoveryCount}). Current terrain source, camera and selection were preserved.`);
 });
 
-window.addEventListener('resize', () => app.resizeCanvas());
+window.addEventListener('resize', resizeEditorCanvas);
 
 setupV21Ui();
 
@@ -6849,8 +6949,8 @@ async function initializeWorldEditorV2() {
     await switchWorld(activeWorldId, { keepCamera: activeWorldId === 'stoneveil-peak' });
     if (isStoneveilWorld()) {
       setStatus(compatibleRecoveryApplied
-        ? 'World Editor V4.2 ready. Recovered edits from the SAME project Stoneveil terrain revision.'
-        : 'World Editor V4.2 ready. Project Stoneveil terrain is authoritative; stale/different browser recovery was not auto-applied.');
+        ? 'World Editor V5.0 ready. Current game meshes/materials loaded; recovered edits use the same terrain revision.'
+        : 'World Editor V5.0 ready. Current game meshes/materials and project terrain loaded.');
     }
   } catch (error) {
     console.error(error);

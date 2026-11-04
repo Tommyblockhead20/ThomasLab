@@ -16,6 +16,7 @@ const sets = {
   wildlife: ['vampire_squid', 'chambered_nautilus', 'sea-star', 'sea-urchin', 'diving_bell_spider', 'blue_dragon_sea_slug', 'giant_pacific_octopus', 'horseshoe-crab', 'leafy_seadragon', 'giant_caribbean_anemone', 'moon-jelly', 'pond-snail'],
   cosmetics: ['cowboy-hat', 'bucket-hat', 'wizard-hat', 'catch-giant_pacific_octopus', 'catch-axolotl', 'catch-mermaid', 'casino-coin-halo', 'scarf', 'catch-jormungandr', 'catch-manta_ray', 'catch-japanese_spider_crab', 'catch-green_sea_turtle'],
   basics: ['trail-hat', 'beanie', 'fishing-cap', 'catch-coelacanth', 'glasses', 'round-glasses', 'aviators', 'goggles', 'scarf', 'necklace', 'daypack', 'rain-cape']
+  ,rewards: ['catch-frost_wyrm','catch-glass_cave_lobster','catch-blue_whale','catch-giant_squid','catch-blue_ringed_octopus','catch-summit_water_dragon','catch-orca','catch-hippopotamus','catch-horseshoe_crab','catch-leatherback_sea_turtle','catch-mantis_shrimp','catch-bunyip']
 };
 let entries = [], mode = 'mythic', angle = 0;
 function walk(root, callback) { if (root.enabled === false) return; callback(root); for (const child of root.children) walk(child, callback); }
@@ -34,7 +35,7 @@ function render(next) {
   mode = next; entries.forEach(e => e.dispose()); entries = []; const labels = document.querySelector('#labels'); labels.replaceChildren();
   for (const id of sets[mode]) {
     let root, label, dispose, yaw = -25;
-    if (mode === 'cosmetics' || mode === 'basics') {
+    if (['cosmetics','basics','rewards'].includes(mode)) {
       root = new pc.Entity(id, app); app.root.addChild(root); const character = createCharacterModel(root);
       const slot = COSMETIC_BY_ID.get(id)?.slot ?? 'headwear';
       character.setAppearance({ ...DEFAULT_APPEARANCE, headwear: 'none', backAccessory: 'none', [slot]: id });

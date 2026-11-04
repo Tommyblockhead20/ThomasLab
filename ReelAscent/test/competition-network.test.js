@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { createRequire } from 'node:module';
+const {WebSocket,WebSocketServer}=createRequire(new URL('../server/package.json',import.meta.url))('ws');
+import { ClientConnection } from '../server/src/connection.js';
+import { RoomManager } from '../server/src/room-manager.js';
+import { createMessage } from '../server/src/protocol.js';
+
+test('two real WebSocket clients join a derby, score catches, reconnect and receive one shared result',async(t)=>{
+  const rooms=new RoomManager(),server=new WebSocketServer({port:0,host:'127.0.0.1'});await once(server,'listening');
+  server.on('connection',socket=>new ClientConnection(socket,rooms));const sockets=[];
+  t.after(async()=>{for(const s of sockets)s.terminate();for(const r of rooms.rooms.values()){r.competition.dispose();for(const p of r.players.values())clearTimeout(p.reconnectTimer);}await new Promise(r=>server.close(r));});
+  const connect=async()=>{const ws=new WebSocket(`ws://127.0.0.1:${server.address().port}`);ws.messages=[];ws.on('message',raw=>ws.messages.push(JSON.parse(raw)));await once(ws,'open');sockets.push(ws);return ws;};
+  const wait=async(ws,condition)=>{const deadline=Date.now()+3000;while(Date.now()<deadline){const hit=ws.messages.find(m=>condition(m));if(hit)return hit;await new Promise(r=>setTimeout(r,10));}throw new Error('Expected room response did not arrive');};
+  const send=(ws,type,payload={})=>ws.send(JSON.stringify(createMessage(type,payload)));
+  const a=await connect();send(a,'hello',{playerId:'net-a',displayName:'Alice'});send(a,'host_room',{displayName:'Alice'});
+  const hosted=(await wait(a,m=>m.type==='room_state')).payload,room=rooms.rooms.get(hosted.roomCode);
+  let now=Date.now();room.competition.dispose();room.competition.clock=()=>now;
+  const b=await connect();send(b,'hello',{playerId:'net-b',displayName:'Bob'});send(b,'join_room',{roomCode:room.code,displayName:'Bob'});
+  await wait(b,m=>m.type==='room_state');
+  send(a,'competition_action',{action:'create',kind:'derby',mode:'haul',saveId:'save-a'});
+  const opened=(await wait(b,m=>m.payload.competition?.phase==='lobby')).payload.competition;
+  send(b,'competition_action',{action:'join',eventId:opened.id,saveId:'save-b'});await wait(a,m=>m.payload.competition?.participants.length===2);
+  send(a,'competition_action',{action:'start',eventId:opened.id});await wait(b,m=>m.payload.competition?.phase==='preparing');
+  send(a,'competition_action',{action:'ready',saveId:'save-a'});send(b,'competition_action',{action:'ready',saveId:'save-b'});
+  await wait(b,m=>m.payload.competition?.phase==='countdown');now+=5001;room.competition.tick();await wait(a,m=>m.payload.competition?.phase==='active');
+  send(a,'catch_event',{speciesId:'bluegill',specimenId:'real-catch',eventId:opened.id,saveId:'save-a',legitimate:true,length:10,value:75});
+  await wait(b,m=>m.payload.competition?.participants[0].count===1);
+  send(a,'catch_event',{speciesId:'bluegill',specimenId:'real-catch',eventId:opened.id,saveId:'save-a',legitimate:true,length:10,value:75});
+  now+=300_001;room.competition.tick();const result=(await wait(b,m=>m.payload.competition?.phase==='finished')).payload.competition;
+  assert.equal(result.participants[0].count,1);assert.deepEqual(result.winnerIds,['net-a']);assert.equal(result.awards[0].amount,150);
+  a.close();await once(a,'close');const resumed=await connect();send(resumed,'hello',{playerId:'net-a',reconnectToken:hosted.reconnectToken,displayName:'Alice'});
+  const restored=(await wait(resumed,m=>m.payload.competition?.phase==='finished')).payload.competition;
+  assert.deepEqual(restored.awards,result.awards);
+});

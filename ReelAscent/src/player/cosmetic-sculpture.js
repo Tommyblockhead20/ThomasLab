@@ -1,9 +1,11 @@
 import { modelMesh } from '../fishing/fish-sculpture.js';
 import { sweptTube, sculptedPanel, revolvedSurface } from '../graphics/sculpted-geometry.js';
+import { buildSpeciesReward } from './species-cosmetics.js';
 
 // Silhouettes are shared by the wardrobe and both multiplayer/local characters.
 export function buildCosmeticSculpture(root, cosmetic, materials, { blob, headY, add }) {
   if (!root._app?.graphicsDevice) return false;
+  if (buildSpeciesReward(root,cosmetic,materials,{blob,headY,add})) return true;
   const size = blob ? 1.16 : 1;
   const mesh = (label, data, material = materials.accessory) => {
     data.positions = data.positions.map((v, i) => i % 3 === 1 ? v : v * size);
@@ -13,9 +15,9 @@ export function buildCosmeticSculpture(root, cosmetic, materials, { blob, headY,
   const panel = (label, points, material = materials.accessory, thickness = .025) => mesh(label, sculptedPanel(points, thickness), material);
   const ring = (label, rx, rz, y, z = 0, radius = .025, material = materials.accessory) => tube(label, Array.from({ length: 49 }, (_, i) => { const a = i / 48 * Math.PI * 2; return [Math.cos(a) * rx, y, z + Math.sin(a) * rz, radius]; }), material);
   const visual = cosmetic.visual;
-  if (cosmetic.slot === 'eyewear' && ['glasses', 'round', 'aviator', 'goggles', 'visor'].includes(visual)) {
+  if (cosmetic.slot === 'eyewear' && ['glasses', 'round', 'aviator', 'goggles', 'visor', 'hammer', 'electric', 'sun'].includes(visual)) {
     const y = blob ? .85 : .73, z = blob ? -.48 : -.267;
-    const round = ['round', 'goggles', 'aviator'].includes(visual);
+    const round = ['round', 'goggles', 'aviator', 'sun', 'electric'].includes(visual);
     if (visual === 'visor') {
       panel('curved visor lens', [[-.21, y + .07, z + .035], [-.07, y + .08, z - .015], [.07, y + .08, z - .015], [.21, y + .07, z + .035], [.18, y - .06, z + .025], [-.18, y - .06, z + .025]], materials.glass, .015);
       tube('visor brow', [[-.22, y + .08, z + .03, .015], [0, y + .09, z - .02, .015], [.22, y + .08, z + .03, .015]], materials.accessoryMetal);
@@ -29,6 +31,11 @@ export function buildCosmeticSculpture(root, cosmetic, materials, { blob, headY,
     tube('nose bridge', [[-.035, y + .025, z, .01], [0, y + .045, z - .007, .01], [.035, y + .025, z, .01]], materials.accessoryMetal, 8);
     for (const side of [-1, 1]) tube('temple arm', [[side * .22, y + .035, z + .01, .012], [side * .25, y + .035, .05, .012], [side * .23, y, .15, .008]], materials.accessoryMetal, 8);
     if (visual === 'goggles') ring('goggle strap', .25, .245, y + .015, 0, .018, materials.dark);
+    for (const side of [-1,1]) {
+      if(visual==='hammer') {tube('hammerhead temple',[[side*.18,y+.045,z,.022],[side*.33,y+.025,z+.025,.03],[side*.37,y-.045,z+.04,.017]],materials.accessoryMetal);add('hammerhead side eye','sphere',{x:side*.365,y:y+.025,z:z+.015},{x:.06,y:.075,z:.025},materials.glass);}
+      if(visual==='electric') tube('lightning temple',[[side*.2,y+.04,z,.012],[side*.29,y+.15,z,.012],[side*.27,y+.075,z,.012],[side*.35,y+.1,z,.003]],materials.silver,7);
+      if(visual==='sun')for(let ray=0;ray<7;ray++){const a=(ray/6-.5)*Math.PI; tube('sunburst lens ray',[[side*.13+Math.sin(a)*.09,y+Math.cos(a)*.08,z,.01],[side*.13+Math.sin(a)*.135,y+Math.cos(a)*.125,z,.003]],materials.accessoryMetal,6);}
+    }
     return true;
   }
   if (cosmetic.slot === 'headwear' && ['cowboy', 'bucket', 'wizard', 'beanie', 'crown', 'halo', 'hood', 'tentacle', 'gills'].includes(visual)) {
@@ -62,6 +69,7 @@ export function buildCosmeticSculpture(root, cosmetic, materials, { blob, headY,
       mesh('open face hood', hood);
       // Back drape stays behind the face and joins the shoulders.
       panel('hood shoulder drape', [[-.27, headY, .12], [-.35, headY - .48, .24], [.35, headY - .48, .24], [.27, headY, .12]]);
+      if(cosmetic.id==='catch-giant_panda')for(const side of [-1,1]){add('rounded panda ear','sphere',{x:side*.23,y:headY+.23,z:.01},{x:.18,y:.19,z:.13},materials.dark);add('panda ear inset','sphere',{x:side*.23,y:headY+.23,z:-.055},{x:.1,y:.11,z:.018},materials.silver);}
     } else if (visual === 'tentacle') {
       add('soft octopus mantle', 'sphere', { x: 0, y: headY + .2, z: 0 }, { x: .48, y: .4, z: .45 });
       for (let i = 0; i < 8; i += 1) { const a = i / 8 * Math.PI * 2; tube(`curling hat arm ${i}`, Array.from({ length: 15 }, (_, j) => { const t = j / 14, r = .16 + t * .26, phase = a + t * t * .4; return [Math.cos(phase) * r, headY + .1 - Math.sin(t * 2) * .19 + t * t * .1, Math.sin(phase) * r, .055 * (1 - t) + .008]; })); }
@@ -97,9 +105,23 @@ export function buildCosmeticSculpture(root, cosmetic, materials, { blob, headY,
     }
     return true;
   }
-  if (cosmetic.slot === 'backAccessory' && ['wings', 'fin', 'claws', 'tentacle', 'shell'].includes(visual)) {
+  if (cosmetic.slot === 'backAccessory' && ['wings', 'fin', 'claws', 'tentacle', 'shell', 'hydra', 'cape'].includes(visual)) {
     const y = blob ? .05 : -.03, z = blob ? .55 : .39;
-    if (visual === 'wings' || visual === 'fin') {
+    if(visual==='hydra') {
+      add('hydra harness','box',{x:0,y,z},{x:.32,y:.55,z:.13},materials.pack);
+      for(let i=-1;i<=1;i++) {
+        const hx=i*.4,hy=y+.48+(.12*(1-Math.abs(i)));
+        tube(`hydra curved neck ${i}`,[[i*.09,y-.2,z,.08],[i*.22,y+.08,z+.08,.075],[hx,hy,z+.09,.055]]);
+        add('hydra armored head','sphere',{x:hx,y:hy+.04,z:z+.1},{x:.23,y:.17,z:.22});
+        add('hydra open jaw','sphere',{x:hx,y:hy-.035,z:z+.17},{x:.18,y:.06,z:.18},materials.dark);
+        for(const side of [-1,1]) {tube('hydra swept horn',[[hx+side*.07,hy+.09,z+.06,.025],[hx+side*.13,hy+.24,z+.03,.002]],materials.silver,7);add('hydra eye','sphere',{x:hx+side*.09,y:hy+.065,z:z+.17},{x:.032,y:.035,z:.025},materials.silver);}
+      }
+    } else if(visual==='cape') {
+      const points=[[-.2,y+.31,z],[.2,y+.31,z],[.38,y-.32,z+.12],[.24,y-.52,z+.17],[.12,y-.46,z+.15],[0,y-.58,z+.18],[-.12,y-.46,z+.15],[-.24,y-.52,z+.17],[-.38,y-.32,z+.12]];
+      panel('tailored scalloped cape',points);
+      tube('cape neckline',[[-.21,y+.31,z,.025],[0,y+.34,z,.025],[.21,y+.31,z,.025]],materials.silver);
+      for(const x of [-.22,0,.22])tube('cape embroidered seam',[[x*.6,y+.24,z+.02,.009],[x,y-.37,z+.15,.006]],materials.silver,6);
+    } else if (visual === 'wings' || visual === 'fin') {
       add('harness', 'box', { x: 0, y, z }, { x: .35, y: .6, z: .13 }, materials.pack);
       for (const side of [-1, 1]) {
         const p = [[side * .12, y + .3, z], [side * .53, y + .4, z + .05], [side * .98, y + .05, z + .15], [side * .7, y - .1, z + .25], [side * .33, y - .48, z + .2], [side * .12, y - .3, z]];
@@ -108,7 +130,10 @@ export function buildCosmeticSculpture(root, cosmetic, materials, { blob, headY,
       }
     } else if (visual === 'shell') {
       add('domed shell', 'sphere', { x: 0, y, z: z + .08 }, { x: .62, y: .72, z: .3 });
-      tube('continuous raised shell spiral', Array.from({ length: 65 }, (_, i) => { const t = i / 64, a = t * Math.PI * 5, r = .015 + t * .27; return [Math.cos(a) * r, y + Math.sin(a) * r, z + .235 - t * .03, .021]; }), materials.silver);
+      if(/turtle/.test(cosmetic.id)) {
+        tube('turtle shell rim',Array.from({length:49},(_,i)=>{const a=i/48*Math.PI*2;return[Math.cos(a)*.29,y+Math.sin(a)*.34,z+.145,.02];}),materials.silver);
+        for(const [cx,cy] of [[0,0],[.16,.1],[-.16,.1],[.14,-.15],[-.14,-.15],[0,.22],[0,-.25]]) tube('hexagonal turtle scute',Array.from({length:7},(_,i)=>{const a=i/6*Math.PI*2;return[cx+Math.cos(a)*.09,y+cy+Math.sin(a)*.1,z+.232-.18*(cx*cx+cy*cy),.012];}),materials.dark,7);
+      } else tube('continuous raised shell spiral', Array.from({ length: 65 }, (_, i) => { const t = i / 64, a = t * Math.PI * 5, r = .015 + t * .27; return [Math.cos(a) * r, y + Math.sin(a) * r, z + .235 - t * .03, .021]; }), materials.silver);
     } else for (const side of [-1, 1]) for (let i = 0; i < (visual === 'claws' ? 2 : 3); i += 1) {
       const x = side * (.12 + i * .07);
       tube(`swept mantle arm ${side}:${i}`, [[x, y + .23, z, .065], [side * (.48 + i * .09), y + .05 - i * .14, z + .1, .055], [side * (.59 + i * .08), y - .31 - i * .1, z + .19, .035], [side * (.42 + i * .1), y - .44 - i * .1, z + .25, .006]]);

@@ -1,7 +1,7 @@
 const PROFILES = Object.freeze({
   'stoneveil-peak': Object.freeze({
     production: 'map-editor-patch.json frozen Stoneveil mesh + authored object overrides',
-    editor: 'the same map-editor-patch.json',
+    editor: 'the same map-editor-patch.json + live output of the current game rock/plant/object builders',
     productionOnly: ['transient particles', 'runtime fishing interaction helpers'],
     editorOnly: ['selection helpers', 'diagnostic overlays'],
     origin: 'global world; main-mountain origin (260, 0, 0)',
@@ -33,7 +33,7 @@ const PROFILES = Object.freeze({
   }),
   'library-island': Object.freeze({
     production: 'library-island-v2.scene.json + buildOceanIslandTerrainData(veiled-athenaeum)',
-    editor: 'same scene JSON + topology-refined terrain editing copy (terrain edits are not part of scene JSON export)',
+    editor: 'same scene JSON + editable terrain stored with the scene on Save',
     productionOnly: ['batched shelf books', 'fishing/ride interaction helpers'],
     editorOnly: ['individual editable book records', 'terrain authoring topology'],
     origin: 'scene local root at world-locations.js Veiled Athenaeum origin',
@@ -59,9 +59,9 @@ const PROFILES = Object.freeze({
 
 export function worldParityProfile(worldId) {
   return PROFILES[worldId] ?? Object.freeze({
-    production: 'buildOceanIslandTerrainData() + active deterministic structure builder',
-    editor: 'same terrain generator + edit-relevant production records',
-    productionOnly: ['minor runtime-only decoration/interaction helpers'],
+    production: 'buildOceanIslandTerrainData() + MountainWorld builders + checked-in world level edits',
+    editor: 'current MountainWorld mesh/material output + the same checked-in world level edits',
+    productionOnly: ['save-dependent fish/trophies and runtime interaction helpers'],
     editorOnly: ['authoring helpers'],
     origin: 'island-local editor coordinates translated by world-locations.js globalOrigin',
     status: 'shared-terrain'

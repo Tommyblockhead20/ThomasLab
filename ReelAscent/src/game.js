@@ -21,6 +21,7 @@ import { RunManager } from './world/run-manager.js';
 import { MultiplayerClient } from './multiplayer/multiplayer-client.js';
 import { MESSAGE_TYPES } from './multiplayer/protocol.js';
 import { MultiplayerMenu } from './ui/multiplayer-menu.js';
+import { CompetitionController } from './ui/competition.js';
 import { describeTransientSession } from './persistence/session-state.js';
 import { createRemoteAvatar } from './multiplayer/remote-avatar.js';
 import { MountainMapMenu } from './ui/mountain-map.js';
@@ -229,7 +230,8 @@ export class Game {
       this.hud,
       this.camera,
       initialStart,
-      { onLocationChange: (locationId, coordinateSpace) => this.setCurrentLocation(locationId, coordinateSpace) }
+      { onLocationChange: (locationId, coordinateSpace) => this.setCurrentLocation(locationId, coordinateSpace),
+        onDebugAction: () => this.competitions?.withdraw() }
     );
     this.player.setRunManager(this.runManager);
     this.runManager.startRun(initialStart, false);
@@ -245,6 +247,7 @@ export class Game {
     this.persistedCatches = new WeakSet();
     this.lastSummitReached = false;
     this.lastRunStatus = this.runManager.status;
+    this.competitions = new CompetitionController(this);
     this.camera.update(1 / 60, true);
     this.pauseMenu = new PauseMenu(this.progression, {
       getPlayerName: () => this.saveSystem.playerDisplayName,
@@ -451,6 +454,7 @@ export class Game {
     if (this.devUiPreview === 'appearance') globalThis.setTimeout(() => this.appearanceMenu.open(), 0);
     if (this.devUiPreview === 'song-feedback') globalThis.setTimeout(() => this.songFeedbackDashboard.open(), 0);
     if (this.devUiPreview === 'boat') globalThis.setTimeout(() => this.boatTravel.open(this.currentLocationId), 0);
+    if (this.devUiPreview === 'multiplayer') globalThis.setTimeout(() => this.multiplayerMenu.open(), 0);
     this.ensureDeveloperFishingResultPreview();
   }
 
@@ -473,9 +477,10 @@ export class Game {
   update(dt) {
     if (this.destroyed) return;
     this.gamepadController.poll(dt);
+    this.competitions?.update();
     const modalOpen = this.isGameplayModalOpen();
     const localGameplayPaused = this.localPause.active;
-    if (!modalOpen && !localGameplayPaused) {
+    if (!modalOpen && !localGameplayPaused && !this.competitions?.frozen) {
       this.runManager.update(dt);
       if (!this.runManager.paused) {
         // Generic world interaction only consumes Grip when a real nearby target exists;
@@ -766,6 +771,7 @@ export class Game {
   }
 
   markCheatAction(kind) {
+    this.competitions?.withdraw();
     if (kind === 'teleport') this.sessionStats.ascentCheatContaminated = true;
     this.recordStatEvent(`cheat:${kind}`, {}, false);
   }
@@ -1064,6 +1070,7 @@ export class Game {
       }, { legitimate: legitimateCatch });
       const presentation = {
         ...catchData,
+        ...this.competitions?.catchMetadata(catchData, legitimateCatch),
         presentationId: `${catchData.speciesId}:${catchData.caughtAt}`,
         active: true
       };
@@ -1127,6 +1134,7 @@ export class Game {
 
   destroy() {
     this.destroyed = true;
+    this.competitions?.destroy();
     this.gamepadController?.destroy();
     this.flushActivePlaytime();
     this.player.destroy();

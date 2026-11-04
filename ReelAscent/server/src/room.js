@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { MESSAGE_TYPES, send } from './protocol.js';
+import { RoomCompetition } from './competition.js';
 
 export class Room {
   constructor(code, capacity, runSeed = crypto.randomInt(1, 2_147_483_647)) {
@@ -9,6 +10,7 @@ export class Room {
     this.players = new Map();
     this.benchSeats = new Map();
     this.hostId = null;
+    this.competition = new RoomCompetition(this);
   }
 
   get size() { return this.players.size; }
@@ -68,6 +70,8 @@ export class Room {
       runSeed: this.runSeed,
       capacity: this.capacity,
       hostId: this.hostId,
+      competitionSupported: true,
+      competition: this.competition.state(),
       reconnectToken: session.reconnectToken,
       benchSeats: [...this.benchSeats].map(([benchId, playerIds]) => ({ benchId, playerIds })),
       players: [...this.players.values()].map((player) => ({

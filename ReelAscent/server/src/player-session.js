@@ -13,7 +13,7 @@ export class PlayerSession {
     this.lastSequence = -1;
     this.lastSnapshot = null;
     this.fishingState = null;
-    // Presentation-only, rate-limited metadata. Ownership and economy never leave clients.
+    // Inventory ownership remains local. Room events receive only catch summaries.
     this.aquariumShowcase = [];
     this.displayName = '';
     this.rateLimiter = new RateLimiter();

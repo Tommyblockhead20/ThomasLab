@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark" />
-  <title>Bass Camp — World Editor V4.2</title>
+  <title>Bass Camp — World Editor V5.0</title>
   <link rel="stylesheet" href="./editor.css" />
   <style>
     #walkthrough-hud {
@@ -29,7 +29,7 @@
     <header id="topbar">
       <div class="brand">
         <strong>BASS CAMP</strong>
-        <span>WORLD EDITOR V4.2</span>
+        <span>WORLD EDITOR V5.0</span>
         <select id="world-selector" aria-label="World / scene"></select>
         <span id="world-source-indicator" class="source-indicator" title="The editor shows shared terrain or references; not every runtime detail is editable here.">Source</span>
       </div>
@@ -42,6 +42,7 @@
             <button id="checkpoint" title="Store a browser-local safety checkpoint before a risky edit">Checkpoint</button>
             <button id="restore-checkpoint" title="Restore your latest manual safety checkpoint">Restore Checkpoint</button>
             <button id="reload-project-patch" title="Reload the current world data from the dev server">Reload Project Data</button>
+            <button id="restore-game-terrain" title="Replace only this island's edited terrain with the current game terrain. Undo restores your previous mesh.">Restore Current Game Terrain</button>
             <button id="recover-browser-autosave" title="Explicitly load the latest Stoneveil IndexedDB autosave, including one from a different project terrain revision">Recover Browser Autosave</button>
             <button id="open-patch">Open Level / Patch</button>
             <button id="import-snapshot">Import Runtime Snapshot</button>
