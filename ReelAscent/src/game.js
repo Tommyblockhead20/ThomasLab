@@ -22,6 +22,7 @@ import { MultiplayerClient } from './multiplayer/multiplayer-client.js';
 import { MESSAGE_TYPES } from './multiplayer/protocol.js';
 import { MultiplayerMenu } from './ui/multiplayer-menu.js';
 import { CompetitionController } from './ui/competition.js';
+import { OldManMenu } from './ui/old-man.js';
 import { describeTransientSession } from './persistence/session-state.js';
 import { createRemoteAvatar } from './multiplayer/remote-avatar.js';
 import { MountainMapMenu } from './ui/mountain-map.js';
@@ -176,7 +177,7 @@ export class Game {
     this.mapMenu = new MountainMapMenu(mountainMapData, {
       getLocalPlayer: () => ({ id: 'YOU', position: this.getLocalGlobalPosition() }),
       getRemotePlayers: () => [...(this.multiplayer?.room?.members ?? new Map()).entries()]
-        .filter(([, remote]) => remote.globalPosition || remote.lastSample)
+        .filter(([, remote]) => !remote.eventHidden&&(remote.globalPosition || remote.lastSample))
         .map(([id, remote]) => ({
           id: id.slice(-6).toUpperCase(),
           locationId: remote.locationId,
@@ -187,7 +188,7 @@ export class Game {
       getDestinationAccess: (locationId) => getDestinationAccess(this.saveSystem.data, locationId)
     });
     this.boatTravel = new BoatTravelMenu((destinationId) => this.travelByBoat(destinationId), {
-      getDestinationAccess: (locationId) => getDestinationAccess(this.saveSystem.data, locationId),
+      getDestinationAccess: (locationId) => this.competitions?.destinationAccess(locationId,getDestinationAccess(this.saveSystem.data, locationId))??getDestinationAccess(this.saveSystem.data,locationId),
       ownsBoat: () => this.progression.ownsBoat()
     });
     this.onOpenBoat = (event) => this.boatTravel.open(event.detail?.currentLocationId);
@@ -248,6 +249,7 @@ export class Game {
     this.lastSummitReached = false;
     this.lastRunStatus = this.runManager.status;
     this.competitions = new CompetitionController(this);
+    this.oldManMenu=new OldManMenu(this);
     this.camera.update(1 / 60, true);
     this.pauseMenu = new PauseMenu(this.progression, {
       getPlayerName: () => this.saveSystem.playerDisplayName,
@@ -455,6 +457,7 @@ export class Game {
     if (this.devUiPreview === 'song-feedback') globalThis.setTimeout(() => this.songFeedbackDashboard.open(), 0);
     if (this.devUiPreview === 'boat') globalThis.setTimeout(() => this.boatTravel.open(this.currentLocationId), 0);
     if (this.devUiPreview === 'multiplayer') globalThis.setTimeout(() => this.multiplayerMenu.open(), 0);
+    if(this.devUiPreview==='old-man')globalThis.setTimeout(()=>{this.travelByBoat('jester-island');this.oldManMenu.open();},0);
     this.ensureDeveloperFishingResultPreview();
   }
 
@@ -478,6 +481,7 @@ export class Game {
     if (this.destroyed) return;
     this.gamepadController.poll(dt);
     this.competitions?.update();
+    this.oldManMenu?.update();
     const modalOpen = this.isGameplayModalOpen();
     const localGameplayPaused = this.localPause.active;
     if (!modalOpen && !localGameplayPaused && !this.competitions?.frozen) {
@@ -625,7 +629,7 @@ export class Game {
   }
 
   isGameplayModalOpen() {
-    return this.journal.isOpen || this.inventory.isOpen || this.multiplayerMenu.isOpen
+    return this.oldManMenu?.isOpen || this.journal.isOpen || this.inventory.isOpen || this.multiplayerMenu.isOpen
       || this.mapMenu.isOpen || this.emoteMenu.isOpen || this.appearanceMenu.isOpen
       || this.shopMenu.isOpen || this.aquariumMenu.isOpen || this.boatTravel.isOpen
       || this.trailBadgeMenu.isOpen || this.songFeedbackDashboard?.isOpen;
@@ -904,7 +908,8 @@ export class Game {
   }
 
   travelByBoat(destinationId) {
-    const access = getDestinationAccess(this.saveSystem.data, destinationId);
+    const baseAccess=getDestinationAccess(this.saveSystem.data,destinationId);
+    const access = this.competitions?.destinationAccess(destinationId,baseAccess)??baseAccess;
     if (!access.playable) {
       this.hud.showToast?.(access.reason || 'That destination is not currently available.');
       return false;
@@ -1070,6 +1075,7 @@ export class Game {
       }, { legitimate: legitimateCatch });
       const presentation = {
         ...catchData,
+        legitimate:legitimateCatch,
         ...this.competitions?.catchMetadata(catchData, legitimateCatch),
         presentationId: `${catchData.speciesId}:${catchData.caughtAt}`,
         active: true
@@ -1134,6 +1140,7 @@ export class Game {
 
   destroy() {
     this.destroyed = true;
+    this.oldManMenu?.destroy();
     this.competitions?.destroy();
     this.gamepadController?.destroy();
     this.flushActivePlaytime();

@@ -1,4 +1,5 @@
 import { WORLD_CENTER, WORLD_LOCATIONS, WORLD_MAP_DISPLAY_RADIUS, compressWorldMapPosition } from '../world/world-locations.js';
+import { islandChartArt } from './island-chart-art.js';
 
 export const BOAT_MAP_CLOUD_STATES = Object.freeze(new Set(['locked-cloud', 'known-unavailable']));
 export const boatMapDestinationUsesClouds = state => BOAT_MAP_CLOUD_STATES.has(String(state ?? ''));
@@ -10,6 +11,7 @@ export function boatMapLockSummary(access = {}) {
   return progress ? `${progress[1]} Trail Badges or ${progress[2]} species` : reason.replace(/[.]$/, '');
 }
 const DESCRIPTIONS = {
+  'jester-island':['Events & mischief','Meet the Old Man. Arrange races and fishing derbies, or browse his questionable bargains.'],
   'main-mountain': ['Climb & explore', 'Rocky shores, forest lakes, hidden caves, and the summit tarn.'],
   'home-island': ['Your island home', 'Return to your cabin, change your look, or fish the quiet pond.'],
   'shop-island': ['Gear & fish market', 'Upgrade your kit and sell your latest catches.'],
@@ -31,6 +33,7 @@ export class BoatTravelMenu {
     this.title = document.querySelector('#boat-travel-selection'); this.detail = document.querySelector('#boat-travel-detail');
     this.confirmButton = document.querySelector('#confirm-boat-travel'); this.closeButton = document.querySelector('#close-boat-travel');
     this.transition = document.querySelector('#boat-travel-transition'); this.viewButton = document.querySelector('#boat-travel-view');
+    this.sailingOverlay=this.transition?.cloneNode(true);if(this.sailingOverlay){this.sailingOverlay.removeAttribute('id');this.sailingOverlay.classList.add('sailing-overlay');this.sailingOverlay.hidden=true;document.body.append(this.sailingOverlay);}
     this.onClick = event => { const marker = event.target.closest('[data-travel-destination]'); if (marker) this.select(marker.dataset.travelDestination); };
     this.onDoubleClick = event => { const marker = event.target.closest('[data-travel-destination]'); if (marker && this.select(marker.dataset.travelDestination)) { event.preventDefault(); void this.travel(); } };
     this.onConfirm = () => void this.travel(); this.onClose = () => this.close();
@@ -53,11 +56,7 @@ export class BoatTravelMenu {
       const p = compressWorldMapPosition(location.worldPosition);
       marker.style.left = `${50 + (p.x - WORLD_CENTER.x) / WORLD_MAP_DISPLAY_RADIUS * 41}%`;
       marker.style.top = `${50 + (p.z - WORLD_CENTER.z) / WORLD_MAP_DISPLAY_RADIUS * 39}%`;
-      const footprint = element('span', 'boat-map-footprint', ['main-island', 'open-water-boat'].includes(location.type) ? ICONS[location.type] : '');
-      if (location.outline?.length && !['main-island', 'open-water-boat'].includes(location.type)) {
-        const xs = location.outline.map(p => p.x), zs = location.outline.map(p => p.z), minX = Math.min(...xs), minZ = Math.min(...zs);
-        footprint.style.clipPath = `polygon(${location.outline.map(p => `${(p.x - minX) / (Math.max(...xs) - minX) * 100}% ${(p.z - minZ) / (Math.max(...zs) - minZ) * 100}%`).join(',')})`;
-      }
+      const footprint = element('span', 'boat-map-footprint');footprint.append(islandChartArt(location));
       marker.append(footprint, element('b', '', name));
       if (boatMapDestinationUsesClouds(access.state)) {
         const clouds = element('span', 'boat-map-clouds'); clouds.setAttribute('aria-hidden', 'true');
@@ -72,6 +71,21 @@ export class BoatTravelMenu {
       markers.push(marker); rows.push(row);
     }
     this.map.append(...markers); this.list?.replaceChildren(...rows); this.renderSelection();
+    this.renderRoute();
+  }
+  renderRoute() {
+    this.map.querySelector('.boat-map-route')?.remove();
+    const start=WORLD_LOCATIONS.find(l=>l.id===this.currentId),end=WORLD_LOCATIONS.find(l=>l.id===this.selectedId);
+    if(!start||!end||start===end)return;
+    const point=l=>{const p=compressWorldMapPosition(l.worldPosition);return [50+(p.x-WORLD_CENTER.x)/WORLD_MAP_DISPLAY_RADIUS*41,50+(p.z-WORLD_CENTER.z)/WORLD_MAP_DISPLAY_RADIUS*39];};
+    const a=point(start),b=point(end),s=document.createElementNS('http://www.w3.org/2000/svg','svg');s.setAttribute('viewBox','0 0 100 100');s.setAttribute('preserveAspectRatio','none');s.setAttribute('aria-hidden','true');s.classList.add('boat-map-route');
+    const path=document.createElementNS(s.namespaceURI,'path');path.setAttribute('d',`M${a} Q${(a[0]+b[0])/2+5},${(a[1]+b[1])/2-6} ${b}`);path.setAttribute('vector-effect','non-scaling-stroke');s.append(path);this.map.prepend(s);
+  }
+  async runTransition(label,action) {
+    const overlay=this.sailingOverlay;
+    if(overlay){overlay.querySelector('strong').textContent=label;overlay.hidden=false;}
+    try{await new Promise(r=>setTimeout(r,650));await action();await new Promise(r=>setTimeout(r,350));}
+    finally{if(overlay)overlay.hidden=true;}
   }
   renderSelection() {
     const location = WORLD_LOCATIONS.find(l => l.id === this.selectedId);
@@ -91,6 +105,7 @@ export class BoatTravelMenu {
   select(id) {
     if (this.travelInProgress || !WORLD_LOCATIONS.some(l => l.id === id)) return false;
     this.selectedId = id; this.renderSelection();
+    this.renderRoute();
     for (const marker of this.screen.querySelectorAll('[data-travel-destination]')) { const selected = marker.dataset.travelDestination === id; marker.classList.toggle('is-selected', selected); marker.setAttribute('aria-pressed', String(selected)); }
     return true;
   }
@@ -99,13 +114,12 @@ export class BoatTravelMenu {
     if (!destination || !this.onTravel || this.travelInProgress || destination.id === this.currentId || !this.markerAccess(destination).playable) return;
     this.travelInProgress = true; this.confirmButton.disabled = true; this.closeButton.disabled = true;
     try {
-      if (this.transition) { this.transition.hidden = false; this.transition.querySelector('strong').textContent = `Sailing to ${destination.displayName}…`; }
-      await new Promise(resolve => globalThis.setTimeout(resolve, 450)); await this.onTravel(destination.id);
-      await new Promise(resolve => globalThis.setTimeout(resolve, 250)); this.close();
+      await this.runTransition(`Sailing to ${destination.displayName}…`,()=>this.onTravel(destination.id));this.close();
     } finally { this.travelInProgress = false; if (this.transition) this.transition.hidden = true; this.closeButton.disabled = false; this.renderSelection(); }
   }
   close() { if (!this.screen || !this.isOpen) return; this.isOpen = false; this.screen.hidden = true; document.body.classList.remove('boat-travel-open'); document.querySelector('#game-canvas')?.focus({ preventScroll: true }); }
   destroy() {
+    this.sailingOverlay?.remove();
     this.map?.removeEventListener('click', this.onClick); this.map?.removeEventListener('dblclick', this.onDoubleClick); this.list?.removeEventListener('click', this.onClick);
     this.confirmButton?.removeEventListener('click', this.onConfirm); this.closeButton?.removeEventListener('click', this.onClose); this.viewButton?.removeEventListener('click', this.onView); window.removeEventListener('keydown', this.onKeyDown, true); document.body.classList.remove('boat-travel-open');
   }

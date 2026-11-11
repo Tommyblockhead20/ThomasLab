@@ -1,0 +1,17 @@
+# Example for a separate coturn installation. Copy outside the repository,
+# replace the placeholders, and restrict access to the completed config.
+listening-port=3478
+tls-listening-port=5349
+fingerprint
+lt-cred-mech
+realm=turn.example.com
+server-name=turn.example.com
+user=titanic:REPLACE_WITH_A_LONG_RANDOM_PASSWORD
+external-ip=203.0.113.10
+min-port=49160
+max-port=49200
+no-multicast-peers
+no-cli
+# Configure real TLS certificates before using turns: URLs.
+# cert=/etc/letsencrypt/live/turn.example.com/fullchain.pem
+# pkey=/etc/letsencrypt/live/turn.example.com/privkey.pem

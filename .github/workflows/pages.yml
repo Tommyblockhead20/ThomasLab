@@ -31,7 +31,9 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: ReelAscent/package-lock.json
+          cache-dependency-path: |
+            ReelAscent/package-lock.json
+            TitanicGame/package-lock.json
 
       - name: Install Bass Camp build dependencies
         working-directory: ReelAscent
@@ -39,6 +41,20 @@ jobs:
 
       - name: Build Bass Camp from its source
         working-directory: ReelAscent
+        run: npm run build
+
+      - name: Install Titanic build dependencies
+        working-directory: TitanicGame
+        run: npm ci
+
+      - name: Test Titanic multiplayer, simulation, and WebRTC relay
+        working-directory: TitanicGame
+        run: npm test
+
+      - name: Build Titanic from its source
+        working-directory: TitanicGame
+        env:
+          VITE_GAME_SERVER_URL: ${{ vars.TITANIC_SERVER_URL }}
         run: npm run build
 
       - name: Prepare and validate the complete website

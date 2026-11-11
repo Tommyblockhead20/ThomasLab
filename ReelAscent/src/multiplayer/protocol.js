@@ -13,6 +13,7 @@ export const MESSAGE_TYPES = Object.freeze({
   LEAVE_ROOM: 'leave_room',
   ROOM_STATE: 'room_state',
   COMPETITION_ACTION: 'competition_action',
+  OLD_MAN_ACTION:'old_man_action',
   PLAYER_SNAPSHOT: 'player_snapshot',
   CATCH_EVENT: 'catch_event',
   FISHING_STATE: 'fishing_state',

@@ -29,6 +29,7 @@ const outlineFromScales = (scales) => freezePoints(scales.map((scale, index) => 
 // footprints for the rendered terrain, so the boat/GPS map can depict the REAL simple shape
 // instead of inventing unrelated ovals.
 export const ISLAND_OUTLINES = Object.freeze({
+  'jester-island': outlineFromScales([1.08,.94,1.13,.9,1.04,1.12,.96,1.05,.92,1.08,1.02,.95]),
   'home-island': outlineFromScales([1.02, .94, 1.08, 1.03, .92, 1.1, 1.04, .96, 1.07, 1.01, .93, 1.08]),
   'shop-island': outlineFromScales([1.12, 1.02, .91, .96, 1.08, 1.12, .94, .89, 1.05, 1.12, 1.02, .95]),
   'aquarium-island': outlineFromScales([1.07, 1.01, .96, 1.03, 1.08, 1.01, .95, 1.02, 1.08, 1.01, .96, 1.02]),
@@ -152,6 +153,11 @@ function openWaterBoatLocation({ id, displayName, angle, radius }) {
 // foundations, structures, or virtual craft. Keep the legacy alias below for callers that
 // predate v14; new systems should consume SATELLITE_WORLD_LOCATIONS or WORLD_LOCATIONS.
 export const SATELLITE_WORLD_LOCATIONS = Object.freeze([
+  islandLocation({
+    id:'jester-island',displayName:"Rascal's Rest",type:'event-island',
+    angle:8,radius:760,radii:{x:22,z:18},elevation:.74,
+    theme:'old-fisher-outpost',functions:['events','old-man','pranks'],dockSide:'outward'
+  }),
   islandLocation({
     id: 'home-island', displayName: 'Hearthward Isle', type: 'home-island',
     angle: 222, radius: 980, radii: { x: 22, z: 18 }, elevation: .72,

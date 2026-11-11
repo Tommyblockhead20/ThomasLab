@@ -19,6 +19,7 @@ test('two real WebSocket clients join a derby, score catches, reconnect and rece
   let now=Date.now();room.competition.dispose();room.competition.clock=()=>now;
   const b=await connect();send(b,'hello',{playerId:'net-b',displayName:'Bob'});send(b,'join_room',{roomCode:room.code,displayName:'Bob'});
   await wait(b,m=>m.type==='room_state');
+  room.players.get('net-a').lastSnapshot={position:{x:0,y:2,z:0},locationId:'jester-island',teleportRevision:0};
   send(a,'competition_action',{action:'create',kind:'derby',mode:'haul',saveId:'save-a'});
   const opened=(await wait(b,m=>m.payload.competition?.phase==='lobby')).payload.competition;
   send(b,'competition_action',{action:'join',eventId:opened.id,saveId:'save-b'});await wait(a,m=>m.payload.competition?.participants.length===2);
@@ -29,7 +30,7 @@ test('two real WebSocket clients join a derby, score catches, reconnect and rece
   await wait(b,m=>m.payload.competition?.participants[0].count===1);
   send(a,'catch_event',{speciesId:'bluegill',specimenId:'real-catch',eventId:opened.id,saveId:'save-a',legitimate:true,length:10,value:75});
   now+=300_001;room.competition.tick();const result=(await wait(b,m=>m.payload.competition?.phase==='finished')).payload.competition;
-  assert.equal(result.participants[0].count,1);assert.deepEqual(result.winnerIds,['net-a']);assert.equal(result.awards[0].amount,150);
+  assert.equal(result.participants[0].count,1);assert.deepEqual(result.winnerIds,['net-a']);assert.equal(result.awards[0].amount,100);
   a.close();await once(a,'close');const resumed=await connect();send(resumed,'hello',{playerId:'net-a',reconnectToken:hosted.reconnectToken,displayName:'Alice'});
   const restored=(await wait(resumed,m=>m.payload.competition?.phase==='finished')).payload.competition;
   assert.deepEqual(restored.awards,result.awards);

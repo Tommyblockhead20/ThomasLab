@@ -53,6 +53,8 @@ export function defaultProgressionState(playerId = createDurableId('player')) {
     player: { id: playerId, createdAt: Date.now() },
     money: 0,
     competitionRewards: [],
+    competitionWins: {race:0,derby:0}, raceResults: [],
+    oldManReceipts:[],
     inventory: [],
     aquarium: [],
     aquariumTankCount: 1,
@@ -235,6 +237,9 @@ export function normalizeProgressionState(value = {}) {
     money: Math.max(0, Math.floor(finite(value.money))),
     competitionRewards: [...new Set((Array.isArray(value.competitionRewards) ? value.competitionRewards : [])
       .filter(id => typeof id === 'string' && id.length <= 140))].slice(-256),
+    competitionWins:Object.fromEntries(['race','derby'].map(k=>[k,Math.max(0,Math.floor(finite(value.competitionWins?.[k])))])),
+    oldManReceipts:[...new Set((Array.isArray(value.oldManReceipts)?value.oldManReceipts:[]).filter(id=>typeof id==='string'&&id.length<=140))].slice(-256),
+    raceResults:(Array.isArray(value.raceResults)?value.raceResults:[]).filter(r=>typeof r.eventId==='string'&&Number.isFinite(r.seconds)&&r.seconds>0&&r.seconds<=1200).slice(-100).map(r=>({eventId:r.eventId.slice(0,140),seconds:r.seconds,allowEquipment:r.allowEquipment===true,spacedStart:r.spacedStart===true})),
     inventory,
     aquarium,
     aquariumTankCount,

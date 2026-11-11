@@ -2074,7 +2074,8 @@ export class FishingController {
       recentSpeciesIds,
       habitatWeights: ecology.habitatWeights,
       baselineSpeciesProbabilityCaps,
-      disablePoolEnrichment: true
+      disablePoolEnrichment: true,
+      oldManEffect:this.getOldManEffect?.()??{}
     };
   }
 

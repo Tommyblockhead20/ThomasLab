@@ -77,6 +77,12 @@ export class ClientConnection {
           if (error) sendError(this.socket, 'competition_error', error);
         }
         break;
+      case MESSAGE_TYPES.OLD_MAN_ACTION:
+        if(this.session.room&&this.rateLimit('oldman',6,10_000)) {
+          const error=this.session.room.oldMan.action(this.session,message.payload);
+          if(error)sendError(this.socket,'old_man_error',error);
+        }
+        break;
       case MESSAGE_TYPES.FISHING_STATE:
         this.handleFishingState(message.payload);
         break;
@@ -231,6 +237,7 @@ export class ClientConnection {
     };
     this.session.room.broadcast(MESSAGE_TYPES.CATCH_EVENT, event, this.session.playerId);
     this.session.room.competition.catch(this.session, payload);
+    this.session.room.oldMan.catch(this.session,payload);
   }
 
   handleAquariumShowcase(payload = {}) {

@@ -15,6 +15,25 @@ export function buildCosmeticSculpture(root, cosmetic, materials, { blob, headY,
   const panel = (label, points, material = materials.accessory, thickness = .025) => mesh(label, sculptedPanel(points, thickness), material);
   const ring = (label, rx, rz, y, z = 0, radius = .025, material = materials.accessory) => tube(label, Array.from({ length: 49 }, (_, i) => { const a = i / 48 * Math.PI * 2; return [Math.cos(a) * rx, y, z + Math.sin(a) * rz, radius]; }), material);
   const visual = cosmetic.visual;
+  if(visual==='gold-top-hat'||visual==='pearl-pendant') {
+    const precious=materials.accessoryMetal.clone();precious.name=cosmetic.label;
+    if(visual==='gold-top-hat'){precious.diffuse.set(.94,.67,.17);precious.metalness=.88;precious.gloss=.86;}
+    else {precious.diffuse.set(.84,.9,.88);precious.metalness=.25;precious.gloss=.93;precious.emissive.set(.035,.045,.05);}
+    precious.update();root.once('destroy',()=>precious.destroy());
+    if(visual==='gold-top-hat') {
+      mesh('broad gold brim',revolvedSurface([[headY-.04,.31],[headY,.36],[headY+.04,.31]],32),precious);
+      mesh('tapered golden crown',revolvedSurface([[headY+.01,.235],[headY+.37,.21],[headY+.43,.23],[headY+.43,0]],32),precious);
+      ring('dark satin band',.235,.235,headY+.075,0,.025,materials.dark);
+      add('pearl hat pin','sphere',{x:.12,y:headY+.1,z:-.22},{x:.065,y:.065,z:.04},materials.silver);
+    }else {
+      const y=blob?.44:.45,z=blob?-.5:-.28;
+      ring('platinum neck chain',blob?.34:.245,blob?.34:.245,y,0,.014,materials.silver);
+      ring('pearl setting',.11,.035,y-.18,z,.014,precious);
+      add('large moon pearl','sphere',{x:0,y:y-.2,z:z-.015},{x:.19,y:.23,z:.13},precious);
+      for(const side of [-1,1])tube('pendant cradle',[[side*.1,y-.12,z,.014],[side*.095,y-.26,z,.012],[0,y-.31,z,.008]],materials.silver,7);
+    }
+    return true;
+  }
   if (cosmetic.slot === 'eyewear' && ['glasses', 'round', 'aviator', 'goggles', 'visor', 'hammer', 'electric', 'sun'].includes(visual)) {
     const y = blob ? .85 : .73, z = blob ? -.48 : -.267;
     const round = ['round', 'goggles', 'aviator', 'sun', 'electric'].includes(visual);

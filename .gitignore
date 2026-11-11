@@ -1,2 +1,5 @@
 # Temporary website assembled by the GitHub Pages workflow or a local check.
 /_site/
+
+# Generated browser build; source lives in TitanicGame/.
+/Titanic/

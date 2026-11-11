@@ -72,7 +72,7 @@ export class RemotePlayer {
   }
 
   syncVisibility() {
-    const visible = this.connected && this.snapshots.snapshots.length > 0
+    const visible = !this.eventHidden && this.connected && this.snapshots.snapshots.length > 0
       && this.locationId === this.localLocationId;
     if (this.representation?.setRemoteVisible) this.representation.setRemoteVisible(visible);
     else if (this.representation) this.representation.enabled = visible;

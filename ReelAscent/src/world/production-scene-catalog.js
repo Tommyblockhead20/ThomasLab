@@ -45,7 +45,7 @@ export function captureProductionCatalog(world) {
       references.set(`WATER:${entity.productionFishingZoneId}`,ref);
     }
     // These exact terrain owners are already rendered from the shared editable mesh.
-    if (terrain.has(entity) || waters.has(entity) || entity.productionFishingZoneId || /^(Continuous irregular mountain body|Global ocean|Ocean floor|Stoneveil Peak summit crown)/.test(entity.name)
+    if (terrain.has(entity) || waters.has(entity) || entity._transientWorldEffect || entity.productionFishingZoneId || /^(Continuous irregular mountain body|Global ocean|Ocean floor|Stoneveil Peak summit crown)/.test(entity.name)
       || entity.name.endsWith(' text') || /^(Map Editor baked|Authoritative summit)/.test(entity.name)) continue;
     if (locationId === 'main-mountain' && /^(Ocean|Sea floor)/.test(entity.name)) continue;
     const location = WORLD_LOCATIONS.find(l => l.id === locationId), origin = locationId === 'main-mountain' ? { x:0,y:0,z:0 } : location?.worldPosition ?? {x:0,y:0,z:0};

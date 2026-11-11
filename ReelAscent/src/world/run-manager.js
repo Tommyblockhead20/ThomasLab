@@ -149,6 +149,7 @@ export class RunManager {
       this.status = 'active';
       this.endedTime = 0;
       this.fishing.cancel();
+        this.onLocationChange?.(target.locationId??'main-mountain',target.coordinateSpace??'global-world');
       this.player.teleport(target.position, target.facingYaw);
       this.camera.setYaw(target.facingYaw);
       this.world.setDeveloperCourseVisible(['KeyT', 'KeyV'].includes(action.code));

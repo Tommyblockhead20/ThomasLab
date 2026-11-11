@@ -186,6 +186,9 @@ export class HomeInteractionController {
   interact() {
     const interaction = this.current;
     if (!interaction || this.modalOpen()) return false;
+    if(interaction.action==='old-man') {
+      this.player.cancelEmote();this.dismissPrompt();window.dispatchEvent(new CustomEvent('reel-ascent:open-old-man'));return true;
+    }
     if (this.player.benchSeat) {
       this.pendingSeat = null;
       this.player.clearBenchSeat();

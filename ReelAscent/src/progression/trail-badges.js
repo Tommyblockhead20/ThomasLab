@@ -7,6 +7,8 @@ const badge = (id, name, description, kind, target = 1) => Object.freeze({
 });
 
 export const TRAIL_BADGE_DEFINITIONS = Object.freeze([
+  badge('derby-champion','Derby Champion','Finish first in a multiplayer fishing derby.','derbyWins',1),
+  badge('race-champion','Summit Champion','Finish first in a multiplayer summit race.','raceWins',1),
   badge('field-naturalist-1', 'Field Naturalist I', 'Catch 50 unique active creatures.', 'uniqueCreatures', 50),
   badge('field-naturalist-2', 'Field Naturalist II', 'Catch 100 unique active creatures.', 'uniqueCreatures', 100),
   badge('field-naturalist-3', 'Field Naturalist III', 'Catch 200 unique active creatures.', 'uniqueCreatures', 200),
@@ -71,6 +73,8 @@ export class TrailBadgeSystem {
       + mapPurchases.filter((item) => ownedItems.has(item.id)).length
       + cosmeticPurchases.filter((item) => (save.progression?.ownedCosmetics ?? []).includes(item.id)).length;
     return {
+      derbyWins:save.progression?.competitionWins?.derby??0,
+      raceWins:save.progression?.competitionWins?.race??0,
       uniqueCreatures: activeCount(progress.uniqueSpeciesCaught),
       totalCatches: Number(save.lifetime?.fishCaught) || 0,
       uniqueSold: activeCount(progress.uniqueSpeciesSold),

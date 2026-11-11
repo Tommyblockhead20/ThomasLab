@@ -5,12 +5,13 @@ import AQUARIUM from './world-editor-levels/aquarium-island.json' with {type:'js
 import MANGROVE from './world-editor-levels/normal-fishing-island.json' with {type:'json'};
 import FROST from './world-editor-levels/cold-island.json' with {type:'json'};
 import CAVE from './world-editor-levels/cave-fishing-island.json' with {type:'json'};
+import JESTER from './world-editor-levels/jester-island.json' with {type:'json'};
 import { WORLD_LOCATIONS } from './world-locations.js';
 import { attachWorldEditorLevelToStructure } from './world-editor-v2-runtime.js';
 import { addSurfaceUvs } from '../graphics/surface-detail.js';
 import { attachSignText } from './sign-text-renderer.js';
 
-export const PRODUCTION_LEVELS = Object.freeze([HOME,SHOP,AQUARIUM,MANGROVE,FROST,CAVE]);
+export const PRODUCTION_LEVELS = Object.freeze([HOME,SHOP,AQUARIUM,MANGROVE,FROST,CAVE,JESTER]);
 export function terrainSignature(terrain) {
   let h=2166136261;
   for (const value of [...terrain?.positions??[],...terrain?.indices??[]]) {

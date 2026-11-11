@@ -1374,7 +1374,7 @@ function updateCoreSupportMeshes(data) {
     }
     const geometry=new pc.Geometry();geometry.positions=group.positions;geometry.normals=group.normals;
     addSurfaceUvs(geometry);state.mesh.setPositions(group.positions);state.mesh.setNormals(group.normals);
-    state.mesh.setUvs(0,geometry.uvs);state.mesh.setIndices(group.indices);state.mesh.update(pc.PRIMITIVE_TRIANGLES,true);
+    state.mesh.setColors32(group.colors);state.mesh.setUvs(0,geometry.uvs);state.mesh.setIndices(group.indices);state.mesh.update(pc.PRIMITIVE_TRIANGLES,true);
   }
 }
 
@@ -6949,8 +6949,8 @@ async function initializeWorldEditorV2() {
     await switchWorld(activeWorldId, { keepCamera: activeWorldId === 'stoneveil-peak' });
     if (isStoneveilWorld()) {
       setStatus(compatibleRecoveryApplied
-        ? 'World Editor V5.0 ready. Current game meshes/materials loaded; recovered edits use the same terrain revision.'
-        : 'World Editor V5.0 ready. Current game meshes/materials and project terrain loaded.');
+        ? 'World Editor V5.1 ready. Current game meshes/materials loaded; recovered edits use the same terrain revision.'
+        : 'World Editor V5.1 ready. Current game meshes/materials and project terrain loaded.');
     }
   } catch (error) {
     console.error(error);

@@ -28,3 +28,9 @@ For local iteration, open a terminal in `ReelAscent` and run `npm run dev`. The 
 - The GitHub actions are pinned to verified commits. Update those pins deliberately when maintaining the workflow.
 
 Official reference: [Using custom workflows with GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
+## Titanic: Altered History
+
+Game source lives in `TitanicGame/`; `Titanic/` is its ignored, generated browser build. The Pages workflow installs its locked dependencies, runs simulation/network/WebRTC tests, builds it and stages the fresh client alongside Bass Camp. The staging script excludes the Node server source and local configuration.
+
+Titanic also requires a persistent Node multiplayer/voice server with inbound UDP support; GitHub Pages serves only its browser client. Host that server separately, then set the repository Actions variable `TITANIC_SERVER_URL` to its public HTTPS origin before publishing. Players may also choose a server in the game's Settings. Full Node, Docker, HTTPS, STUN/TURN and testing instructions are in [`TitanicGame/README.md`](TitanicGame/README.md) and [`TitanicGame/TESTING.md`](TitanicGame/TESTING.md). No production server is provisioned by this workflow.

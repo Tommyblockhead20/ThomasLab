@@ -2,7 +2,7 @@
 import { BoatTravelMenu } from '../../src/ui/boat-travel.js';
 const markup = new DOMParser().parseFromString(await (await fetch('/index.html')).text(), 'text/html');
 document.body.append(markup.querySelector('#boat-travel'));
-const known = new Set(['main-mountain', 'home-island', 'shop-island', 'aquarium-island']);
+const known = new Set(['main-mountain', 'home-island', 'shop-island', 'aquarium-island','jester-island']);
 const menu = new BoatTravelMenu(() => {}, { getDestinationAccess(id) {
   if (known.has(id)) return { playable: true, revealed: true, state: 'available' };
   if (id === 'bluewater-reach') return { playable: false, revealed: true, state: 'locked-purchase', reason: 'Buy the Bluewater Boat' };

@@ -123,15 +123,24 @@ export class ProgressionSystem {
     if (!award || award.playerId !== playerId || award.saveId !== this.saveSystem.data.saveId
       || !['derby', 'race'].includes(award.kind) || typeof award.eventId !== 'string'
       || award.eventId.length > 140 || !award.eventId.length
-      || !Number.isSafeInteger(award.amount) || award.amount < 1 || award.amount > 200) return false;
+      || !Number.isSafeInteger(award.amount) || award.amount < 1 || award.amount > 350) return false;
     this.state.competitionRewards ??= [];
     if (this.state.competitionRewards.includes(award.eventId)) return false;
     this.state.competitionRewards = [...this.state.competitionRewards, award.eventId].slice(-256);
     this.state.money += award.amount;
+    if(award.place===1) {this.state.competitionWins??={race:0,derby:0};this.state.competitionWins[award.kind]++;}
     // Save receipt and money together, before any follow-up UI or network activity.
     this.commit();
     this.saveSystem.recordLegitimateEarnings?.(award.amount);
     return true;
+  }
+
+  recordRaceResult(event,participant) {
+    if(event.phase!=='finished'||participant.saveId!==this.saveSystem.data.saveId||participant.disqualified||!participant.finishAt)return false;
+    const seconds=(participant.finishAt-event.startedAt)/1000;
+    if(!(seconds>0&&seconds<=1200))return false;
+    this.state.raceResults??=[];if(this.state.raceResults.some(r=>r.eventId===event.id))return false;
+    this.state.raceResults=[...this.state.raceResults,{eventId:event.id,seconds,allowEquipment:event.allowEquipment===true,spacedStart:event.spacedStart===true}].slice(-100);this.commit();return true;
   }
 
   sellInventorySpecimen(specimenId) {
@@ -608,9 +617,9 @@ export class ProgressionSystem {
     };
   }
 
-  purchaseCosmetic(cosmeticId) {
+  purchaseCosmetic(cosmeticId,vendor='shop') {
     const cosmetic = COSMETIC_BY_ID.get(cosmeticId);
-    if (!cosmetic || cosmetic.source.type !== 'shop') return { ok: false, reason: 'That cosmetic is not sold here' };
+    if (!cosmetic || cosmetic.source.type !== vendor || !['shop','old-man'].includes(vendor)) return { ok: false, reason: 'That cosmetic is not sold here' };
     if (this.state.ownedCosmetics.includes(cosmetic.id)) return { ok: false, reason: 'Already owned' };
     if (!this.spend(cosmetic.source.price)) return { ok: false, reason: `Need $${cosmetic.source.price}` };
     this.state.ownedCosmetics.push(cosmetic.id);

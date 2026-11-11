@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Old Man event controls review</title><link rel="stylesheet" href="../../src/styles.css"></head><body style="background:#34585a"><output id="review-result" style="position:fixed;bottom:0;left:0;z-index:200;color:white;background:#123;padding:8px;font:12px monospace">UI fixture · memory-only save · no server actions</output><script type="module">
+import { CompetitionController } from '../../src/ui/competition.js';
+import { OldManMenu } from '../../src/ui/old-man.js';
+import { SaveSystem } from '../../src/persistence/save-system.js';
+import { ProgressionSystem } from '../../src/progression/progression.js';
+const markup=new DOMParser().parseFromString(await(await fetch('/index.html')).text(),'text/html');document.body.append(markup.querySelector('#multiplayer-menu'));
+const data=new Map(),saveSystem=new SaveSystem({getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)}),progression=new ProgressionSystem(saveSystem);progression.state.money=10000;
+class ReviewClient extends EventTarget {
+  state='in_room';playerId='host';competition=null;oldMan={receipts:[],curses:[],fluteAvailable:false};
+  room={roomCode:'0000',getSharedTimeSeconds:()=>Date.now()/1000,roster:new Map([['host',{id:'host',displayName:'Host'}],['guest',{id:'guest',displayName:'Guest'}]]),members:new Map()};
+  getState(){return {state:this.state,hostId:'host',competitionSupported:true};}
+  competitionAction(action,payload){document.querySelector('#review-result').textContent=JSON.stringify({action,...payload});return true;}
+  oldManAction(){return false;}
+}
+const game={multiplayer:new ReviewClient(),currentLocationId:'jester-island',saveSystem,progression,fishing:{},hud:{showToast(){}},multiplayerMenu:{close(){},open(){}},player:{exitFishing(){},clearBenchSeat(){},setUnlimitedStamina(){},stamina:{}},sessionStats:{}};
+game.competitions=new CompetitionController(game);game.oldManMenu=new OldManMenu(game);game.oldManMenu.open();
+</script></body></html>

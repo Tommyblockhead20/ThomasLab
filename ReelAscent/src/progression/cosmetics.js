@@ -192,7 +192,12 @@ export const CASINO_EXCLUSIVE_COSMETICS = Object.freeze([
   item('casino-flashy-pack', 'Jackpot Light Pack', 'backAccessory', { type: 'casino', hint: 'Casino Exclusive' }, 'tank')
 ]);
 
+export const OLD_MAN_COSMETICS=Object.freeze([
+  item('old-man-golden-top-hat','Golden Tide Top Hat','headwear',{type:'old-man',price:5000,hint:"Old Man · Rascal's Rest"},'gold-top-hat'),
+  item('old-man-pearl-pendant','Moon Pearl Pendant','faceAccessory',{type:'old-man',price:8000,hint:"Old Man · Rascal's Rest"},'pearl-pendant')
+]);
 export const COSMETIC_CATALOG = Object.freeze([
+  ...OLD_MAN_COSMETICS,
   ...STARTER_COSMETICS,
   ...SHOP_COSMETICS,
   ...EXISTING_REWARD_COSMETICS,

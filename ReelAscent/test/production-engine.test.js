@@ -10,6 +10,7 @@ import { COSMETIC_CATALOG, PENDING_COSMETIC_VISUAL_REDESIGN_IDS } from '../src/p
 import { DEFAULT_APPEARANCE } from '../src/player/appearance.js';
 import { GenericWorldScene } from '../tools/map-editor/generic-scene.js';
 import { getWorldEditorWorld } from '../tools/map-editor/world-registry.js';
+import { ShoreWaves } from '../src/graphics/shore-waves.js';
 
 test('real production world, editor references, saved object edits and all cosmetic factories work in the engine',async()=>{
   const runtime=await createHeadlessWorld();
@@ -17,13 +18,17 @@ test('real production world, editor references, saved object edits and all cosme
     const {app,world}=runtime,catalog=captureProductionCatalog(world);
     assert.ok(catalog.records.get('main-mountain').filter(r=>r.category==='Climbing rocks').length>6000);
     const editor=new GenericWorldScene(app,app.root);editor.productionCatalog=catalog;
-    for(const id of ['home-island','shop-island','aquarium-island','normal-fishing-island','cold-island','cave-fishing-island']) {
+    for(const id of ['home-island','shop-island','aquarium-island','normal-fishing-island','cold-island','cave-fishing-island','jester-island']) {
       assert.ok(catalog.records.get(id)?.length>8,`${id} has real game detail`);
       const level=makeProductionIslandEditorLevel(id);mergeProductionCatalog(level,catalog,id);
       editor.setWorld(getWorldEditorWorld(id),level);editor.setEnabled(true);
       assert.ok(editor.entities.size>5,`${id} renders and registers selectable game objects`);
       for(const water of level.waters??[]) if(water.metadata?.productionSourceWater)assert.ok(catalog.waterReferences.has(water.identity||water.id),`${id} has the actual game water mesh`);
     }
+    const npc=catalog.records.get('jester-island').filter(r=>r.metadata.npcId==='old-man-fisher');assert.ok(npc.length>15,'the complete Old Man is editable as an NPC assembly');
+    const waves=new ShoreWaves(world,-.76);world.activeLocationId='main-mountain';waves.update(1);
+    assert.equal(waves.bands.length,2);assert.ok(waves.bands[0].segments.length>0&&waves.bands[0].segments.length<=180);
+    assert.ok(waves.bands[0].positions.every(Number.isFinite));world.activeLocationId='home-island';waves.update(1);assert.equal(waves.bands[0].entity.enabled,false);
     const level=makeProductionIslandEditorLevel('shop-island');mergeProductionCatalog(level,catalog,'shop-island');
     const seat=level.objects.find(r=>/shore rest bench seat/.test(r.name));assert.ok(seat);
     const entity=world.productionEntities.get(seat.id).entity,old=entity.getPosition().clone();

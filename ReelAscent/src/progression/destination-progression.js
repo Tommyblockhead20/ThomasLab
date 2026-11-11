@@ -8,7 +8,7 @@ export const DESTINATION_UNLOCK_RULES = Object.freeze({
 });
 
 export const ALWAYS_AVAILABLE_DESTINATIONS = Object.freeze(new Set([
-  'main-mountain', 'home-island', 'shop-island', 'aquarium-island'
+  'main-mountain', 'home-island', 'shop-island', 'aquarium-island', 'jester-island'
 ]));
 
 const cleanIds = (items) => [...new Set((Array.isArray(items) ? items : [])

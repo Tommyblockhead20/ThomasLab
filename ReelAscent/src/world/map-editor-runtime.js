@@ -3,6 +3,7 @@ import { PLAYER_CONFIG } from '../config.js';
 import * as pc from 'playcanvas';
 import { applyProductionObjectTransform } from './production-level-edits.js';
 import { MAIN_WORLD_LOCATION } from './world-locations.js';
+import { terrainSupportTint } from '../graphics/terrain-tints.js';
 
 export const MAP_EDITOR_SCHEMA = 1;
 const METERS_PER_FOOT = 0.3048;
@@ -639,7 +640,7 @@ export function partitionTerrainBySupport(positions, indices, normals = calculat
   const standableNormalY = Math.cos(35 * Math.PI / 180);
   const slideNormalY = Math.cos(PLAYER_CONFIG.slideSlopeDegrees * Math.PI / 180);
   const groups = Object.fromEntries(['standable', 'walkable', 'slide'].map((kind) => [kind, {
-    positions: [], normals: [], indices: [], vertexMap: new Map()
+    positions: [], normals: [], colors: [], indices: [], vertexMap: new Map()
   }]));
   for (let i = 0; i < indices.length; i += 3) {
     const [a, b, c] = indices.slice(i, i + 3);
@@ -657,6 +658,7 @@ export function partitionTerrainBySupport(positions, indices, normals = calculat
         group.vertexMap.set(vertex, local);
         group.positions.push(...positions.slice(vertex * 3, vertex * 3 + 3));
         group.normals.push(...normals.slice(vertex * 3, vertex * 3 + 3));
+        group.colors.push(...terrainSupportTint(normals[vertex*3+1],standableNormalY,slideNormalY));
       }
       group.indices.push(local);
     }
@@ -851,11 +853,12 @@ function addBakedTerrainMesh(world, patch, center = centerFallback()) {
       const geometry = new pc.Geometry();
       geometry.positions = group.positions;
       geometry.normals = group.normals;
+      geometry.colors = group.colors;
       geometry.indices = group.indices;
       const mesh = pc.Mesh.fromGeometry(world.app.graphicsDevice, addSurfaceUvs(geometry));
       const meshMaterial = material.clone();
       meshMaterial.name = `Stoneveil ${kind} core`;
-      if (kind === 'standable') meshMaterial.diffuse.set(.62, .72, .53);
+      meshMaterial.diffuse.set(1,1,1);meshMaterial.diffuseVertexColor=true;
       meshMaterial.cull = pc.CULLFACE_NONE;
       applySurfaceDetail(meshMaterial, world.app.graphicsDevice, `core-${kind}`, { tiling: 2.4, strength: .3 });
       return new pc.MeshInstance(mesh, meshMaterial, entity);

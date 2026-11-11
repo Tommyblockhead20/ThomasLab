@@ -19,7 +19,7 @@ import {
 
 const ISLAND_EDITOR_IDS = Object.freeze([
   'home-island', 'shop-island', 'aquarium-island', 'cave-fishing-island',
-  'normal-fishing-island', 'cold-island', 'skyreach-foundation'
+  'normal-fishing-island', 'cold-island', 'skyreach-foundation', 'jester-island'
 ]);
 
 export function productionIslandEditorIds() { return [...ISLAND_EDITOR_IDS]; }

@@ -1,4 +1,5 @@
 import { SHINY_CONFIG } from '../config.js';
+import { applyOldManTable } from '../multiplayer/old-man-rules.js';
 import { EXPANDED_SPECIES_DEFINITIONS } from './species-expansion.js';
 import { buildTwoStageProbabilityTable } from './rarity-selection.js';
 import { FUTURE_CREATURE_RESERVATIONS } from './future-reservations.js';
@@ -774,7 +775,7 @@ function capWeightedShares(rawWeights, requestedCap = .25) {
 
 export function getWeightedSpeciesTable(fishIds, modifiers = {}) {
   const expandedIds = modifiers.disablePoolEnrichment ? fishIds : enrichPoolIds(fishIds);
-  return buildTwoStageProbabilityTable(FISH_SPECIES, expandedIds, modifiers);
+  return applyOldManTable(buildTwoStageProbabilityTable(FISH_SPECIES, expandedIds, modifiers),modifiers.oldManEffect);
 }
 
 export function chooseWeightedSpecies(fishIds, rng = Math.random, modifiers = {}) {
@@ -930,5 +931,7 @@ export function rollFish(fishIds, modifiers = {}, rng = Math.random) {
 
   const shinyChance = SHINY_CONFIG.chance * Math.max(0, modifiers.shinyChanceMultiplier ?? 1);
   const shiny = modifiers.forceShiny ?? (SHINY_CONFIG.debugForce || rng() < shinyChance);
+  const curse=modifiers.oldManEffect?.curse;
+  if(curse?.kind==='smallCommon'&&curse.remaining>0&&fish.rarity==='Common'&&(!curse.speciesId||curse.speciesId===(fish.canonicalId??fish.id)))return createFishSpecimenForCategories(fish,0,0,shiny,rng);
   return createFishSpecimen(fish, clamp(size, .02, 1.65), shiny, rng);
 }

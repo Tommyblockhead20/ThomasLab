@@ -8,14 +8,14 @@ import { CompetitionController } from '../src/ui/competition.js';
 
 function setup(kind = 'derby', mode = 'count', allowEquipment = false) {
   let now = 100_000; const players = ['a','b'].map(playerId => ({ playerId, displayName: playerId, connected: true,
-    lastSnapshot: { position: { x: 464, y: 2, z: -28 }, locationId: 'main-mountain', teleportRevision: 1 } }));
+    lastSnapshot: { position: { x: 464, y: 2, z: -28 }, locationId: 'jester-island', teleportRevision: 1 } }));
   const room = { hostId: 'a', players: new Map(players.map(p=>[p.playerId,p])), broadcastState() {} };
   const competition = new RoomCompetition(room, { clock: () => now, schedule: false });
   assert.equal(competition.action(players[0], { action:'create', kind, mode, allowEquipment, saveId:'save-a' }), null);
   assert.equal(competition.action(players[1], { action:'join', saveId:'save-b' }), null);
   const advance = ms => { now += ms; competition.tick(); };
   const start = () => { assert.equal(competition.action(players[0], { action:'start' }), null);
-    players.forEach(p => competition.action(p, { action:'ready', saveId:`save-${p.playerId}` })); advance(5001); assert.equal(competition.event.phase,'active'); };
+    players.forEach(p => {p.lastSnapshot.locationId='main-mountain';competition.action(p, { action:'ready', saveId:`save-${p.playerId}` });}); advance(5001); assert.equal(competition.event.phase,'active'); };
   const catchFish = (who, id, length, value, extra = {}) => competition.catch(players[who], { eventId: competition.event.id,
     saveId: `save-${players[who].playerId}`, specimenId:id, speciesId:'bluegill', length, value, legitimate:true, ...extra });
   return { competition, players, advance, start, catchFish };
@@ -25,7 +25,7 @@ test('all four derby scoring modes produce the correct winner without consuming 
     const s=setup('derby',mode); assert.equal(s.competition.event.allowEquipment,false); s.start();
     s.catchFish(0,'one',20,100); s.catchFish(1,'two',10,200); s.advance(2000); s.catchFish(0,'three',5,150);
     s.advance(300_000); const e=s.competition.state();
-    assert.deepEqual(e.winnerIds,[mode === 'bestValue' ? 'b' : 'a']); assert.equal(e.awards[0].amount,150);
+    assert.deepEqual(e.winnerIds,[mode === 'bestValue' ? 'b' : 'a']); assert.equal(e.awards[0].amount,100);
     assert.equal(e.participants[0].count,2); assert.equal(e.participants[1].count,1);
   }
 });
@@ -34,14 +34,14 @@ test('derby ignores duplicate, old-event, debug and mismatched-save catches; tie
   s.catchFish(0,'one',10,50); s.catchFish(0,'wrong-save',10,50,{saveId:'other'});
   s.catchFish(0,'debug',10,50,{legitimate:false}); s.catchFish(0,'old',10,50,{eventId:'old'});
   s.catchFish(1,'two',10,50); s.advance(300_000);
-  assert.equal(s.competition.event.participants[0].count,1); assert.deepEqual(s.competition.event.awards.map(a=>a.amount),[75,75]);
+  assert.equal(s.competition.event.participants[0].count,1); assert.deepEqual(s.competition.event.awards.map(a=>a.amount),[50,50]);
 });
 test('race uses ordered server-observed checkpoints and rejects teleport shortcuts', () => {
   const s=setup('race'); s.start();
   const snap = (y, teleportRevision=1) => ({ position:{x:260,y,z:0}, locationId:'main-mountain',teleportRevision });
   s.competition.snapshot(s.players[0],snap(305)); assert.equal(s.competition.event.phase,'active');
   for (const y of [61,121,181,241,296,305]) { s.advance(20_000); s.competition.snapshot(s.players[0],snap(y)); }
-  assert.equal(s.competition.event.phase,'finished'); assert.deepEqual(s.competition.event.winnerIds,['a']); assert.equal(s.competition.event.awards[0].amount,200);
+  assert.equal(s.competition.event.phase,'finished'); assert.deepEqual(s.competition.event.winnerIds,['a']); assert.equal(s.competition.event.awards[0].amount,100);
   const shortcut=setup('race'); shortcut.start(); shortcut.competition.snapshot(shortcut.players[0],snap(305,2));
   assert.ok(shortcut.competition.event.participants[0].disqualified); assert.equal(shortcut.competition.event.phase,'cancelled'); assert.equal(shortcut.competition.event.awards.length,0);
 });

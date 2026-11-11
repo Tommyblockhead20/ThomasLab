@@ -48,7 +48,8 @@ export const WORLD_EDITOR_WORLDS = Object.freeze([
     id: 'library-island', label: 'LIBRARY ISLAND / VEILED ATHENAEUM', runtimeLocationId: 'veiled-athenaeum',
     dataUrl: '../../src/world/library-island-v2.scene.json', kind: 'library-authored-scene',
     capabilities: ['select', 'terrain', 'objects', 'water', 'prefabs', 'lights', 'markers', 'benches', 'walkthrough', 'collision-debug']
-  })
+  }),
+  Object.freeze({id:'jester-island',label:"RASCAL'S REST / EVENTS",runtimeLocationId:'jester-island',dataUrl:null,kind:'production-island',capabilities:['select','terrain','objects','water','walkthrough','collision-debug']})
 ]);
 
 export const WORLD_EDITOR_WORLD_BY_ID = new Map(WORLD_EDITOR_WORLDS.map((world) => [world.id, world]));

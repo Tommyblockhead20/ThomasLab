@@ -13,9 +13,9 @@ import { applySurfaceDetail } from '../graphics/surface-detail.js';
 // visual token without a corresponding low-poly recipe makes the audit fail instead of
 // quietly falling through to an unrelated placeholder.
 export const COSMETIC_MODEL_VISUALS = Object.freeze({
-  headwear: Object.freeze(['beanie', 'cowboy', 'cap', 'headlamp', 'flower', 'bucket', 'wizard', 'propeller', 'crown', 'halo', 'hood', 'horn', 'gills', 'tentacle', 'sun', 'crest', 'top-hat']),
+  headwear: Object.freeze(['beanie', 'cowboy', 'cap', 'headlamp', 'flower', 'bucket', 'wizard', 'propeller', 'crown', 'halo', 'hood', 'horn', 'gills', 'tentacle', 'sun', 'crest', 'top-hat','gold-top-hat']),
   eyewear: Object.freeze(['glasses', 'round', 'aviator', 'visor', 'goggles', 'electric', 'hammer', 'sun']),
-  faceAccessory: Object.freeze(['scarf', 'bandana', 'gaiter', 'necklace', 'collar', 'serpent', 'whirlpool', 'puff']),
+  faceAccessory: Object.freeze(['scarf', 'bandana', 'gaiter', 'necklace', 'collar', 'serpent', 'whirlpool', 'puff','pearl-pendant']),
   backAccessory: Object.freeze(['pack', 'cape', 'flag', 'emblem', 'tank', 'atlas', 'wings', 'claws', 'fin', 'hydra', 'tentacle', 'shell'])
 });
 

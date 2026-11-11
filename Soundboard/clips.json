@@ -1,0 +1,292 @@
+[
+  {
+    "id": "thomas",
+    "label": "Thomas",
+    "text": "Thomas.",
+    "group": "attention",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "thomas-call",
+    "label": "Thomas!",
+    "text": "Thomas!",
+    "group": "attention",
+    "voice": "en-US-AriaNeural",
+    "rate": "+8%",
+    "pitch": "+12Hz",
+    "volume": "+25%"
+  },
+  {
+    "id": "zion",
+    "label": "Zion",
+    "text": "Zion.",
+    "group": "attention",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "zion-call",
+    "label": "Zion!",
+    "text": "Zion!",
+    "group": "attention",
+    "voice": "en-US-AriaNeural",
+    "rate": "+8%",
+    "pitch": "+12Hz",
+    "volume": "+25%"
+  },
+  {
+    "id": "alexis",
+    "label": "Alexis",
+    "text": "Alexis.",
+    "group": "attention",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "yes",
+    "label": "Yes",
+    "text": "Yes.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "no",
+    "label": "No",
+    "text": "No.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "maybe",
+    "label": "Maybe",
+    "text": "Maybe.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "idk",
+    "label": "IDK",
+    "text": "I don’t know.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "good",
+    "label": "Good",
+    "text": "Good.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "ok",
+    "label": "OK",
+    "text": "Okay.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "bad",
+    "label": "Bad",
+    "text": "Bad.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "wait",
+    "label": "Wait",
+    "text": "Wait.",
+    "group": "answers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "thirsty",
+    "label": "Thirsty",
+    "text": "Thirsty.",
+    "group": "needs",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "hungry",
+    "label": "Hungry",
+    "text": "Hungry.",
+    "group": "needs",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "love-you",
+    "label": "Love you",
+    "text": "Love you.",
+    "group": "love",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "cutie",
+    "label": "You are a cutie",
+    "text": "You are a cutie.",
+    "group": "love",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "poop",
+    "label": "Poop",
+    "text": "Poop.",
+    "group": "words",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "on",
+    "label": "On",
+    "text": "On.",
+    "group": "words",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "bed",
+    "label": "Bed",
+    "text": "Bed.",
+    "group": "words",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "1",
+    "label": "1",
+    "text": "One.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "2",
+    "label": "2",
+    "text": "Two.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "3",
+    "label": "3",
+    "text": "Three.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "4",
+    "label": "4",
+    "text": "Four.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "5",
+    "label": "5",
+    "text": "Five.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "6",
+    "label": "6",
+    "text": "Six.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "7",
+    "label": "7",
+    "text": "Seven.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "8",
+    "label": "8",
+    "text": "Eight.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  },
+  {
+    "id": "9",
+    "label": "9",
+    "text": "Nine.",
+    "group": "numbers",
+    "voice": "en-US-AriaNeural",
+    "rate": "-5%",
+    "pitch": "+0Hz",
+    "volume": "+0%"
+  }
+]

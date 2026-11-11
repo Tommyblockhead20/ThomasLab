@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f1e7">
+  <meta name="robots" content="noindex">
+  <title>Say it. · ThomasLab</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="board.js" defer></script>
+</head>
+<body>
+  <main class="board">
+    <nav class="topbar" aria-label="Site"><a href="../">← ThomasLab</a><span>THE SOUNDBOARD</span></nav>
+    <header class="intro">
+      <div><p class="eyebrow"><span class="dot"></span> A LITTLE HELP SAYING IT</p><h1>Say it<span>.</span></h1><p class="subtitle">Tap a button to speak.</p></div>
+      <svg class="intro-wave" viewBox="0 0 140 80" fill="none" aria-hidden="true"><path d="M10 35V45M26 26V54M42 14V66M58 25V55M74 8V72M90 23V57M106 30V50M122 36V44" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></svg>
+    </header>
+    <div class="playback" aria-label="Playback controls">
+      <div class="now-playing"><span class="meter" aria-hidden="true"><i></i><i></i><i></i></span><span id="status" role="status">Ready when you are</span></div>
+      <div class="controls"><label class="volume" for="volume">Volume <input id="volume" type="range" min="0" max="100" value="85"><output id="volume-value" for="volume">85%</output></label><button class="stop" id="stop" type="button" disabled>■ <span>Stop</span></button></div>
+    </div>
+    <div class="sections">
+      <section class="panel attention" aria-labelledby="attention-title"><header><h2 id="attention-title">Get their attention</h2></header><div class="buttons attention-buttons">
+        <button data-audio="thomas" type="button"><span>Thomas</span><small>Talking</small></button>
+        <button data-audio="thomas-call" type="button" class="calling"><span>Thomas!</span><small>Louder call</small></button>
+        <button data-audio="zion" type="button"><span>Zion</span><small>Talking</small></button>
+        <button data-audio="zion-call" type="button" class="calling"><span>Zion!</span><small>Louder call</small></button>
+        <button data-audio="alexis" type="button"><span>Alexis</span><small>Talking</small></button>
+      </div></section>
+      <section class="panel answers" aria-labelledby="answers-title"><header><h2 id="answers-title">Quick answers</h2></header><div class="buttons answer-buttons">
+        <button data-audio="yes" type="button" class="positive">Yes</button><button data-audio="no" type="button" class="negative">No</button>
+        <button data-audio="good" type="button" class="positive">Good</button><button data-audio="bad" type="button" class="negative">Bad</button>
+        <button data-audio="ok" type="button">OK</button><button data-audio="wait" type="button" class="calling">Wait</button>
+        <button data-audio="maybe" type="button">Maybe</button><button data-audio="idk" type="button" aria-label="I don’t know">IDK</button>
+      </div></section>
+      <section class="panel numbers" aria-labelledby="numbers-title"><header><h2 id="numbers-title">By the numbers</h2></header><div class="buttons number-buttons">
+        <button data-audio="1" type="button">1</button><button data-audio="2" type="button">2</button><button data-audio="3" type="button">3</button>
+        <button data-audio="4" type="button">4</button><button data-audio="5" type="button">5</button><button data-audio="6" type="button">6</button>
+        <button data-audio="7" type="button">7</button><button data-audio="8" type="button">8</button><button data-audio="9" type="button">9</button>
+      </div></section>
+      <section class="panel needs" aria-labelledby="needs-title"><header><h2 id="needs-title">How I’m feeling</h2></header><div class="buttons two-buttons"><button data-audio="thirsty" type="button">Thirsty</button><button data-audio="hungry" type="button">Hungry</button></div></section>
+      <section class="panel love" aria-labelledby="love-title"><header><h2 id="love-title">A little affection</h2></header><div class="buttons two-buttons"><button data-audio="love-you" type="button">Love you</button><button data-audio="cutie" type="button">You are a cutie</button></div></section>
+      <section class="panel words" aria-labelledby="words-title"><header><h2 id="words-title">A few more words</h2></header><div class="buttons three-buttons"><button data-audio="poop" type="button">Poop</button><button data-audio="on" type="button">On</button><button data-audio="bed" type="button">Bed</button></div></section>
+    </div>
+    <footer class="footer">One voice at a time. A new tap replaces the last.<span>THOMASLAB / SOUND & WORDS</span></footer>
+    <audio id="voice" preload="auto" src="audio/thomas.mp3"></audio>
+    <noscript><p class="error">Please enable JavaScript to use the sound buttons.</p></noscript>
+  </main>
+</body>
+</html>

@@ -3226,3 +3226,58 @@ body:is(.multiplayer-open, .pause-open, .inventory-open, .fishing-open) .competi
 @media (max-width: 720px) {
   .multiplayer-actions { grid-template-columns: minmax(0, 1fr) auto; }
 }
+
+/* A small harbour chart, with inked landmarks rather than generic map chips. */
+.boat-travel { background: linear-gradient(145deg,#163b3d,#102d32); border-color:#cfb77c; box-shadow:0 2rem 6rem #001c27aa,inset 0 0 0 4px #c4ac6f10; }
+.boat-travel > header { padding:.25rem .2rem 1rem; }
+.boat-travel h2 { font-family:Georgia,serif; letter-spacing:-.035em; color:#f3dfaa; }
+.boat-travel .boat-travel-map { background:radial-gradient(ellipse at 45% 45%,#80b9b3,#508c95 70%,#316370); border:5px solid #c9b27b; box-shadow:inset 0 0 0 1px #f1e7bb,inset 0 0 5rem #163c5270; }
+.boat-travel .boat-travel-map::before { opacity:.16; background:repeating-linear-gradient(0deg,transparent 0 63px,#e6edd74d 64px 65px),repeating-linear-gradient(90deg,transparent 0 63px,#e6edd74d 64px 65px); }
+.boat-travel .boat-travel-map::after { inset:11%; border:1px solid #d9e8c82b; box-shadow:0 0 0 1.8rem #c7dec40b,0 0 0 3.6rem #c7dec408; }
+.boat-travel .boat-map-chart-title { color:#204c50; font-family:Georgia,serif; font-size:.65rem; letter-spacing:.16em; }
+.boat-travel .boat-map-island { gap:.05rem; width:7rem; }
+.boat-travel .boat-map-footprint { display:block; width:4.2rem; height:3.1rem; background:none!important; border:0!important; border-radius:0!important; box-shadow:none!important; overflow:visible; }
+.boat-map-footprint svg { width:100%;height:100%;overflow:visible;filter:drop-shadow(0 3px 2px #18474938); }
+.boat-travel .boat-map-main-island .boat-map-footprint { width:5.5rem;height:4rem; }
+.boat-travel .boat-map-island b { font-family:Georgia,serif; font-size:.7rem; font-weight:700;color:#153f44;text-shadow:0 1px #d5e4cba8; }
+.boat-travel .boat-map-clouds { inset:auto!important;left:50%!important;top:10%!important;transform:translateX(-50%);width:4.4rem;height:2.9rem;background:#e9f1e9; }
+.boat-travel .boat-map-clouds i {width:2.3rem;height:1.4rem;}
+.boat-travel .boat-map-island.is-selected .boat-map-footprint { outline:0;filter:drop-shadow(0 0 .35rem #f8e7a0); }
+.boat-map-route { position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0; }
+.boat-map-route path { fill:none;stroke:#f3dfaa;stroke-width:2;stroke-dasharray:3 6;stroke-linecap:round;opacity:.9; }
+.boat-travel .boat-travel-list-item { background:linear-gradient(110deg,#244b4c,#1b3e43)!important;border-bottom:1px solid #9bb29a24!important; }
+.boat-travel .boat-travel-list-item strong { font-family:Georgia,serif;font-size:.86rem;font-weight:600;color:#f0e8ce; }
+.boat-travel .boat-destination-icon { border:1px solid #c7d6b129;background:#53756866; }
+.boat-travel .boat-travel-list-item.is-selected { background:linear-gradient(110deg,#48665b,#25494a)!important; }
+.boat-travel .boat-travel-list-item.is-unavailable { background:#17373b!important; }
+.boat-travel .boat-travel-list-item.is-unavailable strong { color:#bdcec2; }
+.sailing-overlay { position:fixed;inset:0;z-index:140;border-radius:0;background:radial-gradient(ellipse,#265e68,#102e37 75%);color:#f3e0ad; }
+.sailing-overlay::after { content:'〜  〜  〜  〜';font-size:1.5rem;letter-spacing:1rem;color:#79b0b1; }
+.sailing-overlay strong { font-family:Georgia,serif;font-size:1.35rem;font-weight:500; }
+.old-man-menu { position:fixed;inset:50% auto auto 50%;transform:translate(-50%,-50%);z-index:105;width:min(48rem,calc(100vw - 1.5rem));max-height:calc(100dvh - 1.5rem);display:flex;flex-direction:column;gap:1rem;padding:1.4rem;border:1px solid #d1b56d;border-radius:1rem;background:#123537;box-shadow:0 0 0 100vmax #031a24b3,0 2rem 6rem #001c27aa;color:#ecedda; }
+.old-man-menu[hidden] { display:none; }
+.old-man-menu header { display:flex;justify-content:space-between;gap:1rem;align-items:start; }
+.old-man-menu h2 { font:1.9rem Georgia,serif;color:#f1d99a;margin:.3rem 0; }
+.old-man-menu header p { font-size:.78rem;color:#b9ccb9;margin:.3rem 0; }
+.old-man-menu nav { display:flex;gap:.5rem;border-bottom:1px solid #8ba78d55;padding-bottom:.7rem; }
+.old-man-menu button { padding:.65rem .8rem;border:1px solid #e8d49455;border-radius:.4rem;font-size:.65rem;font-weight:750;color:#183d3d;background:#ead492;cursor:pointer; }
+.old-man-menu button:disabled {color:#a2b5a9;background:#315052;cursor:default;}
+.old-man-menu nav button[aria-pressed='false'] { background:#24494a;color:#bfd0bf; }
+.old-man-content { overflow-y:auto;min-height:0;overscroll-behavior:contain;padding-right:.35rem; }
+.old-man-content article { padding:1rem;margin-bottom:.6rem;background:#1e4445;border:1px solid #7f9c7f44;border-radius:.6rem; }
+.old-man-content h3 { margin:0 0 .4rem;color:#ead8a8;font:1.15rem Georgia,serif; }
+.old-man-content p { font-size:.78rem;line-height:1.5;color:#bfcfbd; }
+.old-man-content select { padding:.6rem;max-width:100%;color:#e4e7ce;background:#16393b;border:1px solid #849f85;border-radius:.3rem;margin:0 .6rem .5rem 0; }
+.old-man-status { margin:0;font-size:.75rem;color:#ead8a8; }
+.competition-islands { width:100%;border:1px solid #819f8355;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem; }
+.competition-islands label { display:flex;align-items:center;gap:.4rem; }
+.competition-panel[hidden],.competition-banner[hidden],.competition-panel [hidden] {display:none!important;}
+body.shop-open .competition-banner { display:none; }
+@media(max-width:760px),(max-height:580px) {
+  .boat-travel .boat-map-footprint { width:3.3rem;height:2.4rem; }
+  .boat-travel .boat-map-main-island .boat-map-footprint { width:4.1rem;height:3rem; }
+  .boat-travel .boat-map-island b { font-size:.57rem; }
+  .old-man-menu { padding:.9rem;gap:.7rem; }
+  .old-man-menu h2 { font-size:1.5rem; }
+}
+@media(prefers-reduced-motion:reduce) { .sailing-overlay span { animation:none; } }

@@ -12,6 +12,8 @@ import { indexProductionEntities } from './production-scene-catalog.js';
 import { PRODUCTION_LEVELS, applyProductionLevelEdits } from './production-level-edits.js';
 import { aquariumPathSurface, tankRimBoxes, unitSurfacePlane } from './aquarium-surfaces.js';
 import { attachSignText } from './sign-text-renderer.js';
+import { buildRascalsRest } from './rascals-rest.js';
+import { ShoreWaves } from '../graphics/shore-waves.js';
 // REEL_ASCENT_MAP_EDITOR_V1: begin
 import MAP_EDITOR_PATCH from './map-editor-patch-loader.js';
 import {
@@ -2145,6 +2147,7 @@ export class MountainWorld extends TestWorld {
 
   decorateOceanIsland(location) {
     const { x, z } = location.worldPosition;
+    if(location.id==='jester-island') { buildRascalsRest(this,location);return; }
     if (location.id === SKYREACH_TOWER_CONFIG.locationId) {
       this.buildSkyreachFoundation(location);
     } else if (['home-island', 'shop-island', 'aquarium-island', 'cave-fishing-island'].includes(location.id)) {
@@ -4218,6 +4221,7 @@ export class MountainWorld extends TestWorld {
     this.ocean.setPosition(MOUNTAIN_CENTER.x, OCEAN_SURFACE_Y - .06, MOUNTAIN_CENTER.z);
     this.buildTarget.addChild(this.ocean);
     this.buildWadeableOceanShelf();
+    if(!this.editorReference)this.shoreWaves=new ShoreWaves(this,OCEAN_SURFACE_Y);
 
     // A frozen editor mesh is the production Stoneveil core. Keep the procedural height
     // function available to the still-procedural rock/decor placement pass, but do not
@@ -6719,10 +6723,11 @@ export class MountainWorld extends TestWorld {
   getWorldInfo(point, climbMaterial = null) {
     const elevation = Math.max(0, point.y - PLAYER_FOOT_OFFSET);
     const course = this.isInDeveloperCourse(point);
+    const island=SMALL_ISLAND_LOCATIONS.find(l=>l.id===this.activeLocationId);
     return {
-      sector: course ? 'Developer Course' : this.getSector(point),
+      sector: island?.displayName ?? (course ? 'Developer Course' : this.getSector(point)),
       elevation,
-      band: course ? 'Mechanics test' : this.getElevationBand(elevation),
+      band: island ? island.id==='jester-island'?'Events & mischief':'Island shore' : course ? 'Mechanics test' : this.getElevationBand(elevation),
       material: this.inferGroundMaterial(point, climbMaterial),
       rockSupport: this.rockSupportAudit,
       rockDensity: this.rockDensityAudit,
@@ -6766,6 +6771,7 @@ export class MountainWorld extends TestWorld {
 
   update(dt) {
     super.update(dt);
+    this.shoreWaves?.update(dt);
     this.updateAquariumSwimming();
     // Water footprints are intentionally static. Scaling transparent discs every frame
     // made their edges cross the terrain carve and produced intermittent clipping/z-fighting.

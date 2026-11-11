@@ -1,0 +1,7 @@
+**
+!TitanicGame
+!TitanicGame/**
+TitanicGame/node_modules
+TitanicGame/build
+TitanicGame/.env
+TitanicGame/*.log

@@ -70,8 +70,9 @@ export function createSurfacePixels(kind, size = 128) {
       shade = .91 + tuft * .07 + grain * .03 + (stem ? .065 : 0);
     } else if (kind === 'core-walkable') {
       const contour = Math.sin(TAU * (v * 6 + u * 1.5 + broad * .12));
-      h = .5 + contour * .08 + grain * .12;
-      shade = .94 + contour * .065 + grain * .04;
+      const blades=Math.sin(TAU*(u*18+Math.sin(v*TAU*3)))*Math.cos(v*TAU*13);
+      h = .5 + contour * .045 + blades*.07 + grain * .085;
+      shade = .94 + contour * .035 + blades*.03 + grain * .035;
     } else if (kind === 'core-slide') {
       const streak = Math.sin(TAU * (u * 12 + v * .5 + broad * .08));
       h = .5 + streak * .045 + grain * .06;

@@ -50,6 +50,7 @@ export class MultiplayerClient extends EventTarget {
     this.voteRetryDelay = 2000;
     this.songVoteAggregates = new Map();
     this.competition = null;
+    this.oldMan=null;
     this.competitionSupported = false;
     this.hostId = null;
     this.transport.onMessage = (value) => this.handleMessage(value);
@@ -157,6 +158,7 @@ export class MultiplayerClient extends EventTarget {
     this.reconnectToken = '';
     this.room.clear();
     this.competition = null;
+    this.oldMan=null;
     this.competitionSupported = false;
     this.setState(this.transport.isOpen ? 'connected' : 'disconnected');
   }
@@ -191,6 +193,7 @@ export class MultiplayerClient extends EventTarget {
     return this.transport.send(createProtocolMessage(MESSAGE_TYPES.COMPETITION_ACTION,
       { ...payload, action, eventId: payload.eventId ?? this.competition?.id }));
   }
+  oldManAction(payload) {return this.state==='in_room'&&this.transport.send(createProtocolMessage(MESSAGE_TYPES.OLD_MAN_ACTION,payload));}
 
   sendFishingState(state = {}) {
     if (this.state !== 'in_room') return false;
@@ -211,6 +214,7 @@ export class MultiplayerClient extends EventTarget {
       specimenId: catchData.specimenId,
       value: catchData.value,
       legitimate: catchData.legitimate === true,
+      sizeCategory:catchData.sizeCategory,
       speciesId: String(catchData.speciesId ?? '').slice(0, 100),
       name: String(catchData.name ?? catchData.speciesName ?? 'Catch').slice(0, 100),
       rarity: String(catchData.rarity ?? 'Common').slice(0, 24),
@@ -335,6 +339,7 @@ export class MultiplayerClient extends EventTarget {
       this.hostId = message.payload.hostId ?? null;
       this.competitionSupported = message.payload.competitionSupported === true;
       this.competition = message.payload.competition ?? null;
+      this.oldMan=message.payload.oldMan??null;
       this.reconnectAttempt = 0;
       this.cancelReconnect();
       this.setState('in_room');
@@ -376,7 +381,7 @@ export class MultiplayerClient extends EventTarget {
     } else if (message.type === MESSAGE_TYPES.ERROR) {
       const code = String(message.payload.code ?? 'server_error');
       const text = String(message.payload.message ?? 'Multiplayer service error.');
-      if (code === 'competition_error') {
+      if (code === 'competition_error' || code==='old_man_error') {
         this.dispatchEvent(new CustomEvent('competitionerror', { detail: text }));
         return;
       }
