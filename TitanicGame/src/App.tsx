@@ -1554,6 +1554,8 @@ function StationPanel({
   );
   const machine = s.machine ? state.machines.find((m) => m.id === s.machine) : null,
     me = state.players.find((p) => p.id === state.self.id)!;
+  const [valveSetting, setValveSetting] = useState(state.ship.mainSteamValve);
+  useEffect(() => setValveSetting(state.ship.mainSteamValve), [state.ship.mainSteamValve]);
   const send = (verb: string, value?: unknown) => act({ station: s.id, verb, value });
   const Equipment = 'details';
   const unavailable =
@@ -1769,7 +1771,7 @@ function StationPanel({
               <p>Steam from the boilers passes through this valve to the engines.</p>
               <label className="range-setting">
                 <span>
-                  Main steam valve <b>{Math.round(state.ship.mainSteamValve * 100)}% open</b>
+                  Main steam valve <b>{Math.round(valveSetting * 100)}% open</b>
                 </span>
                 <input
                   aria-label="Main steam valve opening"
@@ -1777,8 +1779,10 @@ function StationPanel({
                   min="0"
                   max="1"
                   step="0.05"
-                  value={state.ship.mainSteamValve}
-                  onChange={(e) => void send('steam-valve', Number(e.target.value))}
+                  value={valveSetting}
+                  onChange={(e) => setValveSetting(Number(e.target.value))}
+                  onPointerUp={(e) => void send('steam-valve', Number(e.currentTarget.value))}
+                  onKeyUp={(e) => void send('steam-valve', Number(e.currentTarget.value))}
                 />
               </label>
               <Instrument

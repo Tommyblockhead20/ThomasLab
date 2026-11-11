@@ -1,5 +1,6 @@
 import type { Action, ShipState } from './types';
 import type { FiringTool } from './firing';
+import { firebed } from './firing';
 import { steamPsi } from './plant';
 
 export interface BoilerControl {
@@ -25,10 +26,16 @@ export function boilerHint(c: BoilerControl, ship: ShipState, inventory: string[
           ? 'Spread shovel load'
           : 'Shovel empty · refill at coal basket'
         : tool === 'slice'
-          ? 'Work slice bar · hold E'
+          ? visibleClinker(ship.clinker[i][c.zone!])
+            ? 'Work slice bar · hold E'
+            : 'Grate clear'
           : 'Open fire · take shovel or slice bar';
     case 'ash':
-      return tool === 'rake' ? 'Rake ashpan · hold E' : 'Ashpan · take ash rake';
+      return tool === 'rake'
+        ? firebed(ship, i, c.zone!).ash > 0.06
+          ? 'Rake ashpan · hold E'
+          : 'Ashpan clear'
+        : 'Ashpan · take ash rake';
     case 'tool':
       return `Take ${c.tool === 'coal' ? 'shovel' : c.tool === 'slice' ? 'slice bar' : 'ash rake'}`;
     case 'coal':
@@ -38,7 +45,7 @@ export function boilerHint(c: BoilerControl, ship: ShipState, inventory: string[
     case 'stop':
       return `Steam stop valve · ${ship.boilerConnected[i] ? 'Open' : 'Shut'} · E turn`;
     case 'relief':
-      return `Safety valve · ${ship.safetyLifted[i] ? 'Lifting' : 'Seated'} · E ease briefly`;
+      return `Safety valve · ${ship.reliefUntil[i] > 0 ? 'Easing' : ship.safetyLifted[i] ? 'Lifting' : 'Seated'} · E ease briefly`;
     case 'gauge':
       return `Boiler ${i + 1} · ${steamPsi(ship.boilerPressure[i]).toFixed(0)} psi · B guide`;
   }
@@ -57,10 +64,12 @@ export function boilerAction(
     case 'door':
       return action('door', { zone: c.zone, open: !ship.fireDoors[c.bank][c.zone!] });
     case 'fire':
+      if (tool === 'slice' && !visibleClinker(ship.clinker[c.bank][c.zone!])) return null;
       return tool && tool !== 'rake'
         ? action('tend', { zone: c.zone, tool, physical: true })
         : null;
     case 'ash':
+      if (firebed(ship, c.bank, c.zone!).ash <= 0.06) return null;
       return tool === 'rake' ? action('tend', { zone: c.zone, tool, physical: true }) : null;
     case 'tool':
       return action('equip', c.tool);

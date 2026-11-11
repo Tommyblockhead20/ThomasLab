@@ -1308,7 +1308,11 @@ export class OceanWorld {
       ['voyage', 'sinking'].includes(state.phase) &&
       this.local.level === -1 &&
       !this.overlay;
-    for (const model of this.toolModels.children) model.visible = model.name === heldTool;
+    for (const model of this.toolModels.children) {
+      model.visible = model.name === heldTool;
+      const load = model.getObjectByName('shovel-load');
+      if (load) load.visible = !!state?.self.inventory.includes('Coal load');
+    }
     const stroke = Math.max(0, 1 - (time - this.toolStrokeAt) / 0.4);
     this.toolModels.position.set(
       0.34,

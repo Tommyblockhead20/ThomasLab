@@ -211,6 +211,12 @@ export const PLAN_WALLS: PlanWall[] = [
   ...cross(-6, -8.9, 8.9, -1, 0, 2.4),
   ...cross(0, -8.9, 8.9, -1, 0, 2.4),
   ...BOILERS.map((b) => w(b.x, b.z, (b.radius * 2) / W, b.length / L, -1, { prop: true })),
+  ...BOILERS.flatMap((b) =>
+    [-1, 1].flatMap((side) => [
+      w(b.x + 1.85 / W, b.z + (side * 4.08) / L, 0.7 / W, 0.7 / L, -1, { prop: true }),
+      w(b.x - 1.52 / W, b.z + (side * 3.75) / L, 0.78 / W, 0.12 / L, -1, { prop: true }),
+    ]),
+  ),
   ...[-1, 1].map((s) => w(s * 5, 17, 3, 7, -1, { prop: true })),
   // Actual equipment footprints.
   w(BRIDGE.chart.x, BRIDGE.chart.z, 2.7, 0.7, 0, { prop: true }),

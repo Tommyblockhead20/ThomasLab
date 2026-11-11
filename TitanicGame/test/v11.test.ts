@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import { Room } from '../server/game';
 import { stepPlant, steamPsi } from '../shared/plant';
-import { boilerAction, visibleClinker } from '../shared/boiler-controls';
-import { STATIONS } from '../shared/world';
+import { boilerAction, boilerHint, visibleClinker } from '../shared/boiler-controls';
+import { STATIONS, canOccupy } from '../shared/world';
 import { buildBoilerRoom } from '../src/graphics/interiors';
 import type { ShipMaterials } from '../src/graphics/materials';
 import {
@@ -12,7 +12,7 @@ import {
   SHIP_HEIGHT_SCALE as H,
   SHIP_LENGTH_SCALE as L,
 } from '../shared/navigation';
-import { LEVEL_Y } from '../shared/layout';
+import { LEVEL_Y, BOILERS } from '../shared/layout';
 
 function room() {
   const r = new Room('V11', 14),
@@ -87,6 +87,14 @@ test('rear fire access is usable and remote boiler operation is rejected', () =>
   p.z = 16;
   assert.throws(() => r.action(p.id, { station: s.id, verb: 'ease' }), /closer/);
 });
+test('new firing baskets and racks are solid while the central firing approach stays open', () => {
+  for (const b of BOILERS)
+    for (const side of [-1, 1]) {
+      assert.equal(canOccupy({ x: b.x + 1.85 / W, z: b.z + (side * 4.08) / L, level: -1 }), false);
+      assert.equal(canOccupy({ x: b.x - 1.52 / W, z: b.z + (side * 3.75) / L, level: -1 }), false);
+      assert.equal(canOccupy({ x: b.x, z: b.z + (side * 4.4) / L, level: -1 }), true);
+    }
+});
 test('physical shovelling requires a tool and a fresh load, while slice strokes clear visible clinker', () => {
   const { r, p } = room();
   const act = (verb: string, value?: unknown) => {
@@ -104,6 +112,8 @@ test('physical shovelling requires a tool and a fresh load, while slice strokes 
   r.ship.clinker[0][0] = 0.75;
   for (let n = 0; n < 3; n++) act('tend', { zone: 0, tool: 'slice', physical: true });
   assert.equal(visibleClinker(r.ship.clinker[0][0]), 0);
+  assert.match(boilerHint({ bank: 0, kind: 'fire', zone: 0 }, r.ship, p.inventory), /clear/);
+  assert.equal(boilerAction({ bank: 0, kind: 'fire', zone: 0 }, r.ship, p.inventory), null);
   assert.equal(visibleClinker(0.001), 0, 'trace accumulation does not draw an everlasting lump');
 });
 test('execute answers the current bridge order independently of stale manual controls', () => {
