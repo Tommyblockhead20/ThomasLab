@@ -41,8 +41,18 @@ export function workSeconds(role: Role | null, kind: 'repair' | 'inspect' | 'dec
   const engineer = role?.includes('Engineer'),
     wireless = role?.includes('Wireless');
   if (kind === 'repair') return engineer ? BALANCE.repairSeconds : BALANCE.basicRepairSeconds;
-  if (kind === 'inspect') return engineer ? 3 : 7;
+  if (kind === 'inspect') return 5;
   return wireless ? 14 : 38;
+}
+// Advance a single trajectory once, rather than restarting prediction for every
+// plotted point. The curve and simulation step are unchanged.
+export function projectTrack(ship: Motion, count = 7, step = 8) {
+  const future = { ...ship }, points = [{ ...ship }];
+  for (let n = 0; n < count; n++) {
+    for (let t = 0; t < step; t += 0.05) advanceMotion(future, Math.min(0.05, step - t));
+    points.push({ ...future });
+  }
+  return points;
 }
 export function navigationWarnings(ship: Pick<ShipState, 'delay' | 'north' | 'offRouteTime'>) {
   return {

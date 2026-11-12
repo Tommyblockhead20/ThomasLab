@@ -10,7 +10,7 @@ Thomas and Zion each have a normal voice and a louder calling variant. The latte
 
 Version 2 adds 22 buttons: Bye, Welcome home, Kitchen, Bedroom, Office, Bathroom, Living room, Hug, Cuddle, Kiss, Fast, Slow, Now, Watch, Clean, Wahoo!, Yay!, Up, Down, Left, Right, and Behind. Now and Watch are separate buttons, as confirmed by the user. The original 29 buttons and their audio remain intact.
 
-Groups are attention/names, quick answers, greetings and cheers, directions, rooms, affection, needs, pace and timing, miscellaneous words, and numbers. Playback controls stay accessible while scrolling.
+Groups are attention/names, quick answers, affection, greetings and cheers, needs, directions, rooms, pace and timing, miscellaneous words, and numbers. Bed belongs to miscellaneous words. Playback controls stay accessible while scrolling.
 
 ## Downloads
 
@@ -32,3 +32,7 @@ Each ZIP includes its own `Soundboard` folder with HTML, styling, player code, m
 All 51 files loaded and decoded successfully in the browser; each contains a non-silent signal. The louder Thomas/Zion variants had higher measured RMS and peak levels than their normal counterparts. Checked normal playback, rapid replacement, Stop, Escape, keyboard activation, volume-display feedback, and desktop/390 px layouts. All phrase buttons met 44 × 44 px in the v2 phone check, with no horizontal page overflow. The temporary audio-check page was removed.
 
 Physical phone playback has not been checked on a real device. No existing homepage, project, or publishing configuration was changed for this addition.
+
+## Compact layout revision
+
+Uses the Quick answers footprint across groups: four columns of 74 px-high buttons on desktop and 65 px on phones, with wider cells only for long labels. The title, group spacing, and playback bar take less room. At 390 px width, 18 complete buttons fit above the fold; all 51 targets remain at least 44 × 44 px, with no clipped text or horizontal overflow. Checked Bed playback and Stop after regrouping. All audio files are unchanged. The v2 ZIP is refreshed; v1 remains the original snapshot.

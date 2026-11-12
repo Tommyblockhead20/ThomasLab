@@ -37,6 +37,8 @@ import { encodeMorse, normalizeTelegram } from '../shared/morse';
 import type { PracticeAction, PracticeSettings, StartOptions } from '../shared/types';
 import { canOccupy } from '../shared/world';
 import { cabinetAligned, makeCabinet, turnCabinet } from '../shared/cabinet';
+import { FAULTS, serviceSeconds } from '../shared/machinery';
+import { FIRING_RACK, FIRING_TOOLS, toolName } from '../shared/stokehold';
 import {
   CHART_SCALE,
   HULL_BOW,
@@ -104,6 +106,7 @@ export interface Player extends PublicPlayer {
   talkUntil: number;
   lastTend: number;
   lineMessages: LineMessage[];
+  inspections: Record<string, { fault: string | null; result: string }>;
 }
 interface HiddenIceberg extends Iceberg {
   main: boolean;
@@ -165,6 +168,7 @@ export class Room {
   emptySince: number | null = null;
   fast = false;
   difficulty: 'standard' | 'experienced' = 'standard';
+  equipmentViews = new Map<string, { station: string; until: number }>();
   constructor(code: string, seed = randomBytes(4).readUInt32LE()) {
     this.code = code;
     this.seed = seed;
@@ -191,6 +195,7 @@ export class Room {
       safetyLifted: Array(BOILER_COUNT).fill(false),
       mainSteamValve: 1,
       engineRevs: BALANCE.cruiseKnots * 3.2,
+      steamLeak: 0,
       fires: Array(BOILER_COUNT).fill(0.67),
       coal: Array(BOILER_COUNT).fill(0.62),
       bedBalance: emptyFireZones(),
@@ -255,6 +260,7 @@ export class Room {
       talkUntil: 0,
       lastTend: -Infinity,
       lineMessages: [],
+      inspections: {},
     };
     this.players.set(id, p);
     if (!this.host) this.host = id;
@@ -285,6 +291,8 @@ export class Room {
     p.inputAt = 0;
     p.talking = false;
     p.job = null;
+    this.equipmentViews.delete(id);
+    p.inventory = p.inventory.filter(i => !i.startsWith('Firing tool:') && i !== 'Coal load');
     this.hangup(id);
     if (p.binoculars) {
       p.binoculars = false;
@@ -334,6 +342,7 @@ export class Room {
     this.alternativeWireless = false; // The tenth post is always Second Wireless Operator.
     this.crewSize = crew.length;
     this.chartMarks = [];
+    this.equipmentViews.clear();
     this.command = { heading: 270, acknowledgedBy: null };
     this.phase = 'voyage';
     this.elapsed = 0;
@@ -365,7 +374,7 @@ export class Room {
       ? this.rng.between(65, 90)
       : this.difficulty === 'experienced'
         ? this.rng.between(110, 180)
-        : this.rng.between(225, 360);
+        : this.rng.between(180, 360);
     this.hazardNorth = this.rng.between(-24, 24);
     this.nextEvent = this.rng.between(12, 42);
     this.nextTelegram = this.rng.between(10, 24);
@@ -382,6 +391,7 @@ export class Room {
       p.saboteur = !this.practice && p.id === saboteur.id;
       p.evacuated = false;
       p.inventory = [];
+      p.inspections = {};
       p.notes = [];
       p.charges = BALANCE.sabotageCharges;
       p.cooldown = 0;
@@ -436,6 +446,31 @@ export class Room {
       throw new GameError('Move closer to the equipment.');
     return station!;
   }
+  viewEquipment(id: string, stationId: string | null) {
+    this.equipmentViews.delete(id);
+    if (!stationId) return;
+    const p = this.players.get(id);
+    if (!p?.connected || !['voyage', 'sinking'].includes(this.phase)) return;
+    const station = this.stationFor(p, stationId);
+    if (!station.machine) return;
+    this.equipmentViews.set(id, { station: stationId, until: Date.now() + 2500 });
+  }
+  machineViewed(machine: MachineId, except = '') {
+    for (const [id, view] of this.equipmentViews) {
+      const p = this.players.get(id), s = STATIONS.find(s => s.id === view.station);
+      if (!p?.connected || view.until < Date.now() || !s || distance(p, s) > BALANCE.interactDistance) {
+        this.equipmentViews.delete(id); continue;
+      }
+      if (id !== except && s.machine === machine) return true;
+    }
+    return false;
+  }
+  failMachine(id: MachineId, deliberate = false) {
+    const m = this.machine(id);
+    m.fault = FAULTS[id];
+    m.condition = Math.max(12, m.condition - (deliberate ? 48 : 23));
+    for (const p of this.players.values()) delete p.inspections[id];
+  }
   action(id: string, a: Action) {
     const p = this.players.get(id);
     if (!p || !p.connected) throw new GameError('Crew member disconnected.');
@@ -470,6 +505,7 @@ export class Room {
         throw new GameError('Your tools need time, or you have no charges left.');
       if (this.machine(s.machine).fault)
         throw new GameError('This machine is already malfunctioning.');
+      if (this.machineViewed(s.machine, id)) throw new GameError('A shipmate is watching this equipment.');
       occupy();
       return this.job(p, 'tamper', s.id, BALANCE.sabotageSeconds);
     }
@@ -482,7 +518,7 @@ export class Room {
       if (m.fault) throw new GameError('Repair the fault before routine servicing.');
       if (m.condition > 94) throw new GameError('This equipment does not need servicing yet.');
       occupy();
-      return this.job(p, 'service', s.id, p.role?.includes('Engineer') ? 12 : 35);
+      return this.job(p, 'service', s.id, serviceSeconds(p.role));
     }
     if (a.verb === 'repair' && s.machine) {
       if (!this.machine(s.machine).fault)
@@ -491,6 +527,29 @@ export class Room {
       return this.job(p, 'repair', s.id, workSeconds(p.role, 'repair'));
     }
     switch (s.kind) {
+      case 'firing': {
+        if (s.id === FIRING_RACK.id && (a.verb === 'equip' || a.verb === 'return-tool')) {
+          const tool = String(a.value) as FiringTool;
+          if (!FIRING_TOOLS.includes(tool)) throw new GameError('Choose a tool.');
+          const held = p.inventory.find(i => i.startsWith('Firing tool:'));
+          if (a.verb === 'return-tool') {
+            if (held !== 'Firing tool:' + tool) throw new GameError('You are not carrying that tool.');
+            p.inventory = p.inventory.filter(i => !i.startsWith('Firing tool:') && i !== 'Coal load');
+            return;
+          }
+          if (held) throw new GameError('Put your tool back before taking another.');
+          const owner = [...this.players.values()].find(q => q.inventory.includes('Firing tool:' + tool));
+          if (owner) throw new GameError(`${owner.name} has the ${toolName(tool)}.`);
+          p.inventory.push('Firing tool:' + tool);
+          return;
+        }
+        if (s.id.startsWith('coal-') && a.verb === 'scoop') {
+          if (!p.inventory.includes('Firing tool:coal')) throw new GameError('Take the shovel first.');
+          if (!p.inventory.includes('Coal load')) p.inventory.push('Coal load');
+          return;
+        }
+        break;
+      }
       case 'command':
         if (a.verb === 'heading') {
           this.command = { heading: Math.round(num(0, 359)), acknowledgedBy: null };
@@ -544,21 +603,6 @@ export class Room {
           this.ship.reliefUntil[bank] = 2;
           return;
         }
-        if (a.verb === 'equip') {
-          if (!['coal', 'slice', 'rake'].includes(String(a.value)))
-            throw new GameError('Choose a tool.');
-          p.inventory = p.inventory.filter(
-            (i) => !i.startsWith('Firing tool:') && i !== 'Coal load',
-          );
-          p.inventory.push('Firing tool:' + a.value);
-          return;
-        }
-        if (a.verb === 'scoop') {
-          if (!p.inventory.includes('Firing tool:coal'))
-            throw new GameError('Take the shovel first.');
-          if (!p.inventory.includes('Coal load')) p.inventory.push('Coal load');
-          return;
-        }
         if (a.verb === 'fire') {
           this.ship.fires[bank] = num(0, 1);
           this.log(
@@ -572,6 +616,7 @@ export class Room {
             open?: boolean;
             tool?: FiringTool;
             physical?: boolean;
+            draw?: boolean;
           } | null;
           if (!v || !Number.isInteger(v.zone) || v.zone! < 0 || v.zone! > 2)
             throw new GameError('Choose a furnace.');
@@ -582,21 +627,21 @@ export class Room {
           }
           if (!['coal', 'slice', 'rake'].includes(v.tool ?? ''))
             throw new GameError('Choose a firing tool.');
-          if (v.physical && !p.inventory.includes('Firing tool:' + v.tool))
+          if (!p.inventory.includes('Firing tool:' + v.tool))
             throw new GameError('Take the tool from the rack.');
-          if (v.physical && v.tool === 'coal' && !p.inventory.includes('Coal load'))
-            throw new GameError('Fill the shovel at the coal basket.');
+          if (v.tool === 'coal' && !p.inventory.includes('Coal load'))
+            throw new GameError('Fill the shovel at a coal bunker.');
           const trained = p.role?.includes('Boiler') ?? false,
             clock = this.elapsed + this.pausedTime;
           if (clock - p.lastTend < (trained ? 0.45 : 0.9))
             throw new GameError('Finish your stroke before starting another.');
           try {
-            tendFire(this.ship, bank, v.zone!, v.tool!, trained);
+            tendFire(this.ship, bank, v.zone!, v.tool!, trained, v.draw === true);
           } catch (e) {
             throw new GameError((e as Error).message);
           }
           p.lastTend = clock;
-          if (v.physical && v.tool === 'coal')
+          if (v.tool === 'coal')
             p.inventory = p.inventory.filter((i) => i !== 'Coal load');
           this.log(`${p.name} worked boiler ${bank + 1}, fire ${v.zone! + 1}: ${v.tool}.`);
           return;
@@ -881,12 +926,8 @@ export class Room {
         break;
       case 'tamper': {
         const m = this.machine(s.machine!);
-        m.condition = clamp(m.condition - 48, 10, 100);
-        m.fault = this.rng.pick([
-          'Intermittent pressure loss',
-          'Mechanism out of alignment',
-          'Drive assembly sticking',
-        ]);
+        if (this.machineViewed(m.id)) { p.notes.push('Work interrupted: a shipmate was at the equipment.'); return; }
+        this.failMachine(m.id, true);
         m.evidence.push(
           this.rng.pick([
             'Fresh tool marks around the mounting bolts.',
@@ -909,11 +950,13 @@ export class Room {
         const m = this.machine(s.machine!);
         m.condition = 100;
         m.fault = null;
+        p.inspections[m.id] = { fault: null, result: 'Operational' };
         this.log(`${p.name} repaired ${m.id}.`);
         break;
       }
       case 'inspect': {
         const m = this.machine(s.machine!);
+        p.inspections[m.id] = { fault: m.fault, result: m.fault ?? 'Operational' };
         p.notes.push(
           `${m.id}: ${Math.round(m.condition)}%. ${m.fault ?? 'No active fault.'} ${m.evidence.join(' ') || 'No unusual physical evidence.'}`,
         );
@@ -1041,6 +1084,7 @@ export class Room {
       this.ship.safetyLifted.fill(false);
       this.ship.mainSteamValve = 1;
       this.ship.engineRevs = this.ship.throttle * 3.2;
+      this.ship.steamLeak = 0;
       this.ship.indicatedSteam = 76;
       this.ship.coal.fill(0.62);
       this.ship.bedBalance = emptyFireZones();
@@ -1377,6 +1421,7 @@ export class Room {
       return;
     }
     if (paused) {
+      this.updateSteamLeak(dt);
       if (this.activeDemo === 'boilers')
         for (let i = 1; i < 4; i++) {
           this.ship.coal[i] = 0.7;
@@ -1391,7 +1436,7 @@ export class Room {
       stepPlant(
         this.ship,
         dt,
-        this.machine('valve').fault ? 0.45 : 1,
+        1,
         this.activeDemo === 'boilers' ? 1 : this.crewSize < 7 ? 0.65 : 1,
         engine,
       );
@@ -1463,7 +1508,8 @@ export class Room {
   }
   simulateShip(dt: number) {
     const ship = this.ship;
-    const efficiency = this.machine('valve').fault ? 0.45 : 1;
+    this.updateSteamLeak(dt);
+    const efficiency = 1;
     const engineEfficiency = this.machine('engines').fault
       ? 0.48
       : Math.max(0.75, this.machine('engines').condition / 100);
@@ -1507,18 +1553,18 @@ export class Room {
       m = this.rng.pick(this.machines);
     const failureChance =
       0.16 + (1 - m.condition / 100) * 0.4 + (this.ship.throttle > 21 ? 0.06 : 0);
-    if (event < failureChance && !m.fault) {
-      m.fault = this.rng.pick([
-        'Bearing vibration',
-        'Worn seal leaking',
-        'Drive assembly sticking',
-      ]);
-      m.condition = Math.max(42, m.condition - 23);
+    if (event < failureChance && !m.fault && !this.machineViewed(m.id)) {
+      this.failMachine(m.id);
       this.log(`A natural ${m.id} malfunction developed.`);
     } else if (event < 0.55) {
       this.ship.visibility = this.rng.between(0.77, 1.13);
       this.ship.weather = this.ship.visibility < 0.9 ? 'Drifting sea mist' : 'Clear moonlight';
     } else this.ship.visibility = 1.12;
+  }
+  updateSteamLeak(dt: number) {
+    const target = this.machine('valve').fault ? 0.85 : 0;
+    const rate = target > this.ship.steamLeak ? 0.018 : 0.15;
+    this.ship.steamLeak += Math.sign(target - this.ship.steamLeak) * Math.min(Math.abs(target - this.ship.steamLeak), dt * rate);
   }
   addIce(west: number, north: number, radius: number, main = false) {
     this.icebergs.push({
@@ -1879,6 +1925,9 @@ export class Room {
       wirelessWaiting: this.telegrams.filter((t) => !t.decoded).length,
       chartMarks: this.chartMarks.map((m) => ({ ...m, points: m.points.map((p) => ({ ...p })) })),
       command: { ...this.command },
+      firingTools: Object.fromEntries(FIRING_TOOLS.map(tool => [tool,
+        [...this.players.values()].find(p => p.inventory.includes('Firing tool:' + tool))?.name ?? null,
+      ])) as Snapshot['firingTools'],
       crewSize: this.crewSize,
       demo: this.demoSnapshot(),
       radio: nearWireless
@@ -1931,6 +1980,7 @@ export class Room {
       cabinetOpen: this.cabinetOpen,
       self: {
         id: me.id,
+        inspections: Object.fromEntries(Object.entries(me.inspections).filter(([id, record]) => record.fault === this.machine(id as MachineId).fault).map(([id, record]) => [id, record.result])),
         role: me.role,
         relocation: me.relocation,
         saboteur: me.saboteur,

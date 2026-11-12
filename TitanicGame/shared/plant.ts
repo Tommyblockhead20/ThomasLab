@@ -68,12 +68,13 @@ export function stepPlant(
     if (steamPsi(pressure) >= 226) ship.safetyLifted[i] = true;
     if (steamPsi(pressure) <= 218) ship.safetyLifted[i] = false;
     if (ship.safetyLifted[i] || ship.reliefUntil[i] > 0) pressure -= dt * 4.2;
+    if (ship.boilerConnected[i]) pressure -= ship.steamLeak * dt * 1.25;
     ship.boilerPressure[i] = Math.max(0, pressure);
   }
   const supply =
     (ship.boilerPressure.reduce((sum, p, i) => sum + (ship.boilerConnected[i] ? p : 0), 0) /
       BOILER_COUNT) *
-    valve;
+    valve * (1 - ship.steamLeak * 0.12);
   ship.steam += (supply - ship.steam) * Math.min(1, dt / 3);
   const revs = ship.throttle * 3.2 * Math.min(1, ship.steam / 63) * engineEfficiency;
   ship.engineRevs += (revs - ship.engineRevs) * Math.min(1, dt / 3);

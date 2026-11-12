@@ -24,10 +24,19 @@ export function tendFire(
   zone: number,
   tool: FiringTool,
   trained: boolean,
+  draw = false,
 ) {
   const beds = [0, 1, 2].map((z) => firebed(ship, bank, z)),
     b = beds[zone];
-  if (tool !== 'rake' && !b.open) throw Error('Open the fire door first.');
+  if ((tool !== 'rake' || draw) && !b.open) throw Error('Open the fire door first.');
+  if (draw) {
+    if (tool !== 'rake') throw Error('Use the rake to draw a fire.');
+    b.coal = clamp(b.coal - (trained ? 0.14 : 0.08));
+    b.ash = clamp(b.ash + 0.04);
+    ship.fireHeat[bank] *= 0.93;
+    setBeds(ship, bank, beds.map(b => b.coal), beds.map(b => b.ash));
+    return;
+  }
   if (tool === 'coal') {
     b.coal = clamp(b.coal + (trained ? 0.16 : 0.09));
     ship.fireHeat[bank] *= 0.97;

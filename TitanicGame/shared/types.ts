@@ -102,6 +102,7 @@ export interface ShipState {
   safetyLifted: boolean[];
   mainSteamValve: number;
   engineRevs: number;
+  steamLeak: number;
   fires: number[];
   coal: number[];
   bedBalance: number[][];
@@ -164,6 +165,7 @@ export interface StartOptions {
   tools?: boolean;
 }
 export interface Snapshot {
+  firingTools: Record<'coal' | 'slice' | 'rake', string | null>;
   wirelessWaiting: number;
   chartMarks: ChartMark[];
   command: { heading: number; acknowledgedBy: string | null };
@@ -206,6 +208,7 @@ export interface Snapshot {
     voice: VoicePath[];
     audience: string[];
     relocation: number;
+    inspections: Record<string, string>;
     puzzle?: number[];
     keyPosition?: Position;
   };
@@ -224,6 +227,7 @@ export interface Station extends Position {
     | 'telegraph'
     | 'engine'
     | 'boiler'
+    | 'firing'
     | 'machine'
     | 'phone'
     | 'wireless'

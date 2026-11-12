@@ -155,6 +155,10 @@ export function createGameServer(env: NodeJS.ProcessEnv = process.env) {
       player.ready = data === true;
       publish(room);
     });
+    on('equipment:view', (data) => {
+      const { room, player } = requirePlayer(socket);
+      room.viewEquipment(player.id, typeof data?.station === 'string' ? data.station : null);
+    }, 4);
     on('room:start', (data) => {
       const { room, player } = requirePlayer(socket);
       room.start(player.id, data ?? {}, allowDev);

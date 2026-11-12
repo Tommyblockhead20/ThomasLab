@@ -193,7 +193,7 @@
     "id": "bed",
     "label": "Bed",
     "text": "Bed.",
-    "group": "home",
+    "group": "words",
     "voice": "en-US-AriaNeural",
     "rate": "-5%",
     "pitch": "+0Hz",

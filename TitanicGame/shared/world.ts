@@ -1,4 +1,5 @@
 import { BRIDGE } from './layout';
+import { FIRING_RACK, COAL_BUNKERS } from './stokehold';
 import {
   NEST,
   NEST_PHONE,
@@ -262,6 +263,8 @@ export const STATIONS: Station[] = [
     z: b.stationZ,
     level: -1 as Level,
   })),
+  { ...FIRING_RACK, name: 'Firing tools', kind: 'firing' },
+  ...COAL_BUNKERS.map(b => ({ ...b, name: 'Coal bunker', kind: 'firing' as const })),
   {
     id: 'boiler-phone',
     name: 'Boiler room telephone',
