@@ -12,10 +12,16 @@ export function chartCoordinates(west: number, north: number) {
     lon: DATUM_LON - west / (METRES_PER_NM * 60 * Math.cos((DATUM_LAT * Math.PI) / 180)),
   };
 }
+export function metresFromCoordinates(lat: number, lon: number) {
+  return {
+    west: (DATUM_LON - lon) * METRES_PER_NM * 60 * Math.cos((DATUM_LAT * Math.PI) / 180),
+    north: (lat - DATUM_LAT) * METRES_PER_NM * 60,
+  };
+}
 export function coordinate(value: number, latitude: boolean) {
-  const a = Math.abs(value),
-    deg = Math.floor(a),
-    minutes = (a - deg) * 60;
+  const tenths = Math.round(Math.abs(value) * 600),
+    deg = Math.floor(tenths / 600),
+    minutes = (tenths % 600) / 10;
   return `${deg}°${minutes.toFixed(1).padStart(4, '0')}′${latitude ? (value >= 0 ? 'N' : 'S') : value >= 0 ? 'E' : 'W'}`;
 }
 export function chartPosition(west: number, north: number) {

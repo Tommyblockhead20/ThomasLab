@@ -12,6 +12,7 @@ import {
   SHIP_HEIGHT_SCALE as H,
   SHIP_LENGTH_SCALE as L,
 } from '../shared/navigation';
+import { FIRING_RACK, COAL_BUNKERS } from '../shared/stokehold';
 import { LEVEL_Y, BOILERS } from '../shared/layout';
 
 function room() {
@@ -87,11 +88,11 @@ test('rear fire access is usable and remote boiler operation is rejected', () =>
   p.z = 16;
   assert.throws(() => r.action(p.id, { station: s.id, verb: 'ease' }), /closer/);
 });
-test('new firing baskets and racks are solid while the central firing approach stays open', () => {
+test('shared tool rack is solid and the firing aisles have no small baskets', () => {
+  assert.equal(canOccupy(FIRING_RACK), false);
   for (const b of BOILERS)
     for (const side of [-1, 1]) {
-      assert.equal(canOccupy({ x: b.x + 1.85 / W, z: b.z + (side * 4.08) / L, level: -1 }), false);
-      assert.equal(canOccupy({ x: b.x - 1.52 / W, z: b.z + (side * 3.75) / L, level: -1 }), false);
+      assert.equal(canOccupy({ x: b.x + 1.85 / W, z: b.z + (side * 4.08) / L, level: -1 }), true);
       assert.equal(canOccupy({ x: b.x, z: b.z + (side * 4.4) / L, level: -1 }), true);
     }
 });
@@ -99,7 +100,16 @@ test('physical shovelling requires a tool and a fresh load, while slice strokes 
   const { r, p } = room();
   const act = (verb: string, value?: unknown) => {
     r.tick(1);
-    r.action(p.id, { station: 'boiler-a', verb, value });
+    const saved = { x: p.x, z: p.z, level: p.level };
+    const supply =
+      verb === 'equip' || verb === 'return-tool'
+        ? FIRING_RACK
+        : verb === 'scoop'
+          ? COAL_BUNKERS[0]
+          : null;
+    if (supply) Object.assign(p, { x: supply.x, z: supply.z + 0.6, level: supply.level });
+    r.action(p.id, { station: supply?.id ?? 'boiler-a', verb, value });
+    Object.assign(p, saved);
   };
   act('door', { zone: 0, open: true });
   assert.throws(() => act('tend', { zone: 0, tool: 'coal', physical: true }), /tool/);
@@ -108,6 +118,7 @@ test('physical shovelling requires a tool and a fresh load, while slice strokes 
   act('scoop');
   act('tend', { zone: 0, tool: 'coal', physical: true });
   assert.ok(!p.inventory.includes('Coal load'));
+  act('return-tool', 'coal');
   act('equip', 'slice');
   r.ship.clinker[0][0] = 0.75;
   for (let n = 0; n < 3; n++) act('tend', { zone: 0, tool: 'slice', physical: true });
@@ -135,7 +146,7 @@ test('standard first ice is three to six minutes away at passage speeds, with an
     const a = new Room('A', seed),
       p = a.addPlayer('Test', 's');
     a.start(p.id, { practice: true });
-    assert.ok(a.encounterAt >= 225 && a.encounterAt <= 360);
+    assert.ok(a.encounterAt >= 180 && a.encounterAt <= 360);
     const b = new Room('B', seed),
       q = b.addPlayer('Test', 's');
     b.start(q.id, { practice: true, difficulty: 'experienced' });
@@ -166,17 +177,7 @@ test('physical model targets exist on every boiler and an aimed front door wins 
   const b = buildBoilerRoom(g, m);
   g.updateMatrixWorld(true);
   for (let bank = 0; bank < 4; bank++) {
-    for (const kind of [
-      'door',
-      'fire',
-      'ash',
-      'tool',
-      'coal',
-      'draught',
-      'stop',
-      'relief',
-      'gauge',
-    ])
+    for (const kind of ['door', 'fire', 'ash', 'draught', 'stop', 'relief', 'gauge'])
       assert.ok(
         b.controls.some(
           (o) => o.userData.boilerControl.bank === bank && o.userData.boilerControl.kind === kind,

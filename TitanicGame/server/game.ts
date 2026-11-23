@@ -1,8 +1,16 @@
+import {
+  newAuxiliaries,
+  stepAuxiliaries,
+  auxiliaryEngineEfficiency,
+  auxiliarySteeringEfficiency,
+  wirelessPowered,
+} from '../shared/auxiliary';
+import { naturalFailureChance, firingRate } from '../shared/watch-balance';
 import { inquirySeat } from '../shared/inquiry';
 import { readChartMark } from '../shared/chart';
 import { METRES_PER_NM, chartPosition } from '../shared/units';
 import type { ChartMark } from '../shared/types';
-import { PHONE_LINKS, iceReport, iceMessage, type LineMessage } from '../shared/radio';
+import { PHONE_LINKS, iceReport, iceMessage, watchTime, type LineMessage } from '../shared/radio';
 import { BOILER_COUNT, boilerIndex, stepPlant, steamPsi, fullPowerStrain } from '../shared/plant';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { BALANCE, COLORS, ROLE_INFO, ROLE_ORDER, type Role } from '../shared/config';
@@ -32,6 +40,7 @@ import {
   spawnFor,
   STATIONS,
   wallsBetween,
+  onStairSide,
 } from '../shared/world';
 import { encodeMorse, normalizeTelegram } from '../shared/morse';
 import type { PracticeAction, PracticeSettings, StartOptions } from '../shared/types';
@@ -145,6 +154,10 @@ export class Room {
   rng: Random;
   encounterAt = 0;
   nextEvent = 0;
+  highPowerSeconds = 0;
+  compassError = 0;
+  compassTarget = 6;
+  radioReplyTo: string | null = null;
   nextTelegram = 0;
   radioReplyAt: number | null = null;
   radioReadyAt = 0;
@@ -154,6 +167,7 @@ export class Room {
   mainResolved = false;
   hazardNorth = 0;
   mainPassedAt: number | null = null;
+  finishWest = (METRES_PER_NM * 25) / 6;
   cabinetOpen = false;
   binocularOwner: string | null = null;
   keyPosition: Position = { ...KEY_SPOTS[0] };
@@ -176,6 +190,7 @@ export class Room {
   }
   newShip(): ShipState {
     return {
+      auxiliary: newAuxiliaries(),
       impact: null,
       west: 0,
       north: 0,
@@ -213,9 +228,19 @@ export class Room {
     };
   }
   newMachines(): Machine[] {
-    return (['steering', 'engines', 'valve', 'wireless', 'compass', 'gauge'] as MachineId[]).map(
-      (id) => ({ id, condition: 100, fault: null, evidence: [] }),
-    );
+    return (
+      [
+        'steering',
+        'engines',
+        'valve',
+        'wireless',
+        'compass',
+        'gauge',
+        'feedwater',
+        'condenser',
+        'dynamos',
+      ] as MachineId[]
+    ).map((id) => ({ id, condition: 100, fault: null, evidence: [] }));
   }
   addPlayer(name: string, socket: string) {
     if (this.phase !== 'lobby')
@@ -230,7 +255,7 @@ export class Room {
       id,
       token,
       socket,
-      name: name.trim().slice(0, 20) || 'Crewmate',
+      name: name.trim().slice(0, 20) || 'Shipmate',
       color: COLORS[this.players.size],
       connected: true,
       evacuated: false,
@@ -292,7 +317,7 @@ export class Room {
     p.talking = false;
     p.job = null;
     this.equipmentViews.delete(id);
-    p.inventory = p.inventory.filter(i => !i.startsWith('Firing tool:') && i !== 'Coal load');
+    p.inventory = p.inventory.filter((i) => !i.startsWith('Firing tool:') && i !== 'Coal load');
     this.hangup(id);
     if (p.binoculars) {
       p.binoculars = false;
@@ -341,6 +366,8 @@ export class Room {
     this.difficulty = options.difficulty === 'experienced' ? 'experienced' : 'standard';
     this.alternativeWireless = false; // The tenth post is always Second Wireless Operator.
     this.crewSize = crew.length;
+    this.highPowerSeconds = this.compassError = 0;
+    this.radioReplyTo = null;
     this.chartMarks = [];
     this.equipmentViews.clear();
     this.command = { heading: 270, acknowledgedBy: null };
@@ -457,9 +484,16 @@ export class Room {
   }
   machineViewed(machine: MachineId, except = '') {
     for (const [id, view] of this.equipmentViews) {
-      const p = this.players.get(id), s = STATIONS.find(s => s.id === view.station);
-      if (!p?.connected || view.until < Date.now() || !s || distance(p, s) > BALANCE.interactDistance) {
-        this.equipmentViews.delete(id); continue;
+      const p = this.players.get(id),
+        s = STATIONS.find((s) => s.id === view.station);
+      if (
+        !p?.connected ||
+        view.until < Date.now() ||
+        !s ||
+        distance(p, s) > BALANCE.interactDistance
+      ) {
+        this.equipmentViews.delete(id);
+        continue;
       }
       if (id !== except && s.machine === machine) return true;
     }
@@ -468,6 +502,8 @@ export class Room {
   failMachine(id: MachineId, deliberate = false) {
     const m = this.machine(id);
     m.fault = FAULTS[id];
+    if (id === 'compass')
+      this.compassTarget = this.rng.between(4, 8) * (this.rng.next() < 0.5 ? -1 : 1);
     m.condition = Math.max(12, m.condition - (deliberate ? 48 : 23));
     for (const p of this.players.values()) delete p.inspections[id];
   }
@@ -505,7 +541,8 @@ export class Room {
         throw new GameError('Your tools need time, or you have no charges left.');
       if (this.machine(s.machine).fault)
         throw new GameError('This machine is already malfunctioning.');
-      if (this.machineViewed(s.machine, id)) throw new GameError('A shipmate is watching this equipment.');
+      if (this.machineViewed(s.machine, id))
+        throw new GameError('A shipmate is watching this equipment.');
       occupy();
       return this.job(p, 'tamper', s.id, BALANCE.sabotageSeconds);
     }
@@ -527,24 +564,80 @@ export class Room {
       return this.job(p, 'repair', s.id, workSeconds(p.role, 'repair'));
     }
     switch (s.kind) {
+      case 'auxiliary': {
+        const aux = this.ship.auxiliary;
+        const index = Number(s.id.at(-1)) - 1;
+        const toggle = () => {
+          if (typeof a.value !== 'boolean') throw new GameError('Choose on or off.');
+          return a.value;
+        };
+        if (s.id.startsWith('feed-pump-')) {
+          if (a.verb === 'pump') {
+            aux.feedPumps[index] = toggle();
+            return;
+          }
+          if (a.verb === 'clean-strainer') {
+            if (aux.feedPumps[index])
+              throw new GameError('Stop this pump before opening its strainer.');
+            if (aux.strainers[index] < 0.01) throw new GameError('This strainer is clear.');
+            occupy();
+            return this.job(p, 'strainer', s.id, p.role?.includes('Engineer') ? 5 : 15, index);
+          }
+        }
+        if (s.id.startsWith('feed-valve-') && a.verb === 'feed') {
+          aux.feedValves[index] = num(0, 1);
+          return;
+        }
+        if (s.id.startsWith('condenser-') && a.verb === 'cooling') {
+          aux.coolingValves[index] = num(0, 1);
+          return;
+        }
+        if (s.id.startsWith('dynamo-')) {
+          if (a.verb === 'generator') {
+            aux.generators[index] = toggle();
+            return;
+          }
+          if (a.verb === 'governor') {
+            aux.governors[index] = num(0, 1);
+            return;
+          }
+        }
+        if (s.id.startsWith('circuit-') && a.verb === 'circuit') {
+          const circuit = s.id.slice(8) as keyof typeof aux.circuits;
+          if (!Object.hasOwn(aux.circuits, circuit)) throw new GameError('Unknown circuit.');
+          aux.circuits[circuit] = toggle();
+          return;
+        }
+        if (s.id === 'bearing-oil' && a.verb === 'lubricate') {
+          occupy();
+          return this.job(p, 'lubricate', s.id, p.role?.includes('Engineer') ? 4 : 10);
+        }
+        break;
+      }
       case 'firing': {
         if (s.id === FIRING_RACK.id && (a.verb === 'equip' || a.verb === 'return-tool')) {
           const tool = String(a.value) as FiringTool;
           if (!FIRING_TOOLS.includes(tool)) throw new GameError('Choose a tool.');
-          const held = p.inventory.find(i => i.startsWith('Firing tool:'));
+          const held = p.inventory.find((i) => i.startsWith('Firing tool:'));
           if (a.verb === 'return-tool') {
-            if (held !== 'Firing tool:' + tool) throw new GameError('You are not carrying that tool.');
-            p.inventory = p.inventory.filter(i => !i.startsWith('Firing tool:') && i !== 'Coal load');
+            if (held !== 'Firing tool:' + tool)
+              throw new GameError('You are not carrying that tool.');
+            p.inventory = p.inventory.filter(
+              (i) => !i.startsWith('Firing tool:') && i !== 'Coal load',
+            );
             return;
           }
           if (held) throw new GameError('Put your tool back before taking another.');
-          const owner = [...this.players.values()].find(q => q.inventory.includes('Firing tool:' + tool));
+          const owner = [...this.players.values()].find((q) =>
+            q.inventory.includes('Firing tool:' + tool),
+          );
           if (owner) throw new GameError(`${owner.name} has the ${toolName(tool)}.`);
           p.inventory.push('Firing tool:' + tool);
           return;
         }
         if (s.id.startsWith('coal-') && a.verb === 'scoop') {
-          if (!p.inventory.includes('Firing tool:coal')) throw new GameError('Take the shovel first.');
+          if (!p.inventory.includes('Firing tool:coal'))
+            throw new GameError('Take the shovel first.');
           if (!p.inventory.includes('Coal load')) p.inventory.push('Coal load');
           return;
         }
@@ -594,6 +687,10 @@ export class Room {
       case 'boiler': {
         const bank = boilerIndex(s.id);
         if (bank < 0 || bank >= this.ship.fires.length) throw new GameError('Unknown boiler.');
+        if (a.verb === 'feed') {
+          this.ship.auxiliary.feedValves[bank] = num(0, 1);
+          return;
+        }
         if (a.verb === 'connect') {
           if (typeof a.value !== 'boolean') throw new GameError('Choose a valve position.');
           this.ship.boilerConnected[bank] = a.value;
@@ -627,28 +724,38 @@ export class Room {
           }
           if (!['coal', 'slice', 'rake'].includes(v.tool ?? ''))
             throw new GameError('Choose a firing tool.');
-          if (!p.inventory.includes('Firing tool:' + v.tool))
-            throw new GameError('Take the tool from the rack.');
-          if (v.tool === 'coal' && !p.inventory.includes('Coal load'))
-            throw new GameError('Fill the shovel at a coal bunker.');
+          if ((v.tool !== 'rake' || v.draw) && !this.ship.fireDoors[bank][v.zone!])
+            throw new GameError('Open the fire door first.');
           const trained = p.role?.includes('Boiler') ?? false,
             clock = this.elapsed + this.pausedTime;
           if (clock - p.lastTend < (trained ? 0.45 : 0.9))
             throw new GameError('Finish your stroke before starting another.');
+          if (!p.inventory.includes('Firing tool:' + v.tool))
+            throw new GameError('Take the tool from the rack.');
+          if (v.tool === 'coal' && !p.inventory.includes('Coal load'))
+            throw new GameError('Fill the shovel at a coal bunker.');
           try {
             tendFire(this.ship, bank, v.zone!, v.tool!, trained, v.draw === true);
           } catch (e) {
             throw new GameError((e as Error).message);
           }
           p.lastTend = clock;
-          if (v.tool === 'coal')
-            p.inventory = p.inventory.filter((i) => i !== 'Coal load');
+          if (v.tool === 'coal') p.inventory = p.inventory.filter((i) => i !== 'Coal load');
           this.log(`${p.name} worked boiler ${bank + 1}, fire ${v.zone! + 1}: ${v.tool}.`);
           return;
         }
         break;
       }
       case 'machine':
+        if (s.id === 'steering' && a.verb === 'steering-set') {
+          this.ship.auxiliary.steeringSet = Math.round(num(0, 1));
+          return;
+        }
+        if (s.id === 'steering' && a.verb === 'steering-steam') {
+          this.ship.auxiliary.steeringSteam = num(0, 1);
+          return;
+        }
+
         if (s.machine === 'valve' && a.verb === 'steam-valve') {
           this.ship.mainSteamValve = num(0, 1);
           return;
@@ -664,6 +771,7 @@ export class Room {
         break;
       case 'ladder':
         if (a.verb === 'travel') {
+          if (!onStairSide(p, s)) throw new GameError('Use the flight on this side.');
           return this.job(p, 'travel', s.id, s.travelSeconds ?? 3);
         }
         break;
@@ -724,7 +832,7 @@ export class Room {
             typeof v.note !== 'string'
           )
             throw new GameError('Enter an estimated range and observation.');
-          const bearing = (this.ship.heading + (p.yaw * 180) / Math.PI + 360) % 360;
+          const bearing = (this.ship.indicatedHeading + (p.yaw * 180) / Math.PI + 360) % 360;
           p.notes.push(
             `Lookout ${Math.round(this.elapsed)}s: ${bearing.toFixed(0)}° from ${chartPosition(this.ship.west, this.ship.north)}; ${v.range ? v.range.toFixed(2) + ' NM estimated' : 'range uncertain'}. ${v.note.slice(0, 120)}`,
           );
@@ -803,11 +911,23 @@ export class Room {
         }
         break;
       case 'wireless': {
+        if (
+          ['request', 'assist', 'decode'].includes(a.verb) &&
+          !wirelessPowered(this.ship.auxiliary)
+        )
+          throw new GameError('Wireless power lost. Ask the dynamo room to restore its feeder.');
         if (this.machine('wireless').fault) throw new GameError('The receiver needs repair.');
         if (a.verb === 'request') {
           const clock = this.elapsed + this.pausedTime;
           if (clock < this.radioReadyAt)
             throw new GameError('The other station is still working your request.');
+          const requested =
+            typeof a.value === 'string'
+              ? this.telegrams.find((t) => t.id === a.value && t.decoded && t.report)
+              : undefined;
+          if (a.value !== undefined && !requested)
+            throw new GameError('Choose a decoded ice report to clarify.');
+          this.radioReplyTo = requested?.id ?? null;
           this.radioReplyAt = clock + 8;
           this.radioReadyAt = clock + 40;
           p.notes.push('Requested a fresh ice position over Marconi wireless.');
@@ -830,7 +950,7 @@ export class Room {
         if (a.verb === 'decode') {
           if (normalizeTelegram(v.text ?? '') !== normalizeTelegram(telegram.text!))
             throw new GameError(
-              'The transcription does not match. Compare the Morse chart or use assistance.',
+              'The transcription does not match. Check it against the Morse reference.',
             );
           telegram.decoded = true;
           telegram.receivedBy = p.name;
@@ -917,8 +1037,20 @@ export class Room {
     switch (job.kind) {
       case 'travel':
         if (s.destination) Object.assign(p, s.destination);
+        if (s.exitYaw !== undefined) {
+          p.yaw = p.input.yaw = s.exitYaw;
+          p.pitch = p.input.pitch = 0;
+        }
         p.relocation++;
         p.inputAt = 0;
+        break;
+      case 'strainer':
+        if (!this.ship.auxiliary.feedPumps[Number(p.jobValue)])
+          this.ship.auxiliary.strainers[Number(p.jobValue)] = 0;
+        else p.notes.push('Strainer work stopped: the pump was restarted.');
+        break;
+      case 'lubricate':
+        this.ship.auxiliary.lubrication = 1;
         break;
       case 'unlock':
         this.cabinetOpen = true;
@@ -926,7 +1058,10 @@ export class Room {
         break;
       case 'tamper': {
         const m = this.machine(s.machine!);
-        if (this.machineViewed(m.id)) { p.notes.push('Work interrupted: a shipmate was at the equipment.'); return; }
+        if (this.machineViewed(m.id)) {
+          p.notes.push('Work interrupted: a shipmate was at the equipment.');
+          return;
+        }
         this.failMachine(m.id, true);
         m.evidence.push(
           this.rng.pick([
@@ -950,7 +1085,7 @@ export class Room {
         const m = this.machine(s.machine!);
         m.condition = 100;
         m.fault = null;
-        p.inspections[m.id] = { fault: null, result: 'Operational' };
+        delete p.inspections[m.id];
         this.log(`${p.name} repaired ${m.id}.`);
         break;
       }
@@ -1037,6 +1172,9 @@ export class Room {
               })
             : []),
           ...(station.id === 'engines' ? [[0, -2.1 / SHIP_LENGTH_SCALE]] : []),
+          ...(station.kind === 'wireless'
+            ? [[(station.id === 'wireless' ? -1.4 : 1.25) / SHIP_WIDTH_SCALE, 0]]
+            : []),
           ...approach,
           [0, 2.1 / SHIP_LENGTH_SCALE],
           [2.9 / SHIP_WIDTH_SCALE, 0],
@@ -1068,7 +1206,7 @@ export class Room {
       p.input.right = 0;
       Object.assign(p, destination);
       p.relocation++;
-      this.activeDemo = null;
+      if (this.activeDemo !== 'auxiliary') this.activeDemo = null;
       return;
     }
     if (action.verb === 'restore') {
@@ -1077,6 +1215,7 @@ export class Room {
       this.ship.hull = 100;
       this.ship.compartments.fill(0);
       this.ship.impact = null;
+      this.ship.auxiliary = newAuxiliaries();
       this.ship.steam = 76;
       this.ship.boilerPressure.fill(76);
       this.ship.boilerConnected.fill(true);
@@ -1178,7 +1317,7 @@ export class Room {
     this.nextEvent = this.nextTelegram = Infinity;
     this.practiceSettings = {
       paused: !demo.live,
-      assistance: demo.id !== 'boilers' && demo.id !== 'engineer',
+      assistance: !['boilers', 'engineer', 'auxiliary'].includes(demo.id),
       tools: true,
     };
     const p = this.players.get(id)!;
@@ -1199,6 +1338,8 @@ export class Room {
     }
     if (demo.id === 'helmsman') this.command = { heading: 278, acknowledgedBy: null };
     if (demo.id === 'boilers') {
+      p.pitch = -0.35;
+      p.input.pitch = p.pitch;
       this.ship.coal[0] = 0.32;
       this.ship.bedBalance[0] = [-0.16, 0.17, -0.01];
       this.ship.ash[0] = 0.35;
@@ -1206,6 +1347,12 @@ export class Room {
       this.ship.clinker[0] = [0.75, 0.2, 0.1];
       this.ship.fires[0] = 0.65;
       this.ship.fireHeat[0] = 0.42;
+    }
+    if (demo.id === 'auxiliary') {
+      this.ship.auxiliary.strainers[0] = 0.88;
+      this.ship.auxiliary.boilerWater.fill(0.43);
+      this.ship.auxiliary.voltage = 55;
+      this.failMachine('dynamos');
     }
     if (demo.id === 'engineer') {
       this.ship.order = 25;
@@ -1244,6 +1391,10 @@ export class Room {
         }) &&
         steamPsi(this.ship.steam) >= 190 &&
         steamPsi(this.ship.steam) <= 215,
+      auxiliary:
+        this.ship.auxiliary.strainers[0] < 0.1 &&
+        this.ship.auxiliary.boilerWater.every((v) => v >= 0.45 && v <= 0.8) &&
+        this.ship.auxiliary.voltage >= 90,
       engineer: !this.machine('engines').fault && this.ship.throttle === 25,
       wireless: this.telegrams.some((t) => t.decoded),
       schedule: this.ship.delay >= BALANCE.scheduleWarning,
@@ -1323,7 +1474,7 @@ export class Room {
     this.votes = {};
     if (cause !== 'sinking') {
       this.ship.order = this.ship.throttle = this.ship.speed = 0;
-      this.notice = 'Crossing recalled';
+      this.notice = 'New York · company hearing';
     } else this.notice = '';
     for (const [index, p] of [...this.players.values()].entries()) {
       if (cause === 'sinking') {
@@ -1341,8 +1492,8 @@ export class Room {
       cause === 'sinking'
         ? 'The surviving crew gathered in the lifeboats.'
         : cause === 'route'
-          ? 'The crossing was recalled after leaving the safe route.'
-          : 'The crossing was recalled after exhausting the schedule allowance.',
+          ? 'After arrival, the crew was dismissed for leaving the assigned route.'
+          : 'After arriving late, the crew was dismissed for excessive delay.',
     );
   }
   tickCrew(dt: number) {
@@ -1404,7 +1555,8 @@ export class Room {
     this.tickCrew(dt);
     if (this.radioReplyAt !== null && this.elapsed + this.pausedTime >= this.radioReplyAt) {
       this.radioReplyAt = null;
-      this.generateTelegram(true);
+      this.generateTelegram(true, this.radioReplyTo);
+      this.radioReplyTo = null;
     }
     if (this.phase === 'sinking') {
       this.ship.order = this.ship.throttle = 0;
@@ -1428,27 +1580,34 @@ export class Room {
           this.ship.ash[i] = 0.02;
           this.ship.clinker[i].fill(0.02);
         }
-      if (this.practiceSettings.assistance)
+      if (this.practiceSettings.assistance) {
         this.ship.coal = this.ship.coal.map((c) => Math.max(0.62, c));
-      const engine = this.machine('engines').fault
-        ? 0.48
-        : Math.max(0.75, this.machine('engines').condition / 100);
+        if (this.activeDemo !== 'auxiliary') this.assistAuxiliaries();
+      }
+      const engine =
+        auxiliaryEngineEfficiency(this.ship.auxiliary) *
+        (this.machine('engines').fault
+          ? 0.48
+          : Math.max(0.75, this.machine('engines').condition / 100));
+      stepAuxiliaries(this.ship, dt, (id) => !!this.machine(id).fault, this.crewSize);
       stepPlant(
         this.ship,
         dt,
         1,
-        this.activeDemo === 'boilers' ? 1 : this.crewSize < 7 ? 0.65 : 1,
+        this.activeDemo === 'boilers' ? 1 : firingRate(this.crewSize),
         engine,
       );
       this.ship.speed +=
         (this.ship.throttle * Math.min(1, this.ship.steam / 63) * engine - this.ship.speed) *
         Math.min(1, dt * 0.045);
+      this.updateInstruments(dt);
       this.ship.indicatedSteam = this.ship.steam + (this.machine('gauge').fault ? 18 : 0);
       return;
     }
     if (this.practice && this.practiceSettings.assistance) {
       this.ship.throttle = this.ship.order;
       this.ship.coal = this.ship.coal.map((c) => Math.max(0.62, c));
+      if (this.activeDemo !== 'auxiliary') this.assistAuxiliaries();
     }
     this.simulateShip(dt);
     if (this.elapsed >= this.nextEvent) {
@@ -1494,6 +1653,7 @@ export class Room {
     }
     if (
       this.mainPassedAt !== null &&
+      this.ship.west >= this.finishWest &&
       this.elapsed - this.mainPassedAt > 35 &&
       this.ship.compartments.every((n) => n < 0.35)
     )
@@ -1501,22 +1661,49 @@ export class Room {
     if (
       this.phase === 'voyage' &&
       this.mainPassedAt !== null &&
+      this.ship.west >= this.finishWest &&
       this.elapsed - this.mainPassedAt > 85 &&
       this.ship.hull > 0
     )
       this.finish('crew');
   }
+  assistAuxiliaries() {
+    const a = this.ship.auxiliary;
+    a.feedValves = a.boilerWater.map((v) =>
+      clamp(0.55 + (this.ship.throttle - 20) * 0.06 + (0.6 - v) * 2, 0, 1),
+    );
+    if (!a.feedPumps.some(Boolean)) a.feedPumps[1] = true;
+    a.lubrication = Math.max(0.65, a.lubrication);
+  }
+  updateInstruments(dt: number) {
+    const ship = this.ship;
+    this.highPowerSeconds = Math.min(
+      45,
+      Math.max(0, this.highPowerSeconds + (ship.throttle > 20 ? dt : -dt * 2)),
+    );
+    this.compassError +=
+      ((this.machine('compass').fault ? this.compassTarget : 0) - this.compassError) *
+      Math.min(1, dt / (this.machine('compass').fault ? 12 : 2));
+    ship.indicatedHeading = (ship.heading + this.compassError + 360) % 360;
+  }
   simulateShip(dt: number) {
     const ship = this.ship;
+    this.updateInstruments(dt);
     this.updateSteamLeak(dt);
+    stepAuxiliaries(ship, dt, (id) => !!this.machine(id).fault, this.crewSize);
     const efficiency = 1;
-    const engineEfficiency = this.machine('engines').fault
-      ? 0.48
-      : Math.max(0.75, this.machine('engines').condition / 100);
-    const fire = stepPlant(ship, dt, efficiency, this.crewSize < 7 ? 0.65 : 1, engineEfficiency);
-    const steerEfficiency = this.machine('steering').fault ? 0.24 : 1;
+    const engineEfficiency =
+      auxiliaryEngineEfficiency(ship.auxiliary) *
+      (this.machine('engines').fault
+        ? 0.48
+        : Math.max(0.75, this.machine('engines').condition / 100));
+    const fire = stepPlant(ship, dt, efficiency, firingRate(this.crewSize), engineEfficiency);
+    const steerEfficiency = auxiliarySteeringEfficiency(
+      ship.auxiliary,
+      !!this.machine('steering').fault,
+    );
     advanceMotion(ship, dt, steerEfficiency, engineEfficiency);
-    ship.indicatedHeading = ship.heading + (this.machine('compass').fault ? 6 : 0);
+    ship.indicatedHeading = (ship.heading + this.compassError + 360) % 360;
     ship.indicatedSteam = ship.steam + (this.machine('gauge').fault ? 18 : 0);
     if (this.phase === 'voyage') {
       const progress = ship.speed * Math.cos(((ship.heading - 270) * Math.PI) / 180);
@@ -1540,7 +1727,7 @@ export class Room {
     for (let i = 0; i < ship.compartments.length; i++) {
       let water = ship.compartments[i];
       if (water > 0) {
-        const pump = ship.steam > 48 && !this.machine('engines').fault ? 0.0017 : 0.0005;
+        const pump = ship.steam > 48 && ship.auxiliary.feedFlow > 0.4 ? 0.0017 : 0.0005;
         water += dt * (water > 0.28 ? 0.0085 : -pump);
         ship.compartments[i] = clamp(water, 0, 1);
       }
@@ -1551,8 +1738,7 @@ export class Room {
   randomEvent() {
     const event = this.rng.next(),
       m = this.rng.pick(this.machines);
-    const failureChance =
-      0.16 + (1 - m.condition / 100) * 0.4 + (this.ship.throttle > 21 ? 0.06 : 0);
+    const failureChance = naturalFailureChance(m, this.ship, this.highPowerSeconds);
     if (event < failureChance && !m.fault && !this.machineViewed(m.id)) {
       this.failMachine(m.id);
       this.log(`A natural ${m.id} malfunction developed.`);
@@ -1564,7 +1750,9 @@ export class Room {
   updateSteamLeak(dt: number) {
     const target = this.machine('valve').fault ? 0.85 : 0;
     const rate = target > this.ship.steamLeak ? 0.018 : 0.15;
-    this.ship.steamLeak += Math.sign(target - this.ship.steamLeak) * Math.min(Math.abs(target - this.ship.steamLeak), dt * rate);
+    this.ship.steamLeak +=
+      Math.sign(target - this.ship.steamLeak) *
+      Math.min(Math.abs(target - this.ship.steamLeak), dt * rate);
   }
   addIce(west: number, north: number, radius: number, main = false) {
     this.icebergs.push({
@@ -1608,7 +1796,7 @@ export class Room {
     const future = projectCourse(
       this.ship,
       seconds,
-      this.machine('steering').fault ? 0.24 : 1,
+      auxiliarySteeringEfficiency(this.ship.auxiliary, !!this.machine('steering').fault),
       this.machine('engines').fault
         ? 0.48
         : Math.max(0.75, this.machine('engines').condition / 100),
@@ -1644,6 +1832,8 @@ export class Room {
         );
       west += spacing * this.rng.between(85, 110);
     }
+    const last = this.icebergs.filter((ice) => ice.main).at(-1)!;
+    this.finishWest = last.west + HULL_STERN + last.radius + 20 + spacing * 35;
   }
   resolveEncounter(initial = false) {
     if (this.mainResolved && this.icebergs.some((i) => i.main)) return;
@@ -1732,24 +1922,98 @@ export class Room {
       (i) => i.main || this.ship.west - i.west < BALANCE.horizonDistance + 400,
     );
   }
-  generateTelegram(fresh = false) {
+  generateTelegram(fresh = false, referenceId: string | null = null) {
+    const a = ((this.ship.heading - 270) * Math.PI) / 180;
+    const relative = (i: Iceberg) => ({
+      along: (i.west - this.ship.west) * Math.cos(a) + (i.north - this.ship.north) * Math.sin(a),
+      cross: -(i.west - this.ship.west) * Math.sin(a) + (i.north - this.ship.north) * Math.cos(a),
+    });
     const ahead = this.icebergs
-      .filter((i) => !i.passed && i.west > this.ship.west + 100)
-      .sort((a, b) => a.west - b.west);
-    const source = fresh
-      ? (ahead.find((i) => i.main) ?? ahead[0])
-      : this.rng.pick(ahead.slice(0, 8));
-    const useful =
-      !!source && (fresh || !this.telegrams.some((t) => t.report) || this.rng.next() < 0.75);
-    const report = useful
-      ? iceReport(source.west, source.north, this.elapsed - (fresh ? 0 : this.rng.between(40, 220)))
+      .filter((i) => !i.passed && relative(i).along > 100)
+      .sort(
+        (x, y) =>
+          relative(x).along +
+          Math.abs(relative(x).cross) * 2 -
+          (relative(y).along + Math.abs(relative(y).cross) * 2),
+      );
+    const reference = this.telegrams.find((t) => t.id === referenceId && t.decoded && t.report);
+    const critical = ahead.find(
+      (i) =>
+        i.main &&
+        relative(i).along / Math.max(1, this.ship.speed * 0.514444 * 1.5) < 170 &&
+        !this.telegrams.some(
+          (t) =>
+            t.report &&
+            this.elapsed - t.at < 70 &&
+            Math.hypot(t.report.west - i.west, t.report.north - i.north) < 450,
+        ),
+    );
+    const source = reference
+      ? ahead
+          .slice()
+          .sort(
+            (x, y) =>
+              Math.hypot(x.west - reference.report!.west, x.north - reference.report!.north) -
+              Math.hypot(y.west - reference.report!.west, y.north - reference.report!.north),
+          )[0]
+      : fresh
+        ? (ahead.find((i) => i.main) ?? ahead[0])
+        : (critical ?? ahead[0]);
+    // Keep a usable warning available before an encounter; ordinary traffic is
+    // otherwise half new reports, a quarter repeats/corrections, a quarter noise.
+    const covered =
+      source &&
+      this.telegrams.some(
+        (t) =>
+          t.report &&
+          this.elapsed - t.at < 70 &&
+          Math.hypot(t.report.west - source.west, t.report.north - source.north) < 450,
+      );
+    const traffic = this.rng.next();
+    const prior = this.telegrams.filter((t) => t.report).at(-1);
+    let report: ReturnType<typeof iceReport> | undefined;
+    if (source && (fresh || !covered || traffic < 0.5)) {
+      const group = ahead
+        .filter((i) => Math.hypot(i.west - source.west, i.north - source.north) < 350)
+        .slice(0, 4);
+      const west = group.reduce((n, i) => n + i.west, 0) / group.length,
+        north = group.reduce((n, i) => n + i.north, 0) / group.length;
+      report = iceReport(
+        west + (fresh ? 0 : this.rng.between(-100, 100)),
+        north + (fresh ? 0 : this.rng.between(-60, 60)),
+        this.elapsed - (fresh ? 0 : this.rng.between(20, 100)),
+      );
+      report.count = group.length;
+      report.radiusWest = Math.max(
+        report.radiusWest,
+        ...group.map((i) => Math.abs(i.west - report!.west) + i.radius + 35),
+      );
+      report.radiusNorth = Math.max(
+        report.radiusNorth,
+        ...group.map((i) => Math.abs(i.north - report!.north) + i.radius + 35),
+      );
+      const clear = (sign: number) =>
+        !ahead.some(
+          (i) =>
+            Math.abs(i.west - west) < report!.radiusWest + 200 &&
+            Math.abs(i.north - (north + sign * (report!.radiusNorth + 250))) < i.radius + 120,
+        );
+      if (clear(1)) report.passage = 'north';
+      else if (clear(-1)) report.passage = 'south';
+      if (reference) report.replaces = reference.id;
+    } else if (prior && traffic < 0.75) {
+      report = { ...prior.report!, replaces: prior.id, repeat: true };
+    }
+    const earlier = report?.replaces
+      ? this.telegrams.find((t) => t.id === report.replaces)
       : undefined;
     const text = report
-      ? iceMessage(report)
+      ? `TO ${this.rng.next() < 0.25 ? 'BALTIC' : 'TITANIC'} ${earlier ? `RE ${earlier.sender} ${watchTime(earlier.at)} ` : ''}${iceMessage(report)}`
       : this.rng.pick([
-          'FOR CAPE RACE PASSENGER TRAFFIC HELD UNTIL ICE REPORTS CLEAR',
-          'CARPATHIA ACKNOWLEDGES YOUR SIGNAL',
-          'BALTIC REQUESTS ACKNOWLEDGMENT OF LAST ICE POSITION',
+          'TO CARPATHIA PASSENGER MESSAGE ARRIVAL ARRANGEMENTS CONFIRMED',
+          'TO CAPE RACE HOLD PASSENGER TRAFFIC UNTIL MORNING',
+          'TO BALTIC ACKNOWLEDGE RECEIPT OF COMPANY TRAFFIC',
+          'TO TITANIC PASSENGER GREETINGS RECEIVED FOR DELIVERY',
         ]);
     const t: Telegram = {
       id: randomUUID(),
@@ -1766,11 +2030,12 @@ export class Room {
     if (this.telegrams.length > 30) this.telegrams.shift();
     return t;
   }
+
   vote(id: string, target: string) {
     if (!['lifeboat', 'inquiry'].includes(this.phase))
       throw new GameError('Voting opens during the crew inquiry.');
     if (!this.players.get(id)?.connected || !this.players.has(target))
-      throw new GameError('Choose a crewmate in this voyage.');
+      throw new GameError('Choose a shipmate in this voyage.');
     this.votes[id] = target;
     const connected = [...this.players.values()].filter((p) => p.connected);
     if (connected.every((p) => this.votes[p.id])) this.resolveVote();
@@ -1819,7 +2084,7 @@ export class Room {
       text[0] = outcome === 'draw' ? 'Interference exposed.' : 'Crossing abandoned.';
       text[1] =
         outcome === 'draw'
-          ? 'You identified the time traveler, but the crossing was recalled. Nobody wins.'
+          ? 'You identified the time traveler, but the company dismissed the crew after arrival. Nobody wins.'
           : 'The company dismissed the crew. The time traveler escaped the inquiry’s judgment.';
     }
     this.result = {
@@ -1922,12 +2187,17 @@ export class Room {
         : {}),
     });
     return {
+      finishWest: this.finishWest,
       wirelessWaiting: this.telegrams.filter((t) => !t.decoded).length,
       chartMarks: this.chartMarks.map((m) => ({ ...m, points: m.points.map((p) => ({ ...p })) })),
       command: { ...this.command },
-      firingTools: Object.fromEntries(FIRING_TOOLS.map(tool => [tool,
-        [...this.players.values()].find(p => p.inventory.includes('Firing tool:' + tool))?.name ?? null,
-      ])) as Snapshot['firingTools'],
+      firingTools: Object.fromEntries(
+        FIRING_TOOLS.map((tool) => [
+          tool,
+          [...this.players.values()].find((p) => p.inventory.includes('Firing tool:' + tool))
+            ?.name ?? null,
+        ]),
+      ) as Snapshot['firingTools'],
       crewSize: this.crewSize,
       demo: this.demoSnapshot(),
       radio: nearWireless
@@ -1980,7 +2250,11 @@ export class Room {
       cabinetOpen: this.cabinetOpen,
       self: {
         id: me.id,
-        inspections: Object.fromEntries(Object.entries(me.inspections).filter(([id, record]) => record.fault === this.machine(id as MachineId).fault).map(([id, record]) => [id, record.result])),
+        inspections: Object.fromEntries(
+          Object.entries(me.inspections)
+            .filter(([id, record]) => record.fault === this.machine(id as MachineId).fault)
+            .map(([id, record]) => [id, record.result]),
+        ),
         role: me.role,
         relocation: me.relocation,
         saboteur: me.saboteur,

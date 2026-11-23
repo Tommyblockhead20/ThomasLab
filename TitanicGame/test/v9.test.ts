@@ -30,7 +30,7 @@ const estimate = {
   confidence: 'medium',
 };
 
-test('v9 watches add wireless, lookout, second boiler, helm, second engineer and second wireless in order', () => {
+test('watches add wireless, lookout, auxiliaries, helm, second boiler and second wireless in order', () => {
   const expected = [
     'Captain',
     'Deck Officer',
@@ -38,9 +38,9 @@ test('v9 watches add wireless, lookout, second boiler, helm, second engineer and
     'Boiler Operator',
     'Wireless Operator',
     'Lookout',
-    'Second Boiler Operator',
+    'Auxiliary Engineer',
     'Helmsman',
-    'Second Engineer',
+    'Second Boiler Operator',
     'Second Wireless Operator',
   ];
   assert.deepEqual([...ROLE_ORDER], expected);
@@ -57,7 +57,7 @@ test('v9 watches add wireless, lookout, second boiler, helm, second engineer and
 
 test('smaller crews consume less coal and collect less ash without removing the penalty for poor firing', () => {
   const a = crew(4),
-    b = crew(7);
+    b = crew(9);
   for (let n = 0; n < 1200; n++) {
     a.simulateShip(0.05);
     b.simulateShip(0.05);
@@ -209,6 +209,9 @@ test('maintained ships can navigate every seeded encounter and fixed obstacle, t
   for (const seed of [1, 5, 8]) {
     const r = crew(8, seed);
     for (let t = 0; t < 900 && r.phase === 'voyage'; t += 0.05) {
+      r.ship.auxiliary.boilerWater.fill(0.6);
+      r.ship.auxiliary.lubrication = 0.85;
+      r.ship.auxiliary.feedValves.fill(0.9);
       r.ship.coal.fill(0.65);
       r.ship.ash.fill(0);
       r.ship.clinker.forEach((a) => a.fill(0));
@@ -238,7 +241,7 @@ test('routine engineering service restores condition but cannot erase an active 
   assert.throws(() => r.action(p.id, { station: 'engines', verb: 'repair' }), /No active fault/);
   r.elapsed += 0.2;
   r.action(p.id, { station: 'engines', verb: 'service' });
-  assert.equal(p.job?.duration, 12);
+  assert.equal(p.job?.duration, 8);
   r.completeJob(p, p.job!);
   p.job = null;
   assert.equal(m.condition, 98);

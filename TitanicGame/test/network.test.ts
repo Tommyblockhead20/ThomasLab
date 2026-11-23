@@ -23,6 +23,48 @@ async function connect(url: string) {
   });
   return s;
 }
+
+test('shared firing tools and equipment-view protection synchronize across real shipmates', async (t) => {
+  const game = createGameServer();
+  await new Promise<void>((done) => game.http.listen(0, '127.0.0.1', done));
+  const url = `http://127.0.0.1:${(game.http.address() as { port: number }).port}`,
+    sockets: Socket[] = [];
+  t.after(async () => {
+    sockets.forEach((s) => s.disconnect());
+    await game.close();
+  });
+  for (let n = 0; n < 4; n++) sockets.push(await connect(url));
+  const passes: Reply[] = [await request(sockets[0], 'room:create', { name: 'Mate0' })];
+  for (let n = 1; n < 4; n++)
+    passes.push(await request(sockets[n], 'room:join', { name: 'Mate' + n, code: passes[0].code }));
+  for (const s of sockets) await request(s, 'room:ready', true);
+  await request(sockets[0], 'room:start');
+  const room = game.rooms.get(passes[0].code!)!;
+  room.nextEvent = room.nextTelegram = Infinity;
+  const gauge = STATIONS.find((s) => s.id === 'gauge')!,
+    rack = STATIONS.find((s) => s.id === 'firing-tools')!;
+  const actors = passes.map((p) => room.players.get(p.id!)!);
+  Object.assign(actors[0], { x: gauge.x, z: gauge.z + 0.6, level: gauge.level });
+  await request(sockets[0], 'equipment:view', { station: 'gauge' });
+  assert.equal(room.machineViewed('gauge'), true);
+  await assert.rejects(request(sockets[1], 'equipment:view', { station: 'gauge' }), /closer/);
+  await request(sockets[0], 'equipment:view', { station: null });
+  assert.equal(room.machineViewed('gauge'), false);
+  for (const a of actors.slice(0, 2))
+    Object.assign(a, { x: rack.x, z: rack.z + 0.6, level: rack.level });
+  const seen = snapshot(sockets[1], (s) => s.firingTools.coal === 'Mate0');
+  await request(sockets[0], 'action', { station: rack.id, verb: 'equip', value: 'coal' });
+  await seen;
+  await assert.rejects(
+    request(sockets[1], 'action', { station: rack.id, verb: 'equip', value: 'coal' }),
+    /has the shovel/,
+  );
+  room.elapsed += 1;
+  await request(sockets[0], 'action', { station: rack.id, verb: 'return-tool', value: 'coal' });
+  room.elapsed += 1;
+  await request(sockets[1], 'action', { station: rack.id, verb: 'equip', value: 'coal' });
+  assert.equal(room.snapshot(actors[0].id).firingTools.coal, 'Mate1');
+});
 function snapshot(socket: Socket, condition: (s: Snapshot) => boolean): Promise<Snapshot> {
   return new Promise((done, fail) => {
     const timer = setTimeout(() => {
@@ -66,11 +108,20 @@ test('wireless telephone read-back reaches only the answered crew member, then b
   Object.assign(b, { x: bridge.x, z: bridge.z, level: bridge.level });
   Object.assign(observer, { x: 0, z: 5, level: -2 });
   const telegram = room.generateTelegram(true);
+  const receiver = STATIONS.find((s) => s.id === 'wireless')!;
+  Object.assign(a, { x: receiver.x - 1, z: receiver.z, level: receiver.level });
   await request(sockets[0], 'action', {
     station: 'wireless',
     verb: 'decode',
     value: { id: telegram.id, text: telegram.text },
   });
+  room.tick(0.2);
+  await request(sockets[0], 'action', {
+    station: receiver.id,
+    verb: 'carry',
+    value: { id: telegram.id },
+  });
+  Object.assign(a, { x: desk.x, z: desk.z, level: desk.level });
   room.tick(0.2);
   await request(sockets[0], 'action', { station: desk.id, verb: 'call', value: 'bridge' });
   await request(sockets[1], 'action', { station: bridge.id, verb: 'answer' });
@@ -319,4 +370,52 @@ test('a route recall broadcasts a company inquiry and accepts all votes without 
     assert.equal(s.result?.cause, 'route');
     assert.match(s.result!.description, /company dismissed/);
   }
+});
+
+test('seven networked shipmates share auxiliary controls and answer calls across the new machinery rooms', async (t) => {
+  const game = createGameServer();
+  await new Promise<void>((done) => game.http.listen(0, '127.0.0.1', done));
+  const url = `http://127.0.0.1:${(game.http.address() as { port: number }).port}`;
+  const sockets: Socket[] = [];
+  t.after(async () => {
+    for (const s of sockets) s.disconnect();
+    await game.close();
+  });
+  for (let n = 0; n < 7; n++) sockets.push(await connect(url));
+  const passes: Reply[] = [await request(sockets[0], 'room:create', { name: 'Mate0' })];
+  for (let n = 1; n < 7; n++)
+    passes.push(await request(sockets[n], 'room:join', { name: 'Mate' + n, code: passes[0].code }));
+  for (const s of sockets) await request(s, 'room:ready', true);
+  await request(sockets[0], 'room:start');
+  const room = game.rooms.get(passes[0].code!)!;
+  room.nextEvent = room.nextTelegram = Infinity;
+  const auxIndex = passes.findIndex((p) => room.players.get(p.id!)!.role === 'Auxiliary Engineer');
+  const engineerIndex = passes.findIndex((p) => room.players.get(p.id!)!.role === 'Engineer');
+  assert.ok(auxIndex >= 0);
+  assert.ok(engineerIndex >= 0);
+  const aux = room.players.get(passes[auxIndex].id!)!,
+    engineer = room.players.get(passes[engineerIndex].id!)!;
+  const pump = STATIONS.find((s) => s.id === 'feed-pump-2')!;
+  Object.assign(aux, { x: pump.x, z: pump.z + 0.6, level: pump.level });
+  const changed = snapshot(sockets[engineerIndex], (s) => s.ship.auxiliary.feedPumps[1]);
+  await request(sockets[auxIndex], 'action', { station: pump.id, verb: 'pump', value: true });
+  const shared = await changed;
+  assert.equal(shared.crewSize, 7);
+  Object.assign(engineer, { x: 0, z: 15, level: -1 });
+  await assert.rejects(
+    request(sockets[engineerIndex], 'action', {
+      station: 'dynamo-1',
+      verb: 'generator',
+      value: false,
+    }),
+    /closer/,
+  );
+  const from = STATIONS.find((s) => s.id === 'auxiliary-phone')!,
+    to = STATIONS.find((s) => s.id === 'engine-phone')!;
+  Object.assign(aux, { x: from.x, z: from.z, level: from.level });
+  Object.assign(engineer, { x: to.x, z: to.z, level: to.level });
+  room.elapsed += 0.3;
+  await request(sockets[auxIndex], 'action', { station: from.id, verb: 'call', value: 'engine' });
+  await request(sockets[engineerIndex], 'action', { station: to.id, verb: 'answer' });
+  assert.ok(room.voicePaths(aux).some((v) => v.id === engineer.id && v.phone));
 });

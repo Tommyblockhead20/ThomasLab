@@ -1,4 +1,5 @@
 import type { ShipState } from './types';
+import { electricSupply } from './auxiliary';
 import { firebed, setBeds } from './firing';
 export const BOILER_COUNT = 4;
 export const boilerIndex = (id: string) =>
@@ -43,7 +44,13 @@ export function stepPlant(
             (b.open ? 0.66 : 1),
         0,
       ) / 3;
-    const target = ship.fires[i] * efficiency;
+    const water = ship.auxiliary.boilerWater[i];
+    const waterEfficiency = Math.min(1, water / 0.3) * (1 - Math.max(0, water - 0.85) * 2);
+    const target =
+      ship.fires[i] *
+      efficiency *
+      waterEfficiency *
+      (0.86 + 0.14 * electricSupply(ship.auxiliary, 'ventilation'));
     ship.fireHeat[i] = heat + (target - heat) * Math.min(1, dt / (target < heat ? 5 : 8));
   }
   const fire = ship.fireHeat.reduce((a, b) => a + b, 0) / ship.fireHeat.length;
@@ -58,7 +65,12 @@ export function stepPlant(
     // an isolated boiler still fires and must be cooled or eased deliberately.
     const draw =
       ship.boilerConnected[i] && connected
-        ? ((steamDemand(ship.throttle) * 4) / connected) * valve
+        ? (((steamDemand(ship.throttle) +
+            ship.auxiliary.generatorRevs.reduce((a, b) => a + b, 0) * 0.7 +
+            ship.auxiliary.pumpRevs.reduce((a, b) => a + b, 0) * 0.3) *
+            4) /
+            connected) *
+          valve
         : 0;
     const target = Math.max(0, ship.fireHeat[i] * 143 - draw);
     let pressure = ship.boilerPressure[i];
@@ -74,7 +86,8 @@ export function stepPlant(
   const supply =
     (ship.boilerPressure.reduce((sum, p, i) => sum + (ship.boilerConnected[i] ? p : 0), 0) /
       BOILER_COUNT) *
-    valve * (1 - ship.steamLeak * 0.12);
+    valve *
+    (1 - ship.steamLeak * 0.12);
   ship.steam += (supply - ship.steam) * Math.min(1, dt / 3);
   const revs = ship.throttle * 3.2 * Math.min(1, ship.steam / 63) * engineEfficiency;
   ship.engineRevs += (revs - ship.engineRevs) * Math.min(1, dt / 3);

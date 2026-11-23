@@ -74,6 +74,11 @@ test('job demos complete through the normal department actions and retry resets 
     const { r, p } = demo(d.id);
     const act = (station: string, verb: string, value?: unknown) => {
       advance(r, 0.2);
+      if (verb === 'tend') {
+        const tool = (value as { tool: string }).tool;
+        p.inventory = p.inventory.filter((i) => !i.startsWith('Firing tool:') && i !== 'Coal load');
+        p.inventory.push('Firing tool:' + tool, ...(tool === 'coal' ? ['Coal load'] : []));
+      }
       r.action(p.id, { station, verb, value });
     };
     if (d.id === 'captain') act('telegraph', 'order', 25);
@@ -98,6 +103,8 @@ test('job demos complete through the normal department actions and retry resets 
       act('wheel', 'rudder', 0);
     }
     if (d.id === 'boilers') {
+      const fire = STATIONS.find((s) => s.id === 'boiler-a')!;
+      Object.assign(p, { x: fire.x, z: fire.z + 0.6, level: fire.level });
       for (let zone = 0; zone < 3; zone++) act('boiler-a', 'door', { zone, open: true });
       const stroke = (zone: number, tool: string) => {
         advance(r, 0.5);
@@ -113,6 +120,19 @@ test('job demos complete through the normal department actions and retry resets 
       for (let zone = 0; zone < 3; zone++) act('boiler-a', 'door', { zone, open: false });
       act('boiler-a', 'fire', 0.64);
       advance(r, 25);
+    }
+    if (d.id === 'auxiliary') {
+      const visit = (station: string, verb: string, value?: unknown) => {
+        r.practiceAction(p.id, { verb: 'travel', value: station });
+        act(station, verb, value);
+      };
+      visit('feed-pump-2', 'pump', true);
+      visit('feed-pump-1', 'pump', false);
+      act('feed-pump-1', 'clean-strainer');
+      advance(r, 5.1);
+      for (let i = 1; i <= 4; i++) visit('feed-valve-' + i, 'feed', 0.9);
+      visit('dynamo-2', 'generator', true);
+      advance(r, 30);
     }
     if (d.id === 'engineer') {
       act('engines', 'repair');

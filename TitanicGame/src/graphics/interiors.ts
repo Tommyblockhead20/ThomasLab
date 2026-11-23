@@ -3,6 +3,7 @@ import type { ShipMaterials } from './materials';
 import { gaugeFace } from './materials';
 import type { BoilerControl } from '../../shared/boiler-controls';
 import { buildFiringTool } from './firing-tool';
+import { FIRING_RACK, FIRING_TOOLS, COAL_BUNKERS } from '../../shared/stokehold';
 import { box, cyl, bar, metric, point, plaque, light } from './building';
 import {
   LEVEL_Y,
@@ -15,6 +16,8 @@ import {
   AUXILIARY_PUMPS,
   DOORWAYS,
   VENTILATORS,
+  WIRELESS,
+  DECK_OPENINGS,
 } from '../../shared/layout';
 import { STATIONS, WALLS } from '../../shared/world';
 import {
@@ -22,6 +25,147 @@ import {
   SHIP_HEIGHT_SCALE as H,
   SHIP_LENGTH_SCALE as L,
 } from '../../shared/navigation';
+
+function grandBalustrade(
+  g: T.Object3D,
+  a: T.Vector3,
+  b: T.Vector3,
+  m: ShipMaterials,
+  alreadyRailed = true,
+  footHeight = (t: number) => a.y + (b.y - a.y) * t,
+) {
+  const run = a.distanceTo(b);
+  const bays = Math.max(1, Math.ceil(run / 0.56));
+  const delta = b.clone().sub(a);
+  const flat = delta.clone().setY(0).normalize();
+  if (!alreadyRailed)
+    bar(
+      g,
+      a.clone().add(new T.Vector3(0, 1.03, 0)),
+      b.clone().add(new T.Vector3(0, 1.03, 0)),
+      0.044,
+      m.wood,
+    );
+  for (const end of [a, b]) {
+    box(g, end.x, end.y + 0.49, end.z, 0.15, 0.98, 0.15, m.wood, 'grand-newel');
+    cyl(g, end.x, end.y + 1.03, end.z, 0.108, 0.1, m.brass, 0.075);
+  }
+  for (let bay = 0; bay < bays; bay++) {
+    const t = (bay + 0.5) / bays;
+    const center = a.clone().lerp(b, t);
+    bar(
+      g,
+      center.clone().setY(footHeight(t) - 0.022),
+      center.clone().setY(center.y + 1.02),
+      0.019,
+      m.black,
+    ).name = 'grand-baluster';
+
+    for (const side of [-1, 1]) {
+      const scroll = new T.CatmullRomCurve3(
+        Array.from({ length: 15 }, (_, i) => {
+          const t = i / 14;
+          const angle = t * Math.PI * 2.12;
+          const radius = 0.16 * (1 - t * 0.81);
+          return center
+            .clone()
+            .addScaledVector(
+              flat,
+              side * (Math.sin(angle) * radius + 0.067 * Math.sin(Math.PI * t)),
+            )
+            .setY(center.y + 0.56 + Math.cos(angle) * radius * 1.55);
+        }),
+      );
+      g.add(new T.Mesh(new T.TubeGeometry(scroll, 16, 0.013, 5, false), m.black));
+    }
+    const rosette = new T.Mesh(new T.SphereGeometry(0.047, 8, 6), m.brass);
+    rosette.position.copy(center).add(new T.Vector3(0, 0.56, 0));
+    g.add(rosette);
+  }
+}
+
+function decorateGrandEntrance(stairs: T.Group, m: ShipMaterials) {
+  const well = DECK_OPENINGS[0];
+  const half = (well.w * W) / 2,
+    upper = (well.z - well.d / 2) * L,
+    lower = (well.z + well.d / 2) * L;
+  for (const side of [-1, 1]) {
+    const edge = side * (half + 0.055);
+    box(
+      stairs,
+      edge - side * 0.045,
+      -0.121,
+      (upper + lower) / 2,
+      0.11,
+      0.21,
+      lower - upper,
+      m.wood,
+      'grand-well-fascia',
+    );
+    grandBalustrade(
+      stairs,
+      new T.Vector3(edge, 0, upper + 0.12),
+      new T.Vector3(edge, 0, lower - 0.27),
+      m,
+      false,
+    );
+  }
+  // The clock is centred over the landing and fixed to the end bulkhead.
+  const wall = (-3 - 0.075) * L;
+  box(stairs, 0, 1.8, wall - 0.075, 2.34, 3.52, 0.15, m.wood, 'grand-clock-panel');
+  for (const side of [-1, 1]) {
+    box(stairs, side * 1.02, 1.81, wall - 0.19, 0.16, 3.35, 0.17, m.darkWood);
+    box(stairs, side * 1.02, 0.16, wall - 0.19, 0.25, 0.26, 0.21, m.wood);
+    box(stairs, side * 1.02, 3.41, wall - 0.19, 0.25, 0.19, 0.21, m.wood);
+    for (let i = 0; i < 4; i++) {
+      const accent = new T.Mesh(
+        new T.TorusGeometry(0.103 + i * 0.018, 0.012, 5, 14, Math.PI * 1.32),
+        m.brass,
+      );
+      accent.position.set(side * (0.54 + i * 0.09), 2.19 - i * 0.12, wall - 0.166);
+      accent.rotation.z = side * (i * 0.27);
+      stairs.add(accent);
+    }
+  }
+  box(stairs, 0, 3.53, wall - 0.19, 2.52, 0.15, 0.25, m.darkWood);
+  const clock = cyl(stairs, 0, 2.44, wall - 0.18, 0.42, 0.075, m.brass);
+  clock.rotation.x = Math.PI / 2;
+  const face = cyl(stairs, 0, 2.44, wall - 0.225, 0.359, 0.024, m.ivory);
+  face.rotation.x = Math.PI / 2;
+  for (let tick = 0; tick < 12; tick++) {
+    const angle = (tick * Math.PI) / 6;
+    const marker = box(
+      stairs,
+      Math.sin(angle) * 0.294,
+      2.44 + Math.cos(angle) * 0.294,
+      wall - 0.243,
+      0.022,
+      0.058,
+      0.008,
+      m.black,
+    );
+    marker.rotation.z = -angle;
+  }
+  bar(
+    stairs,
+    new T.Vector3(0, 2.44, wall - 0.26),
+    new T.Vector3(-0.178, 2.55, wall - 0.26),
+    0.014,
+    m.black,
+  );
+  bar(
+    stairs,
+    new T.Vector3(0, 2.44, wall - 0.26),
+    new T.Vector3(0.14, 2.22, wall - 0.26),
+    0.009,
+    m.black,
+  );
+  // The wall continues below deck behind the central landing.
+  const lowerDeck = LEVEL_Y[-2] * H;
+  box(stairs, 0, lowerDeck / 2, wall + 0.13, 2.25, -lowerDeck, 0.26, m.wood, 'grand-landing-panel');
+  for (const x of [-2.45, 2.45])
+    light(stairs, x, 2.35, wall - 0.37, 9, 0xffddad, new T.Vector3(x, 2.35, wall));
+}
 
 export function buildStairways(g: T.Group, m: ShipMaterials) {
   const root = metric(g);
@@ -40,20 +184,21 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
     root.add(p);
     const passenger = station.id.includes('passengers'),
       machinery = station.id === 'deck-engine';
-    const width = passenger ? 2.45 : STAIR_WIDTH,
+    const grand = station.id === 'deck-passengers';
+    const stairWidth = passenger ? 2.45 : STAIR_WIDTH,
       paint = passenger ? m.darkWood : m.steel;
     const route = station.route!.map(point);
     if (station.id === 'deck-forecastle' || station.id === 'deck-poop') {
       const top = route[1],
         direction = station.id === 'deck-forecastle' ? -1 : 1;
       for (const side of [-1, 1]) {
-        const x = top.x + side * (width / 2 - 0.08);
+        const x = top.x + side * (stairWidth / 2 - 0.08);
         box(
           p,
           x,
           -0.32,
           top.z + direction * 0.045,
-          0.2,
+          0.22,
           0.65,
           0.09,
           m.steel,
@@ -64,7 +209,34 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
       }
     }
 
+    if (grand) {
+      const [, , flightEnd, landing, wing, foot] = route;
+      const slabLength = landing.z - flightEnd.z;
+      const landingHeight = landing.y - LEVEL_Y[-2] * H;
+      box(
+        p,
+        0,
+        landing.y - landingHeight / 2,
+        flightEnd.z + slabLength / 2,
+        5.44,
+        landingHeight,
+        slabLength,
+        m.wood,
+        'grand-half-landing',
+      );
+      decorateGrandEntrance(p, m);
+      grandBalustrade(
+        p,
+        new T.Vector3(-1.15, landing.y, landing.z),
+        new T.Vector3(1.15, landing.y, landing.z),
+        m,
+        false,
+      );
+      // Both wings reach the lower deck. Descending players take the starboard wing.
+      route.splice(6, route.length - 6, wing.clone().setX(-wing.x), foot.clone().setX(-foot.x));
+    }
     const railPosts = new Set<string>();
+    const grandRunner = new T.MeshStandardMaterial({ color: 0x5a242c, roughness: 0.96 });
     // End decks already provide their landings. Only intermediate machinery
     // turns need new plates. Merge each U turn into one non-overlapping slab.
     if (machinery)
@@ -78,10 +250,10 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
         while (i < route.length && Math.abs(route[i].y - y) < 0.01) i++;
         if (y <= SHAFT.floor * H + 0.01) continue;
         const flat = route.slice(start, i);
-        let x0 = Math.min(...flat.map((v) => v.x)) - width / 2,
-          x1 = Math.max(...flat.map((v) => v.x)) + width / 2;
-        let z0 = Math.min(...flat.map((v) => v.z)) - width / 2,
-          z1 = Math.max(...flat.map((v) => v.z)) + width / 2;
+        let x0 = Math.min(...flat.map((v) => v.x)) - stairWidth / 2,
+          x1 = Math.max(...flat.map((v) => v.x)) + stairWidth / 2;
+        let z0 = Math.min(...flat.map((v) => v.z)) - stairWidth / 2,
+          z1 = Math.max(...flat.map((v) => v.z)) + stairWidth / 2;
         for (const [edge, near] of [
           [route[start], route[start - 1]],
           [route[i - 1], route[i]],
@@ -111,6 +283,8 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
         }
       }
     for (let i = 1; i < route.length; i++) {
+      if (grand && ![2, 5, 7].includes(i)) continue;
+      const width = grand ? (i === 2 ? 3.78 : 1.48) : stairWidth;
       const a = route[i - 1],
         b = route[i],
         rise = b.y - a.y,
@@ -128,21 +302,34 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
           const tread = box(
             p,
             c.x,
-            top - 0.085,
+            grand ? (top + LEVEL_Y[-2] * H) / 2 : top - 0.085,
             c.z,
             width,
-            0.17,
+            grand ? top - LEVEL_Y[-2] * H : 0.17,
             run / steps,
-            paint,
+            grand ? m.wood : paint,
             'stair-tread',
           );
           tread.rotation.y = -Math.atan2(b.x - a.x, b.z - a.z);
+          if (grand && i === 2)
+            box(
+              p,
+              c.x,
+              top + 0.009,
+              c.z,
+              2.24,
+              0.016,
+              run / steps - 0.01,
+              grandRunner,
+              'grand-stair-runner',
+            );
           const edge = c
             .clone()
             .addScaledVector(
               new T.Vector3(b.x - a.x, 0, b.z - a.z).normalize(),
               (-run / steps) * 0.46,
             );
+          if (grand) continue; // The closed oak treads provide the nosing.
           const nosing = box(
             p,
             edge.x,
@@ -160,11 +347,11 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
           const c = a
             .clone()
             .addScaledVector(normal, side)
-            .add(new T.Vector3(0, -0.2, 0));
+            .add(new T.Vector3(0, grand ? -0.105 : -0.2, 0));
           const d = b
             .clone()
             .addScaledVector(normal, side)
-            .add(new T.Vector3(0, -0.2, 0));
+            .add(new T.Vector3(0, grand ? -0.105 : -0.2, 0));
           const beam = box(
             p,
             (c.x + d.x) / 2,
@@ -172,8 +359,8 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
             (c.z + d.z) / 2,
             0.12,
             c.distanceTo(d),
-            0.24,
-            m.black,
+            grand ? 0.12 : 0.24,
+            grand ? m.wood : m.black,
             'stair-stringer',
           );
           beam.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.clone().sub(c).normalize());
@@ -216,6 +403,18 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
           0.032,
           passenger ? m.darkWood : m.steel,
         );
+        if (grand) {
+          const steps = Math.ceil(Math.abs(rise) / 0.175);
+          grandBalustrade(
+            p,
+            c,
+            d,
+            m,
+            true,
+            (t) => a.y + (rise * (Math.floor(t * steps) + 1)) / steps,
+          );
+          continue;
+        }
         const posts = Math.max(1, Math.ceil(c.distanceTo(d) / (passenger ? 0.4 : 2)));
         for (let n = 0; n <= posts; n++) {
           const v = c.clone().lerp(d, n / posts);
@@ -223,6 +422,13 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
             .toArray()
             .map((n) => Math.round(n * 1000))
             .join(',');
+          const stepCount = Math.ceil(Math.abs(rise) / 0.175);
+          const stairY =
+            Math.abs(rise) > 0.01 && n > 0 && n < posts
+              ? a.y +
+                (rise * Math.min(stepCount, Math.floor((n / posts) * stepCount) + 1)) / stepCount
+              : v.y;
+          const foot = v.clone().setY(stairY);
           if (railPosts.has(key)) continue;
           railPosts.add(key);
           if (passenger) {
@@ -230,17 +436,17 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
             box(
               p,
               v.x,
-              v.y + 0.5,
+              (stairY + v.y + 1) / 2,
               v.z,
               end ? 0.11 : 0.045,
-              1,
+              v.y + 1 - stairY,
               end ? 0.11 : 0.045,
               m.darkWood,
               'stair-rail-post',
             );
             if (end) cyl(p, v.x, v.y + 1.035, v.z, 0.075, 0.07, m.brass);
           } else
-            bar(p, v, v.clone().add(new T.Vector3(0, 1, 0)), 0.026, m.black).name =
+            bar(p, foot, v.clone().add(new T.Vector3(0, 1, 0)), 0.026, m.black).name =
               'stair-rail-post';
         }
       }
@@ -314,17 +520,25 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
   box(root, (x0 + x1) / 2, top, (z0 + z1) / 2, x1 - x0, 0.15, z1 - z0, m.roof, 'stair-casing-roof');
   for (let i = 0; i <= 6; i++) {
     const y = (bottom * i) / 6;
-    light(root, doorX, y + 2.7, i % 2 ? z1 - 0.65 : z0 + 0.65, 22);
+    light(
+      root,
+      doorX,
+      y + 2.7,
+      i % 2 ? z1 - 0.65 : z0 + 0.65,
+      22,
+      undefined,
+      new T.Vector3(x0 + 0.075, y + 2.7, i % 2 ? z1 - 0.65 : z0 + 0.65),
+    );
     if (i === 6) plaque(root, 'BOAT DECK', doorX, y + 2.15, z0 + 0.09, 1.35);
   }
   plaque(root, 'ENGINE ROOM', doorX, 2.8, z0 - 0.09, 1.8);
   // Passenger stair entrance is a complete house, with a small framed skylight.
   const dome = metric(g, 0, 3.41, -4.65);
   const glass = new T.Mesh(
-    new T.SphereGeometry(1.35, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    new T.SphereGeometry(1.8, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2),
     m.glass,
   );
-  glass.scale.z = 1.8;
+  glass.scale.set(1, 0.67, 2.05);
   glass.name = 'entrance-skylight';
   dome.add(glass);
   for (let i = 0; i < 48; i++) {
@@ -332,21 +546,21 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
       b = ((i + 1) / 48) * Math.PI * 2;
     bar(
       dome,
-      new T.Vector3(Math.cos(a) * 1.35, 0, Math.sin(a) * 2.43),
-      new T.Vector3(Math.cos(b) * 1.35, 0, Math.sin(b) * 2.43),
+      new T.Vector3(Math.cos(a) * 1.8, 0, Math.sin(a) * 3.69),
+      new T.Vector3(Math.cos(b) * 1.8, 0, Math.sin(b) * 3.69),
       0.035,
       m.brass,
     );
   }
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4;
+  for (let i = 0; i < 12; i++) {
+    const a = (i * Math.PI) / 6;
     const path = new T.CatmullRomCurve3(
       Array.from({ length: 13 }, (_, j) => {
         const t = (j * Math.PI) / 24;
         return new T.Vector3(
-          Math.cos(a) * 1.35 * Math.cos(t),
-          1.35 * Math.sin(t),
-          Math.sin(a) * 2.43 * Math.cos(t),
+          Math.cos(a) * 1.8 * Math.cos(t),
+          1.206 * Math.sin(t),
+          Math.sin(a) * 3.69 * Math.cos(t),
         );
       }),
     );
@@ -378,7 +592,7 @@ function closedDoor(
   box(p, 0, 2.22, 0.015, 1.27, 0.1, 0.13, m.ivory, 'door-lintel');
   for (const h of [0.55, 1.5]) box(p, 0, h, 0.045, 0.78, 0.67, 0.028, m.wood, 'door-panel');
   cyl(p, 0.37, 1.03, 0.13, 0.045, 0.08, m.brass).rotation.x = Math.PI / 2;
-  plaque(p, label, 0, 1.91, 0.064, 0.45);
+  plaque(p, label, 0, 1.91, 0.0525, 0.45);
 }
 export function buildPassengerDetails(g: T.Group, m: ShipMaterials) {
   const y = LEVEL_Y[-2];
@@ -392,35 +606,64 @@ export function buildPassengerDetails(g: T.Group, m: ShipMaterials) {
   // two overlapping opaque boxes. Closed cabins need no empty interiors.
   for (const wall of WALLS.filter((w) => w.level === -2 && !w.prop)) {
     box(g, wall.x, y + 0.43, wall.z, wall.w, 0.86, wall.d, m.darkWood, 'passenger-dado');
-    box(g, wall.x, y + 0.88, wall.z, wall.w, 0.04, wall.d, m.brass);
+    box(g, wall.x, y + 0.88, wall.z, wall.w, 0.04, wall.d, m.brass, 'passenger-waist-rail');
     box(g, wall.x, y + 1.7, wall.z, wall.w, 1.6, wall.d, m.ivory, 'passenger-wall');
   }
   for (const z of [-18, -13, -8, -3, 2, 7, 12, 17, 22]) {
     const p = metric(g, 0, y, z);
     cyl(p, 0, 2.55, 0, 0.16, 0.08, m.brass);
-    light(p, 0, 2.45, 0, 30);
+    light(p, 0, 2.45, 0, 30, undefined, (0 - 0.14 - y) * H);
   }
   for (const [z, text] of [
     [-6.3, 'STATEROOMS'],
     [9.8, 'DINING SALOON'],
-  ] as const)
-    plaque(metric(g, 0, y, z), text, 0, 2.35, 0.12, 1.9);
+  ] as const) {
+    const p = metric(g, 0, y, z);
+    const ceiling = (0 - 0.14 - y) * H;
+    box(
+      p,
+      0,
+      (2.25 + ceiling) / 2,
+      0,
+      2.8 * W,
+      ceiling - 2.25,
+      0.15 * L,
+      m.ivory,
+      'passenger-door-header',
+    );
+    plaque(p, text, 0, 2.48, (0.15 * L) / 2 + 0.0175, 1.9);
+  }
+  const bookPaints = [0x3c4c41, 0x633e31, 0x3c4655, 0x7d6241].map(
+    (color) => new T.MeshStandardMaterial({ color, roughness: 0.9 }),
+  );
   // A quiet reading corner with filled bookshelves and period panelling.
   for (const side of [-1, 1]) {
     const p = metric(g, side * 6.12, y, 4.4);
     p.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-    box(p, 0, 1.05, 0, 4.1, 2.1, 0.38, m.darkWood);
+    box(p, 0, 1.05, -0.16, 4.1, 2.1, 0.06, m.darkWood, 'bookcase-back');
+    for (const x of [-2.01, 2.01]) box(p, x, 1.05, 0, 0.08, 2.1, 0.38, m.darkWood, 'bookcase-side');
+    for (const height of [0.18, 0.73, 1.28, 2.06])
+      box(p, 0, height, 0, 3.94, 0.08, 0.38, m.darkWood, 'bookcase-shelf');
     for (let row = 0; row < 3; row++)
       for (let i = 0; i < 22; i++) {
-        const cover = new T.MeshStandardMaterial({
-          color: [0x3c4c41, 0x633e31, 0x3c4655, 0x7d6241][i % 4],
-          roughness: 0.9,
-        });
-        box(p, -1.85 + i * 0.17, 0.4 + row * 0.55, 0.2, 0.12, 0.4 + (i % 3) * 0.025, 0.15, cover);
+        const cover = bookPaints[i % 4];
+        const height = 0.4 + (i % 3) * 0.025;
+        box(
+          p,
+          -1.85 + i * 0.17,
+          0.22 + row * 0.55 + height / 2,
+          0.025,
+          0.12,
+          height,
+          0.25,
+          cover,
+          'shelved-book',
+        );
       }
     for (const z of [-4.8, 10.6, 21.1]) {
-      const p = metric(g, side * 6.4, y, z - 0.05);
-      plaque(p, z < 0 ? 'PROMENADE' : 'A DECK', 0, 2.3, 0.05, 1.3);
+      const p = metric(g, side * 6.31, y, z + (z === 21.1 ? -0.35 : 0.35));
+      p.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      plaque(p, z < 0 ? 'PROMENADE' : 'A DECK', 0, 2.3, 0.0175, 1.3);
     }
   }
 }
@@ -428,7 +671,7 @@ export function buildPassengerDetails(g: T.Group, m: ShipMaterials) {
 export function buildOfficerDetails(g: T.Group, m: ShipMaterials) {
   // Wall-mounted lifebelts, rope lashings and hose cases stay out of the walkways.
   for (const side of [-1, 1])
-    for (const z of [-17.5, -10.8]) {
+    for (const z of [-17.545, -10.681]) {
       const p = metric(g, side * (z < -16 ? 6.69 : 5.64), 0, z);
       p.rotation.y = (side * Math.PI) / 2;
       box(p, 0, 1.65, -0.03, 0.62, 0.78, 0.09, m.darkWood, 'life-ring-backboard');
@@ -454,16 +697,16 @@ export function buildOfficerDetails(g: T.Group, m: ShipMaterials) {
       width = door.w > door.d ? door.w * W : door.d * L,
       depth = door.w > door.d ? door.d * L : door.w * W;
     if (door.d > door.w) p.rotation.y = Math.PI / 2;
-    box(p, 0, (2.32 + 3.16 * H) / 2, 0, width, 3.16 * H - 2.32, depth, m.ivory, 'doorway-header');
+    box(p, 0, (2.355 + 3.16 * H) / 2, 0, width, 3.16 * H - 2.355, depth, m.ivory, 'doorway-header');
     box(p, 0, 3.205 * H, 0, width, 0.09 * H, depth + 0.04, m.darkWood, 'doorway-cornice');
     for (const side of [-1, 1])
       box(
         p,
         side * (width / 2 - 0.035),
-        1.16,
+        1.1425,
         0,
         0.07,
-        2.32,
+        2.285,
         depth + 0.04,
         m.darkWood,
         'open-door-jamb',
@@ -494,7 +737,9 @@ export function buildOfficerDetails(g: T.Group, m: ShipMaterials) {
       closedDoor(g, z, side * 3.7, 0, m, side > 0 ? (i ? 'OFFICER' : 'CAPTAIN') : 'OFFICER');
   // Wireless: working room to port, separate apparatus room to starboard,
   // and a passage behind both, with every door opening into that passage.
-  const p = metric(g, -2.6, 0, -8);
+  const p = metric(g, WIRELESS.receiver.x, 0, WIRELESS.receiver.z);
+  p.name = 'wireless-receiver-fixture';
+  p.rotation.y = WIRELESS.receiver.yaw;
   box(p, 0, 0.5, 0, 3.65, 1, 0.95, m.darkWood, 'wireless-desk');
   for (const x of [-1.1, 0.1, 1.2]) {
     box(p, x, 1.28, -0.15, 0.85, 0.56, 0.35, m.black, 'wireless-instrument');
@@ -503,19 +748,21 @@ export function buildOfficerDetails(g: T.Group, m: ShipMaterials) {
       dial.rotation.x = Math.PI / 2;
     }
   }
-  for (const x of [-1.4, -0.7]) cyl(p, x, 1.75, -0.22, 0.06, 0.33, m.brass);
-  box(p, 0.8, 1.03, 0.3, 0.45, 0.035, 0.2, m.ivory);
-  box(p, 1.3, 1.09, 0.29, 0.27, 0.06, 0.1, m.black);
-  plaque(p, 'MARCONI', 0, 1.86, -0.1, 1.15);
-  light(p, 0, 2.75, 0.3, 22);
-  const copy = metric(g, -4.5, 0, -8.85);
+  for (const x of [-1.4, -0.7]) cyl(p, x, 1.725, -0.22, 0.06, 0.33, m.brass);
+  box(p, 0.8, 1.0175, 0.3, 0.45, 0.035, 0.2, m.ivory);
+  box(p, 1.3, 1.03, 0.29, 0.27, 0.06, 0.1, m.black);
+  light(p, 0, 2.75, 0.3, 22, undefined, 3.25 * H);
+  const copy = metric(g, WIRELESS.copy.x, 0, WIRELESS.copy.z);
+  copy.name = 'wireless-copy-fixture';
+  copy.rotation.y = WIRELESS.copy.yaw;
   box(copy, 0, 0.85, 0, 1.4, 0.12, 0.55, m.darkWood, 'second-wireless-desk');
   for (const x of [-0.55, 0.55]) box(copy, x, 0.4, 0, 0.1, 0.8, 0.4, m.darkWood);
   box(copy, -0.15, 0.93, 0, 0.55, 0.025, 0.36, m.ivory, 'copy-slips');
   cyl(copy, 0.4, 1.02, 0, 0.08, 0.17, m.brass);
-  plaque(copy, 'COPY', 0, 1.2, -0.12, 0.55);
-  light(copy, 0, 2.7, 0, 12);
-  const apparatus = metric(g, 2.8, 0, -8);
+  light(copy, 0, 2.7, 0, 12, undefined, 3.25 * H);
+  const apparatus = metric(g, WIRELESS.apparatus.x, 0, WIRELESS.apparatus.z);
+  apparatus.name = 'wireless-apparatus-fixture';
+  apparatus.rotation.y = WIRELESS.apparatus.yaw;
   box(apparatus, 0, 1.1, 0, 2.6, 2.2, 0.6, m.darkWood, 'wireless-apparatus');
   for (const x of [-0.85, 0, 0.85]) {
     cyl(apparatus, x, 1.4, 0.4, 0.2, 0.75, m.brass);
@@ -526,8 +773,7 @@ export function buildOfficerDetails(g: T.Group, m: ShipMaterials) {
       apparatus.add(coil);
     }
   }
-  plaque(apparatus, 'APPARATUS', 0, 2, 0.34, 1.4);
-  light(apparatus, 0, 2.8, 1, 18);
+  light(apparatus, 0, 2.8, 1, 18, undefined, 3.25 * H);
   for (const [x, z, text, width, height] of [
     [4.4, -10.2, 'BINOCULARS', 1.6, 2],
     [0, -10, 'WATCH STORES', 1.6, 1.6],
@@ -539,11 +785,11 @@ export function buildOfficerDetails(g: T.Group, m: ShipMaterials) {
   for (const [x, z, text] of [
     [-2.6, -7.5, 'WIRELESS'],
     [2.6, -7.5, 'APPARATUS'],
-    [4.4, -9.1, 'WATCH ROOM'],
+    [4.4, -9.25, 'WATCH ROOM'],
   ] as const)
-    plaque(metric(g, x, 0, z), text, 0, 2.6, 0.31, 1.55);
+    plaque(metric(g, x, 0, z), text, 0, 2.6, (0.15 * L) / 2 + 0.0175, 1.55);
   for (const x of [-2.85, 2.85])
-    for (const z of [-15.5, -11.5]) light(metric(g, x, 0, z), 0, 2.85, 0, 20);
+    for (const z of [-15.5, -11.5]) light(metric(g, x, 0, z), 0, 2.85, 0, 20, undefined, 3.25 * H);
 }
 
 export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
@@ -559,17 +805,46 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
     dampers: T.Object3D[] = [],
     gauges: T.Object3D[] = [],
     doors: T.Object3D[] = [];
+  const pickRoots = new Set<T.Object3D>();
   const controls: T.Object3D[] = [],
     occluders: T.Object3D[] = [],
     clinkers: T.Object3D[] = [],
     ashMounds: T.Object3D[] = [],
     stopWheels: T.Object3D[] = [],
+    waterGlasses: T.Object3D[] = [],
     steamJets: T.Object3D[] = [],
-    fuelBeds: T.Object3D[] = [];
+    fuelBeds: T.Object3D[] = [],
+    toolObjects: T.Object3D[] = [];
   const tag = <O extends T.Object3D>(object: O, control: BoilerControl) => {
     object.userData.boilerControl = control;
     controls.push(object);
+    let pickRoot: T.Object3D = object;
+    while (pickRoot.parent && pickRoot.parent !== root) pickRoot = pickRoot.parent;
+    pickRoots.add(pickRoot);
     return object;
+  };
+  const boltMatrices: T.Matrix4[] = [],
+    rivetMatrices: T.Matrix4[] = [];
+  const fuelPaint = new T.MeshStandardMaterial({
+    color: 0x201d17,
+    emissive: 0x962e07,
+    emissiveIntensity: 0.35,
+    roughness: 1,
+  });
+  const fuelGeometry = new T.IcosahedronGeometry(0.075, 0),
+    clinkerGeometry = new T.IcosahedronGeometry(0.075, 0);
+  const batch = (
+    parent: T.Object3D,
+    geometry: T.BufferGeometry,
+    material: T.Material,
+    matrices: T.Matrix4[],
+    name: string,
+  ) => {
+    const mesh = new T.InstancedMesh(geometry, material, matrices.length);
+    matrices.forEach((m, n) => mesh.setMatrixAt(n, m));
+    mesh.name = name;
+    parent.add(mesh);
+    return mesh;
   };
   for (const b of BOILERS) {
     const p = new T.Group();
@@ -587,9 +862,13 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
       p.add(rim);
       for (let i = 0; i < 24; i++) {
         const a = (i * Math.PI) / 12;
-        const bolt = new T.Mesh(new T.SphereGeometry(0.045, 6, 4), iron);
-        bolt.position.set(Math.cos(a) * 2.2, 2.5 + Math.sin(a) * 2.2, z + (z > 0 ? 0.025 : -0.025));
-        p.add(bolt);
+        boltMatrices.push(
+          new T.Matrix4().makeTranslation(
+            b.x * W + Math.cos(a) * 2.2,
+            2.5 + Math.sin(a) * 2.2,
+            b.z * L + z + (z > 0 ? 0.025 : -0.025),
+          ),
+        );
       }
       for (const x of [-1.15, 0, 1.15]) {
         const mouth = cyl(p, x, 1.25, z, 0.46, 0.08, m.black);
@@ -609,41 +888,32 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
         fire.push(glow);
         const zone = glow.userData.zone;
         tag(glow, { bank: b.index, kind: 'fire', zone });
-        for (let n = 0; n < 8; n++) {
-          const lump = new T.Mesh(
-            new T.IcosahedronGeometry(0.075 + (n % 3) * 0.015, 0),
-            clinkerPaint,
-          );
-          lump.position.set(
-            x - 0.23 + (n % 4) * 0.145,
-            1.12 + Math.floor(n / 4) * 0.12,
-            z + Math.sign(z) * 0.12,
-          );
-          lump.userData = { bank: b.index, zone, lump: n };
-          tag(lump, { bank: b.index, kind: 'fire', zone });
-          p.add(lump);
-          clinkers.push(lump);
-        }
-        for (let n = 0; n < 12; n++) {
-          const chunk = new T.Mesh(
-            new T.IcosahedronGeometry(0.075, 0),
-            new T.MeshStandardMaterial({
-              color: 0x201d17,
-              emissive: 0x962e07,
-              emissiveIntensity: 0.35,
-              roughness: 1,
-            }),
-          );
-          chunk.position.set(
+        const clinkerMatrices = Array.from({ length: 8 }, (_, n) =>
+          new T.Matrix4().compose(
+            new T.Vector3(
+              x - 0.23 + (n % 4) * 0.145,
+              1.12 + Math.floor(n / 4) * 0.12,
+              z + Math.sign(z) * 0.12,
+            ),
+            new T.Quaternion(),
+            new T.Vector3().setScalar((0.075 + (n % 3) * 0.015) / 0.075),
+          ),
+        );
+        const lumps = batch(p, clinkerGeometry, clinkerPaint, clinkerMatrices, 'clinker-bed');
+        lumps.userData = { bank: b.index, zone };
+        tag(lumps, { bank: b.index, kind: 'fire', zone });
+        clinkers.push(lumps);
+        const fuelMatrices = Array.from({ length: 12 }, (_, n) =>
+          new T.Matrix4().makeTranslation(
             x - 0.23 + (n % 4) * 0.15,
             1.01 + Math.floor(n / 4) * 0.075,
             z + Math.sign(z) * 0.1,
-          );
-          chunk.userData = { bank: b.index, zone, piece: n };
-          tag(chunk, { bank: b.index, kind: 'fire', zone });
-          p.add(chunk);
-          fuelBeds.push(chunk);
-        }
+          ),
+        );
+        const fuel = batch(p, fuelGeometry, fuelPaint, fuelMatrices, 'coal-firebed');
+        fuel.userData = { bank: b.index, zone };
+        tag(fuel, { bank: b.index, kind: 'fire', zone });
+        fuelBeds.push(fuel);
         for (const dx of [-0.19, 0, 0.19])
           box(p, x + dx, 0.99, z, 0.035, 0.035, 0.55, iron, 'furnace-grate');
         const hinge = new T.Group();
@@ -698,36 +968,6 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
       lamp.userData.bank = b.index;
       p.add(lamp);
       lamps.push(lamp);
-      for (const [n, tool] of (['coal', 'slice', 'rake'] as const).entries()) {
-        const rackTool = buildFiringTool(tool, m);
-        rackTool.position.set(-1.8 + n * 0.28, 0.25, z + Math.sign(z) * 0.7);
-        tag(rackTool, { bank: b.index, kind: 'tool', tool });
-        p.add(rackTool);
-        tag(
-          box(
-            p,
-            -1.8 + n * 0.28,
-            0.95,
-            z + Math.sign(z) * 0.67,
-            0.21,
-            0.9,
-            0.05,
-            m.darkWood,
-            'tool-rack-back',
-          ),
-          { bank: b.index, kind: 'tool', tool },
-        );
-      }
-      // A small replenished coal basket makes each shovel load a physical trip.
-      const basket = tag(
-        box(p, 1.85, 0.35, z + Math.sign(z) * 1, 0.7, 0.7, 0.7, iron, 'firing-coal-basket'),
-        { bank: b.index, kind: 'coal' },
-      );
-      for (let n = 0; n < 9; n++) {
-        const chunk = new T.Mesh(new T.IcosahedronGeometry(0.13, 0), coal);
-        chunk.position.set(((n % 3) - 1) * 0.18, 0.4, (Math.floor(n / 3) - 1) * 0.18);
-        basket.add(chunk);
-      }
     }
     // Steam pipe, local gauge, damper lever and smoke uptake all meet the shell.
     cyl(p, 0, 5.05, 0, 0.23, 0.8, lagging);
@@ -749,6 +989,22 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
     p.add(needle);
     needle.userData.bank = b.index;
     gauges.push(needle);
+    const feed = tag(cyl(p, 1.8, 1.4, 3.35, 0.17, 0.09, m.brass), { bank: b.index, kind: 'feed' });
+    feed.rotation.x = Math.PI / 2;
+    box(p, 1.8, 1.92, 3.29, 0.14, 0.6, 0.1, m.black, 'boiler-water-glass');
+    const water = box(
+      p,
+      1.8,
+      1.92,
+      3.35,
+      0.085,
+      0.5,
+      0.025,
+      new T.MeshStandardMaterial({ color: 0x64a5a5, roughness: 0.4 }),
+      'boiler-water-level',
+    );
+    water.userData.bank = b.index;
+    waterGlasses.push(water);
     const lever = new T.Group();
     lever.position.set(-1.8, 1.1, 3.3);
     p.add(lever);
@@ -757,7 +1013,6 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
     lever.userData.bank = b.index;
     dampers.push(lever);
     tag(lever, { bank: b.index, kind: 'draught' });
-    plaque(p, 'AIR', -1.8, 0.94, 3.32, 0.5);
     const stop = new T.Mesh(new T.TorusGeometry(0.22, 0.035, 8, 24), m.brass);
     stop.position.set(0, 2.65, 3.3);
     p.add(stop);
@@ -768,7 +1023,6 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
     stop.userData.bank = b.index;
     tag(stop, { bank: b.index, kind: 'stop' });
     stopWheels.push(stop);
-    plaque(p, 'STEAM', 0, 2.28, 3.32, 0.7);
     const relief = tag(box(p, 0.52, 2.45, 3.32, 0.12, 0.45, 0.1, m.brass, 'safety-easing-handle'), {
       bank: b.index,
       kind: 'relief',
@@ -791,24 +1045,47 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
     steamJets.push(jet);
     plaque(p, 'BOILER ' + (b.index + 1), 0, 3.75, 3.17, 1.35);
   }
-  for (const z of [-13.6, -6.6])
-    for (const x of [-6.3, 0, 6.3]) {
-      if (z === -6.6 && x === 0) continue;
-      const p = new T.Group();
-      p.position.set(x * W, 0, z * L);
-      root.add(p);
-      box(p, 0, 0.3, 0, 3.6, 0.6, 1.4, iron, 'coal-bunker-lip');
-      for (let i = 0; i < 24; i++) {
-        const chunk = new T.Mesh(new T.IcosahedronGeometry(0.16 + (i % 3) * 0.04, 0), coal);
-        chunk.position.set(
-          ((i * 13) % 23) / 7 - 1.55,
-          0.64 + Math.sin(i) * 0.13,
-          ((i * 7) % 11) / 11 - 0.5,
-        );
-        chunk.rotation.set(i, i * 0.7, i * 0.31);
-        p.add(chunk);
-      }
+  const rack = new T.Group();
+  rack.position.set(FIRING_RACK.x * W, 0, FIRING_RACK.z * L);
+  root.add(rack);
+  bar(rack, new T.Vector3(-0.7, 1.8, 0), new T.Vector3(-0.7, 2.15, 0), 0.02, m.steel);
+  bar(rack, new T.Vector3(-0.7, 2.15, 0), new T.Vector3(0, 2.15, 0.18), 0.02, m.steel);
+  const rackLight = light(rack, 0, 2.05, 0.18, 12);
+  rackLight.distance = 6;
+  for (const x of [-0.7, 0.7]) box(rack, x, 0.9, 0, 0.07, 1.8, 0.12, m.darkWood);
+  for (const y of [0.4, 1.35]) box(rack, 0, y, 0, 1.5, 0.07, 0.12, m.darkWood);
+  for (const [n, tool] of FIRING_TOOLS.entries()) {
+    const object = buildFiringTool(tool, m);
+    object.position.set((n - 1) * 0.45, 0.16, 0.12);
+    object.userData.tool = tool;
+    rack.add(object);
+    tag(object, { bank: 0, kind: 'tool', tool, station: FIRING_RACK.id });
+    toolObjects.push(object);
+    tag(box(rack, (n - 1) * 0.45, 0.85, 0, 0.29, 0.95, 0.08, m.darkWood, 'shared-tool-slot'), {
+      bank: 0,
+      kind: 'tool',
+      tool,
+      station: FIRING_RACK.id,
+    });
+  }
+  for (const bunker of COAL_BUNKERS) {
+    const { x, z } = bunker;
+    const p = new T.Group();
+    p.position.set(x * W, 0, z * L);
+    root.add(p);
+    tag(p, { bank: 0, kind: 'coal', station: bunker.id });
+    box(p, 0, 0.3, 0, 3.6, 0.6, 1.4, iron, 'coal-bunker-lip');
+    for (let i = 0; i < 24; i++) {
+      const chunk = new T.Mesh(new T.IcosahedronGeometry(0.16 + (i % 3) * 0.04, 0), coal);
+      chunk.position.set(
+        ((i * 13) % 23) / 7 - 1.55,
+        0.64 + Math.sin(i) * 0.13,
+        ((i * 7) % 11) / 11 - 0.5,
+      );
+      chunk.rotation.set(i, i * 0.7, i * 0.31);
+      p.add(chunk);
     }
+  }
   for (const z of [-13.5, -11.7, -9.8, -7.5]) {
     const zz = z * L;
     box(root, 0, 5.95, zz, 24.8, 0.24, 0.3, iron, 'stokehold-beam');
@@ -823,30 +1100,37 @@ export function buildBoilerRoom(g: T.Group, m: ShipMaterials) {
       lagging,
     );
     for (let i = 0; i < 38; i++) {
-      const rivet = new T.Mesh(new T.SphereGeometry(0.03, 5, 4), iron);
-      rivet.position.set(side * 12.3, 1.1 + (i % 3) * 1.45, -47 + i * 0.7);
-      root.add(rivet);
+      rivetMatrices.push(
+        new T.Matrix4().makeTranslation(side * 12.3, 1.1 + (i % 3) * 1.45, -47 + i * 0.7),
+      );
     }
   }
-  for (const x of [-10, 10]) light(root, x, 4.5, -8 * L, 20, 0xffbc75);
-  plaque(root, 'NO. 6 STOKEHOLD', 0, 4.5, -6 * L - 0.13, 2.5);
+  batch(root, new T.SphereGeometry(0.045, 6, 4), iron, boltMatrices, 'boiler-rivets');
+  batch(root, new T.SphereGeometry(0.03, 5, 4), iron, rivetMatrices, 'bulkhead-rivets');
+  for (const x of [-10, 10])
+    light(root, x, 4.5, -8 * L, 20, 0xffbc75, (MACHINERY_CEILING - LEVEL_Y[-1]) * H);
+  plaque(root, 'NO. 6 STOKEHOLD', 0, 4.5, -6 * L - 0.1 * L - 0.0175, 2.5);
   // Service alley is a narrow industrial passage, not an empty second room.
   for (const side of [-1, 1]) {
     for (let i = 0; i < 5; i++) box(root, side * 3.32, 1.2, (-5.5 + i) * L, 0.12, 2.4, 0.09, rust);
   }
   return {
+    root,
     fires: fire,
     lights: lamps,
     dampers,
     gauges,
     doors,
     controls,
+    pickRoots: [...pickRoots],
     occluders,
     clinkers,
     ashMounds,
     stopWheels,
+    waterGlasses,
     steamJets,
     fuelBeds,
+    toolObjects,
   };
 }
 
@@ -858,36 +1142,9 @@ export function buildMachineryWalls(g: T.Group, m: ShipMaterials) {
   // Junction headers complete every wall opening above its walk-through door.
   for (const z of [-6, 0])
     box(g, 0, LEVEL_Y[-1] + 3.7, z, 2.4, 3.4, 0.2, iron, 'watertight-door-header');
-  for (const unit of AUXILIARY_PUMPS) {
-    const p = metric(g, unit.x, LEVEL_Y[-1], unit.z);
-    p.name = 'auxiliary-feed-pump';
-    box(p, 0, 0.16, 0, 2.8, 0.32, 2.6, m.black);
-    for (const x of [-0.8, 0.8]) {
-      cyl(p, x, 1.2, 0, 0.43, 1.8, iron);
-      cyl(p, x, 2.15, 0, 0.5, 0.12, m.brass);
-      bar(p, new T.Vector3(x, 2.2, 0), new T.Vector3(x, 3.6, 0), 0.07, iron);
-    }
-    box(p, 0, 3.6, 0, 2.2, 0.2, 0.5, iron);
-    const wheel = new T.Mesh(new T.TorusGeometry(0.45, 0.05, 7, 24), m.black);
-    wheel.position.set(0, 1.7, 1.08);
-    p.add(wheel);
-    for (let i = 0; i < 4; i++) {
-      const a = (i * Math.PI) / 2;
-      bar(
-        p,
-        new T.Vector3(0, 1.7, 1.08),
-        new T.Vector3(Math.cos(a) * 0.43, 1.7 + Math.sin(a) * 0.43, 1.08),
-        0.025,
-        m.brass,
-      );
-    }
-    const face = cyl(p, 0, 2.65, 0.5, 0.21, 0.08, m.ivory);
-    face.rotation.x = Math.PI / 2;
-    bar(p, new T.Vector3(1.05, 1.4, 0), new T.Vector3(unit.x < 0 ? -2 : 2, 1.4, 0), 0.12, iron);
-  }
   const ceiling = metric(g, 0, MACHINERY_CEILING, 0);
   for (const z of [2, 6, 11, 16, 21, 26]) {
-    box(ceiling, 0, -0.12, z * L, 24.8, 0.24, 0.25, m.black);
-    light(ceiling, 0, -0.5, z * L, 20);
+    box(ceiling, 0, -0.12, z * L, 24.8, 0.24, 0.25, m.black, 'machinery-crossbeam');
+    light(ceiling, 0, -0.5, z * L, 20, undefined, 0);
   }
 }

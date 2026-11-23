@@ -4071,3 +4071,288 @@ details.machine-panel > summary {
     padding: 9px 12px;
   }
 }
+.machine-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  margin-top: 22px;
+}
+.machine-actions .button {
+  min-width: 0;
+  font-size: 12px;
+}
+.command-course {
+  display: flex;
+  gap: 26px;
+  align-items: center;
+  margin: 18px 0 24px;
+}
+.command-course svg {
+  width: 132px;
+  height: 132px;
+  flex-shrink: 0;
+}
+.command-course > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.command-course strong {
+  font-family: var(--serif);
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1;
+}
+.command-course small,
+.command-course span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.command-course .answered,
+.command-engine .answered {
+  color: #b4c9ab;
+}
+.command-order {
+  margin-bottom: 22px;
+}
+.command-order > label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 9px;
+  color: #ccc2aa;
+}
+.command-order > div {
+  display: flex;
+  gap: 7px;
+  align-items: stretch;
+}
+.command-order input {
+  width: 70px;
+  text-align: center;
+  padding: 9px 3px;
+  background: #0b1a20;
+  border: 1px solid var(--border);
+  color: #eee6d3;
+}
+.command-order button:not(.button) {
+  background: transparent;
+  color: #d0c5aa;
+  border: 1px solid var(--border);
+  padding: 7px;
+}
+.command-order .button {
+  padding: 10px 14px;
+  font-size: 12px;
+  flex: 1;
+}
+.command-desk progress {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 7px;
+  accent-color: #c09a61;
+}
+.command-desk .command-warning {
+  color: #d3a075;
+}
+.command-engine {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+.command-engine span,
+.command-engine small,
+.command-wireless {
+  font-size: 12px;
+  color: #a9b5b1;
+}
+.command-engine span b {
+  display: block;
+  color: #dfd4ba;
+  font-weight: 500;
+  margin-top: 4px;
+}
+.command-engine small {
+  grid-column: 1/-1;
+}
+.chart-v9 .chart-tools {
+  gap: 7px;
+}
+.chart-v9 .chart-tools button {
+  flex: 1;
+  padding: 9px 11px;
+}
+.chart-details {
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+.chart-details > summary {
+  color: #afb7a4;
+  font-size: 12px;
+  cursor: pointer;
+}
+.chart-v9 .chart-readings {
+  font-size: 10px;
+}
+.chart-v9 .chart-mark-list {
+  margin-top: 12px;
+}
+@media (max-width: 550px) {
+  .command-course {
+    gap: 16px;
+  }
+  .command-course svg {
+    width: 105px;
+    height: 105px;
+  }
+}
+.chart-reports .notes-list {
+  max-height: 230px;
+  overflow: auto;
+}
+
+/* Local instrument boards: brass marks, water glasses, and only nearby controls. */
+.auxiliary-panel {
+  display: grid;
+  gap: 18px;
+}
+.aux-instruments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  padding: 18px;
+  background: #211f19;
+  border: 1px solid #75674e;
+  border-radius: 4px;
+}
+.aux-instruments > div {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+  min-width: 115px;
+}
+.aux-instruments small,
+.water-glasses small {
+  color: #b3a78e;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+}
+.aux-instruments strong {
+  color: #eddfc2;
+  font:
+    23px Georgia,
+    serif;
+}
+.aux-warning strong,
+.aux-warning b {
+  color: #e9a16d;
+}
+.aux-adjust {
+  display: grid;
+  gap: 14px;
+}
+.aux-adjust > span {
+  display: flex;
+  justify-content: space-between;
+  color: #d5c5a2;
+}
+.aux-adjust input {
+  width: 100%;
+  accent-color: #bda06a;
+}
+.water-glasses {
+  display: flex;
+  justify-content: space-around;
+  gap: 12px;
+  padding: 15px;
+  background: #26271f;
+  border: 1px solid #675d48;
+}
+.water-glasses > div {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+.water-glass {
+  width: 24px;
+  height: 100px;
+  position: relative;
+  border: 3px solid #b19a64;
+  background: #15211f;
+  overflow: visible;
+}
+.water-glass i {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #76a7a0;
+  transition: height 0.3s;
+}
+.water-glass span {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  height: 2px;
+  background: #d5b972;
+}
+.water-low {
+  bottom: 30%;
+}
+.water-high {
+  bottom: 85%;
+}
+/* Quiet at the helm, readable when a control needs attention. */
+.key-ribbon,
+.voice-hud,
+.practice-state,
+.bearing-hud {
+  border: 0;
+  border-radius: 8px;
+  background: #09171dde;
+  box-shadow: 0 2px 12px #0003;
+  color: #e0e4dc;
+  font-size: 11px;
+}
+.interaction-prompt {
+  bottom: 18%;
+  gap: 10px;
+  padding: 7px 14px 7px 8px;
+  border-radius: 9px;
+  background: #0b181feb;
+  border-color: #e3d5ab36;
+  box-shadow: 0 6px 22px #0005;
+  pointer-events: none;
+}
+.interaction-prompt kbd {
+  min-width: 25px;
+  text-align: center;
+  padding: 4px 6px;
+}
+.ship-menu,
+.station-card {
+  border-radius: 12px;
+  border-color: #c6b79142;
+  background: linear-gradient(145deg, #162630, #0b161d 75%);
+  box-shadow: 0 20px 70px #0008;
+}
+.ship-menu .menu-resume,
+.ship-menu .pause-actions > button {
+  border-radius: 7px;
+}
+.ship-menu .pause-actions > button {
+  min-height: 49px;
+  padding: 12px;
+  font-size: 13px;
+}
+.ship-menu .menu-heading p {
+  font-size: 13px;
+}
+.ship-menu .pause-keys {
+  font-size: 11px;
+}

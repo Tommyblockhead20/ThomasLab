@@ -1,3 +1,4 @@
+import { AFT_HATCH } from '../../shared/auxiliary-layout';
 import { light } from './building';
 import { buildLookout } from './lookout';
 import { SHAFT, MACHINERY_CEILING } from '../../shared/layout';
@@ -127,7 +128,7 @@ export function buildTallShell(g: T.Group, m: ShipMaterials) {
   // Real deck spacing: Boat Deck, A promenade, B/forecastle, then the black hull.
   const center = (BOAT_DECK_FRONT + BOAT_DECK_BACK) / 2,
     length = BOAT_DECK_BACK - BOAT_DECK_FRONT;
-  const central = rectangle(0, center, 20, length);
+  const central = rectangle(0, center, 19.28, length);
   for (const { x, z, w, d } of DECK_OPENINGS) {
     const hole = rectangle(-x, z, w, d);
     central.holes.push(new T.Path(hole.getPoints()));
@@ -138,6 +139,9 @@ export function buildTallShell(g: T.Group, m: ShipMaterials) {
   floor(g, central, -0.14, ceilingPaint).name = 'passenger-ceiling';
   const bDeck = outline();
   bDeck.holes.push(new T.Path(rectangle(-SHAFT.x, SHAFT.z, SHAFT.w, SHAFT.d).getPoints()));
+  bDeck.holes.push(
+    new T.Path(rectangle(-AFT_HATCH.x, AFT_HATCH.z, AFT_HATCH.w, AFT_HATCH.d).getPoints()),
+  );
   floor(g, bDeck, -5.4, m.deck).name = 'b-deck';
   const bottom = floor(g, outline(), -23.4, m.red);
   bottom.scale.set(0.65, 1, 0.86);
@@ -158,21 +162,22 @@ export function buildTallShell(g: T.Group, m: ShipMaterials) {
       }
   // B-deck enclosed window band and the open A-deck promenade above it.
   for (const side of [-1, 1]) {
-    box(g, side * 9.78, -4.03, center, 0.18, 2.62, length, m.ivory);
+    // The upper deck edge, beam and window wall meet at real height breaks.
+    box(g, side * 9.78, -3.96, center, 0.18, 2.88, length, m.ivory).name = 'b-deck-side-wall';
     for (let z = -20.3; z < 24; z += 1.4) {
-      const pane = box(g, side * 9.89, -3.94, z, 0.025, 0.78, 0.72, m.black);
+      const pane = box(g, side * 9.879, -3.94, z, 0.025, 0.78, 0.72, m.black);
       pane.name = 'b-deck-window';
       const glass = new T.Mesh(new T.PlaneGeometry(0.6, 0.65), m.glass);
       glass.rotation.y = (side * Math.PI) / 2;
-      glass.position.set(side * 9.915, -3.94, z);
+      glass.position.set(side * 9.898, -3.94, z);
       g.add(glass);
     }
     for (let z = -20.6; z < 24.3; z += 2) {
-      box(g, side * 9.78, -1.3, z, 0.12, 2.6, 0.045, m.ivory);
+      box(g, side * 9.78, -1.3, z, 0.12, 2.6, 0.045, m.ivory).name = 'promenade-column';
     }
-    box(g, side * 9.78, -0.1, center, 0.23, 0.16, length, m.ivory);
-    box(g, side * 9.78, -2.05, center, 0.12, 0.09, length, m.darkWood);
-    box(g, side * 9.78, -2.4, center, 0.1, 0.08, length, m.ivory);
+    box(g, side * 9.78, -0.12, center, 0.28, 0.24, length, m.ivory).name = 'promenade-deck-beam';
+    box(g, side * 9.78, -2.05, center, 0.12, 0.09, length, m.darkWood).name = 'promenade-cap-rail';
+    box(g, side * 9.78, -2.4, center, 0.1, 0.08, length, m.ivory).name = 'promenade-sill';
   }
   // External flights terminate at the deck edge, against a CLOSED end wall.
   // No hole or full-height slot is cut through the forecastle connection.
@@ -180,7 +185,8 @@ export function buildTallShell(g: T.Group, m: ShipMaterials) {
     [BOAT_DECK_FRONT, 1],
     [BOAT_DECK_BACK, -1],
   ]) {
-    box(g, 0, -2.7, z + direction * 0.04, 20, 5.4, 0.08, m.ivory).name = 'closed-end-bulkhead';
+    box(g, 0, -2.77, z + direction * 0.04, 19.6, 5.26, 0.08, m.ivory).name = 'closed-end-bulkhead';
+    box(g, 0, -0.07, z - direction * 0.026, 19.88, 0.14, 0.052, m.ivory).name = 'boat-deck-end-fascia';
     box(g, 0, LEVEL_Y[-2], z - direction * 0.025, 19.7, 0.09, 0.025, m.darkWood).name =
       'end-deck-band';
     for (const x of [-6, -4, -2, 0, 2, 4, 6]) {
@@ -192,15 +198,45 @@ export function buildTallShell(g: T.Group, m: ShipMaterials) {
       if (direction === 1) pane.rotation.y = Math.PI;
       g.add(pane);
     }
-    light(metric(g, direction === 1 ? 8.8 : 5.6, -0.7, z - direction * 0.12), 0, 0, 0, 1.2);
+    light(
+      metric(g, direction === 1 ? 8.8 : 5.6, -0.7, z - direction * 0.12),
+      0,
+      0,
+      0,
+      1.2,
+      undefined,
+      new T.Vector3(0, 0, direction * 0.12 * L),
+    );
   }
 }
 export function buildDeckhouseRoofs(g: T.Group, m: ShipMaterials) {
-  for (const house of DECK_HOUSES) {
-    const shape = rectangle(-house.x, house.z, house.w, house.d);
+  // The three touching forward houses share one continuous roof. Separate
+  // extrusions left coincident end faces and a visible seam over the wireless.
+  const forward = new T.Shape();
+  forward.moveTo(-6.7, -21);
+  for (const [x, z] of [
+    [6.7, -21],
+    [6.7, -16.3],
+    [5.5, -16.3],
+    [5.5, -6.9],
+    [-5.5, -6.9],
+    [-5.5, -16.3],
+    [-6.7, -16.3],
+  ])
+    forward.lineTo(x, z);
+  forward.closePath();
+  const houses = [
+    { x: 0, z: -13.95, w: 11, d: 14.1, shape: forward },
+    ...DECK_HOUSES.slice(3).map((house) => ({
+      ...house,
+      shape: rectangle(-house.x, house.z, house.w, house.d),
+    })),
+  ];
+  for (const house of houses) {
+    const shape = house.shape;
     if (house.z === -4.65) {
       const skylight = new T.Path();
-      skylight.absellipse(0, house.z, 1.3 / W, 2.38 / L, 0, Math.PI * 2, true, 0);
+      skylight.absellipse(0, house.z, 1.77 / W, 3.65 / L, 0, Math.PI * 2, true, 0);
       shape.holes.push(skylight);
     }
     for (const z of FUNNEL_POSITIONS)
@@ -223,7 +259,12 @@ export function buildDeckhouseRoofs(g: T.Group, m: ShipMaterials) {
 }
 export function buildPassengerDeck(g: T.Group, m: ShipMaterials) {
   const y = LEVEL_Y[-2],
-    shape = rectangle(0, 1.7, 19.45, 45.1);
+    shape = rectangle(
+      0,
+      (BOAT_DECK_FRONT + BOAT_DECK_BACK) / 2,
+      19.38,
+      BOAT_DECK_BACK - BOAT_DECK_FRONT,
+    );
   shape.holes.push(new T.Path(rectangle(-SHAFT.x, SHAFT.z, SHAFT.w, SHAFT.d).getPoints()));
   floor(g, shape, y, m.deck).name = 'passenger-deck';
   box(
@@ -276,6 +317,9 @@ export function buildPassengerDeck(g: T.Group, m: ShipMaterials) {
 export function buildMachineryCeiling(g: T.Group, m: ShipMaterials) {
   const shape = rectangle(0, 7.6, 18, 43.8);
   shape.holes.push(new T.Path(rectangle(-SHAFT.x, SHAFT.z, SHAFT.w, SHAFT.d).getPoints()));
+  shape.holes.push(
+    new T.Path(rectangle(-AFT_HATCH.x, AFT_HATCH.z, AFT_HATCH.w, AFT_HATCH.d).getPoints()),
+  );
   const paint = m.steel.clone();
   paint.side = T.DoubleSide;
   const ceiling = floor(g, shape, MACHINERY_CEILING, paint);
@@ -341,8 +385,11 @@ export function buildBoatStations(g: T.Group, m: ShipMaterials) {
       paint.side = T.DoubleSide;
       hull.add(new T.Mesh(geometry, paint));
       box(hull, 0, 0.08, 0, 0.65, 0.14, 7.3, m.darkWood);
-      for (const dz of [-3.4, -1.7, 0, 1.7, 3.4])
-        box(hull, 0, 0.86, dz, 2.2, 0.09, 0.28, m.darkWood);
+      for (const dz of [-3.4, -1.7, 0, 1.7, 3.4]) {
+        // Narrow the end thwarts to the actual hull cross-section.
+        const width = 2.36 * Math.sqrt(1 - (dz / 4.35) ** 2);
+        box(hull, 0, 0.86, dz, width - 0.045, 0.09, 0.28, m.darkWood);
+      }
       for (const dz of [-3, 3]) {
         box(p, 0, 0.16, dz, 2.0, 0.32, 0.32, m.darkWood);
         for (const direction of [-1, 1])

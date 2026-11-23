@@ -1962,6 +1962,13 @@
       .card.mobile-focus.external .arrow { transform: rotate(-45deg) translate(3px,-3px); }
     }
 
+    @media (min-width: 520px) and (max-width: 620px) {
+      #featureGrid .card, #mainGrid .card, #thirdGrid .card,
+      #gamesGrid .card, #aboutGrid .card { grid-column: span 6; }
+      #featureGrid .copy h3, #mainGrid .copy h3, #thirdGrid .copy h3,
+      #gamesGrid .copy h3, #aboutGrid .copy h3 { font-size: 25px; overflow-wrap: anywhere; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; }
       .hero-doodle { animation:none!important;transition:none!important; }

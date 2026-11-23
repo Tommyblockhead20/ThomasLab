@@ -24,3 +24,25 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px soli
 details>summary:hover{color:#386b52}
 @media(max-width:720px){.siteHeader{min-height:125px;padding:18px;gap:14px}.siteHeader::after{opacity:.16;right:-18px;width:175px}.brandCopy p{max-width:420px}.siteHeader .homeButton{width:53px;height:58px}.brandCopy h1{font-size:2rem}.scoreDock{top:.4rem}.zillowStart{padding:.7rem .85rem}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}button,.homeButton,summary,input,textarea,select{transition:none}}
+
+.house-shortcuts{display:flex;flex-wrap:wrap;gap:6px;max-width:900px;margin:0 auto .65rem}
+.house-shortcuts a{padding:.44rem .65rem;border:1px solid #bdc9b9;border-radius:8px;background:#fcfaf2;color:#254e4b;text-decoration:none;font-size:.81rem;font-weight:800}
+.house-shortcuts a:first-child{background:#31594f;border-color:#31594f;color:#fff9e6}
+.house-shortcuts a:hover{box-shadow:0 2px 5px #31594f25}
+.siteHeader .homeButton{width:auto;height:auto;min-height:36px;padding:6px 9px;display:inline-flex;gap:5px;white-space:nowrap}
+.siteHeader .homeButton svg{width:15px;height:15px}
+.rating-step{display:flex;align-items:center;gap:.45rem;margin:0 0 .28rem;color:#254e4b;font-size:1.1rem}
+.rating-step span{display:grid;place-items:center;flex:none;width:1.5rem;height:1.5rem;border-radius:50%;background:#deeadc;color:#254e4b;font-size:.78rem}
+.listing-help{margin:0 0 .65rem;color:#536861;font-size:.84rem}
+.zillowCard .listingArea textarea{min-height:95px}
+.zillowCard .rateButton{padding:.56rem .62rem!important;font-size:.87rem}
+#houseSetup,#myHouses,#comparisonSection{scroll-margin-top:7.5rem}
+@media(max-width:720px){
+  .siteHeader{grid-template-columns:1fr;min-height:0;padding:12px 14px;gap:7px}
+  .siteHeader .homeButton{justify-self:start;min-height:29px}
+  .zillowCard{padding:.65rem}
+  .addressCheck{padding:.6rem;margin-top:.65rem}
+  .addressCheck .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem}
+  .addressCheck .grid>:last-child{grid-column:1/-1}
+  .addressCheck .field{min-width:0}
+}

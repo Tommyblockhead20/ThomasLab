@@ -61,9 +61,11 @@ test('all four physical boilers have independent, reachable dampers, fuel and as
     r.action(p.id, { station: b.id, verb: 'door', value: { zone: 0, open: true } });
     advance(r, 0.2);
     const fuel = r.ship.coal[b.index];
+    p.inventory = ['Firing tool:coal', 'Coal load'];
     r.action(p.id, { station: b.id, verb: 'tend', value: { zone: 0, tool: 'coal' } });
     assert.ok(r.ship.coal[b.index] > fuel + 0.05);
     advance(r, 0.6);
+    p.inventory = ['Firing tool:rake'];
     r.action(p.id, { station: b.id, verb: 'tend', value: { zone: 0, tool: 'rake' } });
     assert.ok(r.ship.ash[b.index] < 0.73);
   }
@@ -94,7 +96,7 @@ test('closing every damper kills fire and pressure, slows engines, and still wor
 });
 test('neglected firing consumes coal and accumulates ash that reduces steam output', () => {
   const { r } = solo();
-  r.crewSize = 7; // Normal tending rate; small crews are intentionally easier.
+  r.crewSize = 9; // Normal tending rate with two boiler operators; small crews are intentionally easier.
   advance(r, 220);
   assert.ok(r.ship.coal.every((c) => c < 0.45));
   assert.ok(r.ship.ash.every((a) => a > 0.25));

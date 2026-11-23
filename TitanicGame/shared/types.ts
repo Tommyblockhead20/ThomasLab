@@ -1,10 +1,20 @@
+import type { AuxiliaryState } from './auxiliary';
 import type { Role } from './config';
 import type { DemoId, DemoState } from './demos';
 import type { IceReport, LineMessage } from './radio';
 export type Phase = 'lobby' | 'voyage' | 'sinking' | 'lifeboat' | 'inquiry' | 'ended';
 export type InquiryCause = 'sinking' | 'schedule' | 'route';
 export type Level = -2 | -1 | 0 | 1 | 2;
-export type MachineId = 'steering' | 'engines' | 'valve' | 'wireless' | 'compass' | 'gauge';
+export type MachineId =
+  | 'steering'
+  | 'engines'
+  | 'valve'
+  | 'wireless'
+  | 'compass'
+  | 'gauge'
+  | 'feedwater'
+  | 'condenser'
+  | 'dynamos';
 export interface Position {
   x: number;
   z: number;
@@ -78,6 +88,7 @@ export interface Phone {
   at: number;
 }
 export interface ShipState {
+  auxiliary: AuxiliaryState;
   impact: null | {
     id: number;
     at: number;
@@ -165,6 +176,7 @@ export interface StartOptions {
   tools?: boolean;
 }
 export interface Snapshot {
+  finishWest: number;
   firingTools: Record<'coal' | 'slice' | 'rake', string | null>;
   wirelessWaiting: number;
   chartMarks: ChartMark[];
@@ -214,6 +226,7 @@ export interface Snapshot {
   };
 }
 export interface Station extends Position {
+  exitYaw?: number;
   route?: { x: number; y: number; z: number }[];
   travelSeconds?: number;
   id: string;
@@ -228,6 +241,7 @@ export interface Station extends Position {
     | 'engine'
     | 'boiler'
     | 'firing'
+    | 'auxiliary'
     | 'machine'
     | 'phone'
     | 'wireless'

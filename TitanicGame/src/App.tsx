@@ -1,3 +1,4 @@
+import { AuxiliaryPanel } from './AuxiliaryPanel';
 import { CommandPanel, ObservationPanel } from './WatchPanels';
 import { NavigationChart } from './NavigationChart';
 import { WirelessPanel } from './WirelessPanel';
@@ -44,7 +45,7 @@ import {
 import { BALANCE, ROLE_INFO, ROLE_ORDER, type Role } from '../shared/config';
 import type { Action, Snapshot, Station } from '../shared/types';
 import { areaName, distance, STATIONS, WALLS } from '../shared/world';
-import { HULL_OUTLINE, SHIP_LENGTH_SCALE } from '../shared/navigation';
+import { HULL_OUTLINE } from '../shared/navigation';
 import { defaultServer, network } from './network';
 import { VoiceClient } from './voice';
 import { OceanWorld } from './world';
@@ -54,6 +55,7 @@ import { JobDemos } from './JobDemos';
 import type { DemoId } from '../shared/demos';
 import { Cabinet } from './Cabinet';
 import { ShipMenu } from './ShipMenu';
+import { serviceSeconds } from '../shared/machinery';
 import { navigationWarnings, workSeconds } from '../shared/voyage';
 
 const voice: VoiceClient = import.meta.hot?.data.voice ?? new VoiceClient(network);
@@ -146,6 +148,7 @@ export default function App() {
   const [soloPost, setSoloPost] = useState<Role>('Captain');
   const [difficulty, setDifficulty] = useState<'standard' | 'experienced'>('standard');
   const [boilerPrompt, setBoilerPrompt] = useState('');
+  const [boilerCanUse, setBoilerCanUse] = useState(false);
   const [firstWatch, setFirstWatch] = useState(!localStorage.getItem('titanic-briefed-v2'));
   const evacuated = !!state?.players.find((p) => p.id === state.self.id)?.evacuated;
   const [notice, setNotice] = useState('');
@@ -191,7 +194,10 @@ export default function App() {
       world.current = game;
       game.setQuality(quality);
       game.onNearest = setNearest;
-      game.onBoilerPrompt = setBoilerPrompt;
+      game.onBoilerPrompt = (hint, usable) => {
+        setBoilerPrompt(hint);
+        setBoilerCanUse(usable);
+      };
       game.onBoilerGuide = () => {
         const current = game.boilerTarget?.bank;
         const boiler =
@@ -217,6 +223,14 @@ export default function App() {
           void run(() => network.action({ station: s.id, verb: 'board' }));
         } else if (s.kind === 'ladder') {
           void run(() => network.action({ station: s.id, verb: 'travel' }));
+        } else if (s.machine) {
+          void network
+            .request('equipment:view', { station: s.id })
+            .then(() => {
+              setStation(s);
+              setModal('station');
+            })
+            .catch(showError);
         } else {
           setStation(s);
           setModal('station');
@@ -308,6 +322,18 @@ export default function App() {
       !!modal || intro || !state || !['voyage', 'sinking'].includes(state.phase) || evacuated,
     );
   }, [modal, intro, state?.phase, evacuated]);
+  useEffect(() => {
+    const viewed = modal === 'station' && station?.machine ? station.id : null;
+    if (!viewed) return;
+    const pulse = () => void network.request('equipment:view', { station: viewed }).catch(() => {});
+    pulse();
+    const timer = setInterval(pulse, 1000);
+    return () => {
+      clearInterval(timer);
+      void network.request('equipment:view', { station: null }).catch(() => {});
+    };
+  }, [modal, station?.id, state?.code]);
+
   useEffect(() => {
     localStorage.setItem('titanic-volume', String(volume));
     shipAudio.setVolume(volume);
@@ -442,7 +468,7 @@ export default function App() {
       setBusy(false);
     }
   };
-  const leave = () =>
+  const leave = (returnHome = false) =>
     run(async () => {
       await voice.disable();
       await network.leave();
@@ -450,6 +476,7 @@ export default function App() {
       setState(null);
       setModal(null);
       setIntro(false);
+      if (returnHome) window.location.assign('https://thomaslab.me/');
     });
   const copy = () =>
     run(async () => {
@@ -473,13 +500,9 @@ export default function App() {
       {!inGame && <div className="cinematic-shade" />}
       {!inGame && (
         <header className="masthead">
-          <a className="brand" href="https://thomaslab.me/" aria-label="Return to ThomasLab">
-            <Anchor size={25} />
-            <span>
-              TITANIC
-              <span className="brand-divider" />
-              ALTERED HISTORY
-            </span>
+          <a className="brand" href="https://thomaslab.me/">
+            <Anchor size={25} aria-hidden="true" />
+            <span>ThomasLab Home</span>
           </a>
           <button
             className="icon-button settings-button"
@@ -494,7 +517,7 @@ export default function App() {
       {!state && (
         <main className="main-menu">
           <div className="menu-copy">
-            <p className="date-label">NORTH ATLANTIC · 14 APRIL 1912 · V11</p>
+            <p className="date-label">NORTH ATLANTIC · 14 APRIL 1912 · V18</p>
             <h1>
               TITANIC<span>THE CROSSING</span>
             </h1>
@@ -667,8 +690,8 @@ export default function App() {
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}
                 >
-                  <option value="standard">Standard · first ice about 3–6 min</option>
-                  <option value="experienced">Experienced · earlier ice</option>
+                  <option value="standard">Standard</option>
+                  <option value="experienced">Experienced</option>
                 </select>
               </label>
             )}
@@ -711,25 +734,14 @@ export default function App() {
               <span>
                 <kbd>Esc</kbd>Menu
               </span>
-              <span>
-                <kbd>Tab</kbd>Notes
-              </span>
-              <span>
-                <kbd>V</kbd>Talk
-              </span>
-              {state.practice && (
-                <span>
-                  <kbd>P</kbd>Test
-                </span>
-              )}
             </div>
           )}
           {['voyage', 'sinking'].includes(state.phase) && (
             <>
-              {state.practice && (
+              {state.practice && state.practiceSettings?.paused && !state.demo && (
                 <div className="practice-state">
                   <span className="small-dot" />
-                  {state.practiceSettings?.paused ? 'CLOCK HELD' : 'LIVE VOYAGE'}
+                  Clock held
                   <kbd>P</kbd>
                 </div>
               )}
@@ -751,16 +763,17 @@ export default function App() {
               )}
               {(me?.level === 1 || (me?.level === 0 && me.z < -16.3)) && (
                 <div className="bearing-hud">
-                  HORIZON ·{' '}
-                  {((state.ship.heading + (me.yaw * 180) / Math.PI + 360) % 360).toFixed(0)}° ·{' '}
-                  {state.ship.weather}
+                  {((state.ship.indicatedHeading + (me.yaw * 180) / Math.PI + 360) % 360).toFixed(
+                    0,
+                  )}
+                  ° · {state.ship.weather}
                   {me?.level === 1 && ' · L Sighting log'}
                 </div>
               )}
               <div className={cn('crosshair', nearest && 'interactable')} />
               {locked && (nearest || boilerPrompt) && (
                 <div className="interaction-prompt">
-                  <kbd>E</kbd>
+                  {(!boilerPrompt || boilerCanUse) && <kbd>E</kbd>}
                   <div>
                     <b>
                       {boilerPrompt ||
@@ -777,7 +790,7 @@ export default function App() {
                       ? 'Slice bar'
                       : state.self.inventory.includes('Firing tool:rake')
                         ? 'Ash rake'
-                        : 'Take a tool from the boiler rack'}
+                        : 'Take a tool from the shared rack'}
                   <span>
                     <kbd>B</kbd> Guide
                   </span>
@@ -840,6 +853,7 @@ export default function App() {
             if (me?.job) void act({ station: me.job.station, verb: 'cancel' });
           }}
           leave={() => void leave()}
+          returnHome={() => void leave(true)}
         />
       )}
       {intro && state && (
@@ -868,7 +882,8 @@ export default function App() {
                 <p>
                   You are a time traveler. Titanic must sink to preserve history. Keep your role
                   secret. Cause the disaster without getting caught. You have{' '}
-                  {BALANCE.sabotageCharges} tools. A recalled crossing will also prompt an inquiry.
+                  {BALANCE.sabotageCharges} tools. Press T near machinery to tamper. Excessive delay
+                  or leaving the route will also lead to an inquiry.
                 </p>
               </div>
             ) : (
@@ -972,11 +987,11 @@ export default function App() {
           {(!state.practice || state.phase === 'inquiry') && (
             <p>
               {state.inquiryCause === 'schedule'
-                ? 'The company recalled the crossing for excessive delay. Was someone deliberately holding the ship back?'
+                ? 'You reached New York far behind schedule. The company has dismissed the crew. Was someone deliberately holding the ship back?'
                 : state.inquiryCause === 'route'
-                  ? 'The company recalled the crossing for leaving the route. Did someone deliberately lead you off course?'
+                  ? 'After arriving, the crew was dismissed for abandoning the assigned route. Did someone deliberately lead you off course?'
                   : 'Some of the damage looks deliberate.'}{' '}
-              Discuss what you saw, then choose one crewmate.
+              Discuss what you saw, then choose one shipmate.
             </p>
           )}
           <div className="vote-list">
@@ -1131,8 +1146,8 @@ export default function App() {
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}
                   >
-                    <option value="standard">Standard · first ice about 3–6 min</option>
-                    <option value="experienced">Experienced · earlier ice</option>
+                    <option value="standard">Standard</option>
+                    <option value="experienced">Experienced</option>
                   </select>
                 </label>
                 <Button type="submit" disabled={busy || !!webglError}>
@@ -1480,13 +1495,18 @@ function ShipMap({ state }: { state: Snapshot }) {
         : level === -1
           ? [
               ['BOILERS', 0, -10.6],
-              ['ENGINES', 0, 19],
+              ['FEEDWATER', 0, 4],
+              ['CONDENSERS', 2, 10],
+              ['ENGINES', 0, 17],
+              ['DYNAMOS', 0, 24.5],
+              ['↑ STEERING', -1.7, 28],
               ['↑ BOAT DECK', -4.75, 6.35],
             ]
           : [
               ['LOOKOUT', 0, -31],
               ['FORECASTLE', 0, -34],
-              ['AFT WELL', 0, 31],
+              ['STEERING', 0, 29],
+              ['AFT WELL', 0, 33],
             ];
   return (
     <div className="ship-map">
@@ -1557,12 +1577,28 @@ function StationPanel({
   const [valveSetting, setValveSetting] = useState(state.ship.mainSteamValve);
   useEffect(() => setValveSetting(state.ship.mainSteamValve), [state.ship.mainSteamValve]);
   const send = (verb: string, value?: unknown) => act({ station: s.id, verb, value });
-  const Equipment = 'details';
-  const unavailable =
-    Math.min(
-      distance(me, s),
-      s.kind === 'boiler' ? distance(me, { ...s, z: s.z - 6.4 / SHIP_LENGTH_SCALE }) : Infinity,
-    ) > BALANCE.interactDistance;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (
+        e.code !== 'KeyT' ||
+        e.repeat ||
+        !machine ||
+        me.job ||
+        !(state.self.saboteur || (state.practice && state.practiceSettings?.tools)) ||
+        (e.target as HTMLElement)?.closest('input,select,textarea')
+      )
+        return;
+      close();
+      void network
+        .request('equipment:view', { station: null })
+        .then(() => act({ station: s.id, verb: 'sabotage' }))
+        .catch(() => {});
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [s.id, machine, me.job, state.self.saboteur]);
+
+  const unavailable = s.kind !== 'boiler' && distance(me, s) > BALANCE.interactDistance;
   return (
     <>
       <div className="eyebrow">
@@ -1575,11 +1611,53 @@ function StationPanel({
         )}{' '}
         {areaName(s).toUpperCase()}
       </div>
-      <h2>{s.name}</h2>
+      <h2>{s.kind === 'boiler' ? 'Firing guide' : s.name}</h2>
       {unavailable ? (
         <p>Out of reach.</p>
       ) : (
         <>
+          {s.kind === 'auxiliary' && <AuxiliaryPanel state={state} station={s} act={act} />}
+          {s.id === 'steering' && (
+            <div className="auxiliary-panel">
+              <div className="aux-instruments">
+                <div>
+                  <small>WHEEL REQUEST</small>
+                  <strong>{Math.round(state.ship.rudderTarget * 35)}°</strong>
+                </div>
+                <div>
+                  <small>ACTUAL RUDDER</small>
+                  <strong>{Math.round(state.ship.rudder * 35)}°</strong>
+                </div>
+                <div>
+                  <small>ENGINE IN USE</small>
+                  <strong>No. {state.ship.auxiliary.steeringSet + 1}</strong>
+                </div>
+              </div>
+              <Button
+                onClick={() => void send('steering-set', 1 - state.ship.auxiliary.steeringSet)}
+              >
+                Change to steering engine {2 - state.ship.auxiliary.steeringSet}
+              </Button>
+              <label className="aux-adjust">
+                <span>
+                  Steam supply<b>{Math.round(state.ship.auxiliary.steeringSteam * 100)}%</b>
+                </span>
+                <input
+                  aria-label="Steering steam supply"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={state.ship.auxiliary.steeringSteam}
+                  onChange={(e) => void send('steering-steam', Number(e.target.value))}
+                />
+              </label>
+              <p className="station-hint">
+                Telephone the bridge for a wheel test. The spare engine can keep steering available
+                while No. 1 is repaired.
+              </p>
+            </div>
+          )}
           {s.kind === 'command' && <CommandPanel state={state} act={act} />}
           {s.kind === 'wheel' && (
             <>
@@ -1738,12 +1816,17 @@ function StationPanel({
               </p>
               <div className="boiler-guide">
                 <p>
-                  <b>Fire:</b> take the shovel, fill it at the coal basket, open a thin fire and
-                  place a load. Close its door.
+                  <b>Fire:</b> take the shovel from the shared rack, fill it at a large bunker, open
+                  a thin fire and place a load. Close its door.
                 </p>
                 <p>
-                  <b>Grey clinker / ash:</b> take the slice bar for the open fire, or the rake for
-                  its ashpan. Hold E to work.
+                  <b>Tools:</b> return one tool to the rack before taking another.{' '}
+                  <b>Clinker / ash:</b> take the slice bar for the open fire, or the rake for its
+                  ashpan. Hold E to work. Shift E with the rake in an open fire draws coal out.
+                </p>
+                <p>
+                  <b>Boiler water:</b> keep the local glass near 45–75%. Turn the feed wheel below
+                  it: E increases feed, Shift E reduces it. Ask engineering if water keeps falling.
                 </p>
                 <p>
                   <b>Draught = air:</b> E raises the lever; Shift E lowers it. Small changes, then
@@ -1785,10 +1868,6 @@ function StationPanel({
                   onKeyUp={(e) => void send('steam-valve', Number(e.currentTarget.value))}
                 />
               </label>
-              <Instrument
-                label="ENGINE STEAM HEADER"
-                value={`${steamPsi(state.ship.indicatedSteam).toFixed(0)} psi`}
-              />
             </>
           )}
           {s.machine === 'gauge' && (
@@ -1870,59 +1949,26 @@ function StationPanel({
             </>
           )}
           {machine && (
-            <Equipment open className="machine-panel">
-              <summary>{machine.fault ? 'Equipment needs attention' : 'Equipment'}</summary>
-              <div className="machine-status">
-                <span className={cn('small-dot', !machine.fault && 'online')} />
-                <b>{machine.fault ?? 'Operational'}</b>
-                <span>{Math.round(machine.condition)}%</span>
-              </div>
-              <div className="station-buttons">
-                <Button secondary disabled={!!me.job} onClick={() => void send('inspect')}>
-                  Inspect · {workSeconds(state.self.role, 'inspect')}s
-                </Button>
-                <Button
-                  secondary
-                  disabled={!!me.job || !!machine.fault || machine.condition > 94}
-                  onClick={() => void send('service')}
-                >
-                  Service · {state.self.role?.includes('Engineer') ? 12 : 35}s
-                </Button>
-                <Button
-                  secondary
-                  disabled={!!me.job || !machine.fault}
-                  onClick={() => void send('repair')}
-                >
-                  Repair · {workSeconds(state.self.role, 'repair')}s
-                </Button>
-              </div>
-
-              {(state.self.saboteur || (state.practice && state.practiceSettings?.tools)) && (
-                <div className="tamper-section">
-                  <div>
-                    <LockKeyhole size={14} />
-                    <span>{state.practice ? 'TEST TOOLS' : 'YOUR TOOLS'}</span>
-                    <b>{state.self.sabotageCharges} left</b>
-                  </div>
-                  <Button
-                    secondary
-                    disabled={
-                      !!me.job ||
-                      !!machine.fault ||
-                      state.self.sabotageReadyIn > 0 ||
-                      state.self.sabotageCharges === 0
-                    }
-                    onClick={() => void send('sabotage')}
-                  >
-                    {state.self.sabotageReadyIn > 0
-                      ? `Tools cooling · ${state.self.sabotageReadyIn}s`
-                      : state.practice
-                        ? 'Simulate fault · 8s'
-                        : 'Tamper · 8s'}
-                  </Button>
-                </div>
-              )}
-            </Equipment>
+            <div className="machine-actions" aria-label="Equipment checks">
+              <Button
+                secondary
+                disabled={!!me.job || !!state.self.inspections?.[machine.id]}
+                onClick={() => void send('inspect')}
+              >
+                {state.self.inspections?.[machine.id] ?? 'Inspect · 5s'}
+              </Button>
+              <Button
+                secondary
+                disabled={!!me.job || (!machine.fault && machine.condition > 94)}
+                onClick={() => void send(machine.fault ? 'repair' : 'service')}
+              >
+                {machine.fault
+                  ? `Repair · ${workSeconds(state.self.role, 'repair')}s`
+                  : machine.condition > 94
+                    ? 'Service · not needed'
+                    : `Service · ${serviceSeconds(state.self.role)}s`}
+              </Button>
+            </div>
           )}
         </>
       )}

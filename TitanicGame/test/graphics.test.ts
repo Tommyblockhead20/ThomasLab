@@ -178,7 +178,7 @@ test('cabin paint and wainscoting use disjoint solids instead of coplanar overla
   }
 });
 test('windows are single transparent sheets with no depth-writing glass boxes', () => {
-  const group = buildCabinWall(WALLS[0], 0, palette);
+  const group = buildCabinWall(WALLS.find((w) => w.windows)!, 0, palette);
   const glass = group.getObjectByName('window-sheet') as THREE.Mesh<
     THREE.PlaneGeometry,
     THREE.MeshPhysicalMaterial

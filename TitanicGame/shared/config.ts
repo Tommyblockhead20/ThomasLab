@@ -44,12 +44,12 @@ export const ROLE_ORDER = [
   'Boiler Operator',
   'Wireless Operator',
   'Lookout',
-  'Second Boiler Operator',
+  'Auxiliary Engineer',
   'Helmsman',
-  'Second Engineer',
+  'Second Boiler Operator',
   'Second Wireless Operator',
 ] as const;
-export type Role = (typeof ROLE_ORDER)[number] | 'Second Lookout';
+export type Role = (typeof ROLE_ORDER)[number] | 'Second Lookout' | 'Second Engineer';
 export const ROLE_INFO: Record<Role, { area: string; duty: string; tip: string }> = {
   Captain: {
     area: 'Captain’s bridge',
@@ -69,17 +69,22 @@ export const ROLE_INFO: Record<Role, { area: string; duty: string; tip: string }
   'Boiler Operator': {
     area: 'Boiler room',
     duty: 'Balance the fires and maintain enough steam for the engines.',
-    tip: 'Spread the coal, clear the grates and close fire doors.',
+    tip: 'Spread coal and clear grates. At five or six shipmates, also balance boiler feedwater; from seven, coordinate with the Auxiliary Engineer.',
   },
   'Wireless Operator': {
     area: 'Wireless room',
     duty: 'Read ice positions, compare sighting times and relay useful reports to the bridge.',
     tip: 'Use the ship telephone for read-back, or take the report to the chart.',
   },
+  'Auxiliary Engineer': {
+    area: 'Auxiliary machinery',
+    duty: 'Keep feedwater, condensers and electrical services running; assist the engine watch.',
+    tip: 'Compare boiler water levels, change pumps before cleaning strainers, and keep a generating set in reserve.',
+  },
   Engineer: {
     area: 'Engine room',
-    duty: 'Execute engine orders, inspect faults, and repair machinery.',
-    tip: 'You repair faster than the rest of the crew.',
+    duty: 'Answer engine orders, tend bearing oil, and maintain engines and steering machinery.',
+    tip: 'Cover pumps and dynamos until seven shipmates; at five or six, the boiler watch handles routine water checks. Ask the bridge to test steering while you inspect aft.',
   },
   Helmsman: {
     area: 'Bridge',

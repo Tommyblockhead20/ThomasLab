@@ -15,6 +15,8 @@ export class ShipAudio {
   lastStep = 0;
   lastPhase = '';
   lastImpact = 0;
+  lastEngineOrder: number | null = null;
+  lastMachineryAlarm = 0;
   morseTimers: ReturnType<typeof setTimeout>[] = [];
   crash() {
     if (!this.ctx || !this.master) return;
@@ -145,13 +147,32 @@ export class ShipAudio {
       return;
     }
     const room = roomAt(me),
-      inside = ['engine', 'boiler'].includes(room),
+      inside = ['engine', 'boiler', 'auxiliary', 'dynamo', 'steering'].includes(room),
       now = performance.now();
+    if (
+      this.lastEngineOrder !== null &&
+      this.lastEngineOrder !== state.ship.order &&
+      (inside || state.self.role?.includes('Engineer'))
+    ) {
+      this.tone(660, 0.22, 0.25, 'triangle');
+      setTimeout(() => this.tone(660, 0.22, 0.25, 'triangle'), 330);
+    }
+    this.lastEngineOrder = state.ship.order;
+    const aux = state.ship.auxiliary;
+    const alarm =
+      (['boiler', 'auxiliary'].includes(room) &&
+        aux.boilerWater.some((v) => v < 0.3 || v > 0.85)) ||
+      (room === 'dynamo' && aux.voltage < 65) ||
+      (room === 'engine' && aux.bearingHeat > 0.75);
+    if (alarm && now - this.lastMachineryAlarm > 8000) {
+      this.tone(470, 0.35, 0.2, 'triangle');
+      this.lastMachineryAlarm = now;
+    }
     const releasing = state.ship.safetyLifted.filter(
       (lifted, i) => lifted || state.ship.reliefUntil[i] > 0,
     ).length;
     this.steamHiss?.gain.setTargetAtTime(
-      room === 'boiler' ? Math.min(0.13, releasing * 0.05) : 0,
+      room === 'boiler' ? Math.min(0.2, releasing * 0.05 + state.ship.steamLeak * 0.12) : 0,
       this.ctx.currentTime,
       0.1,
     );

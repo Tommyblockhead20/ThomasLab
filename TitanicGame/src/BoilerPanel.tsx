@@ -16,6 +16,10 @@ const centers = [245, 425, 605],
   mouthY = 112;
 const BASICS = [
   [
+    'Water',
+    'Keep water near the middle of the glass (45–75%). Increase feed when falling; reduce it when rising. Ask engineering if more feed does not help.',
+  ],
+  [
     'Steam',
     'Aim for 190–215 psi in this boiler. Its steam stop wheel connects it to the common engine supply.',
   ],
@@ -72,6 +76,14 @@ export function BoilerPanel({
   };
   const begin = (e: React.PointerEvent, kind: FiringTool) => {
     e.preventDefault();
+    if (!state.self.inventory.includes('Firing tool:' + kind)) {
+      setHint('Take that tool from the shared rack.');
+      return;
+    }
+    if (kind === 'coal' && !state.self.inventory.includes('Coal load')) {
+      setHint('Fill the shovel at a large bunker.');
+      return;
+    }
     svg.current?.setPointerCapture(e.pointerId);
     const p = point(e);
     drag.current = { tool: kind, ...p, travel: 0, work: 0, zone: null };
@@ -118,7 +130,7 @@ export function BoilerPanel({
     }
     setSelected(d.zone);
     setTool(d.tool);
-    void send('tend', { zone: d.zone, tool: d.tool });
+    void send('tend', { zone: d.zone, tool: d.tool, physical: true });
   };
   const door = (zone: number) => void send('door', { zone, open: !beds[zone].open });
   const changeDraft = (value: number) => {
@@ -164,6 +176,26 @@ export function BoilerPanel({
                 : 'Firing naturally'}
           </span>
         </div>
+      </div>
+      <div className="station-buttons" aria-label="Boiler feedwater">
+        <span>
+          Water {Math.round(state.ship.auxiliary.boilerWater[bank] * 100)}% · Feed{' '}
+          {Math.round(state.ship.auxiliary.feedValves[bank] * 100)}%
+        </span>
+        <button
+          onClick={() =>
+            void send('feed', Math.max(0, state.ship.auxiliary.feedValves[bank] - 0.1))
+          }
+        >
+          Less feed
+        </button>
+        <button
+          onClick={() =>
+            void send('feed', Math.min(1, state.ship.auxiliary.feedValves[bank] + 0.1))
+          }
+        >
+          More feed
+        </button>
       </div>
       {lesson !== null && (
         <div className="boiler-basics" role="note" aria-label="Boiler basics">

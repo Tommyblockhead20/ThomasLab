@@ -18,6 +18,11 @@ function solo(role: Role = 'Boiler Operator') {
   r.nextEvent = r.nextTelegram = Infinity;
   const act = (station: string, verb: string, value?: unknown) => {
     advance(r, 0.2);
+    if (verb === 'tend') {
+      const tool = (value as { tool: string }).tool;
+      p.inventory = p.inventory.filter((i) => !i.startsWith('Firing tool:') && i !== 'Coal load');
+      p.inventory.push('Firing tool:' + tool, ...(tool === 'coal' ? ['Coal load'] : []));
+    }
     r.action(p.id, { station, verb, value });
   };
   return { r, p, act };
@@ -171,6 +176,13 @@ test('answered ship lines carry private crew messages and read-back reports that
     bridge = STATIONS.find((s) => s.id === 'bridge-phone')!;
   Object.assign(a, { x: wireless.x, z: wireless.z, level: wireless.level });
   Object.assign(b, { x: bridge.x, z: bridge.z, level: bridge.level });
+  const receiver = STATIONS.find((s) => s.id === 'wireless')!;
+  Object.assign(a, { x: receiver.x - 1, z: receiver.z, level: 0 });
+  const t = r.generateTelegram(true);
+  t.decoded = true;
+  r.action(a.id, { station: receiver.id, verb: 'carry', value: { id: t.id } });
+  advance(r, 0.2);
+  Object.assign(a, { x: wireless.x, z: wireless.z, level: wireless.level });
   r.action(a.id, { station: wireless.id, verb: 'call', value: 'bridge' });
   r.action(b.id, { station: bridge.id, verb: 'answer' });
   advance(r, 0.2);
@@ -178,8 +190,6 @@ test('answered ship lines carry private crew messages and read-back reports that
   assert.match(r.snapshot(b.id).self.lineMessages[0].text, /LESS STEAM/);
   assert.equal(r.snapshot(c.id).self.lineMessages.length, 0);
   assert.ok(!JSON.stringify(r.snapshot(c.id)).includes('ENGINE NEEDS LESS STEAM'));
-  const t = r.generateTelegram(true);
-  t.decoded = true;
   advance(r, 0.2);
   r.action(a.id, { station: wireless.id, verb: 'relay', value: t.id });
   assert.ok(b.inventory.includes(`Telegram:${t.id}`));

@@ -1,3 +1,4 @@
+import { AUXILIARY_FOOTPRINTS } from './auxiliary-layout';
 import type { Level } from './types';
 import { FIRING_RACK } from './stokehold';
 import {
@@ -22,6 +23,14 @@ export const BRIDGE = {
   phone: { x: 5.8, z: -18.5 },
   command: { x: 3.4, z: -17.2 },
 };
+// Furniture sits against the sides of the working room. Both doors and the
+// passage between them stay clear, including space to turn after entering.
+export const WIRELESS = {
+  receiver: { x: -0.6, z: -8.375, yaw: -Math.PI / 2 },
+  copy: { x: -4.9, z: -8.375, yaw: Math.PI / 2 },
+  phone: { x: -4.65, z: -8.95 },
+  apparatus: { x: 4.95, z: -8.375, yaw: -Math.PI / 2 },
+};
 export const DECK_FITTINGS = [
   ...[-2, 2].map((x) => ({ x, z: -34, w: 2.1 / W, d: 2.2 / L, level: 2 as Level })),
   { x: 0, z: 31, w: 0.56 / W, d: 0.56 / L, level: 2 as Level },
@@ -45,7 +54,7 @@ export const VENTILATORS = [
 ];
 export const SHAFT = { x: -4, z: 8.9, w: 3.4, d: 4.4, floor: -19, roof: 3.25 };
 export const DECK_OPENINGS = [
-  { id: 'passengers', x: 0, z: -3.8, w: 2.2, d: 1.7 },
+  { id: 'passengers', x: 0, z: -4.04, w: 4.12, d: 2.02 },
   { id: 'passengers-aft', x: 0, z: 15.85, w: 2.2, d: 1.7 },
   { id: 'machinery', ...SHAFT },
 ];
@@ -61,10 +70,15 @@ export const BOILERS = [-6.3, -2.1, 2.1, 6.3].map((x, i) => ({
 }));
 export const passengerRoute = [
   { x: 0, y: 0, z: -5.45 },
-  { x: 0, y: 0, z: -4.65 },
-  { x: 0, y: -2.52, z: -3 },
-  { x: 0, y: -2.52, z: -2.4 },
+  { x: 0, y: 0, z: -5.05 },
+  { x: 0, y: -1.63, z: -4.02 },
+  { x: 0, y: -1.63, z: -3.74 },
+  { x: 1.42, y: -1.63, z: -3.74 },
+  { x: 1.42, y: -2.52, z: -3.03 },
+  { x: 1.42, y: -2.52, z: -2.45 },
 ];
+export const passengerAscent = [...passengerRoute].reverse();
+export const portPassengerAscent = passengerAscent.map((p) => ({ ...p, x: p.x === 0 ? 0 : -p.x }));
 export const aftPassengerRoute = [
   { x: 0, y: 0, z: 14.5 },
   { x: 0, y: 0, z: 15 },
@@ -132,6 +146,13 @@ const cross = (z: number, x0: number, x1: number, level: Level, gapX = 0, gapW =
   w((gapX + gapW / 2 + x1) / 2, z, x1 - gapX - gapW / 2, 0.15, level),
 ];
 export const PLAN_WALLS: PlanWall[] = [
+  ...[-1, 1].flatMap((side) =>
+    [
+      [7, -19],
+      [7, -7],
+      [7, 15],
+    ].map(([x, z]) => w(side * x, z, 0.24 / W, 0.24 / L, 0, { prop: true })),
+  ),
   // Two adjacent forward work areas, with a glazed partition and clear doorway.
   ...[-1, 1].flatMap((side) => [
     w(side * 6.55, -18.15, 0.18, 3.7, 0, { windows: true }),
@@ -183,6 +204,11 @@ export const PLAN_WALLS: PlanWall[] = [
   ...VENTILATORS.map((v) => ({ ...v, level: 0 as Level, prop: true })),
   ...FUNNEL_POSITIONS.map((z) => w(0, z, 4, 2.6, 0, { prop: true })),
   ...DECK_OPENINGS.map((o) => w(o.x, o.z, o.w, o.d, 0, { prop: true })),
+  // The oak stair carcass and grounded landing cannot be walked through.
+  w(0, (-5.05 - 4.02) / 2, 3.78 / W, 1.03, -2, { prop: true }),
+  w(0, (-4.02 - 3.74) / 2, 5.44 / W, 0.28, -2, { prop: true }),
+  ...[-1, 1].map((side) => w(side * 1.42, (-3.74 - 3.03) / 2, 1.48 / W, 0.71, -2, { prop: true })),
+  w(0, -3.075 + 0.13 / L, 2.25 / W, 0.26 / L, -2, { prop: true }),
   w(SHAFT.x, SHAFT.z, SHAFT.w, SHAFT.d, -2, { prop: true }),
   w(SHAFT.x, SHAFT.z, SHAFT.w, SHAFT.d, -1, { prop: true }),
   // A deck: closed forward stateroom facades, broad central passage,
@@ -214,6 +240,15 @@ export const PLAN_WALLS: PlanWall[] = [
   ...BOILERS.map((b) => w(b.x, b.z, (b.radius * 2) / W, b.length / L, -1, { prop: true })),
   w(FIRING_RACK.x, FIRING_RACK.z, 1.5 / W, 0.18 / L, -1, { prop: true }),
   ...[-1, 1].map((s) => w(s * 5, 17, 3, 7, -1, { prop: true })),
+  // Distinct machinery spaces connected by broad watertight doorways.
+  ...cross(12.2, -8.9, 8.9, -1, 1.6, 3.0),
+  ...cross(21.7, -8.9, 8.9, -1, 0, 3.0),
+  ...AUXILIARY_FOOTPRINTS,
+  // Steering engines sit under the aft deckhouse, above the deep machinery spaces.
+  w(-3, 29.2, 0.16, 3.2, 2),
+  w(3, 29.2, 0.16, 3.2, 2),
+  w(0, 30.8, 6, 0.16, 2),
+  ...cross(27.6, -3, 3, 2, 1.5, 1.6),
   // Actual equipment footprints.
   w(BRIDGE.chart.x, BRIDGE.chart.z, 2.7, 0.7, 0, { prop: true }),
   w(BRIDGE.wheel.x, BRIDGE.wheel.z, 0.8, 0.5, 0, { prop: true }),
@@ -221,8 +256,8 @@ export const PLAN_WALLS: PlanWall[] = [
   w(BRIDGE.command.x, BRIDGE.command.z, 1.8, 0.65, 0, { prop: true }),
   w(BRIDGE.wheel.x - 1.1, BRIDGE.wheel.z, 0.46 / W, 0.46 / L, 0, { prop: true }),
   ...DECK_FITTINGS.map((p) => ({ ...p, prop: true })),
-  w(-2.6, -8, 2.8, 0.7, 0, { prop: true }),
-  w(-4.5, -8.85, 1.4 / W, 0.55 / L, 0, { prop: true }),
+  w(WIRELESS.receiver.x, WIRELESS.receiver.z, 0.95 / W, 3.65 / L, 0, { prop: true }),
+  w(WIRELESS.copy.x, WIRELESS.copy.z, 0.55 / W, 1.4 / L, 0, { prop: true }),
   w(4.4, -10.2, 1.6, 0.4, 0, { prop: true }),
   w(0, -10, 1.6, 0.4, 0, { prop: true }),
   w(0, 16, 1.53, 0.92 / L, -1, { prop: true }),
@@ -247,7 +282,14 @@ PLAN_WALLS.push(
   { x: 0, z: 15.825, w: 2.45 / W, d: 1.65, level: -2, prop: true },
   { x: 7.7, z: -22.775, w: 1.55 / W, d: 3.45, level: 2, prop: true },
   { x: 4.5, z: 25.75, w: 1.55 / W, d: 2.5, level: 2, prop: true },
-  { x: 2.8, z: -8, w: 2.6 / W, d: 0.6 / L, level: 0, prop: true },
+  {
+    x: WIRELESS.apparatus.x,
+    z: WIRELESS.apparatus.z,
+    w: 1.25 / W,
+    d: 2.6 / L,
+    level: 0,
+    prop: true,
+  },
   ...[-1, 1].map((side) => ({
     x: side * 6.12,
     z: 4.4,
@@ -301,8 +343,8 @@ export const DOORWAYS = [
   { x: -6.55, z: -20.45, w: 0.18, d: 0.8 },
   { x: 6.55, z: -20.45, w: 0.18, d: 0.8 },
   { x: -2.85, z: -16.3, w: 1.2, d: 0.15 },
-  { x: -5.85, z: -16.3, w: 1.2, d: 0.15 },
-  { x: 5.85, z: -16.3, w: 1.2, d: 0.15 },
+  { x: -5.975, z: -16.3, w: 0.95, d: 0.15 },
+  { x: 5.975, z: -16.3, w: 0.95, d: 0.15 },
   { x: -2.8, z: -9.25, w: 1.2, d: 0.15 },
   { x: -2.6, z: -7.5, w: 1.2, d: 0.15 },
   { x: 2.6, z: -7.5, w: 1.2, d: 0.15 },

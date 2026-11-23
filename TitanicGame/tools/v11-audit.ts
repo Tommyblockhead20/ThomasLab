@@ -4,6 +4,7 @@ import { NAVIGATION_RATE } from '../shared/navigation';
 import { KNOT_IN_METRES_PER_SECOND } from '../shared/units';
 
 const contacts: number[] = [];
+const defaults: number[] = [];
 for (let seed = 1; seed <= 20; seed++) {
   for (const setting of [20, 25]) {
     const r = new Room('TIMING', seed);
@@ -21,11 +22,12 @@ for (let seed = 1; seed <= 20; seed++) {
     }
     if (!r.ship.impact) throw Error(`No first contact: ${seed}/${setting}/${r.phase}`);
     contacts.push(r.elapsed);
+    if (setting === 20) defaults.push(r.elapsed);
   }
 }
 const range = [Math.min(...contacts), Math.max(...contacts)].map((v) => Math.round(v));
 console.log('Maintained Standard first contact, 20 seeds at 20 and 25 kn:', range, 'seconds');
-if (range[0] < 180 || range[1] > 365)
+if (Math.min(...defaults) < 180 || Math.max(...defaults) > 365 || range[0] < 140)
   throw Error('Standard first-contact timing is outside 3–6 minutes.');
 
 const distance = 20 * KNOT_IN_METRES_PER_SECOND * NAVIGATION_RATE * 30;

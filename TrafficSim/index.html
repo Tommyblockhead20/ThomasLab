@@ -24,8 +24,7 @@
   .home-btn svg{width:18px;height:18px;display:block;flex:none}
   .status{display:flex;align-items:center;gap:8px;color:#dce7e2;font-size:13px;white-space:nowrap}
   .status-dot{width:8px;height:8px;border-radius:99px;background:var(--accent);box-shadow:0 0 12px #62e6b066}
-  .control-panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;display:grid;grid-template-columns:minmax(773px,1.2fr) minmax(420px,.8fr);gap:14px;align-items:end;margin-bottom:12px}
-  .control-left{display:grid;grid-template-columns:225px 230px 170px 118px;gap:10px;align-items:start}
+  .control-panel{padding:12px;display:grid;gap:14px}
   .group-label{font-size:12px;color:#c9d2de;font-weight:700;margin-bottom:6px}
   #scenarioPresetSelect{width:225px;max-width:100%;height:79px;font-size:14px;border-color:#4f987d;background:#1a2b2a;box-shadow:0 0 0 1px rgba(98,230,176,.10),0 4px 14px rgba(0,0,0,.16);font-weight:800}
   #scenarioPresetSelect:hover,#scenarioPresetSelect:focus{border-color:var(--accent);outline:none}
@@ -94,16 +93,58 @@
   .winner{color:var(--accent);font-weight:800}
   footer{color:#8d9aab;font-size:11px;text-align:center;margin:14px 15px 3px;line-height:1.4}
   .tiny{font-size:10px;color:var(--muted)}
-  @media(max-width:1330px){
-    .control-panel{grid-template-columns:1fr}
-  }
+  .run-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:end;padding:10px 12px;margin-bottom:8px;background:var(--panel);border:1px solid var(--border);border-radius:12px}
+  .run-toolbar .group-label{display:block}
+  .run-toolbar #scenarioPresetSelect{height:auto;width:100%;min-width:0}
+  .run-toolbar .run-buttons{grid-template-columns:auto auto}
+  .setup-disclosure{margin-bottom:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px}
+  .setup-disclosure>summary{cursor:pointer;padding:8px 12px;color:#d5deea;font-size:12px;font-weight:750}
+  .setup-disclosure .control-panel{border-top:1px solid var(--border);grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:start}
+  :is(.home-btn,button,select,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .home-btn{white-space:nowrap}
   @media(max-width:1050px){
-    .control-panel{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.card{max-width:700px;width:100%;margin:0 auto}
-    .control-left{grid-template-columns:1fr 1fr}.demand-grid{grid-template-columns:repeat(2,1fr)}.advanced-design-grid{grid-template-columns:1fr}
+    .advanced-design-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .demand-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .card-head{height:auto;min-height:44px;flex-wrap:wrap;gap:4px;padding:6px 8px}
   }
   @media(max-width:650px){
-    .app{padding:10px}.control-left{grid-template-columns:1fr}.traffic-demand-layout{grid-template-columns:1fr}.demand-grid{grid-template-columns:repeat(2,1fr)}.set-all-demand{display:grid;grid-template-columns:repeat(4,1fr)}.set-all-label{grid-column:1/-1}.control-panel{padding:10px}.cards{gap:10px}h1{font-size:28px}
+    .app{padding:8px}
+    header{gap:7px;margin-bottom:8px;align-items:flex-start}
+    .title-area{display:grid;gap:6px}
+    .home-btn{width:max-content;height:28px;font-size:11px;padding:0 6px}
+    .home-btn svg{width:13px;height:13px}
+    h1{font-size:23px}
+    .status{font-size:11px;margin-top:7px}
+    .run-toolbar{grid-template-columns:minmax(0,1fr) auto;gap:6px;padding:7px}
+    .run-toolbar>:first-child{grid-column:1/-1}
+    .run-toolbar .group-label{margin-bottom:3px;font-size:10px}
+    .run-toolbar :is(select,.btn){width:auto;max-width:100%;min-height:30px;padding:4px;font-size:11px}
+    .run-toolbar #scenarioPresetSelect{font-size:12px}
+    .run-toolbar .inline-setting,.run-toolbar .run-buttons{gap:3px}
+    .setup-disclosure .control-panel,.traffic-demand-layout,.advanced-design-grid{grid-template-columns:1fr}
+    .set-all-demand{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+    .set-all-label{grid-column:1/-1}
+    .cards{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+    .card{border-radius:8px}
+    .card-head{min-height:42px;padding:4px;align-content:start;gap:2px}
+    .card-title{width:100%;font-size:clamp(10px,3vw,14px)}
+    .card-head .pill{width:100%;min-width:0;overflow-wrap:anywhere;border:0;border-radius:0;background:none;padding:0;font-size:9px}
+    .stats{grid-template-columns:1fr;padding:3px;gap:3px}
+    .stat{min-height:0;padding:3px 4px;border-radius:4px}
+    .stat-label{font-size:9px;margin:0;line-height:1.12}
+    .stat-value{font-size:12px}
+    .comparison-head{padding:6px;gap:5px}
+    .comparison h2{font-size:13px}
+    .comparison th,.comparison td{padding:5px 3px;overflow-wrap:anywhere}
+    .comparison table{table-layout:fixed;font-size:10px}
+    .comparison th{font-size:9px}
   }
+  @media(max-width:420px){
+    .card-head{display:grid;grid-template-rows:auto 2lh;align-content:start;min-height:0}
+    .card-head .pill{font-size:8px;line-height:1.05}
+    .run-toolbar .group-label{line-height:1.15}
+  }
+  @media(prefers-reduced-motion:reduce){.home-btn,.btn,.mode-btn,.approach-demand{transition:none}}
 </style>
 <script src="../achievements.js"></script>
 </head>
@@ -111,9 +152,9 @@
 <div class="app">
   <header>
     <div class="title-area">
-      <a class="home-btn" href="../" aria-label="Home" title="Home">
+      <a class="home-btn" href="../">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.8 12 3.8l8.5 7v9.4a1 1 0 0 1-1 1h-5.1v-6.1H9.6v6.1H4.5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round"/></svg>
-        <span>Home</span>
+        <span>ThomasLab Home</span>
       </a>
       <h1>Intersection Lab</h1>
     </div>
@@ -122,10 +163,9 @@
     </div>
   </header>
 
-  <section class="control-panel">
-    <div class="control-left">
+  <section class="run-toolbar" aria-label="Run controls">
       <div>
-        <div class="group-label">Scenario</div>
+        <label class="group-label" for="scenarioPresetSelect">Scenario</label>
         <select id="scenarioPresetSelect" title="Apply a bundle of traffic and design settings">
           <option value="custom">Custom</option>
           <optgroup label="Traffic scenarios">
@@ -138,15 +178,6 @@
             <option value="stress">Stress test</option>
           </optgroup>
         </select>
-      </div>
-      <div>
-        <div class="group-label">Intersection approaches</div>
-        <div class="seg" id="approachCountButtons">
-          <button class="mode-btn" data-count="3">3-way</button>
-          <button class="mode-btn active" data-count="4">4-way</button>
-          <button class="mode-btn" data-count="5">5-way</button>
-          <button class="mode-btn" data-count="6">6-way</button>
-        </div>
       </div>
       <div>
         <div class="group-label">Simulation</div>
@@ -174,8 +205,20 @@
           <button class="btn primary" id="resetBtn">Reset run</button>
         </div>
       </div>
-    </div>
+  </section>
 
+  <details class="setup-disclosure">
+    <summary>Traffic &amp; intersection setup</summary>
+    <section class="control-panel" aria-label="Traffic and intersection setup">
+      <div>
+        <div class="group-label">Intersection approaches</div>
+        <div class="seg" id="approachCountButtons">
+          <button class="mode-btn" data-count="3">3-way</button>
+          <button class="mode-btn active" data-count="4">4-way</button>
+          <button class="mode-btn" data-count="5">5-way</button>
+          <button class="mode-btn" data-count="6">6-way</button>
+        </div>
+      </div>
     <div class="traffic-controls">
       <div class="group-label">Traffic entering from each approach</div>
       <div class="traffic-demand-layout">
@@ -252,12 +295,13 @@
         </div>
       </div>
     </details>
-  </section>
+    </section>
+  </details>
 
-  <main class="cards">
+  <main class="cards" aria-label="Live intersection simulations">
     <section class="card">
       <div class="card-head"><div class="card-title">Traffic Light</div><div class="pill" id="signalPhasePill">Opposing-pair phases</div></div>
-      <canvas id="signalCanvas" width="520" height="520"></canvas>
+      <canvas aria-label="Traffic light simulation" id="signalCanvas" width="520" height="520"></canvas>
       <div class="stats">
         <div class="stat"><div class="stat-label">Queued now</div><div class="stat-value" id="signalQueue">0</div></div>
         <div class="stat"><div class="stat-label">Longest wait now</div><div class="stat-value" id="signalP95">0 s</div></div>
@@ -268,7 +312,7 @@
 
     <section class="card">
       <div class="card-head"><div class="card-title" id="stopCardTitle">All-Way Stop</div><div class="pill" id="stopModePill">First-arrival priority</div></div>
-      <canvas id="stopCanvas" width="520" height="520"></canvas>
+      <canvas aria-label="Stop signs simulation" id="stopCanvas" width="520" height="520"></canvas>
       <div class="stats">
         <div class="stat"><div class="stat-label">Queued now</div><div class="stat-value" id="stopQueue">0</div></div>
         <div class="stat"><div class="stat-label">Longest wait now</div><div class="stat-value" id="stopP95">0 s</div></div>
@@ -279,7 +323,7 @@
 
     <section class="card">
       <div class="card-head"><div class="card-title">Roundabout</div><div class="pill" id="roundModePill">Single lane · yield on entry</div></div>
-      <canvas id="roundCanvas" width="520" height="520"></canvas>
+      <canvas aria-label="Roundabout simulation" id="roundCanvas" width="520" height="520"></canvas>
       <div class="stats">
         <div class="stat"><div class="stat-label">Queued now</div><div class="stat-value" id="roundQueue">0</div></div>
         <div class="stat"><div class="stat-label">Longest wait now</div><div class="stat-value" id="roundP95">0 s</div></div>

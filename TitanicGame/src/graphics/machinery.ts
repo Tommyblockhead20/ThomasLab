@@ -133,16 +133,18 @@ export function buildEngineRoom(m: ShipMaterials, dialMaterials?: THREE.Material
         const a = (j * Math.PI) / 3;
         const spoke = box(
           wheel,
-          Math.cos(a) * 0.22,
-          Math.sin(a) * 0.22,
+          Math.cos(a) * 0.245,
+          Math.sin(a) * 0.245,
           0,
-          0.46,
+          0.31,
           0.045,
           0.08,
           m.steel,
         );
         spoke.rotation.z = a;
       }
+      const hub = cyl(wheel, 0, 0, 0, 0.105, 0.13, m.brass);
+      hub.rotation.x = Math.PI / 2;
       for (const side of [-1, 1])
         link(
           group,
@@ -176,6 +178,8 @@ export function buildEngineRoom(m: ShipMaterials, dialMaterials?: THREE.Material
   // Floor-mounted console. The dials sit at eye height, below the ceiling.
   box(group, 0, -5.35, -16, 1.35, 1.35, 0.7 / L, m.steel);
   box(group, 0, -4.59, -16, 1.53, 0.18, 0.92 / L, m.darkWood);
+  box(group, 0, -4.35, -16 + 0.48 / L, 1.53, 0.5, 0.06 / L, m.steel).name =
+    'engine-instrument-board';
   for (let i = 0; i < 3; i++) {
     const x = (i - 1) * 0.43,
       y = -4.39,

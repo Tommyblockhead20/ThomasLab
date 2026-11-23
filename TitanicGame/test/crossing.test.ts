@@ -59,6 +59,7 @@ test('every crew assignment can operate another department, with meaningful spec
     r.action(p.id, { station: boiler.id, verb: 'door', value: { zone: 0, open: true } });
     advance(r, 0.2);
     const fuel = r.ship.coal[0];
+    p.inventory.push('Firing tool:coal', 'Coal load');
     r.action(p.id, { station: boiler.id, verb: 'tend', value: { zone: 0, tool: 'coal' } });
     assert.ok(r.ship.coal[0] > fuel + (role.includes('Boiler') ? 0.05 : 0.025));
   }

@@ -36,7 +36,7 @@ export function createGameServer(env: NodeJS.ProcessEnv = process.env) {
     res.json({
       ok: true,
       game: 'Titanic: Altered History',
-      version: 'v11',
+      version: 'v18',
       rooms: rooms.size,
       players: [...rooms.values()].reduce(
         (n, r) => n + [...r.players.values()].filter((p) => p.connected).length,
@@ -48,8 +48,8 @@ export function createGameServer(env: NodeJS.ProcessEnv = process.env) {
   app.get('/Titanic/downloads/Titanic-Altered-History.zip', (_req, res) =>
     res.download(resolve(process.cwd(), '../Titanic/downloads/Titanic-Altered-History.zip')),
   );
-  app.get('/Titanic/downloads/Titanic-Altered-History-v11.zip', (_req, res) =>
-    res.download(resolve(process.cwd(), '../Titanic/downloads/Titanic-Altered-History-v11.zip')),
+  app.get('/Titanic/downloads/Titanic-Altered-History-v18.zip', (_req, res) =>
+    res.download(resolve(process.cwd(), '../Titanic/downloads/Titanic-Altered-History-v18.zip')),
   );
   app.use('/Titanic', express.static(resolve(process.cwd(), '../Titanic')));
   app.get('/', (_req, res) => res.redirect('/Titanic/'));
@@ -155,10 +155,14 @@ export function createGameServer(env: NodeJS.ProcessEnv = process.env) {
       player.ready = data === true;
       publish(room);
     });
-    on('equipment:view', (data) => {
-      const { room, player } = requirePlayer(socket);
-      room.viewEquipment(player.id, typeof data?.station === 'string' ? data.station : null);
-    }, 4);
+    on(
+      'equipment:view',
+      (data) => {
+        const { room, player } = requirePlayer(socket);
+        room.viewEquipment(player.id, typeof data?.station === 'string' ? data.station : null);
+      },
+      4,
+    );
     on('room:start', (data) => {
       const { room, player } = requirePlayer(socket);
       room.start(player.id, data ?? {}, allowDev);

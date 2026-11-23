@@ -47,7 +47,8 @@ export function workSeconds(role: Role | null, kind: 'repair' | 'inspect' | 'dec
 // Advance a single trajectory once, rather than restarting prediction for every
 // plotted point. The curve and simulation step are unchanged.
 export function projectTrack(ship: Motion, count = 7, step = 8) {
-  const future = { ...ship }, points = [{ ...ship }];
+  const future = { ...ship },
+    points = [{ ...ship }];
   for (let n = 0; n < count; n++) {
     for (let t = 0; t < step; t += 0.05) advanceMotion(future, Math.min(0.05, step - t));
     points.push({ ...future });

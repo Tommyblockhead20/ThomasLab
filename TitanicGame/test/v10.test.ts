@@ -94,6 +94,7 @@ test('high power wears propulsion faster and turns the same marginal event into 
     r.machines.forEach((m) => (m.condition = 100));
     r.rng.next = () => 0.2;
   }
+  b.highPowerSeconds = 45;
   a.randomEvent();
   b.randomEvent();
   assert.equal(a.machine('engines').fault, null);
@@ -183,7 +184,16 @@ test('forecastle and aft flights start at the actual deck edge, without invalid 
     )!;
     const b = new T.Box3().setFromObject(bulkhead);
     assert.ok(b.min.y <= LEVEL_Y[2] * H);
-    assert.ok(Math.abs(b.max.y) < 1e-6);
+    const fascia = g.children.find(
+      (o) => o.name === 'boat-deck-end-fascia' && Math.sign(o.position.z) === side,
+    )!;
+    const cap = new T.Box3().setFromObject(fascia);
+    assert.ok(Math.abs(b.max.y - cap.min.y) < 1e-6, 'fascia meets the bulkhead');
+    assert.ok(Math.abs(cap.max.y) < 1e-6, 'fascia meets the deck');
+    assert.ok(
+      side < 0 ? cap.max.z <= boundary * L + 1e-6 : cap.min.z >= boundary * L - 1e-6,
+      'fascia and plank surface have no overlapping top faces',
+    );
   }
 });
 

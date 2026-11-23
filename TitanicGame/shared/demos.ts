@@ -42,10 +42,10 @@ export const JOB_DEMOS = [
     id: 'boilers',
     title: 'Boiler crew',
     role: 'Boiler Operator',
-    station: 'boiler-a',
+    station: 'firing-tools',
     live: false,
     detail: 'Stokehold · uneven firebeds and obstructed airflow',
-    objective: 'Restore an even, clean fire and hold 190–215 psi.',
+    objective: 'Restore boiler 1: clean its grates, level its fires and hold 190–215 psi.',
   },
   {
     id: 'engineer',
@@ -55,6 +55,16 @@ export const JOB_DEMOS = [
     live: false,
     detail: 'Engine stand · a fault and a waiting order',
     objective: 'Repair the engines, then execute the 25-knot order.',
+  },
+  {
+    id: 'auxiliary',
+    title: 'Auxiliary machinery',
+    role: 'Auxiliary Engineer',
+    station: 'feed-pump-1',
+    live: false,
+    detail: 'Low boiler water · obstructed feed pump · weak electrical supply',
+    objective:
+      'Start the standby feed pump, stop No. 1 and clean its strainer. Restore 45–80% boiler water and 90–100 V; use the spare dynamo aft.',
   },
   {
     id: 'wireless',

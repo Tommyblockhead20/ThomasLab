@@ -34,7 +34,12 @@ export function tendFire(
     b.coal = clamp(b.coal - (trained ? 0.14 : 0.08));
     b.ash = clamp(b.ash + 0.04);
     ship.fireHeat[bank] *= 0.93;
-    setBeds(ship, bank, beds.map(b => b.coal), beds.map(b => b.ash));
+    setBeds(
+      ship,
+      bank,
+      beds.map((b) => b.coal),
+      beds.map((b) => b.ash),
+    );
     return;
   }
   if (tool === 'coal') {

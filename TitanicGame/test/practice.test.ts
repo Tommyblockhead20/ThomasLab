@@ -43,17 +43,18 @@ test('paused solo mode still accepts movement, repeated interactions and timed s
   advance(r, 0.2);
   r.action(p.id, { station: 'wheel', verb: 'rudder', value: 0 });
   advance(r, 0.2);
-  r.action(p.id, { station: 'wheel', verb: 'sabotage' });
+  r.practiceAction(p.id, { verb: 'travel', value: 'steering' });
+  r.action(p.id, { station: 'steering', verb: 'sabotage' });
   advance(r, 8.1);
   assert.ok(r.machine('steering').fault);
   assert.equal(p.charges, 3);
-  r.action(p.id, { station: 'wheel', verb: 'repair' });
+  r.action(p.id, { station: 'steering', verb: 'repair' });
   advance(r, 9.1);
   assert.equal(r.machine('steering').fault, null);
   assert.equal(r.elapsed, 0);
   r.practiceAction(p.id, { verb: 'tools', value: false });
   advance(r, 0.2);
-  assert.throws(() => r.action(p.id, { station: 'wheel', verb: 'sabotage' }), /unavailable/);
+  assert.throws(() => r.action(p.id, { station: 'steering', verb: 'sabotage' }), /unavailable/);
 });
 
 test('single-player quick travel reaches every station in legal standing space and updates camera relocation', () => {

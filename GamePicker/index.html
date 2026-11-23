@@ -107,6 +107,44 @@ button:disabled{cursor:not-allowed;opacity:.5;transform:none!important;filter:no
 .custom-select-btn.selected{border-color:rgba(167,243,208,.55);background:rgba(16,185,129,.18);color:var(--good)}
 .custom-selection-note{grid-column:1/-1;padding:11px 12px;border:1px solid rgba(56,189,248,.24);border-radius:14px;background:rgba(56,189,248,.07);color:var(--muted);line-height:1.4}
 
+
+.header-join summary,.extra-filters summary{cursor:pointer;font-weight:850}
+.header-join[open] summary{margin-bottom:8px}
+.extra-filters{margin-top:12px;border-top:1px solid var(--line);padding-top:9px}
+.header-join summary:focus-visible,.extra-filters summary:focus-visible{outline:2px solid var(--accent2);outline-offset:3px}
+@media(max-width:980px){
+  header{padding:12px 12px 8px}
+  .header-layout{grid-template-columns:1fr;gap:8px}
+  .header-title{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;padding:0}
+  .header-title h1{margin:0;font-size:clamp(1.5rem,5.5vw,2.1rem)}
+  .header-title .home-link{padding:6px 8px;font-size:.73rem;border-radius:9px}
+  .header-join{padding:7px 10px;font-size:.8rem}
+  .header-join-row{grid-template-columns:minmax(0,1fr) auto}
+  .mode-tabs{padding:0 12px;margin-bottom:8px;gap:7px}
+  .mode-tabs button{padding:7px;font-size:.8rem;border-radius:11px}
+  main{padding:0 12px;gap:9px}
+  .sidebar{gap:8px;min-width:0}
+  .pad,.results{padding:10px}
+  .picker-filters h2{font-size:.92rem;margin-bottom:6px}
+  .picker-filters>.section-title,.picker-filters>.slider-labels{display:none}
+  .picker-filters>.range-wrap{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .picker-filters>.range-wrap:focus-within{position:static;width:auto;height:auto;clip-path:none}
+  .picker-filters .type-toggle-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .picker-filters .setting-toggle-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .picker-filters .toggle-button{padding:5px 3px;min-height:32px;font-size:.76rem}
+  .picker-filters>.quick-picks{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .picker-filters .quick-picks button{min-height:29px;padding:3px;font-size:.76rem}
+  .picker-filters label[for="playerCount"]{font-weight:750;margin:7px 0 4px}
+  .picker-filters .picker-search-label{margin:7px 0 4px}
+  .picker-filters .field{padding:5px 8px;border-radius:8px}
+  .extra-filters{margin-top:7px;padding-top:6px;font-size:.8rem}
+  #basicSettings{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:5px 7px;align-items:center}
+  #basicSettings h2{display:none}
+  #basicSettings label,#basicSettings .btn{margin:0}
+  #basicSettings .btn,#basicSettings select{padding:6px;font-size:.76rem}
+  #pickForMeResult{grid-column:1/-1;margin-top:2px}
+  .results .grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,265px),1fr))}
+}
 </style>
 <script src="../achievements.js"></script>
 </head>
@@ -115,11 +153,11 @@ button:disabled{cursor:not-allowed;opacity:.5;transform:none!important;filter:no
 <header>
   <div class="header-layout">
     <div class="header-title">
-      <a class="home-link" href="../" aria-label="Return to Thomas Lab home">⌂ Home</a>
+      <a class="home-link" href="../">← ThomasLab Home</a>
       <h1>Game Picker</h1>
     </div>
-    <section id="joinOnlineSection" class="card header-join" aria-label="Join an online room">
-      <h2>Join an online room</h2>
+    <details id="joinOnlineSection" class="card header-join" open>
+      <summary>Join an online room</summary>
       <div class="header-join-row">
         <div>
           <label for="joinRoomPassword">Room code</label>
@@ -127,7 +165,7 @@ button:disabled{cursor:not-allowed;opacity:.5;transform:none!important;filter:no
         </div>
         <button id="joinRoomButton" class="btn secondary" type="button">Join</button>
       </div>
-    </section>
+    </details>
   </div>
 </header>
 
@@ -138,7 +176,7 @@ button:disabled{cursor:not-allowed;opacity:.5;transform:none!important;filter:no
 
 <main id="setupMain">
   <aside class="sidebar">
-    <section class="card pad">
+    <section class="card pad picker-filters" aria-label="Game filters">
       <h2>Game Filters</h2>
 
       <div class="section-title">Type</div>
@@ -175,55 +213,58 @@ button:disabled{cursor:not-allowed;opacity:.5;transform:none!important;filter:no
       </div>
       <div id="playerQuickPicks" class="quick-picks"></div>
 
-      <div class="section-title">Vibe</div>
-      <label for="lengthChoice">Desired length</label>
-      <select id="lengthChoice" class="field">
-        <option value="any" selected>Any length</option>
-        <option value="veryQuick">Very quick · 15 min or less</option>
-        <option value="quick">Quick · 20–30 min</option>
-        <option value="moderate">Moderate · 45–60 min</option>
-        <option value="long">Long · 90–120 min</option>
-        <option value="veryLong">Very long · 180+ min</option>
-      </select>
+      <label for="search" class="picker-search-label">Search title</label>
+      <input id="search" class="field" type="search" placeholder="Root, PARKS, Werewords…">
 
-      <label for="weightChoice">Desired weight</label>
-      <select id="weightChoice" class="field">
-        <option value="any" selected>Any weight</option>
-        <option value="1">Simple</option>
-        <option value="2">Simple–moderate</option>
-        <option value="3">Moderate</option>
-        <option value="4">Moderate–complex</option>
-        <option value="5">Complex</option>
-      </select>
+      <details id="extraFilters" class="extra-filters" open>
+        <summary>More filters</summary>
+        <div class="section-title">Vibe</div>
+        <label for="lengthChoice">Desired length</label>
+        <select id="lengthChoice" class="field">
+          <option value="any" selected>Any length</option>
+          <option value="veryQuick">Very quick · 15 min or less</option>
+          <option value="quick">Quick · 20–30 min</option>
+          <option value="moderate">Moderate · 45–60 min</option>
+          <option value="long">Long · 90–120 min</option>
+          <option value="veryLong">Very long · 180+ min</option>
+        </select>
 
-      <label for="childAge">Is a child playing?</label>
-      <select id="childAge" class="field">
-        <option value="none" selected>No</option>
-        <option value="adult">No, and prioritize adult games</option>
-        <option value="teen">Yes, age 15–17</option>
-        <option value="youngTeen">Yes, age 11–14</option>
-        <option value="kid">Yes, age 8–10</option>
-        <option value="youngKid">Yes, age 6–7</option>
-        <option value="under6">Yes, under age 6</option>
-      </select>
+        <label for="weightChoice">Desired weight</label>
+        <select id="weightChoice" class="field">
+          <option value="any" selected>Any weight</option>
+          <option value="1">Simple</option>
+          <option value="2">Simple–moderate</option>
+          <option value="3">Moderate</option>
+          <option value="4">Moderate–complex</option>
+          <option value="5">Complex</option>
+        </select>
 
-      <div class="section-title">Table preferences</div>
-      <label>Who is playing</label>
-      <div class="toggle-grid player-toggle-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
-        <button id="thomasPlayingToggle" class="toggle-button active" type="button" aria-pressed="true">Thomas</button>
-        <button id="alexisPlayingToggle" class="toggle-button active" type="button" aria-pressed="true">Alexis</button>
-        <button id="othersPlayingToggle" class="toggle-button active" type="button" aria-pressed="true">Others</button>
-      </div>
+        <label for="childAge">Is a child playing?</label>
+        <select id="childAge" class="field">
+          <option value="none" selected>No</option>
+          <option value="adult">No, and prioritize adult games</option>
+          <option value="teen">Yes, age 15–17</option>
+          <option value="youngTeen">Yes, age 11–14</option>
+          <option value="kid">Yes, age 8–10</option>
+          <option value="youngKid">Yes, age 6–7</option>
+          <option value="under6">Yes, under age 6</option>
+        </select>
 
-      <div class="toggle-grid" style="margin-top:8px">
-        <button id="newGamesToggle" class="toggle-button active" type="button" aria-pressed="true">Include new games</button>
-        <button id="costModeToggle" class="toggle-button active" type="button" aria-pressed="true">Include paid games</button>
-        <button id="includeCampaignsToggle" class="toggle-button active" type="button" aria-pressed="true">Include campaign games</button>
-        <button id="mergeCompatibleToggle" class="toggle-button active" type="button" aria-pressed="true">Merge compatible games</button>
-      </div>
+        <div class="section-title">Table preferences</div>
+        <label>Who is playing</label>
+        <div class="toggle-grid player-toggle-grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+          <button id="thomasPlayingToggle" class="toggle-button active" type="button" aria-pressed="true">Thomas</button>
+          <button id="alexisPlayingToggle" class="toggle-button active" type="button" aria-pressed="true">Alexis</button>
+          <button id="othersPlayingToggle" class="toggle-button active" type="button" aria-pressed="true">Others</button>
+        </div>
 
-      <label for="search">Search title</label>
-      <input id="search" class="field" placeholder="Root, PARKS, Werewords…">
+        <div class="toggle-grid" style="margin-top:8px">
+          <button id="newGamesToggle" class="toggle-button active" type="button" aria-pressed="true">Include new games</button>
+          <button id="costModeToggle" class="toggle-button active" type="button" aria-pressed="true">Include paid games</button>
+          <button id="includeCampaignsToggle" class="toggle-button active" type="button" aria-pressed="true">Include campaign games</button>
+          <button id="mergeCompatibleToggle" class="toggle-button active" type="button" aria-pressed="true">Merge compatible games</button>
+        </div>
+      </details>
     </section>
 
     <section id="basicSettings" class="card pad">
@@ -3381,9 +3422,18 @@ updateRoomModeUI();
 initializeFirebase();
 setMode('basic');
 
+const compactPicker = window.matchMedia('(max-width: 980px)');
+function fitPickerDisclosures() {
+  $('joinOnlineSection').open = !compactPicker.matches || Boolean($('joinRoomPassword').value);
+  $('extraFilters').open = !compactPicker.matches;
+}
+fitPickerDisclosures();
+compactPicker.addEventListener('change', fitPickerDisclosures);
+
 const params = new URLSearchParams(location.search);
 if (params.get('room')) {
   const linkedPassword = sanitizePassword(params.get('room'));
+  $('joinOnlineSection').open = true;
   $('joinRoomPassword').value = linkedPassword;
   setMode('veto');
   openRoom(linkedPassword);

@@ -1,12 +1,19 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState, useEffect } from 'react';
 import type { Action, ChartMark, Snapshot, Telegram } from '../shared/types';
 import { BALANCE } from '../shared/config';
-import { METRES_PER_NM as NM, nm, chartPosition } from '../shared/units';
-import { projectCourse } from '../shared/voyage';
+import {
+  METRES_PER_NM as NM,
+  nm,
+  chartPosition,
+  chartCoordinates,
+  coordinate,
+  metresFromCoordinates,
+} from '../shared/units';
+import { projectTrack } from '../shared/voyage';
 import { watchTime } from '../shared/radio';
 
 type Point = { west: number; north: number };
-type Tool = ChartMark['kind'] | 'pan' | 'move';
+type Tool = ChartMark['kind'] | 'view' | 'move';
 export function NavigationChart({
   state,
   reports = state.delivered,
@@ -16,28 +23,48 @@ export function NavigationChart({
   reports?: Telegram[];
   act?: (a: Action) => Promise<void>;
 }) {
-  const [width, setWidth] = useState(25 / 6),
-    [center, setCenter] = useState<Point>({ west: state.ship.west + NM, north: 0 }),
-    [tool, setTool] = useState<Tool>('ice'),
+  const [tool, setTool] = useState<Tool>('view'),
     [draft, setDraft] = useState<Point[]>([]),
     [label, setLabel] = useState(''),
     [source, setSource] = useState('Lookout'),
     [confidence, setConfidence] = useState<ChartMark['confidence']>('medium'),
     [selected, setSelected] = useState(''),
     [cursor, setCursor] = useState<Point | null>(null),
-    [entry, setEntry] = useState({ west: '', north: '' }),
+    [entry, setEntry] = useState({ lat: '', lon: '' }),
     [error, setError] = useState('');
+  const fixes = useRef<{ west: number; north: number; at: number }[]>([]);
+  const [trackCourse, setTrackCourse] = useState<number | null>(null);
+  useEffect(() => {
+    const at = state.elapsed,
+      history = fixes.current;
+    if (history.length && at < history[history.length - 1].at) {
+      history.length = 0;
+      setTrackCourse(null);
+    }
+    if (!history.length || at - history[history.length - 1].at >= 1)
+      history.push({ west: state.ship.west, north: state.ship.north, at });
+    while (history.length > 1 && at - history[0].at > 30) history.shift();
+    const old = history[0],
+      dw = state.ship.west - old.west,
+      dn = state.ship.north - old.north;
+    setTrackCourse(
+      at - old.at >= 15 && Math.hypot(dw, dn) > 100
+        ? (270 + (Math.atan2(dn, dw) * 180) / Math.PI + 360) % 360
+        : null,
+    );
+  }, [state.elapsed, state.ship.west, state.ship.north]);
   const drawing = useRef(false),
     origin = useRef<Point | null>(null),
     id = useId().replace(/:/g, ''),
-    scale = 540 / (width * NM);
-  const x = (p: Point) => 300 - (p.west - center.west) * scale,
-    y = (p: Point) => 140 - (p.north - center.north) * scale;
+    finishWest = state.finishWest,
+    scale = 540 / finishWest;
+  const x = (p: Point) => 570 - p.west * scale,
+    y = (p: Point) => 140 - p.north * scale;
   const at = (e: React.PointerEvent<SVGSVGElement>): Point => {
     const b = e.currentTarget.getBoundingClientRect();
     return {
-      west: center.west - (((e.clientX - b.left) * 600) / b.width - 300) / scale,
-      north: center.north - (((e.clientY - b.top) * 280) / b.height - 140) / scale,
+      west: (570 - Math.max(30, Math.min(570, ((e.clientX - b.left) * 600) / b.width))) / scale,
+      north: (140 - Math.max(25, Math.min(255, ((e.clientY - b.top) * 280) / b.height))) / scale,
     };
   };
   const send = async (verb: string, value?: unknown) => {
@@ -55,12 +82,7 @@ export function NavigationChart({
     drawing.current = false;
     const p = at(e),
       start = origin.current!;
-    if (tool === 'pan') {
-      setCenter((c) => ({
-        west: c.west + start.west - p.west,
-        north: c.north + start.north - p.north,
-      }));
-    } else if (act) {
+    if (act && tool !== 'view') {
       if (tool === 'move') {
         const m = state.chartMarks.find((m) => m.id === selected);
         if (m)
@@ -81,44 +103,41 @@ export function NavigationChart({
       points.map((p, i) => `${i ? 'L' : 'M'}${x(p)},${y(p)}`).join(' '),
     marks = state.chartMarks ?? [],
     ship = state.ship,
-    future = [ship, ...Array.from({ length: 7 }, (_, i) => projectCourse(ship, (i + 1) * 8))],
-    step = width <= 1 ? 0.1 : width <= 2 ? 0.25 : 0.5,
-    grid = Array.from({ length: 81 }, (_, i) => (i - 40) * step * NM);
+    future = useMemo(
+      () => projectTrack({ ...ship, heading: ship.indicatedHeading }),
+      [
+        ship.west,
+        ship.north,
+        ship.indicatedHeading,
+        ship.speed,
+        ship.rudder,
+        ship.rudderTarget,
+        ship.throttle,
+        ship.steam,
+        ship.yawRate,
+      ],
+    ),
+    westGrid = Array.from({ length: 6 }, (_, i) => (finishWest * i) / 5),
+    northGrid = [-96, -48, 0, 48, 96].map((pixels) => pixels / scale);
   return (
     <div className="navigation-chart chart-v9">
       <div className="chart-range">
         <span>{chartPosition(ship.west, ship.north)}</span>
-        <label>
-          Width{' '}
-          <select
-            aria-label="Chart width"
-            value={width}
-            onChange={(e) => setWidth(Number(e.target.value))}
-          >
-            {[0.5, 1, 2, 25 / 6, 8].map((n) => (
-              <option key={n} value={n}>
-                {n.toFixed(n === 25 / 6 ? 2 : 1)} NM
-              </option>
-            ))}
-          </select>
-        </label>
-        <button onClick={() => setCenter({ west: ship.west + NM, north: ship.north })}>
-          Find ship
-        </button>
+        <span>{nm(finishWest)} · Start to finish</span>
       </div>
       {act && (
         <div className="chart-tools" aria-label="Chart tools">
-          {(['ice', 'area', 'bearing', 'route', 'pan'] as Tool[]).map((t) => (
+          {(['view', 'ice', 'route'] as Tool[]).map((t) => (
             <button key={t} className={tool === t ? 'selected' : ''} onClick={() => setTool(t)}>
               {t === 'ice'
-                ? 'Ice point'
+                ? 'Mark ice'
                 : t === 'area'
                   ? 'Uncertain area'
                   : t === 'bearing'
                     ? 'Bearing line'
                     : t === 'route'
-                      ? 'Course line'
-                      : 'Pan'}
+                      ? 'Draw course'
+                      : 'View'}
             </button>
           ))}
         </div>
@@ -126,10 +145,11 @@ export function NavigationChart({
       <svg
         viewBox="0 0 600 280"
         role="img"
-        aria-label="Crew chart with estimated ice positions, bearings and course lines"
-        style={{ touchAction: 'none', cursor: tool === 'pan' ? 'grab' : 'crosshair' }}
+        aria-label="Shipmates’ chart with estimated ice positions and course lines"
+        style={{ touchAction: 'none', cursor: tool === 'view' ? 'default' : 'crosshair' }}
         onPointerDown={(e) => {
-          if (!act && tool !== 'pan') return;
+          if (!act || tool === 'view') return;
+          if (tool !== 'move') setSelected('');
           e.currentTarget.setPointerCapture(e.pointerId);
           drawing.current = true;
           origin.current = at(e);
@@ -161,11 +181,21 @@ export function NavigationChart({
             fill="#879478"
             opacity=".18"
           />
-          {grid.map((v, i) => (
-            <g key={i} stroke="#8c9279" strokeWidth=".45">
-              <path d={`M${x({ west: v, north: 0 })} 25V255`} />
-              <path d={`M30 ${y({ west: 0, north: v })}H570`} />
-            </g>
+          {westGrid.map((v) => (
+            <path
+              key={'w' + v}
+              d={`M${x({ west: v, north: 0 })} 25V255`}
+              stroke="#8c9279"
+              strokeWidth=".45"
+            />
+          ))}
+          {northGrid.map((v) => (
+            <path
+              key={'n' + v}
+              d={`M30 ${y({ west: 0, north: v })}H570`}
+              stroke="#8c9279"
+              strokeWidth=".45"
+            />
           ))}
           {[0, BALANCE.corridorHalfWidth, -BALANCE.corridorHalfWidth].map((n) => (
             <path
@@ -209,7 +239,7 @@ export function NavigationChart({
                 fill="#673f2e"
                 stroke="none"
               >
-                {m.label || m.source} · {watchTime(m.at)}
+                {selected === m.id ? `${m.label || m.source} · ${watchTime(m.at)}` : m.label}
               </text>
             </g>
           ))}
@@ -222,7 +252,7 @@ export function NavigationChart({
           />
           <path
             d="M0 -10L-5 8L0 4L5 8Z"
-            transform={`translate(${x(ship)} ${y(ship)}) rotate(${ship.heading})`}
+            transform={`translate(${Math.max(38, Math.min(562, x(ship)))} ${y(ship)}) rotate(${ship.indicatedHeading})`}
             fill="#953f2b"
           />
           {draft.length > 0 && tool === 'area' && (
@@ -247,26 +277,36 @@ export function NavigationChart({
           <text x="30" y="15">
             N ↑ · CREW ESTIMATES
           </text>
-          <text x="370" y="15">
-            {step} NM GRID · W ←
+          <text x="30" y="245">
+            FINISH
           </text>
-          {grid
-            .filter((v) => x({ west: v, north: 0 }) > 40 && x({ west: v, north: 0 }) < 550)
-            .map((v) => (
-              <text key={v} x={x({ west: v, north: 0 })} y="273" textAnchor="middle">
-                {(v / NM).toFixed(1)} W
-              </text>
-            ))}
-          {grid
+          <text x="570" y="245" textAnchor="end">
+            START
+          </text>
+          {westGrid.map((v) => (
+            <text
+              key={v}
+              x={Math.max(33, Math.min(567, x({ west: v, north: 0 })))}
+              y="273"
+              textAnchor="middle"
+            >
+              {coordinate(chartCoordinates(v, 0).lon, false)}
+            </text>
+          ))}
+          {northGrid
             .filter((v) => y({ west: 0, north: v }) > 40 && y({ west: 0, north: v }) < 240)
             .map((v) => (
               <text key={v} x="33" y={y({ west: 0, north: v }) - 3}>
-                {(v / NM).toFixed(1)} N
+                {coordinate(chartCoordinates(0, v).lat, true)}
               </text>
             ))}
         </g>
       </svg>
       <div className="chart-readings">
+        <span>
+          Track between fixes{' '}
+          <b>{trackCourse === null ? 'Collecting fixes…' : `${trackCourse.toFixed(0)}°`}</b>
+        </span>
         <span>
           Heading <b>{ship.indicatedHeading.toFixed(0)}°</b>
         </span>
@@ -276,88 +316,105 @@ export function NavigationChart({
             {nm(ship.north)} {ship.north >= 0 ? 'N' : 'S'}
           </b>
         </span>
-        <span>
-          {cursor ? chartPosition(cursor.west, cursor.north) : '4.17 NM = 10 min at 25 kn'}
-        </span>
+        <span>{cursor ? chartPosition(cursor.west, cursor.north) : ''}</span>
       </div>
       {act && (
         <>
-          <div className="chart-estimate-fields">
-            <label>
-              Label
-              <input
-                aria-label="Mark label"
-                maxLength={60}
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              />
-            </label>
-            <label>
-              Source
-              <select
-                aria-label="Mark source"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-              >
-                {['Lookout', 'Wireless', 'Bridge', 'Own estimate'].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Confidence
-              <select
-                aria-label="Mark confidence"
-                value={confidence}
-                onChange={(e) => setConfidence(e.target.value as ChartMark['confidence'])}
-              >
-                {['low', 'medium', 'high'].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <details>
-            <summary>Plot by grid coordinates</summary>
-            <div className="chart-coordinate-entry">
-              <label>
-                West NM
-                <input
-                  aria-label="West nautical miles"
-                  type="number"
-                  step="0.01"
-                  value={entry.west}
-                  onChange={(e) => setEntry({ ...entry, west: e.target.value })}
-                />
-              </label>
-              <label>
-                North NM
-                <input
-                  aria-label="North nautical miles"
-                  type="number"
-                  step="0.01"
-                  value={entry.north}
-                  onChange={(e) => setEntry({ ...entry, north: e.target.value })}
-                />
-              </label>
+          <details className="chart-details">
+            <summary>Plot details</summary>
+            <div className="chart-tools">
+              <button className={tool === 'area' ? 'selected' : ''} onClick={() => setTool('area')}>
+                Mark area
+              </button>
               <button
-                disabled={!entry.west || !entry.north}
-                onClick={() =>
-                  void send('mark', {
-                    kind: 'ice',
-                    points: [{ west: Number(entry.west) * NM, north: Number(entry.north) * NM }],
-                    radius: 0,
-                    label,
-                    source,
-                    confidence,
-                  })
-                }
+                className={tool === 'bearing' ? 'selected' : ''}
+                onClick={() => setTool('bearing')}
               >
-                Place estimate
+                Draw bearing
               </button>
             </div>
+            <div className="chart-estimate-fields">
+              <label>
+                Label
+                <input
+                  aria-label="Mark label"
+                  maxLength={60}
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                />
+              </label>
+              <label>
+                Source
+                <select
+                  aria-label="Mark source"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                >
+                  {['Lookout', 'Wireless', 'Bridge', 'Own estimate'].map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Confidence
+                <select
+                  aria-label="Mark confidence"
+                  value={confidence}
+                  onChange={(e) => setConfidence(e.target.value as ChartMark['confidence'])}
+                >
+                  {['low', 'medium', 'high'].map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <details>
+              <summary>Plot by latitude and longitude</summary>
+              <div className="chart-coordinate-entry">
+                <label>
+                  Longitude (decimal degrees)
+                  <input
+                    aria-label="Longitude"
+                    type="number"
+                    step="0.0001"
+                    value={entry.lon}
+                    onChange={(e) => setEntry({ ...entry, lon: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Latitude (decimal degrees)
+                  <input
+                    aria-label="Latitude"
+                    type="number"
+                    step="0.0001"
+                    value={entry.lat}
+                    onChange={(e) => setEntry({ ...entry, lat: e.target.value })}
+                  />
+                </label>
+                <button
+                  disabled={
+                    !entry.lon ||
+                    !entry.lat ||
+                    Math.abs(Number(entry.lat)) > 90 ||
+                    Math.abs(Number(entry.lon)) > 180
+                  }
+                  onClick={() =>
+                    void send('mark', {
+                      kind: 'ice',
+                      points: [metresFromCoordinates(Number(entry.lat), Number(entry.lon))],
+                      radius: 0,
+                      label,
+                      source,
+                      confidence,
+                    })
+                  }
+                >
+                  Place estimate
+                </button>
+              </div>
+            </details>
           </details>
-          {marks.length > 0 && (
+          {selected && marks.length > 0 && (
             <div className="chart-mark-list">
               <select
                 aria-label="Selected chart mark"
@@ -372,7 +429,7 @@ export function NavigationChart({
                 ))}
               </select>
               <button disabled={!selected} onClick={() => setTool('move')}>
-                Move · click new position
+                {tool === 'move' ? 'Click new position' : 'Move mark'}
               </button>
               <button
                 disabled={!selected}
@@ -386,17 +443,14 @@ export function NavigationChart({
               </button>
             </div>
           )}
-          <small>
-            {tool === 'move'
-              ? 'Click a new position for the selected mark.'
-              : 'Click an ice point; drag an area or line. Marks are shared crew estimates.'}
-          </small>
         </>
       )}
       {error && <p className="error">{error}</p>}
       {reports.some((t) => t.report) && (
-        <details>
-          <summary>Reported positions</summary>
+        <details open className="chart-reports">
+          <summary>
+            Wireless reports · {reports.filter((t) => t.decoded && t.report).length}
+          </summary>
           <div className="notes-list">
             {reports
               .filter((t) => t.decoded && t.report)

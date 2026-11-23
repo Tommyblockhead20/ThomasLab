@@ -113,8 +113,9 @@ export function buildRailing(
     posts = new Set();
     railPosts.set(parent, posts);
   }
-  const length = Math.hypot(x2 - x1, z2 - z1),
-    count = Math.ceil(length / 2.4);
+  const length = Math.hypot(x2 - x1, z2 - z1);
+  if (length < 0.0001) return;
+  const count = Math.ceil(length / 2.4);
   for (let i = 0; i <= count; i++) {
     const t = i / count,
       x = x1 + (x2 - x1) * t,
@@ -128,7 +129,10 @@ export function buildRailing(
     parent.add(post);
   }
   for (const height of [0.36, 0.72, 1.1]) {
-    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, length, 8), material);
+    const rail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.026, 0.026, length, 8, 1, true),
+      material,
+    );
     rail.name = 'railing-bar';
     rail.position.set((x1 + x2) / 2, y + height, (z1 + z2) / 2);
     rail.quaternion.setFromUnitVectors(

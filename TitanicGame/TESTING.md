@@ -152,3 +152,35 @@ V10 delivery: all 113 tests and the controlled-evasion balance check pass. Brows
 `test/v11.test.ts` verifies separate shell pressure, header coupling and isolation, automatic safety relief, self-closing manual easing, main-valve effect on supply and revolutions, physical tool/load requirements, actual clinker removal, live bridge-order execution, rear-face reach validation, Standard/Experienced lead ranges, and ray targets on all four boilers. `tools/v11-audit.ts` measures real first contact over 20 seeds at 20 and 25 kn and compares speed changes through an identical forward turning distance. Existing firing, collision, voice, campaign and balance tests still apply.
 
 In Boiler crew demo, use E on a door rather than opening a flat panel. Aim at the three tools to select them; fill the shovel at a basket, fire, then close the door. Slice visible clinker until it disappears, and rake the separate ashpan. Adjust the physical air lever with E/Shift E. Compare local gauges, close one boiler's steam stop wheel, and briefly ease its safety valve. Use B for the guide and optional accessible controls. At the engine demo, repair the fault and use Execute bridge order: applied setting changes to 25, revolutions rise before the hull reaches that speed. Verify Stop eventually halts pistons even while the ship coasts.
+
+## V12 validation
+
+`test/v12.test.ts` checks maintenance times, persistent inspection and invalidation, protected equipment views and heartbeat expiry, shared tool ownership/return/disconnect, usable large bunkers, door-open heat loss and drawing fires, progressive steam leaks, equivalent chart trajectories, and all 748 detail instances across 50 batches including sinking transforms. The network suite covers shared tools and authorized equipment views through real Socket.IO clients. Existing station/path, physics, campaign, inquiry and voice tests continue to apply.
+
+Browser review: inspect the navigation demo, plot the filed report, select/edit its mark and open Plot details; check a captain's course order and read-back; inspect healthy equipment and confirm the button becomes Operational; confirm Service/Repair share one button and the valve has no pressure readout. In the boiler demo take/return tools at the shared rack, load from a large bunker, and work boiler 1. Press T at the main valve in solo fault-testing mode, then compare local/header gauges as the leak develops.
+
+
+## V13 machinery acceptance
+
+`test/v13.test.ts` covers role order, stable cruise intervals, high-power feed demand, gradual pump symptoms and standby recovery, under/overfeeding, strainer lockout and skill times, condenser/engine coupling, steam pumps during an electrical outage, wireless reserve depletion/recharge, dynamo backup and feeder isolation, bearing heat recovery, remote steering sabotage/changeover, proximity/validation, multiplayer engine orders, all 20 physical control ray targets and legal approaches, and aft ladder headroom through actual deck/ceiling holes. Existing demo, world reachability and navigation tests include the new rooms and assignments.
+
+In the Auxiliary demo, start No. 2 feed pump, stop No. 1 and clean its basket. Increase each boiler feed wheel to raise water above 45%, then start Dynamo No. 2. Confirm that output takes time to recover and the first set remains faulty. Try the same controls by aiming and pressing E/Shift E and through the local board. Walk through both bulkhead doors, climb the aft ladder, telephone the bridge and test the spare steering engine. Isolating lighting must dim the ship while leaving some emergency illumination. Wireless battery should temporarily preserve communications after its feeder is isolated. Check that Esc continues toggling reliably.
+
+
+## V14 graphics and performance acceptance
+
+`test/v14.test.ts` checks preserved triangle counts, UVs, bounds and mirrored winding after batching; dynamic controls and physical picking after batching; nearby picking roots; lazy, repeat-safe broken hull copies and cleanup; mounted lamp hardware; backed and supported machinery instruments; clear promenades; reused book materials; and labels touching actual supporting faces. The existing four-boiler control, staircase/headroom, collision, sinking and multiplayer tests remain required.
+
+Visually inspect bridge, wireless, A Deck stairs/corridor/lounge, boiler fronts and rear aisle, feedwater, condensers, engines, dynamos, aft ladder/steering, crow's nest and lifeboat supports. Test E on physical controls after batching. Observe a sinking through breakup, then restart to check that the next ship renders intact and old broken geometry is released. Use the same quality level, camera position and viewport when comparing `?graphics-audit=1` counters. A lower draw count alone is not an FPS benchmark.
+
+
+## V15 doorways and structural joins
+
+`test/v15.test.ts` sweeps the player collider across all 15 top-deck doorways in three lanes, checks the continuous wireless passage and lower machinery/steering door approaches, and verifies relocated desks, demo standing positions and role spawns. It checks joined surfaces for duplicate coplanar patches across the assembled architecture, preserves ray-hit silhouettes, normals and UVs in reflected groups, preserves roof and funnel openings, and checks books against actual shelves. `npx tsx tools/geometry-audit.ts --join` reports the remaining overlapping axis-aligned exterior box faces in the assembled architecture; omit `--join` to inspect raw authoring solids. These checks cover the named architecture, not all curved scenery or every possible visual artifact.
+
+Browser review: start Wireless, turn left and walk through the forward doorway; approach both desks and the relocated handset. Check the rear passage to the apparatus room, both bridge rear doors, forecastle stairs and top landing, and A Deck shelves. Check that joining has not sealed a doorway, removed a stair tread or changed an equipment target. Network report tests now explicitly carry the decoded slip from the desk to the handset before relaying it.
+
+
+## V16 watch balance acceptance
+
+`test/v16.test.ts` covers sustained machinery-specific risk and care, local/shared feedwater state, smaller-crew firing rates, gradual compass drift/recovery, mixed addressed traffic and metadata privacy, referenced clarification, and report-only relevance/ETA. Existing machinery, navigation, multiplayer, voice and geometry tests remain required. In Wireless, transcribe a report, compare its area on the chart and request clarification. In Boiler, change feed and check the local glass and auxiliary control agree. With a compass fault, compare indicated heading with track between fixes; the arrow and lookout bearing must not expose true heading directly.

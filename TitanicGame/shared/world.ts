@@ -1,4 +1,5 @@
-import { BRIDGE } from './layout';
+import { AUXILIARY_STATIONS } from './auxiliary-layout';
+import { BRIDGE, WIRELESS } from './layout';
 import { FIRING_RACK, COAL_BUNKERS } from './stokehold';
 import {
   NEST,
@@ -23,6 +24,8 @@ import {
   PLAN_WALLS,
   BOILERS,
   passengerRoute,
+  passengerAscent,
+  portPassengerAscent,
   aftPassengerRoute,
   machineryRoute,
   foreRoute,
@@ -76,7 +79,6 @@ export const STATIONS: Station[] = [
     id: 'wheel',
     name: 'Ship’s wheel',
     kind: 'wheel',
-    machine: 'steering',
     ...BRIDGE.wheel,
     level: 0,
   },
@@ -102,8 +104,8 @@ export const STATIONS: Station[] = [
     name: 'Marconi receiver',
     kind: 'wireless',
     machine: 'wireless',
-    x: -2.6,
-    z: -8,
+    x: WIRELESS.receiver.x,
+    z: WIRELESS.receiver.z,
     level: 0,
   },
   { id: 'command', name: 'Captain’s order desk', kind: 'command', ...BRIDGE.command, level: 0 },
@@ -112,8 +114,8 @@ export const STATIONS: Station[] = [
     name: 'Marconi second desk',
     kind: 'wireless',
     machine: 'wireless',
-    x: -4.5,
-    z: -8.85,
+    x: WIRELESS.copy.x,
+    z: WIRELESS.copy.z,
     level: 0,
   },
   { id: 'cabinet', name: 'Binocular cabinet', kind: 'cabinet', x: 4.4, z: -10.2, level: 0 },
@@ -122,25 +124,32 @@ export const STATIONS: Station[] = [
     name: 'Ship telephone',
     kind: 'phone',
     phoneRoom: 'wireless',
-    x: -4.5,
-    z: -7.65,
+    ...WIRELESS.phone,
     level: 0,
   },
   { id: 'storage', name: 'Equipment locker', kind: 'storage', x: 0, z: -10, level: 0 },
   passage(
     'deck-passengers',
-    'Descend · A Deck',
+    'Descend · Grand Staircase',
     0,
-    { x: 0, z: -2.4, level: -2 },
+    { x: 1.42, z: -2.45, level: -2 },
     passengerRoute,
     3.6,
   ),
   passage(
     'passengers-deck',
-    'Climb · Boat Deck',
+    'Climb · Grand Staircase (starboard)',
     -2,
     { x: 0, z: -5.45, level: 0 },
-    [...passengerRoute].reverse(),
+    passengerAscent,
+    3.6,
+  ),
+  passage(
+    'passengers-deck-port',
+    'Climb · Grand Staircase (port)',
+    -2,
+    { x: 0, z: -5.45, level: 0 },
+    portPassengerAscent,
     3.6,
   ),
   passage(
@@ -224,18 +233,74 @@ export const STATIONS: Station[] = [
     name: 'Engine room telephone',
     kind: 'phone',
     phoneRoom: 'engine',
-    x: 7,
-    z: 5,
+    x: 7.8,
+    z: 14,
+    level: -1,
+  },
+  ...AUXILIARY_STATIONS,
+  {
+    id: 'auxiliary-phone',
+    name: 'Feedwater telephone',
+    kind: 'phone',
+    phoneRoom: 'auxiliary',
+    x: -7.8,
+    z: 8.4,
     level: -1,
   },
   {
+    id: 'dynamo-phone',
+    name: 'Dynamo room telephone',
+    kind: 'phone',
+    phoneRoom: 'dynamo',
+    x: 7.8,
+    z: 26.4,
+    level: -1,
+  },
+  {
+    id: 'steering-phone',
+    name: 'Steering telephone',
+    kind: 'phone',
+    phoneRoom: 'steering',
+    x: 2.5,
+    z: 28.2,
+    level: 2,
+  },
+  passage(
+    'engine-steering',
+    'Climb · aft steering compartment',
+    -1,
+    { x: -0.3, z: 27.9, level: 2 },
+    [
+      { x: -1.7, z: 27.9, y: -19 },
+      { x: -1.7, z: 28.35, y: -19 },
+      { x: -1.7, z: 28.35, y: -5.4 },
+      { x: -1.7, z: 27.9, y: -5.4 },
+      { x: -0.3, z: 27.9, y: -5.4 },
+    ],
+    8,
+  ),
+  passage(
+    'steering-engine',
+    'Descend · dynamo room',
+    2,
+    { x: -1.7, z: 27.9, level: -1 },
+    [
+      { x: -0.3, z: 27.9, y: -5.4 },
+      { x: -1.7, z: 27.9, y: -5.4 },
+      { x: -1.7, z: 28.35, y: -5.4 },
+      { x: -1.7, z: 28.35, y: -19 },
+      { x: -1.7, z: 27.9, y: -19 },
+    ],
+    8,
+  ),
+  {
     id: 'steering',
-    name: 'Steering linkage',
+    name: 'Steering engines',
     kind: 'machine',
     machine: 'steering',
-    x: 6,
-    z: 25,
-    level: -1,
+    x: 1.2,
+    z: 29.7 + 1.3 / L,
+    level: 2,
   },
   {
     id: 'valve',
@@ -264,7 +329,7 @@ export const STATIONS: Station[] = [
     level: -1 as Level,
   })),
   { ...FIRING_RACK, name: 'Firing tools', kind: 'firing' },
-  ...COAL_BUNKERS.map(b => ({ ...b, name: 'Coal bunker', kind: 'firing' as const })),
+  ...COAL_BUNKERS.map((b) => ({ ...b, kind: 'firing' as const })),
   {
     id: 'boiler-phone',
     name: 'Boiler room telephone',
@@ -276,6 +341,10 @@ export const STATIONS: Station[] = [
   },
   { id: 'passenger-lounge', name: 'A Deck lounge', kind: 'scenery', x: 0, z: 5, level: -2 },
 ];
+for (const id of ['passengers-deck', 'passengers-deck-port'])
+  STATIONS.find((s) => s.id === id)!.exitYaw = 0;
+STATIONS.find((s) => s.id === 'engine-steering')!.exitYaw = 2.8;
+STATIONS.find((s) => s.id === 'steering-engine')!.exitYaw = 0;
 for (const [index, z] of BOAT_POSITIONS.entries())
   for (const side of [-1, 1])
     STATIONS.push({
@@ -286,23 +355,41 @@ for (const [index, z] of BOAT_POSITIONS.entries())
       z,
       level: 0,
     });
-for (const station of STATIONS.filter((s) => s.kind === 'machine'))
-  WALLS.push({ x: station.x, z: station.z, w: 0.8, d: 0.55, level: station.level, prop: true });
+for (const station of STATIONS.filter((s) => s.kind === 'machine' && s.id !== 'steering'))
+  WALLS.push({
+    x: station.x,
+    z: station.z,
+    w: 0.8 / W,
+    d: 0.55 / L,
+    level: station.level,
+    prop: true,
+  });
 for (const s of STATIONS.filter((s) => s.kind === 'phone' && s.level !== 1))
-  WALLS.push({ x: s.x, z: s.z, w: 0.5, d: 0.35, level: s.level, prop: true });
+  WALLS.push({ x: s.x, z: s.z, w: 0.46 / W, d: 0.46 / L, level: s.level, prop: true });
 export const KEY_SPOTS: Position[] = [
   { x: 6, z: 7, level: 0 },
   { x: -6, z: -18, level: 0 },
   { x: 6, z: 22, level: 0 },
 ];
+export function onStairSide(p: Position, station: Station) {
+  if (station.id === 'passengers-deck') return p.x >= 0;
+  if (station.id === 'passengers-deck-port') return p.x < 0;
+  return true;
+}
 export function distance(a: Position, b: Position) {
   return a.level === b.level ? Math.hypot((a.x - b.x) * W, (a.z - b.z) * L) : Infinity;
 }
 export function roomAt(p: Position) {
   if (p.level === 1) return 'nest';
-  if (p.level === 2) return p.z < 0 ? 'forecastle' : 'poop';
+  if (p.level === 2)
+    return p.z < 0
+      ? 'forecastle'
+      : Math.abs(p.x) < 3 && p.z > 27.6 && p.z < 30.8
+        ? 'steering'
+        : 'poop';
   if (p.level === -2) return 'passengers';
-  if (p.level === -1) return p.z > 0 ? 'engine' : 'boiler';
+  if (p.level === -1)
+    return p.z > 21.7 ? 'dynamo' : p.z > 12.2 ? 'engine' : p.z > 0 ? 'auxiliary' : 'boiler';
   if (p.z < -16.3 && Math.abs(p.x) < 6.55) return p.x > 1 ? 'bridge' : 'chart';
   if (Math.abs(p.x) < 5.5 && p.z > -9.25 && p.z < -6.9) return 'wireless';
   if (Math.abs(p.x) < 5.5 && p.z > -16.3 && p.z < -9.25) return 'quarters';
@@ -313,6 +400,9 @@ export function areaName(p: Position) {
     {
       nest: 'Crow’s nest',
       engine: 'Engine room',
+      auxiliary: 'Feedwater & condensers',
+      dynamo: 'Dynamo room',
+      steering: 'Steering compartment',
       boiler: 'Boiler room',
       bridge: 'Captain’s bridge',
       chart: 'Officer’s wheelhouse',
@@ -329,12 +419,13 @@ export function spawnFor(role: string): Position {
   if (role.includes('Lookout')) return lookoutSpawn(role.includes('Second'));
   if (role.includes('Boiler'))
     return { x: role.includes('Second') ? 4.2 : -4.2, z: -8.8, level: -1 };
+  if (role === 'Auxiliary Engineer') return { x: -5.2, z: 4.5, level: -1 };
   if (role.includes('Engineer'))
     return { x: role.includes('Second') ? 5 : 0, z: role.includes('Second') ? 5 : 10, level: -1 };
   if (role.includes('Wireless'))
     return {
-      x: role.includes('Second') ? -4.5 : -2.6,
-      z: role.includes('Second') ? -8.55 : -7.3,
+      x: role.includes('Second') ? WIRELESS.copy.x + 1.25 / W : WIRELESS.receiver.x - 1.4 / W,
+      z: WIRELESS.receiver.z,
       level: 0,
     };
   if (role === 'Helmsman') return { x: BRIDGE.wheel.x, z: -19.5, level: 0 };

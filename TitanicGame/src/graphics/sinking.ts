@@ -69,8 +69,6 @@ export class SinkingSections {
     this.bow.scale.set(W, H, L);
     this.stern.scale.set(W, H, L);
     this.bow.visible = this.stern.visible = false;
-    source.updateMatrixWorld(true);
-    const inverse = source.matrixWorld.clone().invert();
     source.traverse((object) => {
       if (
         (object instanceof T.PointLight || object instanceof T.SpotLight) &&
@@ -78,48 +76,6 @@ export class SinkingSections {
         object.userData.bank === undefined
       )
         this.lights.set(object, object.intensity);
-      if (!(object instanceof T.Mesh)) return;
-      const matrix = inverse.clone().multiply(object.matrixWorld),
-        geometry: T.BufferGeometry = (object.geometry as T.BufferGeometry)
-          .clone()
-          .applyMatrix4(matrix);
-      if (matrix.determinant() < 0) {
-        if (geometry.index) {
-          const indices = geometry.index;
-          for (let i = 0; i < indices.count; i += 3) {
-            const a = indices.getX(i + 1);
-            indices.setX(i + 1, indices.getX(i + 2));
-            indices.setX(i + 2, a);
-          }
-        } else
-          for (const a of Object.values(geometry.attributes))
-            for (let i = 0; i < a.count; i += 3)
-              for (let c = 0; c < a.itemSize; c++) {
-                const values = a.array as Float32Array,
-                  tmp = values[(i + 1) * a.itemSize + c];
-                values[(i + 1) * a.itemSize + c] = values[(i + 2) * a.itemSize + c];
-                values[(i + 2) * a.itemSize + c] = tmp;
-              }
-      }
-      geometry.computeBoundingBox();
-      for (const stern of [false, true]) {
-        if (stern ? geometry.boundingBox!.max.z < BREAK_Z : geometry.boundingBox!.min.z > BREAK_Z)
-          continue;
-        const complete = stern
-          ? geometry.boundingBox!.min.z >= BREAK_Z
-          : geometry.boundingBox!.max.z <= BREAK_Z;
-        const piece = complete ? geometry.clone() : cutGeometry(geometry, stern);
-        if (!piece.getAttribute('position').count) {
-          piece.dispose();
-          continue;
-        }
-        const mesh = new T.Mesh(piece, object.material);
-        mesh.castShadow = object.castShadow;
-        mesh.receiveShadow = object.receiveShadow;
-        mesh.name = object.name;
-        (stern ? this.stern : this.bow).add(mesh);
-      }
-      geometry.dispose();
     });
     for (const group of [this.bow, this.stern]) {
       const side = group === this.stern ? 1 : -1;
@@ -159,9 +115,92 @@ export class SinkingSections {
     }
     scene.add(this.bow, this.stern, this.debris, this.foam);
   }
+  prepared = false;
+  prepare() {
+    if (this.prepared) return;
+    this.prepared = true;
+    const source = this.source;
+    source.updateMatrixWorld(true);
+    const inverse = source.matrixWorld.clone().invert();
+    const copyMesh = (object: T.Mesh, matrix: T.Matrix4) => {
+      const geometry = object.geometry.clone().applyMatrix4(matrix);
+      if (matrix.determinant() < 0) {
+        if (geometry.index) {
+          const indices = geometry.index;
+          for (let i = 0; i < indices.count; i += 3) {
+            const a = indices.getX(i + 1);
+            indices.setX(i + 1, indices.getX(i + 2));
+            indices.setX(i + 2, a);
+          }
+        } else
+          for (const a of Object.values(geometry.attributes))
+            for (let i = 0; i < a.count; i += 3)
+              for (let c = 0; c < a.itemSize; c++) {
+                const values = a.array as Float32Array,
+                  tmp = values[(i + 1) * a.itemSize + c];
+                values[(i + 1) * a.itemSize + c] = values[(i + 2) * a.itemSize + c];
+                values[(i + 2) * a.itemSize + c] = tmp;
+              }
+      }
+      geometry.computeBoundingBox();
+      for (const stern of [false, true]) {
+        if (stern ? geometry.boundingBox!.max.z < BREAK_Z : geometry.boundingBox!.min.z > BREAK_Z)
+          continue;
+        const complete = stern
+          ? geometry.boundingBox!.min.z >= BREAK_Z
+          : geometry.boundingBox!.max.z <= BREAK_Z;
+        const piece = complete ? geometry.clone() : cutGeometry(geometry, stern);
+        if (!piece.getAttribute('position').count) {
+          piece.dispose();
+          continue;
+        }
+        const mesh = new T.Mesh(piece, object.material);
+        mesh.castShadow = object.castShadow;
+        mesh.receiveShadow = object.receiveShadow;
+        mesh.name = object.name;
+        mesh.userData.hullCopy = true;
+        (stern ? this.stern : this.bow).add(mesh);
+      }
+      geometry.dispose();
+    };
+    source.traverse((object) => {
+      if (!(object instanceof T.Mesh) || object.userData.renderBatched || !object.visible) return;
+      for (let parent = object.parent; parent && parent !== source; parent = parent.parent)
+        if (!parent.visible || parent.userData.noHullCopy) return;
+      const matrix = inverse.clone().multiply(object.matrixWorld);
+      if (object instanceof T.InstancedMesh) {
+        object.computeBoundingBox();
+        const bounds = object.boundingBox!.clone().applyMatrix4(matrix);
+        if (bounds.max.z <= BREAK_Z || bounds.min.z >= BREAK_Z) {
+          const mesh = object.clone();
+          mesh.geometry = object.geometry.clone();
+          mesh.userData.hullCopy = true;
+          mesh.matrixAutoUpdate = false;
+          mesh.matrix.copy(matrix);
+          (bounds.min.z >= BREAK_Z ? this.stern : this.bow).add(mesh);
+        } else {
+          for (let n = 0; n < object.count; n++) {
+            const instance = new T.Matrix4();
+            object.getMatrixAt(n, instance);
+            copyMesh(object, matrix.clone().multiply(instance));
+          }
+        }
+      } else copyMesh(object, matrix);
+    });
+  }
+  reset() {
+    for (const group of [this.bow, this.stern])
+      for (const object of [...group.children]) {
+        if (!object.userData.hullCopy) continue;
+        if (object instanceof T.Mesh) object.geometry.dispose();
+        object.removeFromParent();
+      }
+    this.prepared = false;
+  }
   update(seconds: number | null, side = 1, hidden = false) {
     const age = seconds ?? 0,
       state = sinkingPose(age, side);
+    if (state.broken) this.prepare();
     pose(this.bow, state.bow);
     pose(this.stern, state.stern);
     this.bow.visible = this.stern.visible = !hidden && seconds !== null && state.broken;

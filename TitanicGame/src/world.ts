@@ -1,5 +1,14 @@
+import { batchStaticShip, nearbyPickRoots } from './graphics/performance';
+import { joinArchitecturalBoxes } from './graphics/joins';
+import { buildAuxiliaryMachinery } from './graphics/auxiliary';
+import {
+  auxiliaryAction,
+  auxiliaryHint,
+  electricSupply,
+  type AuxiliaryControl,
+} from '../shared/auxiliary';
 import { buildInquiryRoom } from './graphics/inquiry';
-import { BOAT_DECK_FRONT } from '../shared/layout';
+import { BOAT_DECK_FRONT, BOAT_DECK_BACK } from '../shared/layout';
 import { BRIDGE } from '../shared/layout';
 import { buildBridgeDetails } from './graphics/bridge';
 import { firebed } from '../shared/firing';
@@ -15,7 +24,7 @@ import { buildTelegraph, buildTelephone } from './graphics/bridge';
 import { metric } from './graphics/building';
 import { buildOfficerDetails, buildBoilerRoom, buildMachineryWalls } from './graphics/interiors';
 import { steamPsi } from '../shared/plant';
-import { reconcileCrew } from '../shared/crew-camera';
+import { reconcileCrew, passageExitView } from '../shared/crew-camera';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -59,6 +68,7 @@ import {
   STATIONS,
   WALLS,
   travelPoint,
+  onStairSide,
   wallsBetween,
 } from '../shared/world';
 import { network } from './network';
@@ -136,7 +146,11 @@ function label(text: string, width = 512, height = 128, color = '#dfc79d', bg = 
 function sign(parent: THREE.Object3D, text: string, x: number, y: number, z: number, w = 3) {
   return box(parent, x, y, z, w, 0.64, 0.035, label(text));
 }
-function lamp(parent: THREE.Object3D, x: number, y: number, z: number, power = 9) {
+function lamp(parent: THREE.Object3D, x: number, y: number, z: number, power = 9, floor = 0) {
+  const top = y - 0.17;
+  cylinder(parent, x, (floor + top) / 2, z, 0.028, top - floor, materials.black).name =
+    'lantern-post';
+  cylinder(parent, x, floor + 0.035, z, 0.12, 0.07, materials.black).name = 'lantern-foot';
   cylinder(parent, x, y + 0.2, z, 0.035, 0.18, materials.brass);
   cylinder(parent, x, y + 0.12, z, 0.16, 0.055, materials.brass, 0.12);
   cylinder(parent, x, y - 0.15, z, 0.14, 0.045, materials.brass);
@@ -206,6 +220,8 @@ export class OceanWorld {
   launchView = { x: 210, z: 170 };
   launchChosen = false;
   clock = new THREE.Clock();
+  auditOutput: HTMLOutputElement | null = null;
+  auditLast = 0;
   frame = 0;
   raf = 0;
   lastInput = 0;
@@ -242,17 +258,22 @@ export class OceanWorld {
   furnaceDoors: THREE.Object3D[] = [];
   dampers: THREE.Object3D[] = [];
   boilerGauges: THREE.Object3D[] = [];
+  electricLights: { light: THREE.Light; base: number }[] = [];
   boilerParts: ReturnType<typeof buildBoilerRoom> | null = null;
   boilerTarget: BoilerControl | null = null;
+  auxiliaryParts: ReturnType<typeof buildAuxiliaryMachinery> | null = null;
+  auxiliaryTarget: AuxiliaryControl | null = null;
   boilerRay = new THREE.Raycaster();
   boilerPrompt = '';
-  onBoilerPrompt: (hint: string) => void = () => {};
+  boilerUsable = false;
+  onBoilerPrompt: (hint: string, usable: boolean) => void = () => {};
   onBoilerGuide: () => void = () => {};
   toolModels = new THREE.Group();
   toolStrokeAt = -10;
   engineCycle = 0;
   mainValveWheel: THREE.Object3D | null = null;
   mainGaugeNeedle: THREE.Object3D | null = null;
+  steamLeakJet: THREE.Mesh | null = null;
   water: THREE.Mesh;
   wheelRim: THREE.Mesh;
   nearest: Station | null = null;
@@ -291,6 +312,14 @@ export class OceanWorld {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.replaceChildren(this.renderer.domElement);
+    if (new URLSearchParams(location.search).has('graphics-audit')) {
+      this.auditOutput = document.createElement('output');
+      this.auditOutput.id = 'graphics-audit';
+      this.auditOutput.style.cssText =
+        'position:fixed;top:5px;right:5px;z-index:99;background:#111e;color:#fff;padding:5px;font:12px monospace;pointer-events:none;max-width:65vw';
+      container.append(this.auditOutput);
+      this.renderer.info.autoReset = false;
+    }
     this.scene.background = new THREE.Color(...HORIZON_LIGHT);
     this.scene.fog = new THREE.FogExp2(new THREE.Color(...HORIZON_LIGHT), fogDensity());
     this.scene.add(createNightSky());
@@ -377,6 +406,10 @@ export class OceanWorld {
     this.ship.scale.set(SHIP_WIDTH_SCALE, SHIP_HEIGHT_SCALE, SHIP_LENGTH_SCALE);
     this.buildShip();
     this.ship.traverse((o) => {
+      if (o instanceof THREE.Light && !this.furnaceLights.includes(o as THREE.PointLight))
+        this.electricLights.push({ light: o, base: o.intensity });
+    });
+    this.ship.traverse((o) => {
       if (o instanceof THREE.PointLight || o instanceof THREE.SpotLight) {
         o.distance *= SHIP_SCALE;
         o.intensity *= SHIP_SCALE * SHIP_SCALE;
@@ -388,6 +421,31 @@ export class OceanWorld {
     this.crash = new CrashEffects(this.scene);
     this.ship.add(this.damage);
     this.wheelRim = wheel(this.ship, BRIDGE.wheel.x, 0, BRIDGE.wheel.z);
+    joinArchitecturalBoxes(this.ship);
+    batchStaticShip(
+      this.ship,
+      [
+        this.wheelRim,
+        this.telegraphPointer,
+        this.mainValveWheel,
+        this.mainGaugeNeedle,
+        this.steamLeakJet,
+        ...this.pistons,
+        ...this.flywheels,
+        ...this.needles,
+        ...this.fires,
+        ...this.furnaceDoors,
+        ...this.dampers,
+        ...this.boilerGauges,
+        ...(this.boilerParts?.ashMounds ?? []),
+        ...(this.boilerParts?.stopWheels ?? []),
+        ...(this.boilerParts?.waterGlasses ?? []),
+        ...(this.boilerParts?.steamJets ?? []),
+        ...(this.boilerParts?.toolObjects ?? []),
+        ...(this.auxiliaryParts?.moving ?? []),
+        ...this.floodWater,
+      ].filter((p): p is THREE.Object3D => !!p),
+    );
     this.buildLifeboat();
     this.inquiryRoom = buildInquiryRoom(materials);
     this.inquiryRoom.visible = false;
@@ -459,7 +517,7 @@ export class OceanWorld {
     lower.position.y = LEVEL_Y[-1] + 6;
     lower.scale.z = -1;
     s.add(lower);
-    box(lower, 0, -6.12, -7.6, 18.2, 0.2, 43.8, materials.floor);
+    box(lower, 0, -6.1, -7.6, 18.2, 0.2, 43.8, materials.floor);
     buildMachineryCeiling(s, materials);
     for (let i = 0; i < 6; i++) {
       const water = new THREE.Mesh(
@@ -480,14 +538,14 @@ export class OceanWorld {
       this.floodWater.push(water);
     }
     // Plank joints are mipmapped texture detail, not dozens of thin coplanar strips.
-    for (const x of [-10, 10]) {
-      rail(s, x, -20.7, x, 24.3);
+    for (const x of [-9.8, 9.8]) {
+      rail(s, x, BOAT_DECK_FRONT, x, BOAT_DECK_BACK);
     }
     rail(s, -9.8, BOAT_DECK_FRONT, -6.75, BOAT_DECK_FRONT);
     rail(s, 6.75, BOAT_DECK_FRONT, 7.7 - 0.65 / SHIP_WIDTH_SCALE, BOAT_DECK_FRONT);
     rail(s, 7.7 + 0.65 / SHIP_WIDTH_SCALE, BOAT_DECK_FRONT, 9.8, BOAT_DECK_FRONT);
-    rail(s, -9.8, 24.3, 3.6, 24.3);
-    rail(s, 5.5, 24.3, 9.8, 24.3);
+    rail(s, -9.8, BOAT_DECK_BACK, 4.5 - 0.65 / SHIP_WIDTH_SCALE, BOAT_DECK_BACK);
+    rail(s, 4.5 + 0.65 / SHIP_WIDTH_SCALE, BOAT_DECK_BACK, 9.8, BOAT_DECK_BACK);
     for (let i = 1; i < HULL_OUTLINE.length; i++) {
       const a = HULL_OUTLINE[i - 1],
         b = HULL_OUTLINE[i];
@@ -515,6 +573,7 @@ export class OceanWorld {
     buildDeckhouseRoofs(s, materials);
     buildOfficerDetails(s, materials);
     buildMachineryWalls(s, materials);
+    this.auxiliaryParts = buildAuxiliaryMachinery(s, materials);
     const chartRoom = new THREE.Group();
     chartRoom.position.set(BRIDGE.chart.x + 5, 0, BRIDGE.chart.z + 22);
     s.add(chartRoom);
@@ -598,13 +657,16 @@ export class OceanWorld {
     this.boilerGauges = boilers.gauges;
     for (const station of STATIONS.filter((s) => s.kind === 'phone' && s.level !== 1))
       buildTelephone(s, station, materials);
-    for (const station of STATIONS.filter((s) => s.kind === 'machine')) {
+    for (const station of STATIONS.filter((s) => s.kind === 'machine' && s.id !== 'steering')) {
       const y = LEVEL_Y[station.level];
-      box(s, station.x, y + 1, station.z, 0.8, 1.8, 0.55, materials.steel);
+      const stand = metric(s, station.x, y, station.z);
+      box(stand, 0, 0.9, 0, 0.8, 1.8, 0.55, materials.steel).name = 'machine-instrument-stand';
       if (station.machine === 'gauge') {
         const p = metric(s, station.x, y, station.z);
         const housing = cylinder(p, 0, 1.65, 0.38, 0.32, 0.08, materials.brass);
         housing.rotation.x = Math.PI / 2;
+        const mount = cylinder(p, 0, 1.65, 0.31, 0.1, 0.15, materials.steel);
+        mount.rotation.x = Math.PI / 2;
         const face = new THREE.Mesh(
           new THREE.CircleGeometry(0.3, 40),
           gaugeFace('HEADER PSI', 300),
@@ -618,6 +680,8 @@ export class OceanWorld {
         this.mainGaugeNeedle = needle;
       } else {
         const p = metric(s, station.x, y, station.z);
+        const spindle = cylinder(p, 0, 1.65, 0.3, 0.045, 0.2, materials.steel);
+        spindle.rotation.x = Math.PI / 2;
         const valve = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 8, 24), materials.brass);
         valve.position.set(0, 1.65, 0.4);
         p.add(valve);
@@ -625,21 +689,34 @@ export class OceanWorld {
           const spoke = box(valve, 0, 0, 0, 0.58, 0.028, 0.028, materials.brass);
           spoke.rotation.z = a;
         }
-        if (station.machine === 'valve') this.mainValveWheel = valve;
+        if (station.machine === 'valve') {
+          this.mainValveWheel = valve;
+          this.steamLeakJet = new THREE.Mesh(
+            new THREE.ConeGeometry(0.3, 1.7, 8),
+            new THREE.MeshBasicMaterial({
+              color: 0xdde4df,
+              transparent: true,
+              opacity: 0,
+              depthWrite: false,
+            }),
+          );
+          this.steamLeakJet.position.set(0.4, 2, 0.35);
+          this.steamLeakJet.rotation.z = -0.55;
+          p.add(this.steamLeakJet);
+        }
       }
-      sign(s, station.machine!.toUpperCase(), station.x, y + 0.8, station.z + 0.34, 0.7);
     }
     for (const [x, z] of [
       [-7, -19],
       [7, -19],
-      [-6.2, -7],
-      [6.2, -7],
-      [-6.2, 15],
-      [6.2, 15],
+      [-7, -7],
+      [7, -7],
+      [-7, 15],
+      [7, 15],
     ])
       lamp(s, x, 2.7, z, 10);
     for (const x of [-5, 5]) {
-      lamp(lower, x, -2.95, -17, 20);
+      lamp(lower, x, -2.95, -17, 20, -6.02);
       const taskLight = new THREE.SpotLight(0xffd29a, 80, 16, 0.8, 0.7, 2);
       taskLight.position.set(x, -1.2, -16.5);
       taskLight.target.position.set(x, -5.6, -17);
@@ -667,6 +744,7 @@ export class OceanWorld {
     const g = new THREE.Group(),
       coat = mat(new THREE.Color(color).getHex()),
       skin = mat(0xc49c7c);
+    g.userData.noHullCopy = true;
     box(g, 0, 0.92, 0, 0.48, 0.72, 0.28, coat);
     cylinder(g, 0, 1.6, 0, 0.19, 0.38, skin, undefined, 10);
     cylinder(g, 0, 1.82, 0, 0.25, 0.1, materials.black);
@@ -700,18 +778,19 @@ export class OceanWorld {
       this.lastRelocation = state.self.relocation;
       this.local = { x: me.x, z: me.z, level: me.level };
       this.yaw = me.yaw;
-      this.pitch = 0;
+      this.pitch = me.pitch;
     }
     if (this.lastPhase !== state.phase) {
       this.keys.clear();
       if (state.phase === 'voyage') {
+        this.sections.reset();
         this.lastImpact = 0;
         this.impactAt = -100;
         this.crash.reset();
         this.damage.clear();
         this.local = { x: me.x, z: me.z, level: me.level };
         this.yaw = me.yaw;
-        this.pitch = 0;
+        this.pitch = me.pitch;
       }
       this.lastPhase = state.phase;
     }
@@ -775,6 +854,11 @@ export class OceanWorld {
         (state.sinkingElapsed === null ? 1 : Math.max(0, 1 - state.sinkingElapsed / 75));
     for (const damper of this.dampers)
       damper.rotation.z = (state.ship.fires[damper.userData.bank] ?? 0) * 1.1 - 0.55;
+    for (const glass of this.boilerParts?.waterGlasses ?? []) {
+      const level = state.ship.auxiliary.boilerWater[glass.userData.bank];
+      glass.scale.y = Math.max(0.01, level);
+      glass.position.y = 1.67 + 0.25 * level;
+    }
     for (const gauge of this.boilerGauges)
       gauge.rotation.z =
         -((steamPsi(state.ship.boilerPressure[gauge.userData.bank]) / 300) * 1.5 - 0.75) * Math.PI;
@@ -784,12 +868,12 @@ export class OceanWorld {
     if (this.mainValveWheel)
       this.mainValveWheel.rotation.z = state.ship.mainSteamValve * Math.PI * 3;
     for (const lump of this.boilerParts?.clinkers ?? [])
-      lump.visible =
-        lump.userData.lump <
-        visibleClinker(state.ship.clinker[lump.userData.bank][lump.userData.zone]);
+      (lump as THREE.InstancedMesh).count = visibleClinker(
+        state.ship.clinker[lump.userData.bank][lump.userData.zone],
+      );
     for (const piece of this.boilerParts?.fuelBeds ?? []) {
       const b = firebed(state.ship, piece.userData.bank, piece.userData.zone);
-      piece.visible = piece.userData.piece < Math.floor(b.coal * 12);
+      (piece as THREE.InstancedMesh).count = Math.floor(b.coal * 12);
     }
     for (const ash of this.boilerParts?.ashMounds ?? []) {
       const amount = firebed(state.ship, ash.userData.bank, ash.userData.zone).ash;
@@ -801,6 +885,11 @@ export class OceanWorld {
     for (const jet of this.boilerParts?.steamJets ?? [])
       jet.visible =
         state.ship.safetyLifted[jet.userData.bank] || state.ship.reliefUntil[jet.userData.bank] > 0;
+    for (const tool of this.boilerParts?.toolObjects ?? [])
+      tool.visible = !state.firingTools?.[tool.userData.tool as 'coal' | 'slice' | 'rake'];
+    if (this.steamLeakJet)
+      (this.steamLeakJet.material as THREE.MeshBasicMaterial).opacity = state.ship.steamLeak * 0.22;
+
     if (this.scene.fog instanceof THREE.FogExp2)
       this.scene.fog.density = fogDensity(
         state.ship.visibility,
@@ -896,8 +985,16 @@ export class OceanWorld {
         }
         this.keys.add(e.code);
         if (e.code === 'KeyE' && !e.repeat) {
-          if (this.boilerTarget) this.useBoiler();
-          else if (this.nearest?.kind === 'boiler') this.onBoilerGuide();
+          if (this.auxiliaryTarget) {
+            const action = auxiliaryAction(
+              this.auxiliaryTarget,
+              this.state.ship.auxiliary,
+              this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
+            );
+            void network.action(action).catch((e) => network.onError((e as Error).message));
+          } else if (this.boilerTarget) this.useBoiler();
+          else if (this.nearest?.kind === 'boiler' || this.nearest?.kind === 'firing')
+            this.onBoilerGuide();
           else if (this.nearest) this.onInteract(this.nearest);
         }
         if (e.code === 'KeyB' && !e.repeat && this.local.level === -1 && this.local.z < -6)
@@ -909,6 +1006,15 @@ export class OceanWorld {
         if (e.code === 'KeyP' && this.state.practice && !e.repeat) this.onPractice();
         if (e.code === 'KeyR' && this.state.demo && !e.repeat) this.onDemoRetry();
         if (e.code === 'KeyX' && !e.repeat) this.onCancel();
+        if (
+          e.code === 'KeyT' &&
+          !e.repeat &&
+          this.nearest?.machine &&
+          (this.state.self.saboteur || (this.state.practice && this.state.practiceSettings?.tools))
+        )
+          void network
+            .action({ station: this.nearest.id, verb: 'sabotage' })
+            .catch((e) => network.onError((e as Error).message));
       }
     }) as EventListener);
     listen(window, 'keyup', ((e: KeyboardEvent) => {
@@ -944,6 +1050,13 @@ export class OceanWorld {
   }
   useBoiler() {
     if (!this.state || !this.boilerTarget || this.overlay) return;
+    if (this.state.players.find((p) => p.id === this.state!.self.id)?.job) return;
+    if (
+      this.boilerTarget.kind === 'tool' &&
+      this.state.firingTools[this.boilerTarget.tool!] &&
+      !this.state.self.inventory.includes('Firing tool:' + this.boilerTarget.tool)
+    )
+      return;
     const action = boilerAction(
       this.boilerTarget,
       this.state.ship,
@@ -965,25 +1078,73 @@ export class OceanWorld {
       this.local.z < -6
     ) {
       this.camera.updateMatrixWorld();
-      this.ship.updateMatrixWorld(true);
+      this.ship.updateWorldMatrix(true, false);
+      const roots = nearbyPickRoots(this.boilerParts.pickRoots, this.camera.position, 4.5);
+      for (const root of roots) root.updateWorldMatrix(true, true);
       this.boilerRay.setFromCamera(new THREE.Vector2(), this.camera);
       this.boilerRay.far = 4.5;
-      const hit = this.boilerRay.intersectObjects(
-        [...this.boilerParts.controls, ...this.boilerParts.occluders],
-        true,
-      )[0];
+      const hit = this.boilerRay.intersectObjects(roots, true)[0];
       if (hit) {
         let object: THREE.Object3D | null = hit.object;
         while (object && !object.userData.boilerControl) object = object.parent;
         target = object?.userData.boilerControl ?? null;
       }
     }
+    this.auxiliaryTarget = null;
+    if (
+      !target &&
+      this.auxiliaryParts &&
+      this.state &&
+      this.locked &&
+      !this.overlay &&
+      (this.local.level === -1 || this.local.level === 2)
+    ) {
+      this.camera.updateMatrixWorld();
+      this.ship.updateWorldMatrix(true, false);
+      const roots = nearbyPickRoots(this.auxiliaryParts.pickRoots, this.camera.position, 3.3);
+      for (const root of roots) root.updateWorldMatrix(true, true);
+      this.boilerRay.setFromCamera(new THREE.Vector2(), this.camera);
+      this.boilerRay.far = 3.3;
+      const hit = this.boilerRay.intersectObjects(roots, true)[0];
+      let object: THREE.Object3D | null = hit?.object ?? null;
+      while (object && !object.userData.auxiliaryControl) object = object.parent;
+      this.auxiliaryTarget = object?.userData.auxiliaryControl ?? null;
+      const station = STATIONS.find((s) => s.id === this.auxiliaryTarget?.station);
+      if (station && (station.level !== this.local.level || wallsBetween(this.local, station)))
+        this.auxiliaryTarget = null;
+    }
     this.boilerTarget = target;
     const hint =
-      target && this.state ? boilerHint(target, this.state.ship, this.state.self.inventory) : '';
-    if (hint !== this.boilerPrompt) {
+      this.auxiliaryTarget && this.state
+        ? auxiliaryHint(this.auxiliaryTarget, this.state.ship.auxiliary)
+        : target && this.state
+          ? boilerHint(target, this.state.ship, this.state.self.inventory, this.state.firingTools)
+          : '';
+    let usable = !!(
+      target &&
+      this.state &&
+      boilerAction(
+        target,
+        this.state.ship,
+        this.state.self.inventory,
+        this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
+      )
+    );
+    if (
+      target?.kind === 'tool' &&
+      this.state?.firingTools[target.tool!] &&
+      !this.state.self.inventory.includes('Firing tool:' + target.tool)
+    )
+      usable = false;
+    if (this.auxiliaryTarget)
+      usable = !(
+        this.auxiliaryTarget.verb === 'clean-strainer' &&
+        this.state!.ship.auxiliary.feedPumps[this.auxiliaryTarget.index!]
+      );
+    if (hint !== this.boilerPrompt || usable !== this.boilerUsable) {
       this.boilerPrompt = hint;
-      this.onBoilerPrompt(hint);
+      this.boilerUsable = usable;
+      this.onBoilerPrompt(hint, usable);
     }
   }
   cancelPendingPause() {
@@ -1096,12 +1257,16 @@ export class OceanWorld {
           );
         }
       } else if (this.travelKey) {
-        this.yaw = cameraYaw = this.travelCameraYaw + this.travelLookYaw;
-        this.pitch = cameraPitch = THREE.MathUtils.clamp(
-          this.travelCameraPitch + this.travelLookPitch,
-          -1.35,
-          1.35,
+        const passage = STATIONS.find((s) => s.id === this.travelKey);
+        const exit = passageExitView(
+          me.level === passage?.destination?.level ? passage?.exitYaw : undefined,
+          this.travelCameraYaw,
+          this.travelCameraPitch,
+          this.travelLookYaw,
+          this.travelLookPitch,
         );
+        this.yaw = cameraYaw = exit.yaw;
+        this.pitch = cameraPitch = exit.pitch;
         this.travelKey = '';
       }
       let f = 0,
@@ -1137,7 +1302,7 @@ export class OceanWorld {
       const pose = sinkingPose(sinkAge, (state.ship.impact?.normal.x ?? 1) < 0 ? -1 : 1).bow;
       this.ship.position.set(0, pose.heave, pose.z);
       this.ship.rotation.set(pose.pitch, 0, pose.roll);
-      this.ship.updateMatrixWorld(true);
+      this.ship.updateWorldMatrix(true, false);
       const evacuated = me.evacuated || state.phase === 'lifeboat';
       this.boat.visible = evacuated;
       this.boat.position.set(this.launchView.x, SEA_LEVEL + 0.35, this.launchView.z);
@@ -1227,6 +1392,7 @@ export class OceanWorld {
                 .filter(
                   (s) =>
                     s.kind !== 'scenery' &&
+                    onStairSide(this.local, s) &&
                     (s.kind !== 'lifeboat' ||
                       (state.sinkingElapsed !== null &&
                         state.sinkingElapsed >= BALANCE.abandonDelay)) &&
@@ -1298,6 +1464,9 @@ export class OceanWorld {
       this.camera.updateProjectionMatrix();
       if (this.scene.fog instanceof THREE.FogExp2) this.scene.fog.density = 0;
     }
+    if (state) {
+      this.auxiliaryParts?.update(state.ship, time);
+    }
     this.crash.update(time);
     this.engineCycle += dt * (this.state ? (this.state.ship.engineRevs / 60) * Math.PI * 2 : 4);
     const cycle = this.engineCycle;
@@ -1353,10 +1522,20 @@ export class OceanWorld {
         ? null
         : state.sinkingElapsed + Math.max(0, time - this.receivedAt);
     this.sections.update(sinkTime, (state?.ship.impact?.normal.x ?? 1) < 0 ? -1 : 1, !!hearing);
-    this.ship.updateMatrixWorld(true);
+    if (state) {
+      const supply = electricSupply(state.ship.auxiliary, 'lighting');
+      for (const l of this.electricLights) l.light.intensity *= 0.16 + 0.84 * supply;
+    }
+    this.ship.updateWorldMatrix(false, false);
     this.oceanUniforms.shipInverse.value.copy(this.ship.matrixWorld).invert();
+    if (this.auditOutput) this.renderer.info.reset();
     if (this.quality === 'high') this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
+    if (this.auditOutput && time - this.auditLast > 1) {
+      this.auditLast = time;
+      const info = this.renderer.info;
+      this.auditOutput.textContent = `${this.quality} | ${info.render.calls} draws | ${info.render.triangles} triangles | ${info.memory.geometries} geometries | ${info.memory.textures} textures`;
+    }
   };
   resetState() {
     this.state = null;
@@ -1386,5 +1565,6 @@ export class OceanWorld {
     for (const pass of this.composer.passes) pass.dispose();
     this.environment.dispose();
     this.renderer.domElement.remove();
+    this.auditOutput?.remove();
   }
 }

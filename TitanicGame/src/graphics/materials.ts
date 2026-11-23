@@ -191,7 +191,11 @@ export function radialFog(material: THREE.Material) {
 }
 export type ShipMaterials = ReturnType<typeof createShipMaterials>;
 
+const gaugeMaterials = new Map<string, THREE.MeshStandardMaterial>();
 export function gaugeFace(title: string, max: number) {
+  const key = `${title}:${max}`;
+  const cached = gaugeMaterials.get(key);
+  if (cached) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 256;
   const c = canvas.getContext('2d')!;
@@ -237,7 +241,9 @@ export function gaugeFace(title: string, max: number) {
   }
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.MeshStandardMaterial({ map, roughness: 0.7 });
+  const material = new THREE.MeshStandardMaterial({ map, roughness: 0.7 });
+  gaugeMaterials.set(key, material);
+  return material;
 }
 
 export function softParticleTexture(color = '#ffffff') {

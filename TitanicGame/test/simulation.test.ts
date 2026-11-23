@@ -7,7 +7,7 @@ import type { Level, Position } from '../shared/types';
 import { encodeMorse } from '../shared/morse';
 import { cabinetAligned, turnCabinet } from '../shared/cabinet';
 import { workSeconds } from '../shared/voyage';
-import { HULL_BOW, NAVIGATION_RATE } from '../shared/navigation';
+import { HULL_BOW, HULL_STERN, NAVIGATION_RATE } from '../shared/navigation';
 
 function voyage(count = 4, seed = 1234) {
   const r = new Room('TESTAA', seed);
@@ -96,7 +96,7 @@ test('tampering takes time, consumes a charge, hides action label, and can be co
   const r = voyage(),
     sab = [...r.players.values()].find((p) => p.saboteur)!,
     crew = [...r.players.values()].find((p) => !p.saboteur)!;
-  Object.assign(sab, { x: 6, z: 25.6, level: -1 });
+  Object.assign(sab, { x: 1.2, z: 30.4, level: 2 });
   r.action(sab.id, { station: 'steering', verb: 'sabotage' });
   assert.equal(r.machine('steering').fault, null);
   assert.equal(r.snapshot(crew.id).players.find((p) => p.id === sab.id)!.job!.kind, 'maintenance');
@@ -104,7 +104,7 @@ test('tampering takes time, consumes a charge, hides action label, and can be co
   assert.ok(r.machine('steering').fault);
   assert.equal(sab.charges, 3);
   assert.ok(sab.cooldown > 0);
-  Object.assign(crew, { x: 6, z: 25.6, level: -1 });
+  Object.assign(crew, { x: 1.2, z: 30.4, level: 2 });
   r.action(crew.id, { station: 'steering', verb: 'inspect' });
   advance(r, workSeconds(crew.role, 'inspect') + 0.1);
   assert.match(crew.notes.at(-1)!, /tool|seal|screw/);
@@ -146,7 +146,8 @@ test('proximity respects walls and decks; held, answered phones bridge departmen
 test('wireless does not expose plaintext before decoding and telegram delivery requires walking', () => {
   const r = voyage(),
     p = [...r.players.values()][0];
-  Object.assign(p, { x: -2.6, z: -7.4, level: 0 });
+  const receiver = STATIONS.find((s) => s.id === 'wireless')!;
+  Object.assign(p, { x: receiver.x - 1, z: receiver.z, level: 0 });
   r.generateTelegram();
   const telegram = r.telegrams[0];
   const s = r.snapshot(p.id);
@@ -276,10 +277,10 @@ test('repeated ship signals have distinct notice versions', () => {
 test('station jobs cancel when player leaves or disconnects', () => {
   const r = voyage(),
     p = [...r.players.values()][0];
-  Object.assign(p, { x: 6, z: 25.6, level: -1 });
+  Object.assign(p, { x: 1.2, z: 30.4, level: 2 });
   r.machine('steering').fault = 'Drive assembly sticking';
   r.action(p.id, { station: 'steering', verb: 'repair' });
-  p.x = 0;
+  p.x = 7;
   advance(r, 0.1);
   assert.equal(p.job, null);
 });
@@ -297,6 +298,7 @@ test('actual geometry causes collisions; slow contact can survive, full speed ca
   slow.checkIcebergs();
   assert.ok(slow.ship.compartments.filter((n) => n > 0).length <= 3);
   slow.mainPassedAt = 0;
+  slow.finishWest = slow.ship.west;
   slow.mainResolved = true;
   advance(slow, 90);
   assert.equal(slow.result?.outcome, 'crew');
@@ -369,6 +371,7 @@ test('controlled evasion clears with 26 seconds of warning while an 18-second re
     r.icebergs = [];
     r.ship.speed = 21;
     r.addIce(HULL_BOW + 46 + 21 * 0.514444 * NAVIGATION_RATE * lead, 0, 46, true);
+    r.finishWest = r.icebergs[0].west + HULL_STERN + 600;
     r.ship.rudderTarget = 1;
     let counter = false,
       amidships = false;
@@ -399,7 +402,10 @@ test('instrument tampering changes readings without moving the actual world', ()
   advance(r, 0.1);
   const s = r.snapshot([...r.players.keys()][0]);
   assert.equal(s.ship.heading, 270);
-  assert.equal(s.ship.indicatedHeading, 276);
+  assert.ok(
+    s.ship.indicatedHeading > 270 && s.ship.indicatedHeading < 271,
+    'compass error develops gradually',
+  );
   assert.equal(s.ship.indicatedSteam - s.ship.steam, 18);
 });
 

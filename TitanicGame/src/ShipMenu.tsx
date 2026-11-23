@@ -1,14 +1,4 @@
-import {
-  ArrowRight,
-  BookOpen,
-  Compass,
-  FlaskConical,
-  Mic,
-  MicOff,
-  Settings2,
-  X,
-  Wrench,
-} from 'lucide-react';
+import { BookOpen, Compass, FlaskConical, Home, Mic, MicOff, Settings2, X, Wrench } from 'lucide-react';
 export function ShipMenu({
   role,
   area,
@@ -20,6 +10,7 @@ export function ShipMenu({
   toggleMic,
   cancel,
   leave,
+  returnHome,
 }: {
   role: string;
   area: string;
@@ -31,6 +22,7 @@ export function ShipMenu({
   toggleMic: () => void;
   cancel: () => void;
   leave: () => void;
+  returnHome: () => void;
 }) {
   return (
     <div className="pause-scrim">
@@ -46,7 +38,6 @@ export function ShipMenu({
         </div>
         <button className="button menu-resume" onClick={resume}>
           Resume<kbd>Esc</kbd>
-          <ArrowRight size={17} />
         </button>
         <div className="pause-actions">
           <button onClick={() => open('notebook')}>
@@ -81,6 +72,10 @@ export function ShipMenu({
               <kbd>X</kbd>
             </button>
           )}
+          <button onClick={returnHome}>
+            <Home aria-hidden="true" />
+            <span>ThomasLab Home</span>
+          </button>
         </div>
         <div className="pause-keys">
           <span>

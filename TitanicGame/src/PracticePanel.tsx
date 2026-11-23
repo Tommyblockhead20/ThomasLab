@@ -99,7 +99,7 @@ export function PracticePanel({
                 onChange={(e) => void command({ verb: 'assistance', value: e.target.checked })}
               />
               <div>
-                <b>Coal assistance &amp; engine orders</b>
+                <b>Crew assistance</b>
               </div>
             </label>
             <label>
@@ -110,6 +110,7 @@ export function PracticePanel({
               />
               <div>
                 <b>Fault testing</b>
+                <small>T near machinery</small>
               </div>
             </label>
           </div>

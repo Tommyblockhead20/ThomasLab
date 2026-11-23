@@ -1,9 +1,9 @@
+import { electricSupply, wirelessPowered } from '../shared/auxiliary';
 import { useState, useEffect, useRef } from 'react';
 import { Check, Volume2, Radio, Clipboard } from 'lucide-react';
 import type { Snapshot, Station, Action } from '../shared/types';
 import { MORSE } from '../shared/morse';
-import { reportSummary, watchTime } from '../shared/radio';
-import { workSeconds } from '../shared/voyage';
+import { reportSummary, watchTime, assessReport } from '../shared/radio';
 import { STATIONS, distance } from '../shared/world';
 import { shipAudio } from './audio';
 import { NavigationChart } from './NavigationChart';
@@ -50,9 +50,20 @@ export function WirelessPanel({
   const me = state.players.find((p) => p.id === state.self.id)!,
     phone = STATIONS.find((s) => s.id === 'wireless-phone')!;
   const send = (verb: string, value?: unknown) => act({ station: station.id, verb, value });
+  const assessment =
+    selected?.decoded && selected.report
+      ? assessReport(selected.report, state.ship, state.elapsed)
+      : null;
   const ringing = state.phones.some((c) => c.to === 'wireless' && !c.answerer);
   return (
     <div className="wireless-panel">
+      {electricSupply(state.ship.auxiliary, 'wireless') < 0.65 && (
+        <p className="station-hint">
+          {wirelessPowered(state.ship.auxiliary)
+            ? `Reserve battery · ${Math.round(state.ship.auxiliary.wirelessBattery * 100)}%`
+            : 'Power lost · contact the dynamo room'}
+        </p>
+      )}
       <div className="wireless-mode">
         <button className={tab === 'receiver' ? 'selected' : ''} onClick={() => setTab('receiver')}>
           Marconi receiver
@@ -77,7 +88,7 @@ export function WirelessPanel({
             reportId={selected?.decoded ? selected.id : undefined}
           />
         ) : (
-          <p className="small">The ship’s handset is beside the receiver.</p>
+          <p className="small">Take the decoded slip to the ship’s handset.</p>
         )
       ) : tab === 'chart' ? (
         <NavigationChart state={state} reports={state.telegrams.filter((t) => t.decoded)} />
@@ -109,10 +120,21 @@ export function WirelessPanel({
                   <code>{selected.code}</code>
                 ) : (
                   <>
-                    {!selected.report && <p>{selected.text}</p>}
+                    <p>{selected.text}</p>
                     {selected.report && (
                       <div className="radio-position">
                         <b>{reportSummary(selected.report)}</b>
+                        {assessment && (
+                          <small>
+                            {assessment.crossesCourse
+                              ? 'Reported area crosses present course'
+                              : 'Reported area off present course'}{' '}
+                            · {assessment.distanceNm.toFixed(2)} NM
+                            {assessment.minutes !== null
+                              ? ` · about ${assessment.minutes.toFixed(1)} min to abeam`
+                              : ''}
+                          </small>
+                        )}
                         <small>
                           Sighting{' '}
                           {Math.max(
@@ -131,14 +153,6 @@ export function WirelessPanel({
                   <Volume2 size={16} />
                   {playing ? 'Stop listening' : 'Listen to Morse'}
                 </button>
-                {!selected.decoded && (
-                  <button
-                    className="button secondary"
-                    onClick={() => void send('assist', { id: selected.id })}
-                  >
-                    Transcribe · {workSeconds(state.self.role, 'decode')}s
-                  </button>
-                )}
               </div>
               {!selected.decoded ? (
                 <>
@@ -186,13 +200,17 @@ export function WirelessPanel({
           <button
             className="button secondary radio-request"
             disabled={!!state.radio?.pending || !!state.radio?.readyIn}
-            onClick={() => void send('request')}
+            onClick={() =>
+              void send('request', selected?.decoded && selected.report ? selected.id : undefined)
+            }
           >
             {state.radio?.pending
               ? 'Waiting for a reply…'
               : state.radio?.readyIn
                 ? `Working traffic · ${state.radio.readyIn}s`
-                : 'Request a fresh ice position'}
+                : selected?.decoded && selected.report
+                  ? 'Clarify selected report'
+                  : 'Request a fresh ice position'}
           </button>
           <details className="morse-reference">
             <summary>Morse reference</summary>
