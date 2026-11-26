@@ -41,11 +41,13 @@ export const FUNNEL_POSITIONS = [-13, -1.6, 9.8, 21.2];
 export const BOAT_DECK_FRONT = -21.05,
   BOAT_DECK_BACK = 24.5;
 export const BOAT_POSITIONS = [-15.9, -11.6, -7.3, -3, 13, 17.4, 21.8];
+export const GRAND_HALL = { x: 0, z: -4.84, w: 8, d: 3.68 };
+export const GRAND_HALL_DOOR = { z: -6.015, d: 0.53 };
 export const DECK_HOUSES = [
   { x: 0, z: -18.65, w: 13.4, d: 4.7 },
   { x: 0, z: -12.775, w: 11, d: 7.05 },
   { x: 0, z: -8.075, w: 11, d: 2.35 },
-  { x: 0, z: -4.65, w: 6, d: 3.3 },
+  GRAND_HALL,
   { x: 0, z: 15.7, w: 4.8, d: 3.5 },
 ];
 export const VENTILATORS = [
@@ -53,8 +55,29 @@ export const VENTILATORS = [
   { x: -3, z: 20.4, w: 1.4, d: 1.2 },
 ];
 export const SHAFT = { x: -4, z: 8.9, w: 3.4, d: 4.4, floor: -19, roof: 3.25 };
+export const GRAND_STAIR = {
+  top: -5.69,
+  landingFront: -4.31,
+  landingBack: -3.12,
+  turn: -3.68,
+  landingY: -1.31,
+  foot: -5.65,
+  approach: -6.08,
+  wingX: 2.28,
+  mainWidth: 4.68,
+  wingWidth: (2.28 * W - 4.68 / 2) * 2,
+  wellWidth: 5.96,
+  dome: { z: -4.58, width: 1.92, length: 4.02 },
+};
+const grand = GRAND_STAIR;
 export const DECK_OPENINGS = [
-  { id: 'passengers', x: 0, z: -4.04, w: 4.12, d: 2.02 },
+  {
+    id: 'passengers',
+    x: 0,
+    z: (grand.top + grand.landingBack) / 2,
+    w: grand.wellWidth,
+    d: grand.landingBack - grand.top,
+  },
   { id: 'passengers-aft', x: 0, z: 15.85, w: 2.2, d: 1.7 },
   { id: 'machinery', ...SHAFT },
 ];
@@ -69,13 +92,14 @@ export const BOILERS = [-6.3, -2.1, 2.1, 6.3].map((x, i) => ({
   stationZ: -10.6 + 3.2 / L,
 }));
 export const passengerRoute = [
-  { x: 0, y: 0, z: -5.45 },
-  { x: 0, y: 0, z: -5.05 },
-  { x: 0, y: -1.63, z: -4.02 },
-  { x: 0, y: -1.63, z: -3.74 },
-  { x: 1.42, y: -1.63, z: -3.74 },
-  { x: 1.42, y: -2.52, z: -3.03 },
-  { x: 1.42, y: -2.52, z: -2.45 },
+  { x: 0, y: 0, z: -6.24 },
+  { x: 0, y: 0, z: grand.top },
+  { x: 0, y: grand.landingY, z: grand.landingFront },
+  { x: 0, y: grand.landingY, z: grand.turn },
+  { x: grand.wingX, y: grand.landingY, z: grand.turn },
+  { x: grand.wingX, y: grand.landingY, z: grand.landingFront },
+  { x: grand.wingX, y: LEVEL_Y[-2], z: grand.foot },
+  { x: grand.wingX, y: LEVEL_Y[-2], z: grand.approach },
 ];
 export const passengerAscent = [...passengerRoute].reverse();
 export const portPassengerAscent = passengerAscent.map((p) => ({ ...p, x: p.x === 0 ? 0 : -p.x }));
@@ -188,11 +212,11 @@ export const PLAN_WALLS: PlanWall[] = [
     w(side * 5.5, -6.95, 0.18, 0.1, 0),
   ]),
   // A broad first-class vestibule with independent side entrances.
-  w(0, -6.3, 6, 0.15, 0),
-  w(0, -3, 6, 0.15, 0),
+  w(0, -6.68, GRAND_HALL.w, 0.15, 0),
+  w(0, -3, GRAND_HALL.w, 0.15, 0),
   ...[-1, 1].flatMap((side) => [
-    w(side * 3, -6.05, 0.15, 0.5, 0),
-    w(side * 3, -3.925, 0.15, 1.85, 0),
+    w(side * 4, -6.48, 0.15, 0.4, 0),
+    w(side * 4, -4.375, 0.15, 2.75, 0),
   ]),
   // Aft passenger entrance gives the open after deck a destination.
   w(0, 13.95, 4.8, 0.15, 0),
@@ -204,11 +228,42 @@ export const PLAN_WALLS: PlanWall[] = [
   ...VENTILATORS.map((v) => ({ ...v, level: 0 as Level, prop: true })),
   ...FUNNEL_POSITIONS.map((z) => w(0, z, 4, 2.6, 0, { prop: true })),
   ...DECK_OPENINGS.map((o) => w(o.x, o.z, o.w, o.d, 0, { prop: true })),
-  // The oak stair carcass and grounded landing cannot be walked through.
-  w(0, (-5.05 - 4.02) / 2, 3.78 / W, 1.03, -2, { prop: true }),
-  w(0, (-4.02 - 3.74) / 2, 5.44 / W, 0.28, -2, { prop: true }),
-  ...[-1, 1].map((side) => w(side * 1.42, (-3.74 - 3.03) / 2, 1.48 / W, 0.71, -2, { prop: true })),
-  w(0, -3.075 + 0.13 / L, 2.25 / W, 0.26 / L, -2, { prop: true }),
+  w(
+    0,
+    (grand.top + grand.landingFront) / 2,
+    grand.mainWidth / W,
+    grand.landingFront - grand.top,
+    -2,
+    { prop: true },
+  ),
+  w(
+    0,
+    (grand.landingFront + grand.landingBack) / 2,
+    grand.wellWidth,
+    grand.landingBack - grand.landingFront,
+    -2,
+    { prop: true },
+  ),
+  ...[-1, 1].map((side) =>
+    w(
+      side * grand.wingX,
+      (grand.foot + grand.landingFront) / 2,
+      grand.wingWidth / W,
+      grand.landingFront - grand.foot,
+      -2,
+      { prop: true },
+    ),
+  ),
+  ...[-1, 1].map((side) =>
+    w(
+      side * (grand.wellWidth / 2 + 0.02),
+      (grand.top + grand.landingBack) / 2,
+      0.19 / W,
+      grand.landingBack - grand.top,
+      -2,
+      { prop: true },
+    ),
+  ),
   w(SHAFT.x, SHAFT.z, SHAFT.w, SHAFT.d, -2, { prop: true }),
   w(SHAFT.x, SHAFT.z, SHAFT.w, SHAFT.d, -1, { prop: true }),
   // A deck: closed forward stateroom facades, broad central passage,
@@ -250,7 +305,7 @@ export const PLAN_WALLS: PlanWall[] = [
   w(0, 30.8, 6, 0.16, 2),
   ...cross(27.6, -3, 3, 2, 1.5, 1.6),
   // Actual equipment footprints.
-  w(BRIDGE.chart.x, BRIDGE.chart.z, 2.7, 0.7, 0, { prop: true }),
+  w(BRIDGE.chart.x + 0.26, BRIDGE.chart.z, 3.22, 0.7, 0, { prop: true }),
   w(BRIDGE.wheel.x, BRIDGE.wheel.z, 0.8, 0.5, 0, { prop: true }),
   w(BRIDGE.telegraph.x, BRIDGE.telegraph.z, 0.7, 0.5, 0, { prop: true }),
   w(BRIDGE.command.x, BRIDGE.command.z, 1.8, 0.65, 0, { prop: true }),
@@ -350,8 +405,7 @@ export const DOORWAYS = [
   { x: 2.6, z: -7.5, w: 1.2, d: 0.15 },
   { x: -5.5, z: -7.25, w: 0.18, d: 0.5 },
   { x: 5.5, z: -7.25, w: 0.18, d: 0.5 },
-  { x: -3, z: -5.325, w: 0.15, d: 0.95 },
-  { x: 3, z: -5.325, w: 0.15, d: 0.95 },
+  ...[-1, 1].map((side) => ({ x: (side * GRAND_HALL.w) / 2, w: 0.15, ...GRAND_HALL_DOOR })),
   { x: -2.4, z: 14.6, w: 0.15, d: 0.5 },
   { x: 2.4, z: 14.6, w: 0.15, d: 0.5 },
 ];

@@ -578,8 +578,8 @@ export class OceanWorld {
     chartRoom.position.set(BRIDGE.chart.x + 5, 0, BRIDGE.chart.z + 22);
     s.add(chartRoom);
     // Navigation table with a real chart-like texture.
-    box(chartRoom, -5, 0.45, -22, 2.6, 0.9, 0.65, materials.darkWood);
-    box(chartRoom, -5, 0.94, -22, 2.7, 0.08, 0.7, materials.brass);
+    box(chartRoom, -4.74, 0.45, -22, 3.12, 0.9, 0.65, materials.darkWood);
+    box(chartRoom, -4.74, 0.94, -22, 3.22, 0.08, 0.7, materials.brass);
     const chart = document.createElement('canvas');
     chart.width = 768;
     chart.height = 512;
@@ -621,6 +621,14 @@ export class OceanWorld {
     chartMesh.rotation.set(-Math.PI / 2, 0, 0.05);
     chartMesh.position.set(-5, 0.99, -22);
     chartRoom.add(chartMesh);
+    const tray = new THREE.Group();
+    tray.name = 'wireless-report-tray';
+    tray.position.set(-3.44, 0.98, -22);
+    chartRoom.add(tray);
+    box(tray, 0, 0.018, 0, 0.42, 0.036, 0.39, materials.wood);
+    for (const x of [-0.19, 0.19]) box(tray, x, 0.05, 0, 0.035, 0.07, 0.39, materials.brass);
+    box(tray, 0, 0.05, -0.18, 0.35, 0.07, 0.03, materials.brass);
+    box(tray, 0, 0.048, -0.03, 0.29, 0.024, 0.25, materials.ivory);
     for (const x of [-6, -4]) cylinder(chartRoom, x, 0.55, -22, 0.065, 1.1, materials.brass);
     this.updateBridgeOrder = buildBridgeDetails(s, materials);
     this.telegraphPointer = buildTelegraph(s, materials).pointer;
@@ -999,6 +1007,15 @@ export class OceanWorld {
         }
         if (e.code === 'KeyB' && !e.repeat && this.local.level === -1 && this.local.z < -6)
           this.onBoilerGuide();
+        if (
+          e.code === 'KeyF' &&
+          !e.repeat &&
+          this.nearest?.kind === 'chart' &&
+          this.state.self.inventory.some((item) => item.startsWith('Telegram:'))
+        )
+          void network
+            .action({ station: this.nearest.id, verb: 'deliver' })
+            .catch((error) => network.onError((error as Error).message));
         if (e.code === 'Tab') {
           e.preventDefault();
           this.onNotebook();

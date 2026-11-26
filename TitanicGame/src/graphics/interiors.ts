@@ -4,6 +4,7 @@ import { gaugeFace } from './materials';
 import type { BoilerControl } from '../../shared/boiler-controls';
 import { buildFiringTool } from './firing-tool';
 import { FIRING_RACK, FIRING_TOOLS, COAL_BUNKERS } from '../../shared/stokehold';
+import { buildGrandStaircase } from './grand-staircase';
 import { box, cyl, bar, metric, point, plaque, light } from './building';
 import {
   LEVEL_Y,
@@ -17,7 +18,8 @@ import {
   DOORWAYS,
   VENTILATORS,
   WIRELESS,
-  DECK_OPENINGS,
+  GRAND_HALL,
+  GRAND_HALL_DOOR,
 } from '../../shared/layout';
 import { STATIONS, WALLS } from '../../shared/world';
 import {
@@ -26,165 +28,18 @@ import {
   SHIP_LENGTH_SCALE as L,
 } from '../../shared/navigation';
 
-function grandBalustrade(
-  g: T.Object3D,
-  a: T.Vector3,
-  b: T.Vector3,
-  m: ShipMaterials,
-  alreadyRailed = true,
-  footHeight = (t: number) => a.y + (b.y - a.y) * t,
-) {
-  const run = a.distanceTo(b);
-  const bays = Math.max(1, Math.ceil(run / 0.56));
-  const delta = b.clone().sub(a);
-  const flat = delta.clone().setY(0).normalize();
-  if (!alreadyRailed)
-    bar(
-      g,
-      a.clone().add(new T.Vector3(0, 1.03, 0)),
-      b.clone().add(new T.Vector3(0, 1.03, 0)),
-      0.044,
-      m.wood,
-    );
-  for (const end of [a, b]) {
-    box(g, end.x, end.y + 0.49, end.z, 0.15, 0.98, 0.15, m.wood, 'grand-newel');
-    cyl(g, end.x, end.y + 1.03, end.z, 0.108, 0.1, m.brass, 0.075);
-  }
-  for (let bay = 0; bay < bays; bay++) {
-    const t = (bay + 0.5) / bays;
-    const center = a.clone().lerp(b, t);
-    bar(
-      g,
-      center.clone().setY(footHeight(t) - 0.022),
-      center.clone().setY(center.y + 1.02),
-      0.019,
-      m.black,
-    ).name = 'grand-baluster';
-
-    for (const side of [-1, 1]) {
-      const scroll = new T.CatmullRomCurve3(
-        Array.from({ length: 15 }, (_, i) => {
-          const t = i / 14;
-          const angle = t * Math.PI * 2.12;
-          const radius = 0.16 * (1 - t * 0.81);
-          return center
-            .clone()
-            .addScaledVector(
-              flat,
-              side * (Math.sin(angle) * radius + 0.067 * Math.sin(Math.PI * t)),
-            )
-            .setY(center.y + 0.56 + Math.cos(angle) * radius * 1.55);
-        }),
-      );
-      g.add(new T.Mesh(new T.TubeGeometry(scroll, 16, 0.013, 5, false), m.black));
-    }
-    const rosette = new T.Mesh(new T.SphereGeometry(0.047, 8, 6), m.brass);
-    rosette.position.copy(center).add(new T.Vector3(0, 0.56, 0));
-    g.add(rosette);
-  }
-}
-
-function decorateGrandEntrance(stairs: T.Group, m: ShipMaterials) {
-  const well = DECK_OPENINGS[0];
-  const half = (well.w * W) / 2,
-    upper = (well.z - well.d / 2) * L,
-    lower = (well.z + well.d / 2) * L;
-  for (const side of [-1, 1]) {
-    const edge = side * (half + 0.055);
-    box(
-      stairs,
-      edge - side * 0.045,
-      -0.121,
-      (upper + lower) / 2,
-      0.11,
-      0.21,
-      lower - upper,
-      m.wood,
-      'grand-well-fascia',
-    );
-    grandBalustrade(
-      stairs,
-      new T.Vector3(edge, 0, upper + 0.12),
-      new T.Vector3(edge, 0, lower - 0.27),
-      m,
-      false,
-    );
-  }
-  // The clock is centred over the landing and fixed to the end bulkhead.
-  const wall = (-3 - 0.075) * L;
-  box(stairs, 0, 1.8, wall - 0.075, 2.34, 3.52, 0.15, m.wood, 'grand-clock-panel');
-  for (const side of [-1, 1]) {
-    box(stairs, side * 1.02, 1.81, wall - 0.19, 0.16, 3.35, 0.17, m.darkWood);
-    box(stairs, side * 1.02, 0.16, wall - 0.19, 0.25, 0.26, 0.21, m.wood);
-    box(stairs, side * 1.02, 3.41, wall - 0.19, 0.25, 0.19, 0.21, m.wood);
-    for (let i = 0; i < 4; i++) {
-      const accent = new T.Mesh(
-        new T.TorusGeometry(0.103 + i * 0.018, 0.012, 5, 14, Math.PI * 1.32),
-        m.brass,
-      );
-      accent.position.set(side * (0.54 + i * 0.09), 2.19 - i * 0.12, wall - 0.166);
-      accent.rotation.z = side * (i * 0.27);
-      stairs.add(accent);
-    }
-  }
-  box(stairs, 0, 3.53, wall - 0.19, 2.52, 0.15, 0.25, m.darkWood);
-  const clock = cyl(stairs, 0, 2.44, wall - 0.18, 0.42, 0.075, m.brass);
-  clock.rotation.x = Math.PI / 2;
-  const face = cyl(stairs, 0, 2.44, wall - 0.225, 0.359, 0.024, m.ivory);
-  face.rotation.x = Math.PI / 2;
-  for (let tick = 0; tick < 12; tick++) {
-    const angle = (tick * Math.PI) / 6;
-    const marker = box(
-      stairs,
-      Math.sin(angle) * 0.294,
-      2.44 + Math.cos(angle) * 0.294,
-      wall - 0.243,
-      0.022,
-      0.058,
-      0.008,
-      m.black,
-    );
-    marker.rotation.z = -angle;
-  }
-  bar(
-    stairs,
-    new T.Vector3(0, 2.44, wall - 0.26),
-    new T.Vector3(-0.178, 2.55, wall - 0.26),
-    0.014,
-    m.black,
-  );
-  bar(
-    stairs,
-    new T.Vector3(0, 2.44, wall - 0.26),
-    new T.Vector3(0.14, 2.22, wall - 0.26),
-    0.009,
-    m.black,
-  );
-  // The wall continues below deck behind the central landing.
-  const lowerDeck = LEVEL_Y[-2] * H;
-  box(stairs, 0, lowerDeck / 2, wall + 0.13, 2.25, -lowerDeck, 0.26, m.wood, 'grand-landing-panel');
-  for (const x of [-2.45, 2.45])
-    light(stairs, x, 2.35, wall - 0.37, 9, 0xffddad, new T.Vector3(x, 2.35, wall));
-}
-
 export function buildStairways(g: T.Group, m: ShipMaterials) {
   const root = metric(g);
-  root.name = 'v7-stairways';
+  root.name = 'companionways';
+  buildGrandStaircase(g, m);
   for (const station of STATIONS.filter((s) =>
-    [
-      'deck-passengers',
-      'deck-aft-passengers',
-      'deck-engine',
-      'deck-forecastle',
-      'deck-poop',
-    ].includes(s.id),
+    ['deck-aft-passengers', 'deck-engine', 'deck-forecastle', 'deck-poop'].includes(s.id),
   )) {
     const p = new T.Group();
     p.name = station.id + '-structure';
     root.add(p);
     const passenger = station.id.includes('passengers'),
       machinery = station.id === 'deck-engine';
-    const grand = station.id === 'deck-passengers';
     const stairWidth = passenger ? 2.45 : STAIR_WIDTH,
       paint = passenger ? m.darkWood : m.steel;
     const route = station.route!.map(point);
@@ -209,34 +64,7 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
       }
     }
 
-    if (grand) {
-      const [, , flightEnd, landing, wing, foot] = route;
-      const slabLength = landing.z - flightEnd.z;
-      const landingHeight = landing.y - LEVEL_Y[-2] * H;
-      box(
-        p,
-        0,
-        landing.y - landingHeight / 2,
-        flightEnd.z + slabLength / 2,
-        5.44,
-        landingHeight,
-        slabLength,
-        m.wood,
-        'grand-half-landing',
-      );
-      decorateGrandEntrance(p, m);
-      grandBalustrade(
-        p,
-        new T.Vector3(-1.15, landing.y, landing.z),
-        new T.Vector3(1.15, landing.y, landing.z),
-        m,
-        false,
-      );
-      // Both wings reach the lower deck. Descending players take the starboard wing.
-      route.splice(6, route.length - 6, wing.clone().setX(-wing.x), foot.clone().setX(-foot.x));
-    }
     const railPosts = new Set<string>();
-    const grandRunner = new T.MeshStandardMaterial({ color: 0x5a242c, roughness: 0.96 });
     // End decks already provide their landings. Only intermediate machinery
     // turns need new plates. Merge each U turn into one non-overlapping slab.
     if (machinery)
@@ -283,8 +111,7 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
         }
       }
     for (let i = 1; i < route.length; i++) {
-      if (grand && ![2, 5, 7].includes(i)) continue;
-      const width = grand ? (i === 2 ? 3.78 : 1.48) : stairWidth;
+      const width = stairWidth;
       const a = route[i - 1],
         b = route[i],
         rise = b.y - a.y,
@@ -302,34 +129,21 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
           const tread = box(
             p,
             c.x,
-            grand ? (top + LEVEL_Y[-2] * H) / 2 : top - 0.085,
+            top - 0.085,
             c.z,
             width,
-            grand ? top - LEVEL_Y[-2] * H : 0.17,
+            0.17,
             run / steps,
-            grand ? m.wood : paint,
+            paint,
             'stair-tread',
           );
           tread.rotation.y = -Math.atan2(b.x - a.x, b.z - a.z);
-          if (grand && i === 2)
-            box(
-              p,
-              c.x,
-              top + 0.009,
-              c.z,
-              2.24,
-              0.016,
-              run / steps - 0.01,
-              grandRunner,
-              'grand-stair-runner',
-            );
           const edge = c
             .clone()
             .addScaledVector(
               new T.Vector3(b.x - a.x, 0, b.z - a.z).normalize(),
               (-run / steps) * 0.46,
             );
-          if (grand) continue; // The closed oak treads provide the nosing.
           const nosing = box(
             p,
             edge.x,
@@ -347,11 +161,11 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
           const c = a
             .clone()
             .addScaledVector(normal, side)
-            .add(new T.Vector3(0, grand ? -0.105 : -0.2, 0));
+            .add(new T.Vector3(0, -0.2, 0));
           const d = b
             .clone()
             .addScaledVector(normal, side)
-            .add(new T.Vector3(0, grand ? -0.105 : -0.2, 0));
+            .add(new T.Vector3(0, -0.2, 0));
           const beam = box(
             p,
             (c.x + d.x) / 2,
@@ -359,8 +173,8 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
             (c.z + d.z) / 2,
             0.12,
             c.distanceTo(d),
-            grand ? 0.12 : 0.24,
-            grand ? m.wood : m.black,
+            0.24,
+            m.black,
             'stair-stringer',
           );
           beam.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.clone().sub(c).normalize());
@@ -403,18 +217,6 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
           0.032,
           passenger ? m.darkWood : m.steel,
         );
-        if (grand) {
-          const steps = Math.ceil(Math.abs(rise) / 0.175);
-          grandBalustrade(
-            p,
-            c,
-            d,
-            m,
-            true,
-            (t) => a.y + (rise * (Math.floor(t * steps) + 1)) / steps,
-          );
-          continue;
-        }
         const posts = Math.max(1, Math.ceil(c.distanceTo(d) / (passenger ? 0.4 : 2)));
         for (let n = 0; n <= posts; n++) {
           const v = c.clone().lerp(d, n / posts);
@@ -532,44 +334,10 @@ export function buildStairways(g: T.Group, m: ShipMaterials) {
     if (i === 6) plaque(root, 'BOAT DECK', doorX, y + 2.15, z0 + 0.09, 1.35);
   }
   plaque(root, 'ENGINE ROOM', doorX, 2.8, z0 - 0.09, 1.8);
-  // Passenger stair entrance is a complete house, with a small framed skylight.
-  const dome = metric(g, 0, 3.41, -4.65);
-  const glass = new T.Mesh(
-    new T.SphereGeometry(1.8, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2),
-    m.glass,
-  );
-  glass.scale.set(1, 0.67, 2.05);
-  glass.name = 'entrance-skylight';
-  dome.add(glass);
-  for (let i = 0; i < 48; i++) {
-    const a = (i / 48) * Math.PI * 2,
-      b = ((i + 1) / 48) * Math.PI * 2;
-    bar(
-      dome,
-      new T.Vector3(Math.cos(a) * 1.8, 0, Math.sin(a) * 3.69),
-      new T.Vector3(Math.cos(b) * 1.8, 0, Math.sin(b) * 3.69),
-      0.035,
-      m.brass,
-    );
-  }
-  for (let i = 0; i < 12; i++) {
-    const a = (i * Math.PI) / 6;
-    const path = new T.CatmullRomCurve3(
-      Array.from({ length: 13 }, (_, j) => {
-        const t = (j * Math.PI) / 24;
-        return new T.Vector3(
-          Math.cos(a) * 1.8 * Math.cos(t),
-          1.206 * Math.sin(t),
-          Math.sin(a) * 3.69 * Math.cos(t),
-        );
-      }),
-    );
-    dome.add(new T.Mesh(new T.TubeGeometry(path, 12, 0.018, 5, false), m.brass));
-  }
   for (const side of [-1, 1]) {
-    const entrance = metric(g, side * 3, 0, -5.325);
+    const entrance = metric(g, (side * GRAND_HALL.w) / 2, 0, GRAND_HALL_DOOR.z);
     entrance.rotation.y = (side * Math.PI) / 2;
-    plaque(entrance, 'FIRST CLASS ENTRANCE', 0, 2.75, 0.11, 2.2);
+    plaque(entrance, 'FIRST CLASS ENTRANCE', 0, 2.75, 0.112, 1.65);
     const aft = metric(g, side * 2.4, 0, 14.625);
     aft.rotation.y = (side * Math.PI) / 2;
     plaque(aft, 'AFT ENTRANCE', 0, 2.75, 0.11, 1.8);

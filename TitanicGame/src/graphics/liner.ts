@@ -1,7 +1,7 @@
 import { AFT_HATCH } from '../../shared/auxiliary-layout';
 import { light } from './building';
 import { buildLookout } from './lookout';
-import { SHAFT, MACHINERY_CEILING } from '../../shared/layout';
+import { SHAFT, MACHINERY_CEILING, GRAND_STAIR, GRAND_HALL } from '../../shared/layout';
 import { buildStairways, buildPassengerDetails } from './interiors';
 import * as T from 'three';
 import type { ShipMaterials } from './materials';
@@ -186,7 +186,8 @@ export function buildTallShell(g: T.Group, m: ShipMaterials) {
     [BOAT_DECK_BACK, -1],
   ]) {
     box(g, 0, -2.77, z + direction * 0.04, 19.6, 5.26, 0.08, m.ivory).name = 'closed-end-bulkhead';
-    box(g, 0, -0.07, z - direction * 0.026, 19.88, 0.14, 0.052, m.ivory).name = 'boat-deck-end-fascia';
+    box(g, 0, -0.07, z - direction * 0.026, 19.88, 0.14, 0.052, m.ivory).name =
+      'boat-deck-end-fascia';
     box(g, 0, LEVEL_Y[-2], z - direction * 0.025, 19.7, 0.09, 0.025, m.darkWood).name =
       'end-deck-band';
     for (const x of [-6, -4, -2, 0, 2, 4, 6]) {
@@ -234,9 +235,19 @@ export function buildDeckhouseRoofs(g: T.Group, m: ShipMaterials) {
   ];
   for (const house of houses) {
     const shape = house.shape;
-    if (house.z === -4.65) {
+    if (house.z === GRAND_HALL.z) {
       const skylight = new T.Path();
-      skylight.absellipse(0, house.z, 1.77 / W, 3.65 / L, 0, Math.PI * 2, true, 0);
+      const dome = GRAND_STAIR.dome;
+      skylight.absellipse(
+        0,
+        dome.z,
+        (dome.width - 0.025) / W,
+        (dome.length - 0.025) / L,
+        0,
+        Math.PI * 2,
+        true,
+        0,
+      );
       shape.holes.push(skylight);
     }
     for (const z of FUNNEL_POSITIONS)

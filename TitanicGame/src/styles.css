@@ -4356,3 +4356,22 @@ details.machine-panel > summary {
 .ship-menu .pause-keys {
   font-size: 11px;
 }
+.chart-v9 .chart-tools {
+  flex-wrap: wrap;
+}
+.chart-v9 .chart-tools button {
+  min-width: max-content;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.inspection-result {
+  align-self: center;
+  color: #c5ccbd;
+}
+.interaction-prompt .interaction-alternate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline-start: 10px;
+  border-inline-start: 1px solid var(--border);
+}

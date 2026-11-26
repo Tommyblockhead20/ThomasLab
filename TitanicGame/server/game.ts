@@ -162,6 +162,7 @@ export class Room {
   radioReplyAt: number | null = null;
   radioReadyAt = 0;
   chartMarks: ChartMark[] = [];
+  private chartAuthors = new Map<string, string>();
   command = { heading: 270, acknowledgedBy: null as string | null };
   crewSize = 1;
   mainResolved = false;
@@ -369,6 +370,7 @@ export class Room {
     this.highPowerSeconds = this.compassError = 0;
     this.radioReplyTo = null;
     this.chartMarks = [];
+    this.chartAuthors.clear();
     this.equipmentViews.clear();
     this.command = { heading: 270, acknowledgedBy: null };
     this.phase = 'voyage';
@@ -809,6 +811,7 @@ export class Room {
         break;
       case 'key':
         if (a.verb === 'take' && !this.cabinetOpen) {
+          if (p.inventory.includes('Cabinet key')) return;
           p.inventory.push('Cabinet key');
           p.notes.push('The cabinet key was on the ship.');
           return;
@@ -816,7 +819,8 @@ export class Room {
         break;
       case 'storage':
         if (a.verb === 'note') {
-          p.notes.push('Cabinet service record: the three dial shafts are coupled in a loop.');
+          const note = 'Cabinet service record: the three dial shafts are coupled in a loop.';
+          if (!p.notes.includes(note)) p.notes.push(note);
           return;
         }
         break;
@@ -992,20 +996,33 @@ export class Room {
           if (this.chartMarks.length >= 100)
             throw new GameError('Erase an old mark before adding another.');
           try {
+            const mark = readChartMark(a.value, this.ship);
+            const id = randomUUID();
             this.chartMarks.push({
-              ...readChartMark(a.value, this.ship),
-              id: randomUUID(),
+              ...mark,
+              id,
               by: p.name,
               at: Math.round(this.elapsed),
             });
+            this.chartAuthors.set(id, p.id);
           } catch (e) {
             throw new GameError((e as Error).message);
           }
           return;
         }
+        if (a.verb === 'undo') {
+          if (typeof a.value !== 'string' || this.chartAuthors.get(a.value) !== p.id)
+            throw new GameError('There is no mark of yours to undo.');
+          if (this.lastChartMark(p.id) !== a.value)
+            throw new GameError('The chart changed. Try Undo again.');
+          this.chartMarks = this.chartMarks.filter((mark) => mark.id !== a.value);
+          this.chartAuthors.delete(a.value);
+          return;
+        }
         if (a.verb === 'erase') {
           if (typeof a.value !== 'string') throw new GameError('Choose a mark.');
           this.chartMarks = this.chartMarks.filter((m) => m.id !== a.value);
+          this.chartAuthors.delete(a.value);
           return;
         }
         if (a.verb === 'deliver') {
@@ -1157,12 +1174,10 @@ export class Room {
         const length = Math.hypot(dx, dz);
         const approach =
           length > 0.01
-            ? [
-                [
-                  ((-dx / length) * 1.8) / SHIP_WIDTH_SCALE,
-                  ((-dz / length) * 1.8) / SHIP_LENGTH_SCALE,
-                ],
-              ]
+            ? [1.8, 0.9, 0.2].map((metres) => [
+                ((-dx / length) * metres) / SHIP_WIDTH_SCALE,
+                ((-dz / length) * metres) / SHIP_LENGTH_SCALE,
+              ])
             : [];
         const candidates = [
           ...(station.level === 1
@@ -1312,6 +1327,7 @@ export class Room {
     if (!demo || !this.practice) return;
     this.icebergs = [];
     this.chartMarks = [];
+    this.chartAuthors.clear();
     this.mainResolved = true;
     this.mainPassedAt = null;
     this.nextEvent = this.nextTelegram = Infinity;
@@ -2153,6 +2169,12 @@ export class Room {
     this.votes = {};
     this.electHost();
   }
+  private lastChartMark(playerId: string) {
+    for (let i = this.chartMarks.length - 1; i >= 0; i--) {
+      const mark = this.chartMarks[i];
+      if (this.chartAuthors.get(mark.id) === playerId) return mark.id;
+    }
+  }
   snapshot(id: string): Snapshot {
     const me = this.players.get(id)!;
     const nearWireless =
@@ -2188,6 +2210,7 @@ export class Room {
     });
     return {
       finishWest: this.finishWest,
+      chartUndoId: this.lastChartMark(id),
       wirelessWaiting: this.telegrams.filter((t) => !t.decoded).length,
       chartMarks: this.chartMarks.map((m) => ({ ...m, points: m.points.map((p) => ({ ...p })) })),
       command: { ...this.command },

@@ -15,7 +15,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   AudioLines,
-  BookOpen,
   Check,
   ChevronRight,
   CircleHelp,
@@ -27,7 +26,6 @@ import {
   FlaskConical,
   UserRound,
   Headphones,
-  KeyRound,
   LoaderCircle,
   LockKeyhole,
   Mic,
@@ -223,6 +221,10 @@ export default function App() {
           void run(() => network.action({ station: s.id, verb: 'board' }));
         } else if (s.kind === 'ladder') {
           void run(() => network.action({ station: s.id, verb: 'travel' }));
+        } else if (s.kind === 'key' || s.kind === 'storage') {
+          void run(() =>
+            network.action({ station: s.id, verb: s.kind === 'key' ? 'take' : 'note' }),
+          );
         } else if (s.machine) {
           void network
             .request('equipment:view', { station: s.id })
@@ -493,6 +495,12 @@ export default function App() {
     inGame = state && ['voyage', 'sinking', 'lifeboat', 'inquiry'].includes(state.phase),
     isHost = state?.host === state?.self.id;
   const actionPanel = modal === 'station' && station && state;
+  const atChart = nearest?.kind === 'chart' && !boilerPrompt;
+  const carryReport = atChart && state?.self.inventory.some((i) => i.startsWith('Telegram:'));
+  const keyTaken = nearest?.kind === 'key' && state?.self.inventory.includes('Cabinet key');
+  const cardRead =
+    nearest?.kind === 'storage' &&
+    state?.self.notes.some((note) => note.startsWith('Cabinet service record:'));
   void voiceTick;
   return (
     <>
@@ -517,7 +525,7 @@ export default function App() {
       {!state && (
         <main className="main-menu">
           <div className="menu-copy">
-            <p className="date-label">NORTH ATLANTIC · 14 APRIL 1912 · V18</p>
+            <p className="date-label">NORTH ATLANTIC · 14 APRIL 1912 · V20</p>
             <h1>
               TITANIC<span>THE CROSSING</span>
             </h1>
@@ -773,13 +781,28 @@ export default function App() {
               <div className={cn('crosshair', nearest && 'interactable')} />
               {locked && (nearest || boilerPrompt) && (
                 <div className="interaction-prompt">
-                  {(!boilerPrompt || boilerCanUse) && <kbd>E</kbd>}
+                  {(!boilerPrompt || boilerCanUse) && !keyTaken && !cardRead && <kbd>E</kbd>}
                   <div>
                     <b>
                       {boilerPrompt ||
-                        (nearest?.kind === 'boiler' ? 'Boiler guide · B' : nearest?.name)}
+                        (nearest?.kind === 'boiler'
+                          ? 'Boiler guide · B'
+                          : nearest?.kind === 'storage'
+                            ? cardRead
+                              ? 'Card copied to notes'
+                              : 'Read maintenance card'
+                            : nearest?.kind === 'key'
+                              ? keyTaken
+                                ? 'Cabinet key taken'
+                                : 'Take cabinet key'
+                              : nearest?.name)}
                     </b>
                   </div>
+                  {carryReport && (
+                    <span className="interaction-alternate">
+                      <kbd>F</kbd> File wireless reports
+                    </span>
+                  )}
                 </div>
               )}
               {locked && me?.level === -1 && me.z < -6 && (
@@ -1882,17 +1905,7 @@ function StationPanel({
               </p>
             </>
           )}
-          {s.kind === 'chart' && (
-            <>
-              {state.self.inventory.some((i) => i.startsWith('Telegram:')) && (
-                <Button onClick={() => void send('deliver')}>
-                  <Clipboard size={16} />
-                  File carried reports
-                </Button>
-              )}
-              <NavigationChart state={state} act={act} />
-            </>
-          )}
+          {s.kind === 'chart' && <NavigationChart state={state} act={act} />}
           {s.kind === 'phone' && <TelephonePanel state={state} station={s} act={act} />}
           {s.kind === 'wireless' && <WirelessPanel state={state} station={s} act={act} />}
           {s.kind === 'cabinet' && <Cabinet state={state} send={send} />}
@@ -1919,22 +1932,6 @@ function StationPanel({
               </Button>
             </>
           )}
-          {s.kind === 'key' && (
-            <>
-              <Button onClick={() => void send('take')}>
-                <KeyRound size={17} />
-                Take key
-              </Button>
-            </>
-          )}
-          {s.kind === 'storage' && (
-            <>
-              <Button onClick={() => void send('note')}>
-                <BookOpen size={17} />
-                Read maintenance card
-              </Button>
-            </>
-          )}
           {s.kind === 'bell' && (
             <>
               <ObservationPanel state={state} act={act} />
@@ -1949,25 +1946,27 @@ function StationPanel({
             </>
           )}
           {machine && (
-            <div className="machine-actions" aria-label="Equipment checks">
-              <Button
-                secondary
-                disabled={!!me.job || !!state.self.inspections?.[machine.id]}
-                onClick={() => void send('inspect')}
-              >
-                {state.self.inspections?.[machine.id] ?? 'Inspect · 5s'}
-              </Button>
-              <Button
-                secondary
-                disabled={!!me.job || (!machine.fault && machine.condition > 94)}
-                onClick={() => void send(machine.fault ? 'repair' : 'service')}
-              >
-                {machine.fault
-                  ? `Repair · ${workSeconds(state.self.role, 'repair')}s`
-                  : machine.condition > 94
-                    ? 'Service · not needed'
+            <div className="machine-actions">
+              {state.self.inspections?.[machine.id] ? (
+                <span className="inspection-result" role="status">
+                  {state.self.inspections[machine.id]}
+                </span>
+              ) : (
+                <Button secondary disabled={!!me.job} onClick={() => void send('inspect')}>
+                  Inspect · 5s
+                </Button>
+              )}
+              {(machine.fault || machine.condition <= 94) && (
+                <Button
+                  secondary
+                  disabled={!!me.job}
+                  onClick={() => void send(machine.fault ? 'repair' : 'service')}
+                >
+                  {machine.fault
+                    ? `Repair · ${workSeconds(state.self.role, 'repair')}s`
                     : `Service · ${serviceSeconds(state.self.role)}s`}
-              </Button>
+                </Button>
+              )}
             </div>
           )}
         </>

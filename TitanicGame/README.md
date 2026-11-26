@@ -1,4 +1,4 @@
-# Titanic: Altered History — v18
+# Titanic: Altered History — v20
 
 Take your watch aboard Titanic. Crew the bridge, tend the machinery and keep a lookout on the North Atlantic. Play with **4–10 friends**, or explore alone in Single player.
 
@@ -75,7 +75,7 @@ The Captain chooses speed and heading orders, watches schedule and coordinates t
 
 Below seven crew, coal consumption and ash/clinker accumulation run at 65% of normal; bad firing still reduces steam. With two operators, each primarily tends two banks. Engineers can service equipment below 94% condition (8 seconds, versus 20 for untrained shipmates), restoring condition without removing a fault. Repair is still required for faults. Two wireless desks support simultaneous work on different slips and record who transcribed them; the same slip cannot be assisted by two operators at once. Four-player wireless traffic is less frequent.
 
-The working chart defaults to **4.17 NM wide**, the distance covered in ten minutes at 25 knots, with equal nautical-mile spacing on both axes. Zoom and pan, find the ship, click an ice estimate, or drag an uncertain area, bearing or course line. Labels, sources, confidence and watch time remain attached to shared marks. Select a mark to move or erase it. Grid coordinates are NM west/north of the fictional departure datum; latitude/longitude are displayed for the cursor. Filing a report makes it available at the chart; **Plot reported area** is a deliberate crew action, not automatic truth. No real ice positions are drawn automatically.
+The chart spans the voyage from start to finish at a fixed scale. Click to mark ice or drag to draw a course. Undo removes your latest mark. Erase removes a selected ice mark or course from the shared chart. At the chart table, press **F** to file carried wireless reports and **E** to open the chart and plot them. The report area is an estimate. No real ice positions are drawn automatically.
 
 At the crow's nest, **L** opens the sighting log without turning away. Record a bearing, estimate a range (zero means unknown), compare successive observations and read them to the bridge by telephone. Observations stay in the lookout's own notebook until communicated. The chart supports plotting those bearings alongside older wireless areas.
 

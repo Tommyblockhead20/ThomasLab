@@ -177,6 +177,7 @@ export interface StartOptions {
 }
 export interface Snapshot {
   finishWest: number;
+  chartUndoId?: string;
   firingTools: Record<'coal' | 'slice' | 'rake', string | null>;
   wirelessWaiting: number;
   chartMarks: ChartMark[];

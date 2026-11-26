@@ -13,7 +13,7 @@ import { projectTrack } from '../shared/voyage';
 import { watchTime } from '../shared/radio';
 
 type Point = { west: number; north: number };
-type Tool = ChartMark['kind'] | 'view' | 'move';
+type Tool = ChartMark['kind'] | 'view' | 'move' | 'erase';
 export function NavigationChart({
   state,
   reports = state.delivered,
@@ -123,32 +123,60 @@ export function NavigationChart({
     <div className="navigation-chart chart-v9">
       <div className="chart-range">
         <span>{chartPosition(ship.west, ship.north)}</span>
-        <span>{nm(finishWest)} · Start to finish</span>
+        <span aria-live="polite">
+          {tool === 'erase'
+            ? 'Click a mark or course to erase it.'
+            : `${nm(finishWest)} · Start to finish`}
+        </span>
       </div>
       {act && (
         <div className="chart-tools" aria-label="Chart tools">
-          {(['view', 'ice', 'route'] as Tool[]).map((t) => (
-            <button key={t} className={tool === t ? 'selected' : ''} onClick={() => setTool(t)}>
-              {t === 'ice'
-                ? 'Mark ice'
-                : t === 'area'
-                  ? 'Uncertain area'
-                  : t === 'bearing'
-                    ? 'Bearing line'
-                    : t === 'route'
-                      ? 'Draw course'
-                      : 'View'}
+          {(
+            [
+              ['view', 'Select'],
+              ['ice', 'Mark ice'],
+              ['route', 'Draw course'],
+              ['erase', 'Erase'],
+            ] as const
+          ).map(([key, text]) => (
+            <button
+              key={key}
+              aria-pressed={tool === key}
+              className={tool === key ? 'selected' : ''}
+              onClick={() => {
+                setTool(key);
+                setSelected('');
+              }}
+            >
+              {text}
             </button>
           ))}
+          <button
+            disabled={!state.chartUndoId}
+            title="Remove your most recent mark"
+            onClick={() => {
+              setSelected('');
+              void send('undo', state.chartUndoId);
+            }}
+          >
+            Undo
+          </button>
         </div>
       )}
       <svg
         viewBox="0 0 600 280"
         role="img"
         aria-label="Shipmates’ chart with estimated ice positions and course lines"
-        style={{ touchAction: 'none', cursor: tool === 'view' ? 'default' : 'crosshair' }}
+        style={{
+          touchAction: 'none',
+          cursor: tool === 'view' ? 'default' : tool === 'erase' ? 'pointer' : 'crosshair',
+        }}
         onPointerDown={(e) => {
-          if (!act || tool === 'view') return;
+          if (!act) return;
+          if (tool === 'view' || tool === 'erase') {
+            setSelected('');
+            return;
+          }
           if (tool !== 'move') setSelected('');
           e.currentTarget.setPointerCapture(e.pointerId);
           drawing.current = true;
@@ -214,12 +242,32 @@ export function NavigationChart({
               strokeWidth={selected === m.id ? 3 : 1.5}
               strokeDasharray={m.confidence === 'low' ? '4 4' : undefined}
               fill="none"
+              pointerEvents={tool === 'view' || tool === 'erase' ? 'visiblePainted' : 'none'}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                setSelected(m.id);
+                if (tool === 'erase' && act) void send('erase', m.id);
+                else setSelected(m.id);
               }}
             >
+              {m.kind === 'ice' ? (
+                <circle
+                  cx={x(m.points[0])}
+                  cy={y(m.points[0])}
+                  r="10"
+                  fill="transparent"
+                  stroke="none"
+                />
+              ) : (
+                m.kind !== 'area' && (
+                  <path
+                    d={path(m.points)}
+                    stroke="transparent"
+                    strokeWidth="15"
+                    strokeDasharray="none"
+                  />
+                )
+              )}
               {m.kind === 'ice' ? (
                 <path d={`M${x(m.points[0]) - 5} ${y(m.points[0]) - 5}l10 10m-10 0l10 -10`} />
               ) : m.kind === 'area' ? (
@@ -439,7 +487,7 @@ export function NavigationChart({
                   setTool('ice');
                 }}
               >
-                Erase
+                Erase selected
               </button>
             </div>
           )}

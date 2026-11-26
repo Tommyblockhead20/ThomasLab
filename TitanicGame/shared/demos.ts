@@ -18,7 +18,7 @@ export const JOB_DEMOS = [
     station: 'chart',
     live: false,
     detail: 'Officer’s chart · decoded report in hand',
-    objective: 'File the report, then plot its uncertain area on the chart.',
+    objective: 'File the report at the chart table (F), then plot the ice (E).',
   },
   {
     id: 'lookout',

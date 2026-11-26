@@ -5,7 +5,13 @@ import { Room } from '../server/game';
 import { JOB_DEMOS, type DemoId } from '../shared/demos';
 import { NEST, lookoutSpawn, NEST_ENTRY, NEST_EXIT } from '../shared/lookout';
 import { canOccupy, STATIONS, distance, wallsBetween, travelPoint } from '../shared/world';
-import { BOAT_DECK_BACK, FUNNEL_POSITIONS, DECK_OPENINGS, passengerRoute } from '../shared/layout';
+import {
+  BOAT_DECK_BACK,
+  FUNNEL_POSITIONS,
+  DECK_OPENINGS,
+  GRAND_HALL_DOOR,
+  passengerRoute,
+} from '../shared/layout';
 import { navigationWarnings } from '../shared/voyage';
 import { buildStairways } from '../src/graphics/interiors';
 import { buildDeckhouseRoofs } from '../src/graphics/liner';
@@ -177,7 +183,7 @@ test('demos remain private to solo and explicit held clocks leave schedule and p
 test('passenger vestibule is separate from wireless, both sides connect outside, and the after deck has an entrance', () => {
   for (const side of [-1, 1]) {
     for (let x = side * 1.5; Math.abs(x) < 6.3; x += side * 0.1)
-      assert.ok(canOccupy({ x, z: -5.45, level: 0 }));
+      assert.ok(canOccupy({ x, z: GRAND_HALL_DOOR.z, level: 0 }));
     for (let x = side * 0.2; Math.abs(x) < 6.3; x += side * 0.1)
       assert.ok(canOccupy({ x, z: 14.5, level: 0 }));
   }
